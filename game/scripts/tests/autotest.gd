@@ -24,10 +24,17 @@ func _ready() -> void:
 			out_dir = a.get_slice("=", 1)
 	if OS.has_environment("DEEPVAULT_AUTOTEST"):
 		mode = OS.get_environment("DEEPVAULT_AUTOTEST")
+	var web_mode: String = main_web_mode()
+	if web_mode != "":
+		mode = web_mode
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	main = get_parent()
 	t0 = Time.get_ticks_msec()
 	_run.call_deferred()
+
+func main_web_mode() -> String:
+	var m = get_parent()
+	return m._web_autotest() if m and m.has_method("_web_autotest") else ""
 
 func check(name: String, ok: bool, detail := "") -> void:
 	results.append({"check": name, "ok": ok, "detail": detail})
@@ -134,6 +141,8 @@ func _run() -> void:
 	await wait(1.0)
 	if mode == "shots":
 		await _shots()
+	elif mode == "touch":
+		await _touch_test()
 	elif mode == "boss":
 		await _start()
 		god = true
@@ -338,6 +347,136 @@ func _boss_fight() -> void:
 	await wait(2.5)
 	await shot("14_warden_shattered")
 	check("boss_gate_reopens", world().boss_gate.is_open)
+
+# --- touch & trackpad -------------------------------------------------------
+## Simulated touches are given in game (canvas) units and converted to the
+## window pixels a real touchscreen reports; Godot scales them back.
+func to_win(p: Vector2) -> Vector2:
+	return get_viewport().get_final_transform() * p
+
+func touch_ev(idx: int, pos: Vector2, pressed: bool) -> void:
+	var e := InputEventScreenTouch.new()
+	e.index = idx; e.position = to_win(pos); e.pressed = pressed
+	Input.parse_input_event(e)
+	await frames(2)
+
+func drag_ev(idx: int, from: Vector2, to: Vector2, steps := 6) -> void:
+	for i in steps:
+		var e := InputEventScreenDrag.new()
+		e.index = idx
+		var a := from.lerp(to, float(i) / steps)
+		var b := from.lerp(to, float(i + 1) / steps)
+		e.position = to_win(b); e.relative = to_win(b) - to_win(a)
+		Input.parse_input_event(e)
+		await frames(1)
+
+func _touch_test() -> void:
+	await _start()
+	await tp(Vector3(0, 0.1, 26), 0.0)
+	var r := get_viewport().get_visible_rect().size
+	var tc: TouchControls = main.touch
+	# first touch reveals the overlay (no pointer lock)
+	await touch_ev(5, Vector2(r.x * 0.6, r.y * 0.3), true)
+	await touch_ev(5, Vector2(r.x * 0.6, r.y * 0.3), false)
+	check("touch_overlay_appears", tc.visible and Game.touch_active and player.mouse_captured and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED)
+	await shot("t0_touch_overlay")
+	# joystick: push up -> walk forward
+	var p0 := player.global_position
+	var c := Vector2(190, r.y - 190)
+	await touch_ev(0, c, true)
+	await drag_ev(0, c, c + Vector2(0, -80))
+	await wait(1.0)
+	await shot("t1_joystick")
+	await touch_ev(0, c + Vector2(0, -80), false)
+	var moved := p0.distance_to(player.global_position)
+	check("touch_joystick_moves", moved > 1.5, "moved %.2fm" % moved)
+	# swipe right side -> look
+	var y0 := player.yaw
+	var s := Vector2(r.x * 0.62, r.y * 0.45)
+	await touch_ev(1, s, true)
+	await drag_ev(1, s, s + Vector2(-160, 0))
+	await touch_ev(1, s + Vector2(-160, 0), false)
+	check("touch_swipe_looks", absf(player.yaw - y0) > 0.2, "yaw %.2f -> %.2f" % [y0, player.yaw])
+	# pinch in -> first person, pinch out -> third person
+	player.zoom_target = 4.0
+	var a0 := Vector2(r.x * 0.64, r.y * 0.4); var b0 := Vector2(r.x * 0.66, r.y * 0.4)
+	await touch_ev(2, a0, true); await touch_ev(3, b0, true)
+	for i in 8:
+		var e := InputEventScreenDrag.new(); e.index = 2
+		e.position = to_win(a0.lerp(Vector2(r.x * 0.5, r.y * 0.4), (i + 1) / 8.0)); e.relative = Vector2(-5, 0)
+		Input.parse_input_event(e)
+		var e2 := InputEventScreenDrag.new(); e2.index = 3
+		e2.position = to_win(b0.lerp(Vector2(r.x * 0.8, r.y * 0.4), (i + 1) / 8.0)); e2.relative = Vector2(5, 0)
+		Input.parse_input_event(e2)
+		await frames(1)
+	await touch_ev(2, a0, false); await touch_ev(3, b0, false)
+	await wait(0.6)
+	check("touch_pinch_to_first_person", player.first_person, "zoom %.2f" % player.zoom)
+	await shot("t2_pinch_first_person")
+	player.zoom_target = 3.6
+	await wait(0.6)
+	# attack button
+	var atk: Dictionary = tc._buttons[0]
+	var sw0 := player.swings
+	await touch_ev(4, atk.center, true)
+	await frames(3)
+	var swung := player.swings > sw0
+	await touch_ev(4, atk.center, false)
+	check("touch_attack_button", swung)
+	await wait(0.8)
+	# an emulated (touch-generated) mouse click must not attack
+	var sw1 := player.swings
+	var mb := InputEventMouseButton.new()
+	mb.button_index = MOUSE_BUTTON_LEFT; mb.pressed = true; mb.device = InputEvent.DEVICE_ID_EMULATION
+	mb.position = Vector2(r.x * 0.6, r.y * 0.5)
+	Input.parse_input_event(mb)
+	await frames(3)
+	var mb2 := mb.duplicate(); mb2.pressed = false
+	Input.parse_input_event(mb2)
+	await frames(3)
+	check("emulated_click_ignored", player.swings == sw1)
+	# pause button opens the menu, tapping Resume through the GUI closes it
+	var pz: Dictionary = tc._buttons[7]
+	await touch_ev(6, pz.center, true); await touch_ev(6, pz.center, false)
+	await wait(0.3)
+	check("touch_pause_button", main.menus.current == "pause", main.menus.current)
+	await shot("t3_pause_menu")
+	main._resume()
+	await wait(0.3)
+	# keyboard use hides the overlay; trackpad free-cursor fallback
+	var k := InputEventKey.new(); k.physical_keycode = KEY_W; k.keycode = KEY_W; k.pressed = true
+	Input.parse_input_event(k)
+	await frames(2)
+	var k2 := k.duplicate(); k2.pressed = false
+	Input.parse_input_event(k2)
+	await frames(2)
+	check("keyboard_hides_touch", not tc.visible and not Game.touch_active)
+	Game.free_cursor = true
+	player.set_mouse_captured(true)
+	await frames(2)
+	var y1 := player.yaw
+	var sw_drag := player.swings
+	var m := InputEventMouseButton.new(); m.button_index = MOUSE_BUTTON_LEFT; m.pressed = true; m.position = Vector2(400, 300)
+	Input.parse_input_event(m); await frames(2)
+	for i in 6:
+		var mm := InputEventMouseMotion.new(); mm.position = Vector2(400 + (i + 1) * 15, 300); mm.relative = Vector2(15, 0)
+		mm.button_mask = MOUSE_BUTTON_MASK_LEFT
+		Input.parse_input_event(mm); await frames(1)
+	var mu := m.duplicate(); mu.pressed = false; mu.position = Vector2(490, 300)
+	Input.parse_input_event(mu); await frames(3)
+	check("free_cursor_drag_looks", absf(player.yaw - y1) > 0.1 and player.swings == sw_drag, "yaw %.2f -> %.2f" % [y1, player.yaw])
+	await wait(0.8)
+	var sw2 := player.swings
+	var t := InputEventMouseButton.new(); t.button_index = MOUSE_BUTTON_LEFT; t.pressed = true; t.position = Vector2(500, 300)
+	Input.parse_input_event(t); await frames(2)
+	var tu := t.duplicate(); tu.pressed = false
+	Input.parse_input_event(tu); await frames(4)
+	check("free_cursor_tap_attacks", player.swings > sw2)
+	# arrow keys look
+	await wait(0.8)
+	var y2 := player.yaw
+	Input.action_press("look_left"); await wait(0.5); Input.action_release("look_left")
+	check("arrow_keys_look", player.yaw > y2 + 0.2, "yaw %.2f -> %.2f" % [y2, player.yaw])
 
 func world() -> VaultWorld:
 	return main.world

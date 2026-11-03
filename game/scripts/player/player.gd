@@ -55,6 +55,7 @@ var river_tick := 0.0
 var interact_target: Node = null
 var damage_taken := 0.0
 var bolts_fired := 0
+var swings := 0
 var _last_prompt := ""
 var bolt_scene_script := preload("res://scripts/player/projectile.gd")
 
@@ -120,24 +121,105 @@ func _on_inventory_changed() -> void:
 	_equipped_sig = _equip_signature()
 
 # ---------------------------------------------------------------------------
+signal focus_lost   # pointer lock was dropped by the OS / browser (e.g. Esc in Safari)
+
+var _had_lock := false
+var _lock_wait := -1.0
+var _press_down := false
+var _press_pos := Vector2.ZERO
+var _dragged := false
+
+## "Captured" means the player has gameplay focus. The OS pointer is only
+## locked when using mouse/trackpad and the platform allows it; touch play
+## and browsers without pointer lock keep a free cursor.
 func set_mouse_captured(c: bool) -> void:
 	mouse_captured = c
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if c else Input.MOUSE_MODE_VISIBLE
+	if c and not Game.touch_active and not Game.free_cursor:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		_lock_wait = 0.6
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_had_lock = false
+		_lock_wait = -1.0
+
+func _process(delta: float) -> void:
+	# detect a pointer lock that never took (browser) or was dropped
+	if _lock_wait >= 0.0:
+		_lock_wait -= delta
+		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			_had_lock = true
+			_lock_wait = -1.0
+		elif _lock_wait < 0.0 and mouse_captured and not Game.touch_active:
+			Game.free_cursor = true
+			Game.say("Pointer lock unavailable: drag to look, tap/click to attack.", Color(0.7, 0.8, 1.0))
+	elif _had_lock and mouse_captured and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		_had_lock = false
+		focus_lost.emit()
+
+func _look(rel: Vector2, mult := 1.0) -> void:
+	yaw -= rel.x * Game.mouse_sens * mult
+	pitch = clampf(pitch - rel.y * Game.mouse_sens * mult, -1.35, 1.25)
+
+func _tap_action(action: String) -> void:
+	Input.action_press(action)
+	get_tree().create_timer(0.06, true, true).timeout.connect(func() -> void: Input.action_release(action))
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not input_enabled:
 		return
-	if event is InputEventMouseMotion and mouse_captured:
-		yaw -= event.relative.x * Game.mouse_sens
-		pitch = clampf(pitch - event.relative.y * Game.mouse_sens, -1.35, 1.25)
-	elif event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+	# touchscreens also send emulated mouse events; the touch overlay handles touch
+	if (event is InputEventMouse) and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
+	if event is InputEventMouseMotion:
+		if mouse_captured and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			_look(event.relative)
+		elif mouse_captured and Game.free_cursor and _press_down:
+			_look(event.relative, 1.6)
+			if event.position.distance_to(_press_pos) > 10.0:
+				_dragged = true
+	elif event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_UP:
 			zoom_step(-1)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		elif mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			zoom_step(1)
-		elif not mouse_captured and event.button_index == MOUSE_BUTTON_LEFT:
-			set_mouse_captured(true)
-			get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_LEFT:
+			if mb.pressed:
+				var locked := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+				if not mouse_captured or (not Game.free_cursor and not Game.touch_active and not locked):
+					set_mouse_captured(true)
+					get_viewport().set_input_as_handled()
+					return
+				if Game.free_cursor:
+					_press_down = true; _dragged = false; _press_pos = mb.position
+				else:
+					Input.action_press("attack")
+			else:
+				if Game.free_cursor:
+					if _press_down and not _dragged:
+						_tap_action("attack")
+					_press_down = false
+				else:
+					Input.action_release("attack")
+		elif mb.button_index == MOUSE_BUTTON_RIGHT:
+			if mb.pressed:
+				Input.action_press("block")
+			else:
+				Input.action_release("block")
+	elif event is InputEventPanGesture:
+		# trackpad two-finger scroll on macOS / iPadOS
+		var pg := event as InputEventPanGesture
+		_pan_acc += pg.delta.y
+		while absf(_pan_acc) > 1.5:
+			zoom_step(1 if _pan_acc > 0 else -1)
+			_pan_acc -= signf(_pan_acc) * 1.5
+	elif event is InputEventMagnifyGesture:
+		var mg := event as InputEventMagnifyGesture
+		zoom_target = clampf(zoom_target / maxf(mg.factor, 0.01), 0.0, MAX_ZOOM)
+		if zoom_target < FP_THRESHOLD:
+			zoom_target = 0.0
+
+var _pan_acc := 0.0
 
 ## Mouse wheel: each notch moves the camera; zoom continues smoothly into the head.
 func zoom_step(dir: int) -> void:
@@ -164,6 +246,10 @@ func _physics_process(delta: float) -> void:
 			break
 	var dir := Vector3.ZERO
 	if input_enabled:
+		var lk := Input.get_vector("look_left", "look_right", "look_up", "look_down")
+		if lk.length() > 0.05:
+			yaw -= lk.x * 2.4 * delta
+			pitch = clampf(pitch - lk.y * 1.6 * delta, -1.35, 1.25)
 		_handle_actions()
 		var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 		dir = Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, yaw)
@@ -310,6 +396,7 @@ func _use_stamina(v: float) -> void:
 	stamina_delay = 0.7
 
 func _start_attack(kind: int) -> void:
+	swings += 1
 	combo = kind
 	attacking = true
 	attack_time = 0.0

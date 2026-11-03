@@ -9,6 +9,7 @@ var player: Player
 var hud: HUD
 var menus: Menus
 var menu_cam: Camera3D
+var touch: TouchControls
 var state := "title"
 var _orbit := 0.0
 var _death_timer := -1.0
@@ -45,6 +46,12 @@ func _ready() -> void:
 	menus.restart_requested.connect(_restart)
 	menus.quit_requested.connect(func() -> void: get_tree().quit())
 	Game.player_died.connect(func() -> void: _death_timer = 2.2)
+	touch = TouchControls.new()
+	add_child(touch)
+	touch.bind(player, self)
+	player.focus_lost.connect(func() -> void:
+		if state == "play" and menus.current == "":
+			_open("pause"))
 	menu_cam = Camera3D.new()
 	menu_cam.fov = 60
 	add_child(menu_cam)
@@ -56,9 +63,18 @@ func _ready() -> void:
 		_start_game()
 	else:
 		menus.show_panel("title")
-	if OS.get_cmdline_user_args().size() > 0 or OS.has_environment("DEEPVAULT_AUTOTEST"):
+	if OS.get_cmdline_user_args().size() > 0 or OS.has_environment("DEEPVAULT_AUTOTEST") or _web_autotest() != "":
 		var at := preload("res://scripts/tests/autotest.gd").new()
 		add_child(at)
+
+## Browser builds can run the test harness via the URL: index.html?autotest=shots
+static func _web_autotest() -> String:
+	if not OS.has_feature("web"):
+		return ""
+	var q = JavaScriptBridge.eval("window.location.search", true)
+	if typeof(q) == TYPE_STRING and String(q).contains("autotest="):
+		return String(q).get_slice("autotest=", 1).get_slice("&", 0)
+	return ""
 
 func _start_game() -> void:
 	menus.close_all()

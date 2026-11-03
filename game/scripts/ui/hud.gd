@@ -24,6 +24,7 @@ var _target_time := 0.0
 var _last_hp := -1.0
 var _hint_time := 0.0
 var _vig := 0.0
+var _prompt := ""
 
 func _ready() -> void:
 	layer = 5
@@ -136,7 +137,7 @@ func _ready() -> void:
 
 func bind_player(p: Player) -> void:
 	player = p
-	p.interact_target_changed.connect(func(t: String) -> void: prompt_label.text = t)
+	p.interact_target_changed.connect(func(t: String) -> void: _prompt = t)
 
 func set_target(n: Node) -> void:
 	if n == null or n.is_in_group("boss"):
@@ -202,6 +203,9 @@ func _process(delta: float) -> void:
 		target_box.visible = false
 	crosshair.visible = player.mouse_captured and (player.first_person or player.zoom < 2.5)
 	crosshair.queue_redraw()
+	prompt_label.text = _prompt.replace("[E]", "USE ▸") if Game.touch_active else _prompt
+	if Game.touch_active:
+		hint.text = "Left thumb: move (push fully to sprint) · Right side: swipe to look · Pinch: zoom 1st/3rd person · Buttons: attack, block, bolt, dodge, jump, use"
 	_hint_time += delta
 	hint.modulate.a = clampf(1.0 - (_hint_time - 40.0) / 3.0, 0.0, 1.0)
 	view_label.text = "First person" if player.first_person else "Third person  ·  zoom %.1fm" % player.zoom

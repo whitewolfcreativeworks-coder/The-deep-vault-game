@@ -80,6 +80,8 @@ var checkpoint_name := "the outpost"
 var objective := ""
 var in_game := false
 var mouse_sens := 0.0024
+var touch_active := false     # set by the touch overlay once the screen is touched
+var free_cursor := false      # pointer lock unavailable (e.g. some browsers): drag to look
 var game_over := false
 
 const BASE_HP := 100.0
@@ -192,8 +194,9 @@ func say(text: String, color := Color(0.92, 0.88, 0.80)) -> void:
 # ---------------------------------------------------------------------------
 func _register_inputs() -> void:
 	var keys := {
-		"move_forward": [KEY_W, KEY_UP], "move_back": [KEY_S, KEY_DOWN],
-		"move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT],
+		"move_forward": [KEY_W], "move_back": [KEY_S],
+		"move_left": [KEY_A], "move_right": [KEY_D],
+		"look_left": [KEY_LEFT], "look_right": [KEY_RIGHT], "look_up": [KEY_UP], "look_down": [KEY_DOWN],
 		"jump": [KEY_SPACE], "sprint": [KEY_SHIFT], "dodge": [KEY_C, KEY_ALT],
 		"interact": [KEY_E], "inventory": [KEY_I], "character": [KEY_TAB],
 		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1],
@@ -207,13 +210,11 @@ func _register_inputs() -> void:
 			var ev := InputEventKey.new()
 			ev.physical_keycode = k
 			InputMap.action_add_event(action, ev)
-	var mouse := {"attack": MOUSE_BUTTON_LEFT, "block": MOUSE_BUTTON_RIGHT}
-	for action in mouse:
+	# Mouse buttons are routed by the player script (so touch-emulated clicks
+	# can be ignored), which presses these actions itself.
+	for action in ["attack", "block"]:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
-		var mb := InputEventMouseButton.new()
-		mb.button_index = mouse[action]
-		InputMap.action_add_event(action, mb)
 	# Gamepad (basic): left stick move, A jump, X attack, LB block, RB spell, Y interact.
 	var pad_buttons := {"jump": JOY_BUTTON_A, "attack": JOY_BUTTON_X, "interact": JOY_BUTTON_Y,
 		"block": JOY_BUTTON_LEFT_SHOULDER, "spell": JOY_BUTTON_RIGHT_SHOULDER,
