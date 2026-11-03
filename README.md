@@ -46,7 +46,7 @@ A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without
 
 | Input | Action |
 |---|---|
-| WASD | Move |
+| WASD | Move. **Strafe movement by default**: your hero keeps facing where you look, sidestepping and backpedaling (switch to "Free" movement in the pause menu) |
 | Mouse (or arrow keys) | Look |
 | **Mouse wheel** | Zoom smoothly from wide third person into **first person** |
 | V | Snap between first and third person |

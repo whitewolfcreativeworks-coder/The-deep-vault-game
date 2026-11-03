@@ -128,3 +128,14 @@ Several later stages ran with the bot made invulnerable (`god` flag in `autotest
 The sandbox renders at about 7 fps, so these numbers can't capture the frame-rate-related part of the fix. Only a playtest will show it.
 
 **Not addressed yet:** per-hero spells and deeper combat, and an open-world direction. Both are proposed for the next session.
+
+**Second playtest note: moving one way while looking another felt glitchy.** In third person the character always turned to face its movement direction, so pulling the stick back spun it round to face the camera. Strafe movement is now the default:
+- The hero faces the camera direction and moves freely relative to it.
+- Sideways movement plays the sidestep (`Running_Strafe_Left/Right`) animations; backward movement plays `Walking_Backwards`.
+- Sidestepping is slightly slower than running forward (about 10%), and backpedaling slower still (about 28%).
+- "Free" movement (face where you run) is still available in the pause menu.
+
+New automated checks:
+- `strafe_right_faces_camera`
+- `backpedal_keeps_facing`
+- `move_and_look_no_flip`, which runs forward-left while swiping the view; the worst deviation between body and view was 0.00 rad.

@@ -276,6 +276,13 @@ func _physics_process(delta: float) -> void:
 	if sprinting:
 		Game.stamina = maxf(0.0, Game.stamina - 16.0 * delta)
 		stamina_delay = 0.5
+	# strafing: backpedal and sidestep a bit slower than running forward
+	var strafe := Game.strafe_mode or first_person
+	if strafe and dir.length() > 0.1:
+		var local_in := dir.rotated(Vector3.UP, -yaw)
+		var back := clampf(local_in.z, 0.0, 1.0)
+		var side := absf(local_in.x)
+		speed *= 1.0 - back * 0.28 - side * 0.1 * (1.0 - back)
 	var target_v := dir * speed
 	if dodging:
 		target_v = dodge_dir * 10.5 * (1.0 - dodge_time / 0.42 * 0.5)
@@ -291,13 +298,14 @@ func _physics_process(delta: float) -> void:
 	# facing
 	var want := facing
 	var hspeed := Vector2(velocity.x, velocity.z).length()
-	if first_person or attacking or blocking or casting:
-		want = yaw
+	if strafe or attacking or blocking or casting:
+		want = view_yaw    # face where the camera looks; movement is independent
 	elif dir.length() > 0.1:
 		want = atan2(-dir.x, -dir.z)
-	if dodging and not first_person:
+	if dodging and not strafe:
 		want = atan2(-dodge_dir.x, -dodge_dir.z)
-	facing = lerp_angle(facing, want, 1.0 - exp(-(18.0 if attacking else 12.0) * delta))
+	var turn := 22.0 if strafe else (18.0 if attacking else 12.0)
+	facing = lerp_angle(facing, want, 1.0 - exp(-turn * delta))
 	body.rotation.y = facing
 
 	# animation inputs
@@ -310,7 +318,8 @@ func _physics_process(delta: float) -> void:
 	var local_dodge := dodge_dir.rotated(Vector3.UP, -facing)
 	body.dodge_dir = Vector2(local_dodge.x, local_dodge.z)
 	var local_v := Vector3(velocity.x, 0, velocity.z).rotated(Vector3.UP, -facing)
-	body.backwards = first_person and local_v.z > 0.5
+	body.local_move = Vector2(local_v.x, local_v.z)
+	body.backwards = local_v.z > 0.5 and local_v.z > absf(local_v.x)
 	body.cast_t = cast_time / 0.45 if casting else -1.0
 	body.dodge_t = dodge_time / 0.42 if dodging else -1.0
 	body.hurt_t = hurt_time / 0.3 if hurt_time >= 0.0 else -1.0

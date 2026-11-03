@@ -371,6 +371,15 @@ func drag_ev(idx: int, from: Vector2, to: Vector2, steps := 6) -> void:
 		Input.parse_input_event(e)
 		await frames(1)
 
+func _stick_hold(c: Vector2, off: Vector2, sec: float) -> void:
+	await touch_ev(0, c, true)
+	await drag_ev(0, c, c + off)
+	await wait(sec)
+
+func _stick_release(at: Vector2) -> void:
+	await touch_ev(0, at, false)
+	await wait(0.3)
+
 func _touch_test() -> void:
 	await _start()
 	await tp(Vector3(0, 0.1, 26), 0.0)
@@ -406,6 +415,35 @@ func _touch_test() -> void:
 	await touch_ev(0, c + Vector2(0, -80), false)
 	var moved := p0.distance_to(player.global_position)
 	check("touch_joystick_moves", moved > 1.5, "moved %.2fm" % moved)
+	# strafing: stick right / back / diagonal while the view stays put or swings
+	await tp(Vector3(2, 0.1, 10), 0.0)
+	await _stick_hold(c, Vector2(85, 0), 1.2)
+	var fr := absf(angle_difference(player.facing, player.view_yaw))
+	var clip_r: String = player.body.anim.current_animation
+	var lr := (player.global_position - Vector3(2, 0.1, 10)).rotated(Vector3.UP, -player.yaw)
+	await _stick_release(c + Vector2(85, 0))
+	check("strafe_right_faces_camera", fr < 0.25 and lr.x > 1.0 and clip_r.contains("Strafe_Right"), "facing off by %.2f rad, moved %.1fm right, clip %s" % [fr, lr.x, clip_r])
+	await shot("t1b_strafe")
+	await tp(Vector3(2, 0.1, 10), 0.0)
+	await _stick_hold(c, Vector2(0, 85), 1.2)
+	var fb := absf(angle_difference(player.facing, player.view_yaw))
+	var clip_b: String = player.body.anim.current_animation
+	var lb := (player.global_position - Vector3(2, 0.1, 10)).rotated(Vector3.UP, -player.yaw)
+	await _stick_release(c + Vector2(0, 85))
+	check("backpedal_keeps_facing", fb < 0.25 and lb.z > 1.0 and clip_b.contains("Backwards"), "facing off by %.2f rad, moved %.1fm back, clip %s" % [fb, lb.z, clip_b])
+	# run forward-left while swiping the view to the right: body must follow the view, never flip
+	await tp(Vector3(2, 0.1, 10), 0.0)
+	await touch_ev(0, c, true)
+	await drag_ev(0, c, c + Vector2(-60, -60))
+	var worst := 0.0
+	var sw := Vector2(r.x * 0.65, r.y * 0.45)
+	await touch_ev(1, sw, true)
+	for i in 10:
+		await drag_ev(1, sw + Vector2(i * 14, 0), sw + Vector2((i + 1) * 14, 0), 1)
+		worst = maxf(worst, absf(angle_difference(player.facing, player.view_yaw)))
+	await touch_ev(1, sw + Vector2(140, 0), false)
+	await touch_ev(0, c + Vector2(-60, -60), false)
+	check("move_and_look_no_flip", worst < 0.6, "worst facing vs view %.2f rad" % worst)
 	# swipe right side -> look
 	var y0 := player.yaw
 	var s := Vector2(r.x * 0.62, r.y * 0.45)

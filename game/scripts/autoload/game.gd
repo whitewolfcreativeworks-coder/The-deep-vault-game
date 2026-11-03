@@ -80,6 +80,7 @@ var checkpoint_name := "the outpost"
 var objective := ""
 var in_game := false
 var mouse_sens := 0.0024
+var strafe_mode := true      # character faces the camera direction; move any way (sidestep/backpedal)
 var touch_active := false     # set by the touch overlay once the screen is touched
 var free_cursor := false      # pointer lock unavailable (e.g. some browsers): drag to look
 var game_over := false

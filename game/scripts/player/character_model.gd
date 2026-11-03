@@ -17,6 +17,7 @@ var dodge_dir := Vector2(0, -1)   # local x/z of the roll direction
 var hurt_t := -1.0
 var dead := false
 var backwards := false
+var local_move := Vector2.ZERO   # velocity in the body frame: x = right, y = back (m/s)
 
 var model: Node3D
 var anim: AnimationPlayer
@@ -133,6 +134,8 @@ func _setup_anims() -> void:
 		"idle": "Idle_Combat" if sk and anim.has_animation("Idle_Combat") else "Idle",
 		"walk": "Walking_D_Skeletons" if sk and anim.has_animation("Walking_D_Skeletons") else "Walking_A",
 		"back": "Walking_Backwards",
+		"strafe_l": "Running_Strafe_Left",
+		"strafe_r": "Running_Strafe_Right",
 		"run": "Running_A",
 		"jump": "Jump_Idle",
 		"block": "Blocking",
@@ -147,7 +150,11 @@ func _setup_anims() -> void:
 		"spawn": "Skeletons_Awaken_Floor" if anim.has_animation("Skeletons_Awaken_Floor") else "Lie_StandUp",
 		"taunt": "Taunt" if anim.has_animation("Taunt") else "Cheer",
 	}
-	for role in ["idle", "walk", "back", "run", "jump", "block"]:
+	# skeleton rigs lack a few clips; fall back gracefully
+	for role in ["strafe_l", "strafe_r"]:
+		if not anim.has_animation(anims[role]):
+			anims[role] = anims.walk
+	for role in ["idle", "walk", "back", "run", "jump", "block", "strafe_l", "strafe_r"]:
 		var a := anim.get_animation(anims[role])
 		if a:
 			a.loop_mode = Animation.LOOP_LINEAR
@@ -205,10 +212,15 @@ func _process(delta: float) -> void:
 		_play(anims.block, 0.12)
 	elif not grounded:
 		_play(anims.jump, 0.2)
+	elif move_speed > 0.4 and absf(local_move.x) > absf(local_move.y) * 1.1 and absf(local_move.x) > 0.6:
+		# sidestep: strafe clip, playback speed matched to ground speed
+		_play(anims.strafe_r if local_move.x > 0.0 else anims.strafe_l, 0.18, clampf(move_speed / 5.0, 0.55, 1.3))
+	elif move_speed > 0.4 and backwards:
+		_play(anims.back, 0.18, clampf(move_speed / 2.6, 0.6, 1.6))
 	elif move_speed > 5.0:
 		_play(anims.run, 0.2, clampf(move_speed / 6.5, 0.8, 1.3))
 	elif move_speed > 0.4:
-		_play(anims.back if backwards else anims.walk, 0.2, clampf(move_speed / 3.2, 0.6, 1.5))
+		_play(anims.walk, 0.2, clampf(move_speed / 3.2, 0.6, 1.5))
 	else:
 		_play(anims.idle, 0.25)
 
