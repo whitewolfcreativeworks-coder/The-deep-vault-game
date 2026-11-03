@@ -55,7 +55,7 @@
     },
     {
       "check": "player_took_damage",
-      "detail": "9 damage taken",
+      "detail": "11 damage taken",
       "ok": true
     },
     {
@@ -70,7 +70,7 @@
     },
     {
       "check": "fire_trap_damage",
-      "detail": "hp 118 -> 88",
+      "detail": "hp 103 -> 73",
       "ok": true
     },
     {
@@ -100,7 +100,7 @@
     },
     {
       "check": "river_burns",
-      "detail": "hp 130 -> 106 in_river=true",
+      "detail": "hp 130 -> 112 in_river=true",
       "ok": true
     },
     {
@@ -130,12 +130,12 @@
     },
     {
       "check": "boss_defeated",
-      "detail": "after 8s, phase 3, player took 237 damage",
+      "detail": "after 31s of game time, phase 3, player took 294 damage",
       "ok": true
     },
     {
       "check": "boss_dealt_damage",
-      "detail": "237",
+      "detail": "294",
       "ok": true
     },
     {
@@ -149,6 +149,6 @@
       "ok": true
     }
   ],
-  "seconds": 1017.718,
+  "seconds": 1056.088,
   "total": 29
 }

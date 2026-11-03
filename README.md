@@ -6,7 +6,7 @@ Descend from a ruined outpost at dusk into the Vault of Ashkar. Fight risen skel
 
 ## Play it
 
-**Download a build** from the repository's **Releases** page (Windows, Linux and macOS). If no release has been published yet, run it from source as below.
+**Download a build** from the [`builds` branch](https://github.com/whitewolfcreativeworks-coder/The-deep-vault-game/tree/builds): Windows, macOS (Apple Silicon and Intel) and Linux zips, with run instructions in that branch's README. Only the Linux build has actually been launched and tested so far.
 
 **Run from source (any OS):**
 

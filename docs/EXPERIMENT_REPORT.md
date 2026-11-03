@@ -2,6 +2,8 @@
 
 *Written by Claude (Opus 5.5) at the end of the session. It is meant to be candid about what worked, what didn't, and what was actually verified.*
 
+**Headline:** in about 1.5 hours of wall-clock time, starting from an empty repo, the environment produced a complete, exportable dungeon crawl (an estimated 15–25 minutes for a human player; not yet timed) with a boss and a victory screen. It passes a 29-check automated playthrough. A human still needs to play it on real hardware.
+
 ## Timeline (Nov 2, 2026, Pacific time)
 
 | Time | Event |
@@ -11,8 +13,18 @@
 | ~17:00 | Godot 4.5.1 downloaded and verified to render. Software Vulkan installed so Forward+ (volumetric fog) could be screenshot-tested. Export templates downloaded in the background. |
 | ~17:05 | Asset-scout agent dispatched while the core code was written. It reported back with CC0 KayKit packs and Poly Haven textures. |
 | ~17:15 | Compared KayKit rigs against the procedural humans in rendered lineups, then switched characters to KayKit. |
-| ~17:30 | First full launch. The automated playthrough reached the river chamber on its first run. |
-| later | See "Iteration log" below. |
+| ~17:30 | First full launch: 18 checks passed through the armory on the first try, with no crashes. |
+| 17:30–18:05 | Three test-and-fix rounds (see below). Run 2 scored 23/28, run 3 scored **29/29**. |
+| 18:10–18:20 | Exported Windows, Linux and macOS builds. Pruned unused assets so every build fits under GitHub's 100 MB file limit. Tested the exported Linux build, captured a screenshot tour of every area, and published. |
+
+### Iteration log (bugs the automated tests caught)
+- The HUD vignette read an unset shader uniform, which produced 207 runtime errors per run. Fixed.
+- **River damage flag:** four river segments each overwrote the player's "in river" flag, so wading never registered. Fixed by having the player query every river.
+- **Chest loot:** it spawned behind wall-facing chests, so the armor upgrade could not be collected. It now pops out toward the player.
+- **Spell test:** the cast was blocked by a still-running sword combo. That is correct game behaviour; the test was fixed.
+- **Lighting:** screenshots showed the entry hall and armory nearly black, so ambient and torch light were raised. The river's glow fog washed out the screen while wading, so its density was reduced.
+- **Boss:** the first version died in about 15 seconds to the bot, so HP went from 760 to 1700 and it gained 20% damage reduction. It now lasts about 31–33 seconds of game time against a relentless, invulnerable bot, which takes 294–381 damage (roughly twice its maximum HP).
+- **macOS export:** it needed ETC2/ASTC texture import enabled, and was 100.7 MB. Removing 160 unused props brought it to 90.5 MB.
 
 ## Environment findings
 
@@ -55,7 +67,25 @@
 
 See the results table below, filled in from `tools/run_tests.sh flow`. It is a scripted playthrough that drives the game through real input actions: WASD and jump; mouse-wheel events for zoom; attack, spell and interact actions.
 
-*(Filled in after the final run.)*
+**Final run: 29/29 checks passed with 0 script errors** (`docs/test_results_flow.json`), and the **exported Linux build passed the 5/5 boss scenario** (`docs/test_results_exported_linux_boss.json`).
+
+| Verified automatically | Evidence |
+|---|---|
+| Project imports; main scene launches; title and character creator render | screenshots `01`, `02` |
+| WASD movement, sprint, jump | `movement_wasd` 4.4 m, `jump` +1.0 m |
+| **Mouse-wheel zoom into first person and back out to third** | `camera_first_person` zoom 0.00, `camera_third_person` zoom 5.36, screenshots |
+| Inscriptions, chests, loot pickup, potions, gold | `interact_inscription`, `chest_loot_pickup` |
+| Skeletons rise from the floor; melee combat kills; XP; level-up | `skeletons_awaken`, `melee_combat_kills` 3, `level_up` → 2 |
+| Enemies damage the player (no god mode in the first fights) | `player_took_damage` |
+| Arcane bolt | `spell_cast` |
+| Fire vents hurt; lever opens the gate and disables the vents | `fire_trap_damage` 118→88, `lever_opens_gate` |
+| Armory cleared, including the Revenant; sword and armor upgrades auto-equip | `armory_cleared_incl_revenant`, `weapon_upgrade_equipped`, `armor_upgrade_equipped` |
+| The river burns without the amulet and heals with it | `river_burns` 130→106, `amulet_river_heals` 73→88 |
+| Boss wakes, seals the gate, fights (phase 3 reached), dies, reopens the gate | `boss_*` checks, screenshots `10`, `11` |
+| Claiming the Heart triggers the victory screen | `victory`, screenshot `12` |
+| Exported Linux binary runs the boss fight | separate run on `builds/linux` |
+
+Several later stages ran with the bot made invulnerable (`god` flag in `autotest.gd`) so a single run could reach the end. Those checks prove the mechanics work; they say nothing about difficulty. Death and respawn are implemented, but **no automated test covers them**.
 
 ## What could not be verified
 
