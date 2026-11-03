@@ -1,12 +1,12 @@
-# The Deep Vault — playable builds
+# Bobek's Adventure — playable builds
 
-Built from `main` at commit 4e8233c with Godot 4.5.1 on Nov 2, 2026.
+Built from `main` at commit fcc7cfd with Godot 4.5.1 on Nov 2, 2026.
 
 | File | Platform | How to run |
 |---|---|---|
-| `TheDeepVault-Windows.zip` | Windows 10/11 x64 | Unzip, keep `TheDeepVault.exe` and `TheDeepVault.pck` together, run the .exe. Windows SmartScreen may warn about an unknown publisher: *More info → Run anyway*. |
-| `TheDeepVault-macOS.zip` | macOS 11+ (Apple Silicon & Intel) | Unzip, then **right-click → Open** the app the first time (it is unsigned). |
-| `TheDeepVault-Linux.zip` | Linux x86_64 | Unzip, `chmod +x TheDeepVault.x86_64`, run it (keep the .pck beside it). |
+| `BobeksAdventure-Windows.zip` | Windows 10/11 x64 | Unzip, keep `BobeksAdventure.exe` and `BobeksAdventure.pck` together, run the .exe. Windows SmartScreen may warn about an unknown publisher: *More info → Run anyway*. |
+| `BobeksAdventure-macOS.zip` | macOS 11+ (Apple Silicon & Intel) | Unzip, then **right-click → Open** the app the first time (it is unsigned). |
+| `BobeksAdventure-Linux.zip` | Linux x86_64 | Unzip, `chmod +x BobeksAdventure.x86_64`, run it (keep the .pck beside it). |
 
 To download: click a file above → **Download raw file** (or "View raw").
 **iPad / browser:** play at https://whitewolfcreativeworks-coder.github.io/The-deep-vault-game/ (web build on the `gh-pages` branch).
