@@ -137,7 +137,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_splash_cd -= delta
 	var inside: bool = contains(_player.global_position) and _player.get("dead") != true
-	var protected: bool = Game.equipped.artifact == "amulet_deep"
+	var protected: bool = Game.has_special("river")
 	var hspeed: float = Vector2(_player.velocity.x, _player.velocity.z).length() if "velocity" in _player else 0.0
 	_ripple = lerpf(_ripple, (1.0 if inside else 0.0) * clampf(0.35 + hspeed / 5.0, 0.0, 1.2), 1.0 - exp(-4.0 * delta))
 	_corrupt = lerpf(_corrupt, 1.0 if (inside and protected) else 0.0, 1.0 - exp(-1.5 * delta))

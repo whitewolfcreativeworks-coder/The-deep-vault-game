@@ -49,27 +49,44 @@ const OUTFITS := [
 ]
 
 # --- Items ------------------------------------------------------------------
+## Hand-made unique items. Random loot (scripts/autoload/loot.gd) is generated at
+## runtime; every item, unique or random, lives in `items` under its id.
 const ITEMS := {
-	"rusty_sword": {"name": "Rusted Shortsword", "slot": "weapon", "damage": 0, "desc": "Pitted, but it still holds an edge.", "color": Color(0.55, 0.45, 0.38)},
-	"knight_sword": {"name": "Knight's Longsword", "slot": "weapon", "damage": 9, "desc": "Balanced steel bearing a forgotten order's crest.", "color": Color(0.82, 0.84, 0.88)},
-	"vault_blade": {"name": "Runeblade of Ashkar", "slot": "weapon", "damage": 18, "desc": "Blue runes crawl along the fuller. It hums near the river.", "color": Color(0.45, 0.85, 1.0)},
-	"traveler_garb": {"name": "Traveler's Garb", "slot": "armor", "defense": 2, "desc": "Wool and leather. Better than nothing.", "color": Color(0.45, 0.35, 0.25)},
-	"chainmail": {"name": "Vault Guard Hauberk", "slot": "armor", "defense": 10, "desc": "Riveted rings, cold and heavy.", "color": Color(0.60, 0.62, 0.66)},
-	"warden_plate": {"name": "Wardenforged Plate", "slot": "armor", "defense": 20, "desc": "Plate cut from the Warden's own stone-steel.", "color": Color(0.35, 0.55, 0.65)},
-	"amulet_deep": {"name": "Amulet of the Deep", "slot": "artifact", "desc": "While worn, the Vault's river mends rather than burns. +30 max mana.", "color": Color(0.3, 0.9, 1.0)},
-	"heart_vault": {"name": "Heart of the Vault", "slot": "quest", "desc": "The sealed heart of Ashkar. Warm, and beating.", "color": Color(1.0, 0.75, 0.35)},
+	"rusty_sword": {"name": "Rusted Shortsword", "slot": "weapon", "rarity": 0, "model": "skel_blade", "damage": 0.0, "desc": "Pitted, but it still holds an edge."},
+	"vault_blade": {"name": "Runeblade of Ashkar", "slot": "weapon", "rarity": 4, "model": "vault_blade", "damage": 22.0, "spell": 30.0, "crit": 8.0, "desc": "Blue runes crawl along the fuller. It hums near the river."},
+	"traveler_garb": {"name": "Traveler's Garb", "slot": "armor", "rarity": 0, "shield": "shield_round", "defense": 2.0, "desc": "Wool and leather. Better than nothing."},
+	"amulet_deep": {"name": "Amulet of the Deep", "slot": "artifact", "rarity": 3, "mana": 30.0, "regen": 1.0, "special": "river", "desc": "While worn, the Vault's river mends rather than burns."},
+	"heart_vault": {"name": "Heart of the Vault", "slot": "quest", "rarity": 4, "desc": "The sealed heart of Ashkar. Warm, and beating."},
 }
+const SLOTS := ["weapon", "armor", "artifact", "skin"]
+const SLOT_NAMES := {"weapon": "Weapon", "armor": "Armor", "artifact": "Trinket", "skin": "Skin", "quest": "Quest"}
+const BAG_SIZE := 24
+var items := {}
+
+func item(uid: String) -> Dictionary:
+	if uid == "":
+		return {}
+	return items.get(uid, {})
+
+func _reset_items() -> void:
+	items.clear()
+	for k in ITEMS:
+		var it: Dictionary = ITEMS[k].duplicate(true)
+		it["uid"] = k
+		it["color"] = Loot.rarity_color(it.rarity)
+		items[k] = it
 
 # --- Stats ------------------------------------------------------------------
 var level := 1
 var xp := 0
 var gold := 0
-var potions := 2
+var potions := 3          # healing draughts
+var mana_potions := 2
 var hp := 100.0
 var mana := 60.0
 var stamina := 100.0
 var inventory: Array[String] = ["rusty_sword", "traveler_garb"]
-var equipped := {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": ""}
+var equipped := {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
 var kills := 0
 var play_time := 0.0
 var flags := {}  # world state that survives respawn: "chest_x_opened", "enemy_x_dead", "gate_x_open"...
@@ -92,6 +109,7 @@ const BASE_MANA := 60.0
 
 func _init() -> void:
 	_register_inputs()
+	_reset_items()
 
 func _process(delta: float) -> void:
 	if in_game and not get_tree().paused:
@@ -102,25 +120,48 @@ func _process(delta: float) -> void:
 static func is_compat() -> bool:
 	return RenderingServer.get_current_rendering_method() == "gl_compatibility"
 
+## Sum of one bonus across everything you wear.
+func gear(key: String) -> float:
+	var t := 0.0
+	for slot in SLOTS:
+		t += float(item(equipped.get(slot, "")).get(key, 0.0))
+	return t
+
 func max_hp() -> float:
-	return BASE_HP + (level - 1) * 18.0
+	return BASE_HP + (level - 1) * 18.0 + gear("hp")
 
 func max_mana() -> float:
-	return BASE_MANA + (level - 1) * 8.0 + (30.0 if equipped.artifact == "amulet_deep" else 0.0)
+	return BASE_MANA + (level - 1) * 8.0 + gear("mana")
+
+func mana_regen() -> float:
+	return 6.0 + gear("regen")
 
 func max_stamina() -> float:
 	return 100.0 + (level - 1) * 5.0
 
 func attack_damage() -> float:
-	var w: Dictionary = ITEMS.get(equipped.weapon, {})
-	return BASE_DAMAGE + (level - 1) * 3.5 + float(w.get("damage", 0))
+	return BASE_DAMAGE + (level - 1) * 3.5 + gear("damage")
 
 func spell_damage() -> float:
-	return 22.0 + (level - 1) * 6.0
+	return (24.0 + (level - 1) * 6.5) * (1.0 + gear("spell") / 100.0)
+
+func spell_power() -> float:
+	return gear("spell")
+
+func crit_chance() -> float:
+	return 0.10 + gear("crit") / 100.0
+
+func lifesteal() -> float:
+	return gear("lifesteal") / 100.0
 
 func defense() -> float:
-	var a: Dictionary = ITEMS.get(equipped.armor, {})
-	return float(a.get("defense", 0)) + (level - 1) * 1.0
+	return gear("defense") + (level - 1) * 1.0
+
+func has_special(tag: String) -> bool:
+	for slot in SLOTS:
+		if item(equipped.get(slot, "")).get("special", "") == tag:
+			return true
+	return false
 
 func xp_to_next() -> int:
 	return int(round(80.0 * pow(level, 1.45)))
@@ -131,9 +172,10 @@ func mitigate(raw: float) -> float:
 
 # ---------------------------------------------------------------------------
 func reset_run() -> void:
-	level = 1; xp = 0; gold = 0; potions = 2; kills = 0; play_time = 0.0
+	level = 1; xp = 0; gold = 0; potions = 3; mana_potions = 2; kills = 0; play_time = 0.0
+	_reset_items()
 	inventory = ["rusty_sword", "traveler_garb"]
-	equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": ""}
+	equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
 	flags = {}
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
 	game_over = false
@@ -155,34 +197,97 @@ func add_gold(amount: int) -> void:
 	message.emit("+%d gold" % amount, Color(1.0, 0.82, 0.3))
 	stats_changed.emit()
 
+signal loot_found(uid: String)
+
 func add_item(id: String, auto_equip := true) -> void:
+	var it := item(id)
+	if it.is_empty():
+		return
 	if not inventory.has(id):
 		inventory.append(id)
-	var it: Dictionary = ITEMS[id]
-	message.emit("Found: %s" % it.name, it.color)
-	if auto_equip and it.slot in ["weapon", "armor", "artifact"]:
+	var r: int = it.get("rarity", 0)
+	var tag := "" if r == 0 else "[%s] " % Loot.RARITY_NAMES[r].to_upper()
+	message.emit("Found: %s%s" % [tag, it.name], it.color)
+	loot_found.emit(id)
+	if auto_equip and it.slot in SLOTS:
 		var cur: String = equipped[it.slot]
-		if cur == "" or _item_score(id) > _item_score(cur):
+		var better := cur == "" or score(id) > score(cur)
+		if it.slot == "artifact" and item(cur).get("special", "") == "river" and it.get("special", "") != "river":
+			better = false   # never swap away the river amulet automatically
+		if it.get("special", "") == "river":
+			better = true
+		if it.slot == "skin":
+			better = cur == ""   # your first skin goes on straight away; later ones wait in the bag
+		if better:
 			equip(id)
+		elif it.slot != "quest":
+			message.emit("  (in your bag: press I to compare)", Color(0.7, 0.7, 0.7))
+	_trim_bag()
 	inventory_changed.emit()
 
-func _item_score(id: String) -> float:
-	var it: Dictionary = ITEMS.get(id, {})
-	return float(it.get("damage", 0)) + float(it.get("defense", 0)) + (1.0 if it.slot == "artifact" else 0.0)
+## Rough worth of an item for automatic upgrades and comparisons.
+func score(uid: String) -> float:
+	var it := item(uid)
+	return float(it.get("damage", 0)) + float(it.get("defense", 0)) * 1.1 + float(it.get("hp", 0)) * 0.15 \
+		+ float(it.get("mana", 0)) * 0.12 + float(it.get("regen", 0)) * 1.5 + float(it.get("crit", 0)) * 0.9 \
+		+ float(it.get("lifesteal", 0)) * 1.4 + float(it.get("spell", 0)) * 0.18 + float(it.get("rarity", 0)) * 0.5
 
 func equip(id: String) -> void:
-	var it: Dictionary = ITEMS[id]
-	if not it.slot in ["weapon", "armor", "artifact"]:
+	var it := item(id)
+	if it.is_empty() or not it.slot in SLOTS:
 		return
 	equipped[it.slot] = id
+	hp = minf(hp, max_hp())
 	mana = minf(mana, max_mana())
 	message.emit("Equipped %s" % it.name, it.color)
 	inventory_changed.emit(); stats_changed.emit()
 
+func unequip(slot: String) -> void:
+	if slot in ["artifact", "skin"]:
+		equipped[slot] = ""
+		hp = minf(hp, max_hp()); mana = minf(mana, max_mana())
+		inventory_changed.emit(); stats_changed.emit()
+
 func unequip_artifact() -> void:
-	equipped.artifact = ""
-	mana = minf(mana, max_mana())
+	unequip("artifact")
+
+func salvage(id: String) -> void:
+	var it := item(id)
+	if it.is_empty() or equipped.values().has(id) or it.slot == "quest" or ITEMS.has(id):
+		return
+	inventory.erase(id)
+	var g := Loot.salvage_value(it)
+	gold += g
+	message.emit("Salvaged %s for %d gold" % [it.name, g], Color(1.0, 0.82, 0.3))
 	inventory_changed.emit(); stats_changed.emit()
+
+## Keep the bag tidy: when full, the least valuable unequipped item becomes gold.
+func _trim_bag() -> void:
+	while inventory.size() > BAG_SIZE:
+		var worst := ""
+		var ws := INF
+		for id in inventory:
+			if equipped.values().has(id) or ITEMS.has(id):
+				continue
+			var sc := score(id)
+			if sc < ws:
+				ws = sc; worst = id
+		if worst == "":
+			return
+		salvage(worst)
+
+func item_lines(uid: String) -> PackedStringArray:
+	var it := item(uid)
+	var out := PackedStringArray()
+	if it.has("damage") and float(it.damage) > 0: out.append("+%d attack" % int(it.damage))
+	if it.has("defense") and float(it.defense) > 0: out.append("+%d defense" % int(it.defense))
+	for k in ["hp", "mana", "regen", "crit", "lifesteal", "spell"]:
+		if float(it.get(k, 0)) > 0:
+			var a: Array = Loot.AFFIXES[k]
+			out.append(("+%.1f%% %s" if a[3] else "+%.0f %s") % [float(it[k]), a[0]] if k != "regen" else "+%.1f %s" % [float(it[k]), a[0]])
+	if it.get("special", "") == "river":
+		out.append("river heals you")
+	return out
 
 func set_objective(text: String) -> void:
 	objective = text
@@ -205,7 +310,7 @@ func _register_inputs() -> void:
 		"look_left": [KEY_LEFT], "look_right": [KEY_RIGHT], "look_up": [KEY_UP], "look_down": [KEY_DOWN],
 		"jump": [KEY_SPACE], "sprint": [KEY_SHIFT], "dodge": [KEY_C, KEY_ALT],
 		"interact": [KEY_E], "inventory": [KEY_I], "character": [KEY_TAB],
-		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1],
+		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1], "mana_potion": [KEY_F, KEY_2],
 		"zoom_in_key": [KEY_EQUAL, KEY_KP_ADD], "zoom_out_key": [KEY_MINUS, KEY_KP_SUBTRACT],
 		"toggle_view": [KEY_V],
 	}
@@ -225,7 +330,7 @@ func _register_inputs() -> void:
 	var pad_buttons := {"jump": JOY_BUTTON_A, "attack": JOY_BUTTON_X, "interact": JOY_BUTTON_Y,
 		"block": JOY_BUTTON_LEFT_SHOULDER, "spell": JOY_BUTTON_RIGHT_SHOULDER,
 		"dodge": JOY_BUTTON_B, "pause": JOY_BUTTON_START, "inventory": JOY_BUTTON_BACK,
-		"potion": JOY_BUTTON_DPAD_UP}
+		"potion": JOY_BUTTON_DPAD_UP, "mana_potion": JOY_BUTTON_DPAD_DOWN}
 	for action in pad_buttons:
 		var jb := InputEventJoypadButton.new()
 		jb.button_index = pad_buttons[action]

@@ -113,7 +113,7 @@ func _ready() -> void:
 		crosshair.draw_arc(Vector2.ZERO, 9.0, 0, TAU, 24, Color(1, 1, 1, 0.25), 1.5))
 	root.add_child(crosshair)
 
-	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack · RMB block · Q arcane bolt\nSpace jump · Shift sprint · C dodge · E interact · R potion · I inventory · Tab character · Esc menu", 15, UIKit.DIM)
+	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · Esc menu", 15, UIKit.DIM)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	hint.position = Vector2(-600, -70); hint.size = Vector2(1200, 50)
@@ -179,7 +179,7 @@ func _process(delta: float) -> void:
 	mp_bar.max_value = Game.max_mana(); mp_bar.value = Game.mana
 	st_bar.max_value = Game.max_stamina(); st_bar.value = Game.stamina
 	xp_bar.max_value = Game.xp_to_next(); xp_bar.value = Game.xp
-	potion_label.text = "Draughts: %d  [R]" % Game.potions
+	potion_label.text = ("Heal %d   Mana %d" if Game.touch_active else "Heal %d [R]   Mana %d [F]") % [Game.potions, Game.mana_potions]
 	gold_label.text = "Gold: %d" % Game.gold
 	# damage / low-health vignette
 	var vm := vignette.material as ShaderMaterial
@@ -189,7 +189,7 @@ func _process(delta: float) -> void:
 	var low := clampf(1.0 - Game.hp / (Game.max_hp() * 0.3), 0.0, 1.0) * (0.35 + 0.15 * sin(Time.get_ticks_msec() * 0.006))
 	_vig = maxf(low, _vig - delta * 2.5)
 	vm.set_shader_parameter("amount", _vig)
-	if player.in_river and Game.equipped.artifact != "amulet_deep":
+	if player.in_river and not Game.has_special("river"):
 		vm.set_shader_parameter("tint", Color(0.1, 0.5, 0.8, 1))
 	else:
 		vm.set_shader_parameter("tint", Color(0.6, 0.0, 0.0, 1))
@@ -205,7 +205,7 @@ func _process(delta: float) -> void:
 	crosshair.queue_redraw()
 	prompt_label.text = _prompt.replace("[E]", "USE ▸") if Game.touch_active else _prompt
 	if Game.touch_active:
-		hint.text = "Left thumb: move (push fully to sprint) · Right side: swipe to look · Pinch: zoom 1st/3rd person · Buttons: attack, block, bolt, dodge, jump, use"
+		hint.text = "Left thumb: move (push fully to sprint) · Right side: swipe to look · Pinch: zoom 1st/3rd person · Sword hits recharge mana"
 	_hint_time += delta
 	hint.modulate.a = clampf(1.0 - (_hint_time - 40.0) / 3.0, 0.0, 1.0)
 	view_label.text = "First person" if player.first_person else "Third person  ·  zoom %.1fm" % player.zoom

@@ -6,6 +6,7 @@
 - **Balance.**
   - Enemy and boss numbers were tuned against a scripted bot that attacks relentlessly. The early rooms were played by the bot *without* invulnerability and it took very little damage, so the first half may be too easy.
   - The Warden was made much tougher (1700 HP, 20% damage reduction) after the bot killed the first version in about 15 seconds.
+  - Boss difficulty is now tested with a no-cheat bot (see the experiment report). The Runeblade of Ashkar is still a guaranteed Legendary in its chest, which makes every geared run similar in attack power.
   - Expect to want to tweak these values: they live in the `TYPES` table in `scripts/enemies/enemy.gd` and at the top of `scripts/enemies/warden.gd`.
 - **Windows and macOS builds** were exported but never launched. The macOS build is unsigned, so the first launch needs right-click → Open.
 - **Gamepad** bindings exist but are untested.

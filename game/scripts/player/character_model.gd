@@ -65,7 +65,18 @@ const WEAPON_SCENES := {
 	"skel_blade": "res://assets/kaykit/items/Skeleton_Blade.gltf",
 	"skel_axe": "res://assets/kaykit/items/Skeleton_Axe.gltf",
 	"skel_staff": "res://assets/kaykit/items/Skeleton_Staff.gltf",
+	"sword_1handed": "res://assets/kaykit/items/sword_1handed.gltf",
+	"sword_2handed_color": "res://assets/kaykit/items/sword_2handed_color.gltf",
 }
+## How each skin changes the body: albedo multiply, metal/rough, emission, alpha.
+const SKIN_LOOKS := {
+	"lizard": {"albedo": Color(0.55, 1.0, 0.45), "rough": 0.45, "emit": Color(0.03, 0.14, 0.02)},
+	"frost": {"albedo": Color(0.72, 0.9, 1.0), "rough": 0.25, "metal": 0.2, "emit": Color(0.1, 0.25, 0.45)},
+	"gold": {"albedo": Color(1.0, 0.85, 0.4), "rough": 0.3, "metal": 0.55, "emit": Color(0.42, 0.3, 0.06)},
+	"spectral": {"albedo": Color(0.55, 0.88, 1.0, 0.42), "rough": 0.3, "emit": Color(0.25, 0.6, 0.9), "alpha": true},
+	"ember": {"albedo": Color(1.0, 0.55, 0.4), "rough": 0.6, "emit": Color(0.9, 0.28, 0.05)},
+}
+var _aura: Node3D
 
 ## cfg: {kind:"hero", hero:"Knight", cape_color:Color, show_hat:bool, weapon:id, shield:id|""}
 ##      {kind:"skeleton", variant:"minion", weapon:"skel_blade", shield:"Skeleton_Shield_Small_A", eye:Color}
@@ -74,6 +85,12 @@ func setup(cfg: Dictionary) -> void:
 		c.queue_free()
 	head_meshes.clear(); all_meshes.clear()
 	kind = cfg.get("kind", "hero")
+	var skin: String = cfg.get("skin", "")
+	if skin == "bone":
+		kind = "skeleton"
+		cfg = cfg.duplicate()
+		cfg["variant"] = "warrior"
+		cfg["eye"] = Color(0.4, 1.0, 0.8)
 	var path: String
 	var hero: Dictionary = {}
 	if kind == "hero":
@@ -118,11 +135,81 @@ func setup(cfg: Dictionary) -> void:
 				em.emission_enabled = true; em.emission = cfg.eye; em.emission_energy_multiplier = 6.0
 				m.material_override = em
 	_setup_anims()
-	set_weapon(cfg.get("weapon", ""))
+	if cfg.has("tint") and SKIN_LOOKS.get(skin, {}).is_empty():
+		for m in all_meshes:
+			if not String(m.name).contains("Cape") and not String(m.name).contains("Eyes"):
+				_mul(m, Color.WHITE.lerp(cfg.tint, 0.45))
+	if SKIN_LOOKS.has(skin):
+		for m in all_meshes:
+			if String(m.name).contains("Eyes"):
+				continue
+			_skin_mat(m, SKIN_LOOKS[skin], String(m.name).contains("Cape"))
+	var weapon = cfg.get("weapon", "")
+	set_weapon(weapon)
 	set_offhand(cfg.get("shield", ""))
+	if cfg.has("aura"):
+		_add_aura(cfg.aura, int(cfg.get("aura_level", 3)), skin == "ember")
+	elif skin == "ember":
+		_add_aura(Color(1.0, 0.45, 0.15), 2, true)
 	_base_scale = float(cfg.get("scale", 0.84))
 	scale = Vector3.ONE * _base_scale
 	_play(anims.idle, 0.0)
+
+## Multiply a mesh's colours (keeps its texture).
+func _mul(m: MeshInstance3D, c: Color) -> void:
+	for s in m.mesh.get_surface_count():
+		var base := m.get_active_material(s)
+		if base is StandardMaterial3D:
+			var d := (base as StandardMaterial3D).duplicate() as StandardMaterial3D
+			d.albedo_color = d.albedo_color * c
+			m.set_surface_override_material(s, d)
+
+func _skin_mat(m: MeshInstance3D, look: Dictionary, is_cape: bool) -> void:
+	for s in m.mesh.get_surface_count():
+		var base := m.get_active_material(s)
+		if not base is StandardMaterial3D:
+			continue
+		var d := (base as StandardMaterial3D).duplicate() as StandardMaterial3D
+		var c: Color = look.albedo
+		d.albedo_color = Color(d.albedo_color.r * c.r, d.albedo_color.g * c.g, d.albedo_color.b * c.b, c.a)
+		d.roughness = look.get("rough", d.roughness)
+		d.metallic = look.get("metal", d.metallic)
+		var e: Color = look.get("emit", Color.BLACK)
+		if e.get_luminance() > 0.0:
+			d.emission_enabled = true
+			d.emission = e * (0.6 if is_cape else 1.0)
+			d.emission_energy_multiplier = 1.2
+		if look.get("alpha", false):
+			d.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			d.cull_mode = BaseMaterial3D.CULL_BACK
+		m.set_surface_override_material(s, d)
+
+## Glowing ring and motes around the feet for epic / legendary gear (and embers).
+func _add_aura(c: Color, level: int, embers := false) -> void:
+	_aura = Node3D.new()
+	add_child(_aura)
+	var p := CPUParticles3D.new()
+	p.amount = 22 if level < 4 else 40
+	p.lifetime = 1.6
+	p.mesh = FX.quad(0.08 if not embers else 0.06)
+	p.material_override = FX.glow_material(c, 2.2)
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	p.emission_ring_axis = Vector3.UP
+	p.emission_ring_radius = 0.55
+	p.emission_ring_inner_radius = 0.35
+	p.emission_ring_height = 0.05
+	p.direction = Vector3.UP
+	p.spread = 15.0
+	p.initial_velocity_min = 0.4; p.initial_velocity_max = 1.2 if not embers else 2.0
+	p.gravity = Vector3(0, 0.4, 0)
+	p.color_ramp = FX._fade_ramp(c)
+	p.position.y = 0.05
+	_aura.add_child(p)
+	if level >= 4 or embers:
+		var l := OmniLight3D.new()
+		l.light_color = c; l.light_energy = 0.7; l.omni_range = 3.0
+		l.position.y = 1.0
+		_aura.add_child(l)
 
 func _tint(m: MeshInstance3D, c: Color) -> void:
 	for s in m.get_surface_override_material_count():
@@ -228,10 +315,18 @@ func _attach(bone: String) -> BoneAttachment3D:
 	skel.add_child(ba)
 	return ba
 
+## `id` is a model key ("skel_axe") or an item id from Game.items; items glow by rarity.
 func set_weapon(id: String) -> void:
 	if weapon_root:
 		weapon_root.queue_free()
 		weapon_root = null
+	var glow := Color.BLACK
+	var it: Dictionary = Game.item(id) if not WEAPON_SCENES.has(id) or Game.items.has(id) else {}
+	if not it.is_empty():
+		var r: int = it.get("rarity", 0)
+		if r >= 2 and id != "vault_blade":
+			glow = Loot.rarity_color(r)
+		id = it.get("model", id) if id != "vault_blade" else id
 	if id == "" or not WEAPON_SCENES.has(id):
 		return
 	weapon_root = _attach("handslot.r")
@@ -239,6 +334,15 @@ func set_weapon(id: String) -> void:
 	weapon_root.add_child(w)
 	for mi in w.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = flash_mat
+		if glow != Color.BLACK:
+			for si in (mi as MeshInstance3D).mesh.get_surface_count():
+				var bm := (mi as MeshInstance3D).get_active_material(si)
+				if bm is StandardMaterial3D:
+					var gm := (bm as StandardMaterial3D).duplicate() as StandardMaterial3D
+					gm.emission_enabled = true
+					gm.emission = glow
+					gm.emission_energy_multiplier = 0.9 + 0.5 * float(it.rarity - 2)
+					(mi as MeshInstance3D).set_surface_override_material(si, gm)
 		if id == "vault_blade":
 			var g := StandardMaterial3D.new()
 			g.albedo_color = Color(0.45, 0.85, 1.0, 1)

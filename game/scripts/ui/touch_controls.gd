@@ -51,7 +51,8 @@ func _layout() -> void:
 		{"name": "dodge", "action": "dodge", "label": "DODGE", "center": Vector2(w - 178, h - 398), "radius": 63.0, "hold": false},
 		{"name": "jump", "action": "jump", "label": "JUMP", "center": Vector2(w - 70, h - 318), "radius": 56.0, "hold": false},
 		{"name": "interact", "action": "interact", "label": "USE", "center": Vector2(w - 572, h - 100), "radius": 57.0, "hold": false},
-		{"name": "potion", "action": "potion", "label": "POTION", "center": Vector2(w - 560, h - 250), "radius": 49.0, "hold": false},
+		{"name": "potion", "action": "potion", "label": "HEAL", "center": Vector2(w - 560, h - 250), "radius": 49.0, "hold": false},
+		{"name": "mana", "action": "mana_potion", "label": "MANA", "center": Vector2(w - 700, h - 175), "radius": 49.0, "hold": false},
 		{"name": "pause", "action": "pause", "label": "II", "center": Vector2(w - 62, 66), "radius": 42.0, "hold": false},
 		{"name": "inventory", "action": "inventory", "label": "BAG", "center": Vector2(w - 164, 66), "radius": 42.0, "hold": false},
 		{"name": "view", "action": "toggle_view", "label": "VIEW", "center": Vector2(w - 266, 66), "radius": 42.0, "hold": false},
@@ -238,9 +239,18 @@ func _draw_pad() -> void:
 		var held: bool = _held.has(b.name)
 		var interact_ready: bool = b.name == "interact" and player != null and player.interact_target != null
 		var fill := Color(0.08, 0.07, 0.07, 0.45 if not held else 0.75)
+		if b.name == "potion":
+			fill = Color(0.35, 0.05, 0.07, 0.5 if Game.potions > 0 else 0.2)
+		elif b.name == "mana":
+			fill = Color(0.06, 0.12, 0.38, 0.5 if Game.mana_potions > 0 else 0.2)
 		if interact_ready:
 			fill = Color(0.45, 0.33, 0.12, 0.7)
 		pad.draw_circle(b.center, b.radius, fill)
 		pad.draw_arc(b.center, b.radius, 0, TAU, 40, gold if not held else UIKit.GOLD, 3.0 if not held else 4.0)
 		var fs := 20 if b.radius > 60 else (17 if b.radius > 45 else 15)
-		pad.draw_string(_font, b.center + Vector2(-b.radius, fs * 0.35), b.label, HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, fs, Color(1, 0.95, 0.85, 0.9))
+		var label: String = b.label
+		if b.name == "potion":
+			label = "HEAL %d" % Game.potions
+		elif b.name == "mana":
+			label = "MANA %d" % Game.mana_potions
+		pad.draw_string(_font, b.center + Vector2(-b.radius, fs * 0.35), label, HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, fs, Color(1, 0.95, 0.85, 0.9))

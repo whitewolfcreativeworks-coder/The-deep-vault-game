@@ -63,6 +63,9 @@ var river_tick := 0.0
 var interact_target: Node = null
 var damage_taken := 0.0
 var bolts_fired := 0
+var melee_mana_gained := 0.0
+var potions_used := 0
+var mana_potions_used := 0
 var swings := 0
 var _last_prompt := ""
 var bolt_scene_script := preload("res://scripts/player/projectile.gd")
@@ -100,32 +103,41 @@ func _ready() -> void:
 
 func rebuild_body() -> void:
 	var p := Game.profile
+	var weapon := Game.item(Game.equipped.weapon)
+	var armor := Game.item(Game.equipped.armor)
+	var skin := Game.item(Game.equipped.skin)
 	var cfg := {
 		"kind": "hero", "hero": p.hero, "show_hat": p.show_hat,
-		"weapon": Game.equipped.weapon, "shield": _shield_for_armor(), "scale": 0.84,
+		"weapon": Game.equipped.weapon, "shield": armor.get("shield", "shield_round"), "scale": 0.84,
+		"skin": skin.get("skin", ""),
 	}
+	if armor.has("tint") and int(armor.get("rarity", 0)) >= 1:
+		cfg["tint"] = armor.tint
 	if p.cape > 0:
 		cfg["cape_color"] = Game.CAPE_COLORS[p.cape]
+	# epic / legendary gear gives a glowing aura in its rarity colour
+	var best := maxi(int(weapon.get("rarity", 0)), int(armor.get("rarity", 0)))
+	if best >= 3:
+		cfg["aura"] = Loot.rarity_color(best)
+		cfg["aura_level"] = best
 	body.setup(cfg)
 	body.set_head_visible(not _head_hidden)
 	_equipped_sig = _equip_signature()
 
-func _shield_for_armor() -> String:
-	match Game.equipped.armor:
-		"chainmail": return "shield_badge_color"
-		"warden_plate": return "shield_square_color"
-	return "shield_round"
-
 var _equipped_sig := ""
 func _equip_signature() -> String:
-	return "%s|%s" % [Game.equipped.weapon, Game.equipped.armor]
+	return "%s|%s|%s" % [Game.equipped.weapon, Game.equipped.armor, Game.equipped.skin]
 
 func _on_inventory_changed() -> void:
 	if _equip_signature() == _equipped_sig:
 		return
-	body.set_weapon(Game.equipped.weapon)
-	body.set_offhand(_shield_for_armor())
-	_equipped_sig = _equip_signature()
+	var first := _equipped_sig == ""
+	rebuild_body()
+	if not first and is_inside_tree():
+		# a little celebration when your look changes
+		FX.burst(global_position + Vector3(0, 1.0, 0), Color(1.0, 0.9, 0.6), 30, 2.5, 0.14, 0.8, 1.0)
+		body.flash(Color(1, 1, 0.8), 0.6)
+		Sfx.play("pickup", -6.0, 0.0)
 
 # ---------------------------------------------------------------------------
 signal focus_lost   # pointer lock was dropped by the OS / browser (e.g. Esc in Safari)
@@ -369,7 +381,7 @@ func _update_timers(delta: float) -> void:
 	stamina_delay -= delta
 	if stamina_delay <= 0.0 and not blocking:
 		Game.stamina = minf(Game.max_stamina(), Game.stamina + 30.0 * delta)
-	Game.mana = minf(Game.max_mana(), Game.mana + 3.0 * delta)
+	Game.mana = minf(Game.max_mana(), Game.mana + Game.mana_regen() * delta)
 	if attacking:
 		attack_time += delta
 		if not hit_done and attack_time / attack_dur >= 0.42:
@@ -423,6 +435,8 @@ func _handle_actions() -> void:
 			Sfx.play("spell", -6.0)
 		else:
 			Game.say("Not enough mana.", Color(0.6, 0.7, 1.0))
+	if Input.is_action_just_pressed("mana_potion"):
+		drink_mana_potion()
 	if Input.is_action_just_pressed("potion"):
 		drink_potion()
 	if Input.is_action_just_pressed("interact") and interact_target and is_instance_valid(interact_target):
@@ -451,8 +465,9 @@ func _start_attack(kind: int) -> void:
 func _melee_hit() -> void:
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
 	var origin := global_position + Vector3(0, 1.0, 0)
-	var reach := 2.5 + (0.3 if Game.equipped.weapon != "rusty_sword" else 0.0)
+	var reach := 2.5 + (0.3 if Game.equipped.weapon != "rusty_sword" else 0.0) + (0.25 if Game.item(Game.equipped.weapon).get("model", "") in ["sword_2handed_color", "skel_staff", "vault_blade"] else 0.0)
 	var hit_any := false
+	var dealt := 0.0
 	for e in get_tree().get_nodes_in_group("damageable"):
 		if not is_instance_valid(e) or e == self or not e.has_method("take_damage"):
 			continue
@@ -468,12 +483,19 @@ func _melee_hit() -> void:
 		if ang < 0.25 and dist > 0.6:
 			continue
 		var dmg := Game.attack_damage() * (1.6 if combo == 2 else 1.0) * randf_range(0.9, 1.1)
-		var crit := randf() < 0.12
+		var crit := randf() < Game.crit_chance()
 		if crit:
 			dmg *= 1.75
 		e.take_damage(dmg, global_position, 5.0 if combo == 2 else 2.5, crit)
 		hit_any = true
+		dealt += dmg
 	if hit_any:
+		# sword hits charge your mana: cast, melee to recharge, cast again
+		var gain := 7.0 if combo < 2 else 11.0
+		Game.mana = minf(Game.max_mana(), Game.mana + gain)
+		melee_mana_gained += gain
+		if Game.lifesteal() > 0.0:
+			heal(dealt * Game.lifesteal())
 		add_trauma(0.18 if combo < 2 else 0.32)
 		_hitstop(0.05 if combo < 2 else 0.08)
 
@@ -500,7 +522,11 @@ func _fire_bolt() -> void:
 		b.position = camera.global_position + fwd * 0.8 + Vector3(0, -0.15, 0)
 	get_tree().current_scene.add_child(b)
 	bolts_fired += 1
-	b.launch(fwd, "player", Game.spell_damage(), Color(0.45, 0.7, 1.0), 24.0)
+	# spell power makes bolts bigger and hotter
+	var sp := Game.spell_power()
+	b.size = 1.0 + clampf(sp / 60.0, 0.0, 1.2)
+	var bolt_c := Color(0.45, 0.7, 1.0).lerp(Color(0.85, 0.4, 1.0), clampf(sp / 80.0, 0.0, 1.0))
+	b.launch(fwd, "player", Game.spell_damage(), bolt_c, 24.0)
 
 func drink_potion() -> void:
 	if potion_cd > 0.0:
@@ -512,10 +538,28 @@ func drink_potion() -> void:
 		Game.say("Already at full health.", Color(0.8, 0.8, 0.8))
 		return
 	Game.potions -= 1
+	potions_used += 1
 	potion_cd = 1.0
 	Game.hp = minf(Game.max_hp(), Game.hp + 30.0 + Game.max_hp() * 0.4)
 	Sfx.play("pickup", -4.0)
 	FX.burst(global_position + Vector3(0, 1.0, 0), Color(1.0, 0.3, 0.35), 24, 2.0)
+	Game.stats_changed.emit()
+
+func drink_mana_potion() -> void:
+	if potion_cd > 0.0:
+		return
+	if Game.mana_potions <= 0:
+		Game.say("No mana potions left.", Color(0.6, 0.7, 1.0))
+		return
+	if Game.mana >= Game.max_mana() - 0.5:
+		Game.say("Already at full mana.", Color(0.8, 0.8, 0.8))
+		return
+	Game.mana_potions -= 1
+	mana_potions_used += 1
+	potion_cd = 1.0
+	Game.mana = minf(Game.max_mana(), Game.mana + 25.0 + Game.max_mana() * 0.6)
+	Sfx.play("spell", -8.0)
+	FX.burst(global_position + Vector3(0, 1.0, 0), Color(0.35, 0.55, 1.0), 24, 2.0)
 	Game.stats_changed.emit()
 
 # ---------------------------------------------------------------------------

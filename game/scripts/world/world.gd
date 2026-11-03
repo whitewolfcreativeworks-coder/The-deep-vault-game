@@ -240,7 +240,7 @@ func _outpost() -> void:
 	Props.place(self, "sword_shield_broken", Vector3(3.5, 0, 6), 160.0)
 	Interactable.create(self, "inscription", Vector3(-3.0, 0, 20.5), 200.0, "", [], "A torn journal",
 		"Day 9. Corwin went down alone. Said the Warden only stirs for those who reach the Heart.\n\nDay 11. Blue light from the stair at night. The river below the vault is alive, I am sure of it. It burns the skin... but Corwin swore an amulet was made to walk it.\n\nDay 12. No sign of Corwin. I am going in after him. If you find this, the fire vents breathe in rhythm. Watch them, and run between their breaths.")
-	Interactable.create(self, "chest", Vector3(-9.5, 0, 22.5), 90.0, "chest_camp", [{"kind": "potion", "amount": 1}, {"kind": "gold", "amount": 15}])
+	Interactable.create(self, "chest", Vector3(-9.5, 0, 22.5), 90.0, "chest_camp", [{"kind": "potion", "amount": 1}, {"roll": "small"}])
 	Interactable.create(self, "shrine", Vector3(-5.5, 0, 5.5), 0.0, "", [], "the Outpost")
 	# moonlit motes over the clearing
 	var dust := _motes(Vector3(0, 3, 18), Vector3(18, 3, 16), Color(0.8, 0.85, 1.0), 120, 0.05)
@@ -338,6 +338,8 @@ func _entry_hall() -> void:
 		Props.place(self, p[2], p[0], p[1], 1.0, p[2].begins_with("barrel") or p[2].begins_with("table") or p[2].begins_with("shelf"))
 	Interactable.create(self, "inscription", Vector3(-7.5, Y, -18.5), 90.0, "", [], "The Founding Stone",
 		"HERE THE KEEPERS OF ASHKAR SEALED THE HEART,\nTHAT ITS LIGHT MIGHT FEED THE DEEP RIVER AND NEVER THE GREED OF KINGS.\n\nLET THE WARDEN STAND UNTIL ONE WORTHY BRINGS THE HEART BACK INTO THE WORLD.\n\n(Beneath, scratched more recently: \"the bones get up when you walk past them\")")
+	Interactable.create(self, "chest", Vector3(7.4, Y, -29.0), -90.0, "chest_hall_a", [{"roll": "small"}])
+	Interactable.create(self, "chest", Vector3(-7.4, Y, -22.2), 90.0, "chest_hall_b", [{"roll": "small"}])
 	var hall_bounds := AABB(Vector3(-9, Y - 1, -34), Vector3(18, 9, 22))
 	for e in [[Vector3(-3, Y, -21), "minion", "e_hall_1"], [Vector3(3.5, Y, -24), "minion", "e_hall_2"], [Vector3(0, Y, -29.5), "minion", "e_hall_3"]]:
 		_enemy(e[1], e[0], e[2], PI, 6.5, hall_bounds)
@@ -355,6 +357,7 @@ func _corridor() -> void:
 	Props.place(self, "rubble_half", Vector3(2.0, Y, -55), 60.0)
 	corridor_gate = Gate.create(self, Vector3(0, Y, -60.0), 4.0, 3.6, 0.0, "gate_corridor")
 	var lever := Interactable.create(self, "lever", Vector3(2.45, Y, -58.8), -90.0, "lever_corridor")
+	Interactable.create(self, "chest", Vector3(-2.1, Y, -58.6), 90.0, "chest_corridor", [{"kind": "mana", "amount": 1}, {"roll": "small"}])
 	lever.used.connect(func(_by: Node) -> void:
 		corridor_gate.open()
 		for t in corridor_traps:
@@ -385,10 +388,9 @@ func _armory() -> void:
 	]
 	for p in deco:
 		Props.place(self, p[2], p[0], p[1], 1.0, not p[2].begins_with("banner") and not p[2].begins_with("keyring"))
-	Interactable.create(self, "chest", Vector3(-9.4, Y, -63.5), 90.0, "chest_armory_a",
-		[{"kind": "item", "id": "knight_sword"}, {"kind": "gold", "amount": 25}, {"kind": "potion", "amount": 1}])
-	Interactable.create(self, "chest", Vector3(0, Y, -82.6), 0.0, "chest_armory_b",
-		[{"kind": "item", "id": "chainmail"}, {"kind": "potion", "amount": 2}, {"kind": "gold", "amount": 40}])
+	Interactable.create(self, "chest", Vector3(-9.4, Y, -63.5), 90.0, "chest_armory_a", [{"roll": "weapon"}])
+	Interactable.create(self, "chest", Vector3(0, Y, -82.6), 0.0, "chest_armory_b", [{"roll": "armor"}])
+	Interactable.create(self, "chest", Vector3(-9.4, Y, -80.4), 90.0, "chest_armory_c", [{"roll": "big"}])
 	Interactable.create(self, "shrine", Vector3(8.4, Y, -62.6), 180.0, "", [], "the Armory")
 	Interactable.create(self, "inscription", Vector3(9.8, Y, -76.5), -90.0, "", [], "Sentinel's Oath",
 		"We who guard the Vault ask no rest.\nWhen flesh fails, the bone will stand.\nWhen bone fails, the Warden wakes.\n\n(Someone has scrawled beneath: \"the big one is slow. dodge, then strike.\")")
@@ -400,6 +402,8 @@ func _armory() -> void:
 	# passage onward
 	var pm: Material = b.wall_mat(Color(0.31, 0.30, 0.30), 0.3, Y)
 	b.room(-2, 2, -92, -84, Y, 4.2, pm, b.mats.floor, {"s": [[-2.0, 2.0, 3.6]], "n": [[-2.0, 2.0, 3.6]]})
+	# a curious chest in the passage: always holds a skin (a new look)
+	Interactable.create(self, "chest", Vector3(1.35, Y, -88.0), -90.0, "chest_curious", [{"roll": "skin"}])
 
 # ---------------------------------------------------------------------------
 func _glowing_deep() -> void:
@@ -491,9 +495,12 @@ func _glowing_deep() -> void:
 	Props.torch(self, Vector3(2.6 + 0.5, Y + 3.0, -133.95), 0.0, true, false, Color(0.5, 0.8, 1.0))
 	# loot and lore
 	Interactable.create(self, "chest", Vector3(15.0, Y - 0.1, -126.0), 0.0, "chest_island",
-		[{"kind": "item", "id": "amulet_deep"}, {"kind": "gold", "amount": 50}])
+		[{"kind": "item", "id": "amulet_deep"}, {"roll": "big"}])
 	Interactable.create(self, "chest", Vector3(-19.6, Y, -131.0), 90.0, "chest_runeblade",
-		[{"kind": "item", "id": "vault_blade"}, {"kind": "potion", "amount": 2}, {"kind": "gold", "amount": 35}])
+		[{"kind": "item", "id": "vault_blade"}, {"roll": "small"}])
+	Interactable.create(self, "chest", Vector3(19.4, Y, -98.0), -90.0, "chest_deep_a", [{"roll": "small"}])
+	Interactable.create(self, "chest", Vector3(-19.4, Y, -104.5), 90.0, "chest_deep_b", [{"roll": "big"}])
+	Interactable.create(self, "chest", Vector3(-4.6, Y, -132.6), 0.0, "chest_supply", [{"roll": "supply"}])
 	Interactable.create(self, "shrine", Vector3(-6.0, Y, -95.6), 180.0, "", [], "the Glowing Deep")
 	Interactable.create(self, "shrine", Vector3(-6.5, Y, -129.8), 0.0, "", [], "the Warden's Door")
 	Interactable.create(self, "inscription", Vector3(8.5, Y, -95.0), 180.0, "", [], "Corwin's last words",
@@ -685,6 +692,8 @@ func reset_boss() -> void:
 
 func _on_warden_defeated() -> void:
 	boss_gate.open()
+	var reward := Interactable.create(self, "chest", Vector3(0, Y, -164.0), 0.0, "chest_warden", [{"roll": "boss"}])
+	FX.burst(reward.global_position + Vector3(0, 1, 0), Loot.rarity_color(4), 60, 4.0, 0.25, 1.5, 0.5)
 	Sfx.music("music_explore", -12.0)
 	Game.set_objective("Claim the Heart of the Vault upon the altar.")
 	Game.say("The Warden crumbles. The Heart's light pulses from the altar.", Color(1.0, 0.8, 0.5))

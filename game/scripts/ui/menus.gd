@@ -274,61 +274,99 @@ func _build_pause() -> void:
 	v.add_child(_button("Quit game", func() -> void: quit_requested.emit(), 360))
 
 func _build_inventory() -> void:
-	var p := _center_panel("inventory", 1000, 640)
-	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 30); p.add_child(h)
-	var left := VBoxContainer.new(); left.custom_minimum_size.x = 360; h.add_child(left)
+	var p := _center_panel("inventory", 1220, 760)
+	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 26); p.add_child(h)
+	var left := VBoxContainer.new(); left.custom_minimum_size.x = 380; left.add_theme_constant_override("separation", 8); h.add_child(left)
 	left.add_child(UIKit.label("Character", 30, UIKit.GOLD, true))
-	_stats_label = UIKit.label("", 18)
+	_stats_label = UIKit.label("", 17)
 	left.add_child(_stats_label)
-	var right := VBoxContainer.new(); right.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(right)
-	right.add_child(UIKit.label("Inventory", 30, UIKit.GOLD, true))
-	var sc := ScrollContainer.new(); sc.custom_minimum_size = Vector2(560, 470); right.add_child(sc)
+	var right := VBoxContainer.new(); right.size_flags_horizontal = Control.SIZE_EXPAND_FILL; right.add_theme_constant_override("separation", 8); h.add_child(right)
+	right.add_child(UIKit.label("Equipped", 26, UIKit.GOLD, true))
+	_equipped_box = VBoxContainer.new(); _equipped_box.add_theme_constant_override("separation", 6)
+	right.add_child(_equipped_box)
+	right.add_child(UIKit.label("Bag", 26, UIKit.GOLD, true))
+	var sc := ScrollContainer.new(); sc.custom_minimum_size = Vector2(760, 400); right.add_child(sc)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_inv_list = VBoxContainer.new(); _inv_list.add_theme_constant_override("separation", 8)
 	_inv_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(_inv_list)
-	right.add_child(UIKit.label("[I] or [Esc] to close", 14, UIKit.DIM))
+	right.add_child(UIKit.label("[I] or [Esc] to close  ·  green numbers = better than what you wear", 14, UIKit.DIM))
+
+var _equipped_box: VBoxContainer
 
 func _refresh_stats() -> void:
 	if _stats_label == null:
 		return
 	var t := int(Game.play_time)
-	_stats_label.text = "%s the %s\n\nLevel %d   (%d / %d XP)\nHealth   %d / %d\nMana     %d / %d\nStamina  %d\n\nAttack   %.0f\nArcane   %.0f\nDefense  %.0f  (-%d%% damage)\n\nGold %d   ·   Draughts %d\nFoes defeated %d\nTime in the Vault %d:%02d" % [
+	_stats_label.text = "%s the %s\n\nLevel %d   (%d / %d XP)\nHealth   %d / %d\nMana     %d / %d  (+%.1f/s, +7 per sword hit)\nStamina  %d\n\nAttack   %.0f\nArcane bolt  %.0f  (+%.0f%% spell power)\nDefense  %.0f  (-%d%% damage)\nCritical %.0f%%\nLife steal %.0f%%\n\nGold %d\nHealing draughts %d   Mana potions %d\nFoes defeated %d\nTime in the Vault %d:%02d" % [
 		Game.profile.name, Game.profile.hero, Game.level, Game.xp, Game.xp_to_next(),
-		int(maxf(Game.hp, 0)), int(Game.max_hp()), int(Game.mana), int(Game.max_mana()), int(Game.max_stamina()),
-		Game.attack_damage(), Game.spell_damage(), Game.defense(), int(round(Game.defense() / (Game.defense() + 45.0) * 100.0)),
-		Game.gold, Game.potions, Game.kills, t / 60, t % 60]
+		int(maxf(Game.hp, 0)), int(Game.max_hp()), int(Game.mana), int(Game.max_mana()), Game.mana_regen(), int(Game.max_stamina()),
+		Game.attack_damage(), Game.spell_damage(), Game.spell_power(), Game.defense(), int(round(Game.defense() / (Game.defense() + 45.0) * 100.0)),
+		Game.crit_chance() * 100.0, Game.lifesteal() * 100.0,
+		Game.gold, Game.potions, Game.mana_potions, Game.kills, t / 60, t % 60]
+
+func _item_row(id: String, equipped_now: bool) -> Control:
+	var it: Dictionary = Game.item(id)
+	var r: int = it.get("rarity", 0)
+	var row := PanelContainer.new()
+	row.add_theme_stylebox_override("panel", UIKit.panel_style(0.6, it.get("color", UIKit.GOLD), 4))
+	var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 12); row.add_child(hb)
+	var vb := VBoxContainer.new(); vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hb.add_child(vb)
+	var slot: String = it.get("slot", "")
+	vb.add_child(UIKit.label("%s   [%s %s]" % [it.name, Loot.RARITY_NAMES[r], Game.SLOT_NAMES.get(slot, slot)], 18, it.get("color", UIKit.PARCH), true))
+	var lines := Game.item_lines(id)
+	var stat := UIKit.label(", ".join(lines) if lines.size() > 0 else String(it.get("desc", "")), 15, UIKit.PARCH)
+	stat.autowrap_mode = TextServer.AUTOWRAP_WORD; stat.custom_minimum_size.x = 480
+	vb.add_child(stat)
+	if slot in Game.SLOTS and not equipped_now:
+		var cur: String = Game.equipped.get(slot, "")
+		var diff := Game.score(id) - Game.score(cur)
+		var cmp := UIKit.label(("▲ better (+%.0f)" if diff > 0.5 else ("▼ weaker (%.0f)" if diff < -0.5 else "about the same")) % diff, 14,
+			Color(0.4, 1.0, 0.45) if diff > 0.5 else (Color(1.0, 0.45, 0.4) if diff < -0.5 else UIKit.DIM))
+		vb.add_child(cmp)
+	if slot == "skin" and it.has("desc"):
+		var d := UIKit.label(String(it.desc), 14, UIKit.DIM); d.autowrap_mode = TextServer.AUTOWRAP_WORD; d.custom_minimum_size.x = 480
+		vb.add_child(d)
+	if slot in Game.SLOTS:
+		if equipped_now:
+			if slot in ["artifact", "skin"]:
+				var ub := Button.new(); ub.text = "Remove"; ub.custom_minimum_size = Vector2(118, 46)
+				ub.pressed.connect(func() -> void: Game.unequip(slot))
+				hb.add_child(ub)
+		else:
+			var eb := Button.new(); eb.text = "Wear" if slot == "skin" else "Equip"; eb.custom_minimum_size = Vector2(118, 46)
+			eb.pressed.connect(func() -> void: Game.equip(id))
+			hb.add_child(eb)
+			if not Game.ITEMS.has(id):
+				var sb := Button.new(); sb.text = "Salvage %dg" % Loot.salvage_value(it); sb.custom_minimum_size = Vector2(140, 46)
+				sb.pressed.connect(func() -> void: Game.salvage(id))
+				hb.add_child(sb)
+	return row
 
 func _refresh_inventory() -> void:
 	if _inv_list == null:
 		return
+	for c in _equipped_box.get_children():
+		c.queue_free()
 	for c in _inv_list.get_children():
 		c.queue_free()
+	for slot in Game.SLOTS:
+		var id: String = Game.equipped.get(slot, "")
+		if id == "":
+			_equipped_box.add_child(UIKit.label("%s: (empty)" % Game.SLOT_NAMES[slot], 16, UIKit.DIM))
+		else:
+			_equipped_box.add_child(_item_row(id, true))
+	var bag: Array = []
 	for id in Game.inventory:
-		var it: Dictionary = Game.ITEMS[id]
-		var row := PanelContainer.new()
-		row.add_theme_stylebox_override("panel", UIKit.panel_style(0.6, it.color, 4))
-		var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 14); row.add_child(hb)
-		var vb := VBoxContainer.new(); vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hb.add_child(vb)
-		var stat := ""
-		if it.has("damage"): stat = "  +%d attack" % it.damage
-		if it.has("defense"): stat = "  %d defense" % it.defense
-		vb.add_child(UIKit.label("%s%s" % [it.name, stat], 19, it.color, true))
-		var d := UIKit.label(it.desc, 15, UIKit.DIM); d.autowrap_mode = TextServer.AUTOWRAP_WORD; d.custom_minimum_size.x = 340
-		vb.add_child(d)
-		var slot: String = it.slot
-		if slot in ["weapon", "armor", "artifact"]:
-			var eq: bool = Game.equipped[slot] == id
-			if eq and slot != "artifact":
-				hb.add_child(UIKit.label("Equipped", 16, UIKit.GOLD))
-			else:
-				var b := Button.new(); b.text = "Unequip" if eq else "Equip"; b.custom_minimum_size = Vector2(120, 40)
-				b.pressed.connect(func() -> void:
-					if eq:
-						Game.unequip_artifact()
-					else:
-						Game.equip(id))
-				hb.add_child(b)
-		_inv_list.add_child(row)
+		if not Game.equipped.values().has(id):
+			bag.append(id)
+	bag.sort_custom(func(a, b) -> bool:
+		var ra: int = Game.item(a).get("rarity", 0); var rb: int = Game.item(b).get("rarity", 0)
+		return ra > rb if ra != rb else Game.score(a) > Game.score(b))
+	if bag.is_empty():
+		_inv_list.add_child(UIKit.label("Nothing else yet. Open chests and defeat monsters to find gear!", 16, UIKit.DIM))
+	for id in bag:
+		_inv_list.add_child(_item_row(id, false))
 
 func _build_lore() -> void:
 	var p := _center_panel("lore", 760, 460)

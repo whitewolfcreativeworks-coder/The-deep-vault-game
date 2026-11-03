@@ -8,7 +8,7 @@ var kind := "chest"
 var uid := ""
 var title := ""
 var text := ""
-var loot: Array = []        # [{kind:"gold", amount:30}, {kind:"item", id:"knight_sword"}, {kind:"potion", amount:2}]
+var loot: Array = []        # [{roll:"big"}, {kind:"gold", amount:30}, {kind:"item", id:"vault_blade"}, {kind:"mana", amount:1}]
 var once := true
 var spent := false
 var spawn_yaw := 0.0
@@ -37,7 +37,11 @@ static func create(parent: Node, k: String, pos: Vector3, yaw_deg := 0.0, id := 
 func _build() -> void:
 	match kind:
 		"chest":
-			_vis = Props.place(self, "chest_gold" if loot.size() > 2 else "chest", Vector3.ZERO, 0.0, 1.0, true)
+			var golden := false
+			for l in loot:
+				if l.get("roll", "") in ["big", "boss", "skin", "supply"] or l.get("id", "") in ["vault_blade", "amulet_deep"]:
+					golden = true
+			_vis = Props.place(self, "chest_gold" if golden else "chest", Vector3.ZERO, 0.0, 1.0, true)
 			for n in _vis.find_children("*", "Node3D", true, false):
 				if String(n.name).to_lower().contains("lid") or String(n.name).to_lower().contains("top"):
 					_lid = n
@@ -139,16 +143,29 @@ func interact(by: Node) -> void:
 	match kind:
 		"chest":
 			Sfx.play_at("chest", global_position, 0.0)
-			var i := 0
+			var rolled: Array = []
 			for l in loot:
+				if l.has("roll"):
+					rolled.append_array(Loot.roll_chest(l.roll, int(l.get("ilvl", Loot.area_level(global_position.z)))))
+				else:
+					rolled.append(l)
+			var best := -1
+			for l in rolled:
+				if l.get("kind", "") == "item":
+					best = maxi(best, int(Game.item(l.id).get("rarity", 0)))
+			var burst_c := Loot.rarity_color(best) if best >= 1 else Color(1, 0.85, 0.4)
+			var i := 0
+			for l in rolled:
 				var k: String = l.get("kind", "gold")
 				var toward := (by as Node3D).global_position - global_position if by is Node3D else Vector3.BACK
 				toward.y = 0
 				var pos := global_position + Vector3(0, 1.0, 0) + toward.normalized() * 0.9
-				Pickup.spawn(pos + Vector3(i * 0.15, 0, 0), "item" if k == "item" else k, int(l.get("amount", 1)), String(l.get("id", "")))
+				Pickup.spawn(pos + Vector3(i * 0.15, 0, 0), k, int(l.get("amount", 1)), String(l.get("id", "")))
 				i += 1
-			FX.burst(global_position + Vector3(0, 0.9, 0), Color(1, 0.85, 0.4), 30, 3.0, 0.18, 0.9, 0.5)
-			FX.flash_light(global_position + Vector3(0, 1.2, 0), Color(1, 0.8, 0.4), 4.0, 6.0, 0.8)
+			FX.burst(global_position + Vector3(0, 0.9, 0), burst_c, 30 + 15 * maxi(best, 0), 3.0, 0.18, 0.9, 0.5)
+			FX.flash_light(global_position + Vector3(0, 1.2, 0), burst_c, 4.0 + 1.5 * maxi(best, 0), 6.0, 0.8)
+			if best >= 3:
+				Game.say("%s loot!" % Loot.RARITY_NAMES[best].to_upper(), burst_c)
 		"lever":
 			Sfx.play_at("lever", global_position, 0.0)
 		"inscription":

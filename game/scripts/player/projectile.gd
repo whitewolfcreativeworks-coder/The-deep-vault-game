@@ -9,6 +9,7 @@ var color := Color(0.45, 0.7, 1.0)
 var dir := Vector3.FORWARD
 var life := 3.0
 var homing := 2.5
+var size := 1.0
 var _done := false
 var _light: OmniLight3D
 
@@ -22,7 +23,7 @@ func launch(d: Vector3, t: String, dmg: float, c: Color, spd: float) -> void:
 	cs.shape = s
 	add_child(cs)
 	var core := MeshInstance3D.new()
-	var sm := SphereMesh.new(); sm.radius = 0.13; sm.height = 0.26
+	var sm := SphereMesh.new(); sm.radius = 0.13 * size; sm.height = 0.26 * size
 	core.mesh = sm
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -32,7 +33,7 @@ func launch(d: Vector3, t: String, dmg: float, c: Color, spd: float) -> void:
 	add_child(core)
 	var trail := CPUParticles3D.new()
 	trail.amount = 40; trail.lifetime = 0.45; trail.local_coords = false
-	trail.mesh = FX.quad(0.28)
+	trail.mesh = FX.quad(0.28 * size)
 	trail.material_override = FX.glow_material(color, 1.6)
 	trail.gravity = Vector3.ZERO
 	trail.initial_velocity_min = 0.1; trail.initial_velocity_max = 0.6
@@ -82,7 +83,7 @@ func _on_body(b: Node) -> void:
 
 func _explode() -> void:
 	_done = true
-	FX.burst(global_position, color, 26, 4.0, 0.22, 0.5, 0.0)
+	FX.burst(global_position, color, int(26 * size), 4.0 * size, 0.22 * size, 0.5, 0.0)
 	FX.flash_light(global_position, color, 5.0, 6.0, 0.3)
 	Sfx.play_at("spell_hit", global_position, -4.0)
 	queue_free()

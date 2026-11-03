@@ -58,12 +58,20 @@ A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without
 | Space / Shift / C | Jump (press against a ledge to climb up) / Sprint / Dodge roll |
 | E | Interact (chests, levers, shrines, inscriptions) |
 | R or 1 | Drink a healing draught |
+| F or 2 | Drink a mana potion |
 | I or Tab | Inventory and character sheet |
 | Esc | Pause menu |
 
 Basic gamepad support is included: left stick to move, A jump, X attack, LB block, RB spell, B dodge, Y interact.
 
 ## What's in it
+
+- **Random loot (new).**
+  - Weapons, armor, trinkets and *skins* come in five rarities: Common, Uncommon, Rare, Epic and Legendary.
+  - Each piece rolls random bonuses: attack, defense, health, mana, mana regeneration, critical hits, life steal and spell power.
+  - Loot drops from monsters and from 13 chests (plus a reward chest after the boss). Rare and better drops shoot a beam of light.
+- **Gear changes your look.** Weapons glow in their rarity colour, armor changes your shield and colours, and Epic or Legendary gear gives you an aura. Skins transform you: Lizardfolk, Bone Ward (you become a skeleton), Gilded, Spectral, Ember and Frost.
+- **Healing and mana potions.** Your sword hits recharge mana, so the rhythm is: cast, slash to recharge, cast again.
 
 - Character creation with five hero presets (male and female), cloak colours, helm toggle, name, and a live 3D preview.
 - A continuous first-/third-person camera that collides with walls.

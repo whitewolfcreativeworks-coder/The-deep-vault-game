@@ -172,3 +172,44 @@ Each issue was first measured on the old build with a new `feel` autotest, then 
   - The river and pool beds were raised from 1.5 m to 1.0 m deep.
 
 **Renamed** to **Bobek's Adventure**. The random-name button now offers twenty variations of "Bobek".
+
+### Fourth playtest (the designer's son): "ran out of potions and mana at the Warden, gear never changes"
+
+**Added:**
+- Random rarity loot from monsters and 13 chests, plus a boss reward chest
+- Skins that transform the hero
+- Gear that changes the hero's look
+- Mana potions
+- Mana regeneration doubled
+- Sword hits that recharge mana
+- Bigger, rarity-coloured spell bolts with spell power
+- Life steal and critical-hit bonuses
+- A rarity inventory with comparisons and salvage
+
+**Loot test (`loot` autotest):**
+- **Rarity spread over 2,000 rolls:** 998 Common, 479 Uncommon, 414 Rare, 86 Epic, 23 Legendary. Rare is inflated because skins are always Rare or better.
+- **Opening every chest:** 17 healing draughts, 11 mana potions and 15 pieces of gear.
+- **Monster drops:** over 200 kills, 159 potions and 73 items.
+- **Mana:** four sword swings restored 28 mana.
+
+**Boss balance without cheats (`balance` autotest).**
+
+The first bot dodged every telegraph perfectly and beat the old Warden even with starting gear in seconds. The test bot was changed to play more like a person: it reacts to only about half of the Warden's slams and pauses between swings now and then.
+
+The Warden was then tuned:
+- health: 1700 → 3000
+- swipe damage: 26 → 32
+- slam damage: 36 → 44
+- leap damage: 40 → 50
+- summons twice instead of once
+
+In the "geared" setup the bot is level 4 with everything a player would find before the boss, having drunk half its potions on the way down.
+
+| Setup | Result | Damage taken | Lowest health | Potions used |
+|---|---|---|---|---|
+| Geared, seed 7 | won in 48 s | 339 (1.3× max health) | 38% | 1 |
+| Geared, seed 42 | won in 62 s | 416 (2.1×) | 39% | 1 |
+| Geared, seed 21 | won in 61 s | 420 (1.9×) | 29% | 3 |
+| Starting gear, seed 21 | **died**, Warden at 59% | 439 | 0% | all |
+
+A human player swings less relentlessly than the bot, so expect longer fights and more potions than this.

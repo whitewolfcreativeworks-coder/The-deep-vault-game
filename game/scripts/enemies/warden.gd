@@ -11,8 +11,9 @@ signal health_changed(hp: float, max_hp: float)
 
 enum S { DORMANT, AWAKEN, CHASE, SWIPE, SLAM, LEAP, SUMMON, RECOVER, DEAD }
 
-var max_hp := 1700.0
-var hp := 1700.0
+var max_hp := 3000.0
+var hp := 3000.0
+var summon_waves := 0
 const ARMOR := 0.8   # stone hide: takes 80% of incoming damage
 var dead := false
 var state := S.DORMANT
@@ -112,7 +113,7 @@ func _physics_process(delta: float) -> void:
 			want_face = atan2(-to_p.x, -to_p.z)
 			if pdead:
 				move = Vector3.ZERO
-			elif phase >= 2 and not _summoned:
+			elif (phase >= 2 and summon_waves < 1) or (phase >= 3 and summon_waves < 2):
 				_go(S.SUMMON)
 			elif cooldown <= 0.0:
 				if phase >= 2 and dist > 7.0 and randf() < 0.65:
@@ -139,7 +140,7 @@ func _physics_process(delta: float) -> void:
 				Sfx.play_at("swing", global_position + Vector3(0, 2, 0), 4.0, 0.0, 12.0)
 				var fwd := -Vector3(sin(facing), 0, cos(facing))
 				if dist < 5.2 and fwd.dot(to_p.normalized()) > 0.1 and not pdead:
-					player.take_damage(26.0, global_position, 7.0)
+					player.take_damage(32.0, global_position, 7.0)
 			if st >= dur:
 				_combo += 1
 				cooldown = 0.6 * tempo
@@ -151,7 +152,7 @@ func _physics_process(delta: float) -> void:
 			_tele_mat.set_shader_parameter("fill", clampf(st / wind, 0.0, 1.0) * 0.98)
 			if not _hit_done and st >= wind:
 				_hit_done = true
-				_impact(_target, 4.8, 36.0)
+				_impact(_target, 4.8, 44.0)
 			if st >= wind + 0.6:
 				_combo = 0
 				cooldown = 1.4 * tempo
@@ -168,7 +169,7 @@ func _physics_process(delta: float) -> void:
 			if k >= 1.0 and not _hit_done:
 				_hit_done = true
 				global_position = _target
-				_impact(_target, 5.5, 40.0)
+				_impact(_target, 5.5, 50.0)
 			if st >= air + 0.8:
 				cooldown = 1.2 * tempo
 				_go(S.RECOVER)
@@ -177,6 +178,7 @@ func _physics_process(delta: float) -> void:
 			if st > 0.3 and not _hit_done:
 				_hit_done = true
 				_summoned = true
+				summon_waves += 1
 				Sfx.play_at("roar", global_position + Vector3(0, 3, 0), 2.0, 0.1, 20.0)
 				Game.say("The Warden calls the dead to its side!", Color(1.0, 0.55, 0.4))
 				if summon_callback.is_valid():
@@ -298,8 +300,9 @@ func _die(from_pos: Vector3) -> void:
 	Game.kills += 1
 	Game.add_xp(600)
 	Game.flags["warden_dead"] = true
-	Pickup.spawn(global_position + Vector3(0, 1.5, 0), "item", 1, "warden_plate")
+	Pickup.spawn(global_position + Vector3(0, 1.5, 0), "item", 1, Loot.make_random(5, 2.0, 3))
 	for i in 6:
 		Pickup.spawn(global_position + Vector3(randf_range(-1, 1), 1.2, randf_range(-1, 1)), "gold", randi_range(15, 30))
 	Pickup.spawn(global_position + Vector3(0.5, 1.2, 0.5), "potion", 1)
+	Pickup.spawn(global_position + Vector3(-0.5, 1.2, 0.5), "mana", 1)
 	defeated.emit()

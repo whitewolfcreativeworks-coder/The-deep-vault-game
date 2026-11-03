@@ -84,3 +84,43 @@ game/
   shaders/                   stone, river, mist, waterfall, rune
 tools/  make_audio.py, build.sh, run_tests.sh
 ```
+
+
+## Loot, rarity and looks (added after playtests)
+
+**Rarity.** About 50% Common, 24% Uncommon, 21% Rare (this includes all skins, which are always Rare or better), 4% Epic and 1% Legendary. Better sources raise the odds:
+- big chests, guaranteed-gear chests, the Revenant and the Warden
+- deeper areas also give higher item levels
+
+**Generated items:**
+- **Weapons** have five bases (Shortsword, Longsword, Greatblade, Battle Axe, Battlestaff with spell power).
+- **Armor** has five bases; each sets the shield model and a tint.
+- **Trinkets** (Ring, Charm, Talisman, Band, Pendant) are all bonuses.
+- **Skins** are cosmetic transformations with a bonus.
+
+Each rarity adds one more random bonus. Legendaries get unique names (for example "Bobek's Fury").
+
+**Auto-equip and the bag.** Strictly better gear is equipped automatically, so players on touch screens aren't stuck in menus. Your first skin goes straight on. The amulet is never swapped out automatically. Everything else waits in the bag, where the inventory compares it with what you wear and lets you equip it or salvage it for gold. The bag holds 24 items; when it's full, the weakest item is salvaged.
+
+**Mana loop.**
+- Mana regenerates at 6/s plus gear (it was 3/s).
+- Each sword hit restores 7 mana (11 for the heavy third hit).
+- Mana potions restore 25 + 60% of max mana; healing draughts restore 30 + 40% of max health.
+
+**Chests (13):**
+- Outpost camp
+- Two in the Entry Hall
+- One at the corridor lever
+- Three in the Armory (guaranteed weapon, guaranteed armor, one big)
+- The curious chest in the passage (always a skin)
+- The island (Amulet of the Deep plus a big roll)
+- The Runeblade alcove
+- Two more in the Glowing Deep
+- A supply chest by the Warden's door (always 2 healing + 2 mana)
+- After the Warden falls, a reward chest appears (Epic or Legendary)
+
+**Monster drops.**
+- Basic skeleton: 32% chance of a potion, 10% chance of gear.
+- Mages lean towards mana potions.
+- The Revenant always drops 2 potions and an Uncommon-or-better item.
+- The Warden's summoned skeletons drop potions 70% of the time.

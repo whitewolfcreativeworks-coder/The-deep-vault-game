@@ -310,7 +310,10 @@ func _die(away: Vector3) -> void:
 
 func _drop_loot() -> void:
 	var g: Array = t.gold
-	var amount := randi_range(g[0], g[1])
-	Pickup.spawn(global_position + Vector3(0, 0.6, 0), "gold", amount)
-	if randf() < (0.5 if t.get("heavy", false) else 0.22):
-		Pickup.spawn(global_position + Vector3(0.4, 0.6, 0.2), "potion", 1)
+	Pickup.spawn(global_position + Vector3(0, 0.6, 0), "gold", randi_range(g[0], g[1]))
+	var table := "summon" if uid == "" else type_id
+	var k := 0
+	for d in Loot.roll_enemy(table, Loot.area_level(global_position.z)):
+		k += 1
+		var off := Vector3(cos(k * 2.1), 0, sin(k * 2.1)) * 0.5
+		Pickup.spawn(global_position + Vector3(0, 0.7, 0) + off, d.kind, int(d.get("amount", 1)), String(d.get("id", "")))

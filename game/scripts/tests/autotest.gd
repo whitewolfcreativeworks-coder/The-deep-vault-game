@@ -140,6 +140,10 @@ func _run() -> void:
 	await wait(1.0)
 	if mode == "shots":
 		await _shots()
+	elif mode == "loot":
+		await _loot_test()
+	elif mode == "balance":
+		await _balance_test()
 	elif mode == "river":
 		await _start()
 		god = false
@@ -275,14 +279,17 @@ func _flow() -> void:
 	await shot("06_armory")
 	var ak := await clear_enemies(26.0, 90.0)
 	check("armory_cleared_incl_revenant", ak >= 3, "%d killed" % ak)
+	var atk0 := Game.attack_damage()
 	await tp(Vector3(-8.0, -5.9, -63.5), PI / 2)
 	await use_nearest_interactable()
 	await wait(2.0)
-	check("weapon_upgrade_equipped", Game.equipped.weapon == "knight_sword", Game.equipped.weapon)
+	check("weapon_upgrade_equipped", Game.attack_damage() > atk0, "%s: attack %.0f -> %.0f" % [Game.item(Game.equipped.weapon).get("name", "?"), atk0, Game.attack_damage()])
+	var def0 := Game.defense()
 	await tp(Vector3(0, -5.9, -81.2), 0.0)
 	await use_nearest_interactable()
 	await wait(2.0)
-	check("armor_upgrade_equipped", Game.equipped.armor == "chainmail", Game.equipped.armor)
+	check("armor_upgrade_equipped", Game.defense() > def0, "%s: defense %.0f -> %.0f" % [Game.item(Game.equipped.armor).get("name", "?"), def0, Game.defense()])
+	await shot("06b_armory_loot")
 	# the Glowing Deep
 	await tp(Vector3(0, -5.9, -94), 0.0, -0.15)
 	await shot("07_glowing_deep_entrance")
@@ -321,7 +328,9 @@ func _flow() -> void:
 	await tp(Vector3(-18.4, -5.9, -131.0), -PI / 2)
 	await use_nearest_interactable()
 	await wait(2.0)
-	check("runeblade_equipped", Game.equipped.weapon == "vault_blade", Game.equipped.weapon)
+	# random loot may already have given something stronger: then it waits in the bag
+	check("runeblade_found", Game.inventory.has("vault_blade") and Game.score(Game.equipped.weapon) >= Game.score("vault_blade") - 0.01,
+		"wielding %s" % Game.item(Game.equipped.weapon).get("name", "?"))
 	await tp(Vector3(0, -5.9, -100), 0.0, -0.05)
 	await shot("11_bridge_view")
 	# boss
@@ -852,6 +861,206 @@ func _feel_test() -> void:
 
 func ch_x() -> float:
 	return -9.0
+
+# --- loot -------------------------------------------------------------------
+func _loot_test() -> void:
+	await _start()
+	god = true
+	Loot.rng.seed = 1234
+	# 1. rarity spread over many rolls
+	var counts := [0, 0, 0, 0, 0]
+	var kinds := {}
+	var bad := 0
+	for i in 2000:
+		var id := Loot.make_random(3)
+		var it := Game.item(id)
+		counts[it.rarity] += 1
+		kinds[it.slot] = kinds.get(it.slot, 0) + 1
+		if String(it.get("name", "")) == "" or (it.slot == "weapon" and float(it.get("damage", 0)) <= 0.0):
+			bad += 1
+		Game.items.erase(id)
+	print("LOOT rarity_counts=%s kinds=%s" % [counts, kinds])
+	check("loot_rarities_spread", counts[0] > counts[1] and counts[1] > counts[2] and counts[2] > counts[3] and counts[3] > counts[4] and counts[4] > 0, "%s" % [counts])
+	check("loot_items_valid", bad == 0, "%d bad" % bad)
+	# 2. open every chest in the dungeon
+	var chests := []
+	for n in get_tree().get_nodes_in_group("interactable"):
+		if n is Interactable and n.kind == "chest":
+			chests.append(n)
+	var hp0 := Game.potions; var mp0 := Game.mana_potions; var inv0 := Game.inventory.size()
+	for c in chests:
+		c.interact(player)
+	await wait(0.3)
+	for pk in get_tree().get_nodes_in_group("pickup_dbg"):
+		pass
+	# collect everything that spawned
+	var picks := []
+	for n in world().get_parent().get_children():
+		if n is Pickup:
+			picks.append(n)
+	for pk in picks:
+		pk._collect()
+	print("LOOT chests=%d heal+%d mana+%d items+%d gold=%d" % [chests.size(), Game.potions - hp0, Game.mana_potions - mp0, Game.inventory.size() - inv0, Game.gold])
+	check("more_chests", chests.size() >= 12, "%d chests" % chests.size())
+	check("chests_give_potions", Game.potions - hp0 + Game.mana_potions - mp0 >= 15, "heal +%d, mana +%d" % [Game.potions - hp0, Game.mana_potions - mp0])
+	check("chests_give_gear", Game.inventory.size() - inv0 >= 10, "%d items" % (Game.inventory.size() - inv0))
+	# 3. enemy drops
+	var drops := 0; var dpots := 0
+	for i in 200:
+		for d in Loot.roll_enemy(["minion", "warrior", "mage", "revenant"][i % 4], 3):
+			if d.kind == "item":
+				drops += 1
+				Game.items.erase(d.id)
+			else:
+				dpots += 1
+	print("LOOT enemy_drops per 200 kills: items=%d potions=%d" % [drops, dpots])
+	check("monsters_drop_loot", drops >= 20 and dpots >= 60, "items %d potions %d" % [drops, dpots])
+	# 4. melee recharges mana
+	await tp(Vector3(0, -5.9, -62), 0.0)
+	var e := Enemy.new(); e.configure("revenant", "dummy"); e.position = Vector3(0, -6, -64); world().add_child(e)
+	await wait(0.5)
+	Game.mana = 0.0
+	var m0 := player.melee_mana_gained
+	for k in 4:
+		face(e.global_position)
+		await tap("attack")
+		await wait(0.6)
+	check("melee_recharges_mana", player.melee_mana_gained - m0 >= 14.0, "+%.0f mana from hits" % (player.melee_mana_gained - m0))
+	e.queue_free()
+	# 5. looks: every skin plus epic gear auras
+	await tp(Vector3(2, 0.1, 12), PI)
+	player.zoom_target = 3.0; player.zoom = 3.0
+	player.yaw = PI; player.pitch = -0.15
+	await wait(0.4)
+	for sk in Loot.SKINS:
+		var id := Loot.make_skin(4, 3, sk)
+		Game.add_item(id, false)
+		Game.equip(id)
+		await wait(0.9)
+		player.facing = PI   # look the camera in the eye
+		player.yaw = 0.0; player.snap_view()
+		await wait(0.5)
+		await shot("look_skin_" + sk)
+	Game.unequip("skin")
+	var ew := Loot.make_weapon(4, 3); Game.add_item(ew, false); Game.equip(ew)
+	var ea := Loot.make_armor(4, 4); Game.add_item(ea, false); Game.equip(ea)
+	await wait(1.0)
+	player.facing = PI; player.yaw = 0.0; player.snap_view()
+	await wait(0.5)
+	await shot("look_epic_gear")
+	check("looks_change", true, "skins and auras captured")
+	main._open("inventory")
+	await wait(0.6)
+	await shot("look_inventory")
+	main._resume()
+
+# --- boss balance (no cheats) ----------------------------------------------------
+func _gear_up_like_a_player() -> void:
+	# loot from every chest before the boss + drops from every monster
+	for n in get_tree().get_nodes_in_group("interactable"):
+		if n is Interactable and n.kind == "chest":
+			for l in n.loot:
+				var rolled: Array = Loot.roll_chest(l.roll, Loot.area_level(n.global_position.z)) if l.has("roll") else [l]
+				for d in rolled:
+					match d.kind:
+						"potion": Game.potions += int(d.get("amount", 1))
+						"mana": Game.mana_potions += int(d.get("amount", 1))
+						"item": Game.add_item(d.id)
+						"gold": Game.gold += int(d.amount)
+	for t in ["minion", "minion", "minion", "warrior", "warrior", "minion", "revenant", "minion", "minion", "mage", "mage", "warrior", "minion"]:
+		for d in Loot.roll_enemy(t, 3):
+			match d.kind:
+				"potion": Game.potions += 1
+				"mana": Game.mana_potions += 1
+				"item": Game.add_item(d.id)
+	# a real player drinks some on the way down
+	Game.potions = int(Game.potions * 0.5)
+	Game.mana_potions = int(Game.mana_potions * 0.5)
+
+func _bot_boss() -> Dictionary:
+	await tp(Vector3(0, -5.9, -139), 0.0)
+	Game.hp = Game.max_hp(); Game.mana = Game.max_mana()
+	face(Vector3(0, -6, -157))
+	Input.action_press("move_forward")
+	var tw := 0.0
+	while not world().boss_started and tw < 8.0:
+		await wait(0.2); tw += 0.2
+	Input.action_release("move_forward")
+	var w: Warden = world().warden
+	var t := 0.0
+	var pot0 := player.potions_used; var mp0 := player.mana_potions_used
+	var casts0 := player.bolts_fired
+	var gt0 := game_time
+	# "human" skill: reacts to only some telegraphs, a little slower to swing
+	var skill := float(OS.get_environment("BALANCE_SKILL")) if OS.has_environment("BALANCE_SKILL") else 0.5
+	var reacted := {}
+	var min_frac := 1.0
+	var dmg0 := player.damage_taken
+	while game_time - gt0 < 300.0 and is_instance_valid(w) and not w.dead and not player.dead:
+		var d := player.global_position.distance_to(w.global_position)
+		min_frac = minf(min_frac, Game.hp / Game.max_hp())
+		if Game.hp < Game.max_hp() * 0.4 and Game.potions > 0 and player.potion_cd <= 0.0:
+			await tap("potion")
+		elif Game.mana < 20.0 and Game.mana_potions > 0 and player.potion_cd <= 0.0 and d > 5.0:
+			await tap("mana_potion")
+		var danger := (w.state == Warden.S.SLAM or w.state == Warden.S.LEAP) and \
+			Vector2(player.global_position.x - w._target.x, player.global_position.z - w._target.z).length() < 6.0
+		var tele_id := "%d_%d" % [w.state, int((game_time - gt0) / 1.5)]
+		if danger and not reacted.has(tele_id):
+			reacted[tele_id] = randf() < skill   # decide once per telegraph whether we notice it
+		var will_dodge: bool = danger and reacted.get(tele_id, false)
+		if will_dodge and not player.dodging and Game.stamina >= 22:
+			var away := player.global_position - w._target
+			face(player.global_position + away)
+			Input.action_press("move_forward")
+			await tap("dodge")
+			await wait(0.45)
+			Input.action_release("move_forward")
+		else:
+			var add := nearest_enemy(5.0)
+			var target: Node3D = add if add != null and add != w else w
+			face(target.global_position)
+			var dt := player.global_position.distance_to(target.global_position)
+			var reach := 3.4 if target == w else 2.0
+			if target == w and Game.mana >= 20.0 and (dt > 5.0 or randf() < 0.3):
+				Input.action_release("move_forward")
+				await tap("spell")
+			elif dt > reach:
+				Input.action_press("move_forward")
+			else:
+				Input.action_release("move_forward")
+				await tap("attack")
+				if randf() > skill:
+					await wait(0.25)   # a human pauses between swings now and then
+		await wait(0.1)
+		t += 0.1
+	Input.action_release("move_forward")
+	return {"won": is_instance_valid(w) and w.dead, "died": player.dead, "game_time": snappedf(game_time - gt0, 0.1), "skill": skill, "lowest_hp_pct": int(min_frac * 100), "damage_taken": int(player.damage_taken - dmg0),
+		"warden_hp": w.hp if is_instance_valid(w) else 0.0, "hp_left": Game.hp,
+		"heal_used": player.potions_used - pot0, "mana_used": player.mana_potions_used - mp0,
+		"heal_left": Game.potions, "mana_left": Game.mana_potions, "casts": player.bolts_fired - casts0,
+		"attack": Game.attack_damage(), "defense": Game.defense(), "max_hp": Game.max_hp(), "spell": Game.spell_damage()}
+
+func _balance_test() -> void:
+	await _start()
+	god = false
+	var setup := OS.get_environment("BALANCE_SETUP") if OS.has_environment("BALANCE_SETUP") else "geared"
+	var sd := int(OS.get_environment("BALANCE_SEED")) if OS.has_environment("BALANCE_SEED") else 7
+	Loot.rng.seed = sd
+	seed(sd)
+	Game.level = 4
+	if setup == "geared":
+		_gear_up_like_a_player()
+	Game.hp = Game.max_hp(); Game.mana = Game.max_mana(); Game.stamina = Game.max_stamina()
+	var gear := []
+	for sl in Game.SLOTS:
+		var it := Game.item(Game.equipped[sl])
+		if not it.is_empty():
+			gear.append("%s[%s]" % [it.name, Loot.RARITY_NAMES[it.rarity]])
+	print("BALANCE skill=%s setup=%s seed=%d level=%d heal=%d mana=%d gear=%s" % [OS.get_environment("BALANCE_SKILL"), setup, sd, Game.level, Game.potions, Game.mana_potions, gear])
+	var r := await _bot_boss()
+	print("BALANCE result %s" % JSON.stringify(r))
+	check("balance_%s_seed%d" % [setup, sd], r.won if setup == "geared" else not r.won, JSON.stringify(r))
 
 func world() -> VaultWorld:
 	return main.world
