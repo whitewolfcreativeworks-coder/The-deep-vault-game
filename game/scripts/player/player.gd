@@ -111,10 +111,12 @@ func rebuild_body() -> void:
 		"weapon": Game.equipped.weapon, "shield": armor.get("shield", "shield_round"), "scale": 0.84,
 		"skin": skin.get("skin", ""),
 	}
+	_apply_profile_looks(cfg)
 	if armor.has("tint") and int(armor.get("rarity", 0)) >= 1:
 		cfg["tint"] = armor.tint
 	if p.cape > 0:
 		cfg["cape_color"] = Game.CAPE_COLORS[p.cape]
+		cfg["outfit_color"] = Game.CAPE_COLORS[p.cape]
 	# epic / legendary gear gives a glowing aura in its rarity colour
 	var best := maxi(int(weapon.get("rarity", 0)), int(armor.get("rarity", 0)))
 	if best >= 3:
@@ -123,6 +125,20 @@ func rebuild_body() -> void:
 	body.setup(cfg)
 	body.set_head_visible(not _head_hidden)
 	_equipped_sig = _equip_signature()
+
+## Looks chosen in the character creator (shared with the creator preview).
+static func _apply_profile_looks(cfg: Dictionary) -> void:
+	var p := Game.profile
+	if int(p.get("skin", 0)) > 0:
+		cfg["skin_color"] = Game.SKIN_COLORS[p.skin]
+	cfg["hair_style"] = p.get("hair_style", "natural")
+	var hc := int(p.get("hair_color", 0))
+	cfg["hair_color"] = Game.HAIR_COLORS2[hc]
+	if hc > 0:
+		cfg["hair_tint"] = Game.HAIR_COLORS2[hc]
+	cfg["face"] = p.get("face", "none")
+	cfg["build"] = float(p.get("build", 1.0))
+	cfg["height"] = float(p.get("height", 1.0))
 
 var _equipped_sig := ""
 func _equip_signature() -> String:
@@ -319,6 +335,10 @@ func _physics_process(delta: float) -> void:
 		var side := absf(local_in.x)
 		speed *= 1.0 - back * 0.28 - side * 0.1 * (1.0 - back)
 	var target_v := dir * speed
+	if special_kind == "charge":
+		target_v = _charge_dir * 15.0
+	elif special_kind == "whirl":
+		target_v *= 0.6
 	if dodging:
 		target_v = dodge_dir * 10.5 * (1.0 - dodge_time / 0.42 * 0.5)
 	var a := ACCEL if is_on_floor() else AIR_ACCEL
@@ -340,8 +360,12 @@ func _physics_process(delta: float) -> void:
 	if dodging and not strafe:
 		want = atan2(-dodge_dir.x, -dodge_dir.z)
 	var turn := 22.0 if strafe else (18.0 if attacking else 12.0)
+	if special_kind == "charge":
+		want = atan2(-_charge_dir.x, -_charge_dir.z)
 	facing = lerp_angle(facing, want, 1.0 - exp(-turn * delta))
 	body.rotation.y = facing
+	if special_kind == "whirl":
+		body.rotation.y = facing + _special_t / 0.75 * TAU * 2.0
 
 	# animation inputs
 	body.move_speed = hspeed
@@ -374,6 +398,9 @@ func _physics_process(delta: float) -> void:
 func _update_timers(delta: float) -> void:
 	invuln = maxf(0.0, invuln - delta)
 	potion_cd = maxf(0.0, potion_cd - delta)
+	special_cd = maxf(0.0, special_cd - delta)
+	if special_kind != "":
+		_special_step(delta)
 	if hurt_time >= 0.0:
 		hurt_time += delta
 		if hurt_time > 0.3:
@@ -435,6 +462,8 @@ func _handle_actions() -> void:
 			Sfx.play("spell", -6.0)
 		else:
 			Game.say("Not enough mana.", Color(0.6, 0.7, 1.0))
+	if Input.is_action_just_pressed("special"):
+		use_special()
 	if Input.is_action_just_pressed("mana_potion"):
 		drink_mana_potion()
 	if Input.is_action_just_pressed("potion"):
@@ -737,7 +766,7 @@ func _update_camera(delta: float) -> void:
 		pitch = lerpf(pitch, -0.18, 1.0 - exp(-0.9 * delta))
 	# --- follow the interpolated body position
 	var base := get_global_transform_interpolated().origin
-	var head_pos := base + Vector3(0, EYE_H, 0)
+	var head_pos := base + Vector3(0, EYE_H * float(Game.profile.get("height", 1.0)), 0)
 	if body.dead:
 		head_pos = base + Vector3(0, 0.6, 0)
 	if fp:
@@ -834,3 +863,253 @@ var mantles := 0
 const MANTLE_TIME := 0.42
 var _hold := 0.0
 var _off_now := Vector3.ZERO
+
+# ---------------------------------------------------------------------------
+# Special abilities: one per hero (Game.ABILITIES), on a cooldown.
+var special_cd := 0.0
+var special_kind := ""
+var specials_used := 0
+var special_damage := 0.0
+var _special_t := 0.0
+var _charge_dir := Vector3.ZERO
+var _special_hit := {}
+var _whirl_hits := 0
+
+func special_ready() -> bool:
+	return special_cd <= 0.0 and special_kind == ""
+
+func _live_enemies() -> Array:
+	var out: Array = []
+	for e in get_tree().get_nodes_in_group("damageable"):
+		if is_instance_valid(e) and e != self and e.has_method("take_damage") and e.get("dead") != true and e is Node3D:
+			out.append(e)
+	return out
+
+func _hit_radius(e: Node) -> float:
+	return e.get("hit_radius") if e.get("hit_radius") != null else 0.5
+
+func _blocked(a: Vector3, b: Vector3) -> Dictionary:
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1)
+	q.exclude = [get_rid()]
+	return get_world_3d().direct_space_state.intersect_ray(q)
+
+func _floor_at(p: Vector3) -> Variant:
+	var hit := _blocked(p + Vector3(0, 1.6, 0), p + Vector3(0, -4.0, 0))
+	return hit.position if hit else null
+
+func _special_hit_enemy(e: Node, dmg: float, knock: float, crit := false, stun := false) -> void:
+	if stun and e.get("_stagger_acc") != null:
+		e.set("_stagger_acc", 1.0e9)   # guarantees a stagger
+	e.take_damage(dmg, global_position, knock, crit)
+	special_damage += dmg
+	if Game.lifesteal() > 0.0:
+		heal(dmg * Game.lifesteal())
+
+func _teleport(to: Vector3) -> void:
+	global_position = to
+	velocity = Vector3.ZERO
+	reset_physics_interpolation()
+	body.reset_physics_interpolation()
+
+func use_special() -> void:
+	if dead or mantling or not input_enabled:
+		return
+	var ab := Game.ability()
+	if special_kind != "":
+		return
+	if special_cd > 0.0:
+		Game.say("%s ready in %ds." % [ab.name, ceili(special_cd)], Color(0.75, 0.7, 1.0))
+		return
+	attacking = false; casting = false; dodging = false; combo_queued = false; blocking = false
+	var ok := false
+	match Game.profile.hero:
+		"Rogue": ok = _backstab()
+		"Mage": ok = _shadow_step()
+		"Knight": ok = _start_charge()
+		"Barbarian": ok = _start_whirl()
+		"Ranger": ok = _volley()
+	if ok:
+		special_cd = ab.cd
+		specials_used += 1
+
+func _special_step(delta: float) -> void:
+	_special_t += delta
+	match special_kind:
+		"charge":
+			invuln = maxf(invuln, 0.05)
+			if int(_special_t * 30.0) % 2 == 0:
+				FX.burst(global_position + Vector3(0, 0.3, 0), Color(0.55, 0.5, 0.45), 3, 1.5, 0.3, 0.4, -2.0)
+			for e in _live_enemies():
+				if _special_hit.has(e):
+					continue
+				var to: Vector3 = e.global_position - global_position
+				to.y = 0
+				if to.length() < 1.4 + _hit_radius(e) and to.normalized().dot(_charge_dir) > -0.2:
+					_special_hit[e] = true
+					_special_hit_enemy(e, Game.attack_damage() * 1.8, 9.0, false, true)
+					FX.flash_light(e.global_position + Vector3(0, 1, 0), Color(0.6, 0.8, 1.0), 5.0, 6.0, 0.25)
+					add_trauma(0.35)
+					_hitstop(0.06)
+			if _special_t > 0.45 or (_special_t > 0.12 and get_real_velocity().length() < 3.0):
+				special_kind = ""
+				FX.shockwave(global_position, Color(0.5, 0.7, 1.0), 2.5, 0.35)
+		"whirl":
+			for m in [0.18, 0.5]:
+				if _special_t >= m and _special_t - delta < m:
+					var n := 0
+					for e in _live_enemies():
+						var to: Vector3 = e.global_position - global_position
+						to.y = 0
+						if to.length() < 3.4 + _hit_radius(e) and absf(e.global_position.y - global_position.y) < 2.5:
+							_special_hit_enemy(e, Game.attack_damage() * 1.15 * randf_range(0.9, 1.1), 6.0, randf() < Game.crit_chance())
+							n += 1
+					_whirl_hits += n
+					FX.shockwave(global_position, Color(1.0, 0.55, 0.25), 3.6, 0.35)
+					Sfx.play("swing", -4.0, 0.1)
+					if n > 0:
+						add_trauma(0.3)
+			if _special_t > 0.75:
+				special_kind = ""
+
+## Rogue: appear behind the nearest enemy in reach and strike for a big crit.
+func _backstab() -> bool:
+	var head := global_position + Vector3(0, 1.3, 0)
+	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
+	var best: Node3D = null
+	var best_s := INF
+	for e in _live_enemies():
+		var to: Vector3 = e.global_position - global_position
+		var d := to.length()
+		if d > 11.0 or absf(to.y) > 3.0:
+			continue
+		if not _blocked(head, e.global_position + Vector3(0, 1.0, 0)).is_empty():
+			continue
+		var sc := d - 3.5 * fwd.dot(Vector3(to.x, 0, to.z).normalized())
+		if sc < best_s:
+			best_s = sc
+			best = e
+	if best == null:
+		Game.say("No enemy close enough to backstab.", Color(0.75, 0.7, 1.0))
+		return false
+	var ep := best.global_position
+	var away := ep - global_position
+	away.y = 0
+	away = away.normalized() if away.length() > 0.05 else fwd
+	var back_d := _hit_radius(best) + 0.9
+	var mid := ep + Vector3(0, 1.0, 0)
+	var hit := _blocked(mid, mid + away * (back_d + 0.4))
+	if not hit.is_empty():
+		back_d = maxf(0.3, mid.distance_to(hit.position) - 0.45)
+	var dest := ep + away * back_d
+	var fl = _floor_at(dest)
+	if fl == null:
+		dest = ep - away * (_hit_radius(best) + 0.9)   # no floor behind it: strike from the front
+		fl = _floor_at(dest)
+	if fl != null:
+		dest.y = (fl as Vector3).y + 0.05
+	FX.burst(global_position + Vector3(0, 1, 0), Color(0.7, 0.35, 1.0), 34, 3.0, 0.3, 0.6, 1.0)
+	_teleport(dest)
+	var look := ep - dest
+	facing = atan2(-look.x, -look.z)
+	yaw = facing
+	body.rotation.y = facing
+	snap_view()
+	invuln = maxf(invuln, 0.5)
+	FX.burst(global_position + Vector3(0, 1, 0), Color(0.6, 0.3, 1.0), 26, 2.5, 0.25, 0.5, 1.0)
+	_special_hit_enemy(best, Game.attack_damage() * 3.5 * randf_range(0.95, 1.05), 4.0, true, true)
+	FX.flash_light(ep + Vector3(0, 1, 0), Color(0.8, 0.4, 1.0), 6.0, 6.0, 0.3)
+	Sfx.play("swing", -3.0, 0.05)
+	combo = 2
+	attacking = true
+	attack_dur = 0.72
+	attack_time = 0.25
+	hit_done = true
+	add_trauma(0.4)
+	_hitstop(0.09)
+	return true
+
+## Mage: blink up to 11 m the way you look (or move), with a shadow burst at both ends.
+func _shadow_step() -> bool:
+	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
+	var mv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	if mv.length() > 0.3:
+		fwd = Vector3(mv.x, 0, mv.y).rotated(Vector3.UP, view_yaw).normalized()
+	var start := global_position
+	var chest := start + Vector3(0, 1.0, 0)
+	var dist := 11.0
+	var hit := _blocked(chest, chest + fwd * dist)
+	if not hit.is_empty():
+		dist = chest.distance_to(hit.position) - 0.7
+	var dest := Vector3.ZERO
+	var found := false
+	while dist >= 2.0:
+		var p := start + fwd * dist
+		var fl = _floor_at(p)
+		if fl != null and absf((fl as Vector3).y - start.y) < 2.5:
+			dest = Vector3(p.x, (fl as Vector3).y + 0.05, p.z)
+			found = true
+			break
+		dist -= 1.0
+	if not found:
+		Game.say("No room to shadow step.", Color(0.75, 0.7, 1.0))
+		return false
+	_shadow_burst(start)
+	_teleport(dest)
+	snap_view()
+	invuln = maxf(invuln, 0.6)
+	_shadow_burst(dest)
+	Sfx.play("spell", -3.0, 0.05)
+	casting = true
+	cast_time = 0.2
+	return true
+
+func _shadow_burst(at: Vector3) -> void:
+	FX.burst(at + Vector3(0, 1.0, 0), Color(0.7, 0.35, 1.0), 50, 4.5, 0.35, 0.8, 1.5)
+	FX.shockwave(at, Color(0.5, 0.25, 1.0), 3.0, 0.4)
+	FX.flash_light(at + Vector3(0, 1, 0), Color(0.6, 0.3, 1.0), 5.0, 7.0, 0.3)
+	for e in _live_enemies():
+		if (e.global_position - at).length() < 3.0 + _hit_radius(e):
+			_special_hit_enemy(e, Game.attack_damage() * 1.3 + Game.spell_damage() * 0.4, 5.0, false, true)
+
+## Knight: a short shield rush that stuns whatever it hits.
+func _start_charge() -> bool:
+	var mv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	_charge_dir = -Vector3(sin(view_yaw), 0, cos(view_yaw))
+	if mv.length() > 0.3:
+		_charge_dir = Vector3(mv.x, 0, mv.y).rotated(Vector3.UP, view_yaw).normalized()
+	special_kind = "charge"
+	_special_t = 0.0
+	_special_hit.clear()
+	Sfx.play("swing", -2.0, 0.05)
+	add_trauma(0.15)
+	return true
+
+## Barbarian: spin twice, hitting everything around.
+func _start_whirl() -> bool:
+	special_kind = "whirl"
+	_special_t = 0.0
+	combo = 2
+	attacking = true
+	attack_dur = 0.75
+	attack_time = 0.0
+	hit_done = true
+	return true
+
+## Ranger: five arrows in a fan toward where the camera looks.
+func _volley() -> bool:
+	var fwd := -camera.global_transform.basis.z
+	fwd.y = clampf(fwd.y, -0.25, 0.25)
+	var start := global_position + Vector3(0, 1.35, 0) + (-Vector3(sin(facing), 0, cos(facing))) * 0.6
+	for i in 5:
+		var d := fwd.rotated(Vector3.UP, deg_to_rad(-24.0 + 12.0 * i)).normalized()
+		var b := Area3D.new()
+		b.set_script(bolt_scene_script)
+		b.position = start
+		get_tree().current_scene.add_child(b)
+		b.size = 0.8
+		b.homing = 0.8
+		b.launch(d, "player", Game.attack_damage() * 1.1, Color(0.55, 1.0, 0.45), 30.0)
+	Sfx.play("spell", -4.0, 0.1)
+	casting = true
+	cast_time = 0.15
+	return true

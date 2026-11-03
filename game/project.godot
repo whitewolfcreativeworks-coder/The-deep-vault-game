@@ -11,6 +11,11 @@ config/name="Bobek's Adventure"
 config/description="A small atmospheric dungeon crawler."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
+config/icon="res://icon.png"
+boot_splash/bg_color=Color(0, 0, 0, 1)
+boot_splash/image="res://assets/ui/splash.png"
+boot_splash/fullsize=true
+boot_splash/use_filter=true
 
 [autoload]
 

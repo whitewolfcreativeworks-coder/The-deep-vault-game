@@ -49,6 +49,7 @@ func _layout() -> void:
 		{"name": "block", "action": "block", "label": "BLOCK", "center": Vector2(w - 392, h - 112), "radius": 68.0, "hold": true},
 		{"name": "spell", "action": "spell", "label": "BOLT", "center": Vector2(w - 378, h - 300), "radius": 63.0, "hold": false},
 		{"name": "dodge", "action": "dodge", "label": "DODGE", "center": Vector2(w - 178, h - 398), "radius": 63.0, "hold": false},
+		{"name": "special", "action": "special", "label": "SPECIAL", "center": Vector2(w - 372, h - 462), "radius": 66.0, "hold": false},
 		{"name": "jump", "action": "jump", "label": "JUMP", "center": Vector2(w - 70, h - 318), "radius": 56.0, "hold": false},
 		{"name": "interact", "action": "interact", "label": "USE", "center": Vector2(w - 572, h - 100), "radius": 57.0, "hold": false},
 		{"name": "potion", "action": "potion", "label": "HEAL", "center": Vector2(w - 560, h - 250), "radius": 49.0, "hold": false},
@@ -243,6 +244,9 @@ func _draw_pad() -> void:
 			fill = Color(0.35, 0.05, 0.07, 0.5 if Game.potions > 0 else 0.2)
 		elif b.name == "mana":
 			fill = Color(0.06, 0.12, 0.38, 0.5 if Game.mana_potions > 0 else 0.2)
+		elif b.name == "special":
+			var abc: Color = Game.ability().color
+			fill = Color(abc.r * 0.45, abc.g * 0.3, abc.b * 0.55, 0.6 if player == null or player.special_cd <= 0.0 else 0.25)
 		if interact_ready:
 			fill = Color(0.45, 0.33, 0.12, 0.7)
 		pad.draw_circle(b.center, b.radius, fill)
@@ -253,4 +257,10 @@ func _draw_pad() -> void:
 			label = "HEAL %d" % Game.potions
 		elif b.name == "mana":
 			label = "MANA %d" % Game.mana_potions
+		elif b.name == "special":
+			label = Game.ability().short
+			if player and player.special_cd > 0.0:
+				var frac: float = player.special_cd / float(Game.ability().cd)
+				pad.draw_arc(b.center, b.radius - 6.0, -PI / 2, -PI / 2 + TAU * frac, 40, Color(1, 1, 1, 0.5), 7.0)
+				label = "%d" % ceili(player.special_cd)
 		pad.draw_string(_font, b.center + Vector2(-b.radius, fs * 0.35), label, HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, fs, Color(1, 0.95, 0.85, 0.9))

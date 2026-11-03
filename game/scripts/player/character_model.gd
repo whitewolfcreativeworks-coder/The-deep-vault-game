@@ -78,7 +78,7 @@ const SKIN_LOOKS := {
 }
 var _aura: Node3D
 
-## cfg: {kind:"hero", hero:"Knight", cape_color:Color, show_hat:bool, weapon:id, shield:id|""}
+## cfg: {kind:"hero", hero:"Knight", cape_color:Color, outfit_color:Color, show_hat:bool, weapon:id, shield:id|""}
 ##      {kind:"skeleton", variant:"minion", weapon:"skel_blade", shield:"Skeleton_Shield_Small_A", eye:Color}
 func setup(cfg: Dictionary) -> void:
 	for c in get_children():
@@ -125,7 +125,7 @@ func setup(cfg: Dictionary) -> void:
 			if hero.hat != "" and m.name == hero.hat and not cfg.get("show_hat", true):
 				m.visible = false
 			if m.name == hero.cape and cfg.has("cape_color"):
-				_tint(m, cfg.cape_color)
+				_recolor(m, cfg.cape_color, 1.0, 0.0, null)
 		else:
 			if String(m.name).contains("Head") or String(m.name).contains("Jaw") or String(m.name).contains("Skull") or String(m.name).contains("Eyes") or String(m.name).contains("Helmet") or String(m.name).contains("Hat") or String(m.name).contains("Hood"):
 				head_meshes.append(m)
@@ -135,10 +135,27 @@ func setup(cfg: Dictionary) -> void:
 				em.emission_enabled = true; em.emission = cfg.eye; em.emission_energy_multiplier = 6.0
 				m.material_override = em
 	_setup_anims()
-	if cfg.has("tint") and SKIN_LOOKS.get(skin, {}).is_empty():
+	if SKIN_LOOKS.get(skin, {}).is_empty() and skin != "bone":
+		# outfit colour chosen at the start tints body, arms, legs and headgear;
+		# armour found later adds its own lighter tint on top
+		var outfit: Color = cfg.get("outfit_color", Color.WHITE)
+		var has_outfit := outfit != Color.WHITE
+		var armor_t: Color = Color.WHITE.lerp(cfg.tint, 0.45 if not has_outfit else 0.25) if cfg.has("tint") else Color.WHITE
+		var skin_c = cfg.get("skin_color", null)
+		var hair_t = cfg.get("hair_tint", null)
+		if kind != "hero":
+			skin_c = null
+			hair_t = null
 		for m in all_meshes:
-			if not String(m.name).contains("Cape") and not String(m.name).contains("Eyes"):
-				_mul(m, Color.WHITE.lerp(cfg.tint, 0.45))
+			var nm := String(m.name)
+			if nm.contains("Cape") or nm.contains("Eyes"):
+				continue
+			var is_head := nm.contains("_Head")
+			if skin_c != null or has_outfit or (is_head and hair_t != null):
+				var st := 0.0 if is_head else (0.72 if has_outfit else (0.3 if armor_t != Color.WHITE else 0.0))
+				_recolor(m, (outfit if has_outfit else Color.WHITE) * armor_t, st, 1.0, skin_c, hair_t if is_head else null)
+			elif armor_t != Color.WHITE and not is_head:
+				_mul(m, armor_t)
 	if SKIN_LOOKS.has(skin):
 		for m in all_meshes:
 			if String(m.name).contains("Eyes"):
@@ -153,6 +170,13 @@ func setup(cfg: Dictionary) -> void:
 		_add_aura(Color(1.0, 0.45, 0.15), 2, true)
 	_base_scale = float(cfg.get("scale", 0.84))
 	scale = Vector3.ONE * _base_scale
+	if kind == "hero":
+		var bw := float(cfg.get("build", 1.0))
+		var bh := float(cfg.get("height", 1.0))
+		model.scale = Vector3(bw, bh, lerpf(1.0, bw, 0.85))
+		var hat_on: bool = hero.hat != "" and cfg.get("show_hat", true)
+		var hooded: bool = String(hero.get("path", "")).contains("Hooded")
+		_add_head_looks(hero, cfg, hat_on or hooded)
 	_play(anims.idle, 0.0)
 
 ## Multiply a mesh's colours (keeps its texture).
@@ -210,6 +234,36 @@ func _add_aura(c: Color, level: int, embers := false) -> void:
 		l.light_color = c; l.light_energy = 0.7; l.omni_range = 3.0
 		l.position.y = 1.0
 		_aura.add_child(l)
+
+## Swap a mesh's colour for `c`, keeping the texture's shading (see recolor.gdshader).
+func _recolor(m: MeshInstance3D, c: Color, strength: float, skin_protect: float, skin = null, hair = null) -> void:
+	for s in m.mesh.get_surface_count():
+		var base := m.get_active_material(s)
+		if not base is StandardMaterial3D:
+			continue
+		var sm := base as StandardMaterial3D
+		if sm.albedo_texture == null:
+			var d := sm.duplicate() as StandardMaterial3D
+			d.albedo_color = sm.albedo_color.lerp(c, strength)
+			m.set_surface_override_material(s, d)
+			continue
+		var r := ShaderMaterial.new()
+		r.shader = _recolor_shader
+		r.set_shader_parameter("tex", sm.albedo_texture)
+		r.set_shader_parameter("tint", c)
+		r.set_shader_parameter("strength", strength)
+		r.set_shader_parameter("skin_protect", skin_protect)
+		if skin != null:
+			r.set_shader_parameter("skin_tone", skin)
+			r.set_shader_parameter("skin_on", 1.0)
+		if hair != null:
+			r.set_shader_parameter("hair_tone", hair)
+			r.set_shader_parameter("hair_on", 1.0)
+		r.set_shader_parameter("roughness_v", sm.roughness)
+		r.set_shader_parameter("metallic_v", sm.metallic)
+		m.set_surface_override_material(s, r)
+
+static var _recolor_shader: Shader = preload("res://shaders/recolor.gdshader")
 
 func _tint(m: MeshInstance3D, c: Color) -> void:
 	for s in m.get_surface_override_material_count():
@@ -441,3 +495,125 @@ func _locomotion(delta: float) -> void:
 	else:
 		_pend = ""
 	_play(_loco, 0.24, w[1] if clip == _loco else anim.speed_scale)
+
+# ---------------------------------------------------------------------------
+# Character-creator looks: hair styles and face details are small meshes on the
+# head bone, laid out from the head mesh's own bounds so they fit every hero.
+var looks_root: Node3D
+
+func _head_bounds(hero: Dictionary) -> AABB:
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		if mi.name == hero.head[0]:
+			return (mi as MeshInstance3D).get_aabb()
+	return AABB(Vector3(-0.54, 1.2, -0.5), Vector3(1.08, 1.1, 1.02))
+
+func _look_mat(c: Color, rough := 0.75) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.roughness = rough
+	return m
+
+func _piece(mesh: Mesh, mat: Material, pos: Vector3, scl := Vector3.ONE, rot := Vector3.ZERO) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.material_overlay = flash_mat
+	mi.position = pos
+	mi.scale = scl
+	mi.rotation = rot
+	looks_root.add_child(mi)
+	head_meshes.append(mi)
+	return mi
+
+func _sphere(hemi := false) -> SphereMesh:
+	var sm := SphereMesh.new(); sm.radius = 1.0; sm.height = 2.0 if not hemi else 1.0
+	sm.is_hemisphere = hemi
+	sm.radial_segments = 20; sm.rings = 10
+	return sm
+
+func _boxm(x: float, y: float, z: float) -> BoxMesh:
+	var b := BoxMesh.new(); b.size = Vector3(x, y, z)
+	return b
+
+func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
+	var style: String = cfg.get("hair_style", "natural")
+	var face: String = cfg.get("face", "none")
+	if (style == "natural" or covered) and face == "none":
+		return
+	if skel == null or skel.find_bone("head") < 0:
+		return
+	var hb := skel.find_bone("head")
+	var ba := _attach("head")
+	looks_root = Node3D.new()
+	looks_root.transform = skel.get_bone_global_rest(hb).affine_inverse()   # author in skeleton space
+	ba.add_child(looks_root)
+	var box := _head_bounds(hero)
+	var c := box.get_center()
+	var sz := box.size
+	var rx := sz.x * 0.5; var ry := sz.y * 0.5; var rz := sz.z * 0.5
+	var hair_c: Color = cfg.get("hair_color", Color(0.32, 0.19, 0.1))
+	var skin_c: Color = cfg.get("skin_color", Color(0.97, 0.8, 0.67))
+	var hair := _look_mat(hair_c, 0.7)
+	if not covered and style != "natural":
+		var cap_mat: Material = hair
+		if style in ["bald", "mohawk"]:
+			cap_mat = _look_mat(skin_c, 0.45)
+		# skull cap (top half) and nape: cover the hero's own hair
+		_piece(_sphere(true), cap_mat, c + Vector3(0, ry * 0.1, -rz * 0.04), Vector3(rx * 1.11, ry * 1.13, rz * 1.13))
+		_piece(_sphere(), cap_mat, c + Vector3(0, ry * 0.06, -rz * 0.3), Vector3(rx * 1.05, ry * 0.9, rz * 0.82))
+		match style:
+			"cropped":
+				_piece(_boxm(sz.x * 0.7, ry * 0.2, rz * 0.3), hair, c + Vector3(0, ry * 0.62, rz * 0.62), Vector3.ONE, Vector3(-0.35, 0, 0))
+			"long":
+				_piece(_sphere(), hair, c + Vector3(0, -ry * 0.45, -rz * 0.62), Vector3(rx * 0.98, ry * 0.95, rz * 0.45))
+				for sd in [-1.0, 1.0]:
+					_piece(_sphere(), hair, c + Vector3(sd * rx * 0.92, -ry * 0.35, -rz * 0.2), Vector3(rx * 0.2, ry * 0.75, rz * 0.55))
+				_piece(_boxm(sz.x * 0.72, ry * 0.2, rz * 0.3), hair, c + Vector3(0, ry * 0.62, rz * 0.62), Vector3.ONE, Vector3(-0.35, 0, 0))
+			"ponytail":
+				var cap := CapsuleMesh.new(); cap.radius = rx * 0.2; cap.height = sz.y * 0.85
+				_piece(cap, hair, c + Vector3(0, -ry * 0.1, -rz * 1.12), Vector3.ONE, Vector3(-0.45, 0, 0))
+				_piece(_sphere(), _look_mat(Color(0.75, 0.2, 0.2)), c + Vector3(0, ry * 0.42, -rz * 0.98), Vector3.ONE * rx * 0.16)
+			"buns":
+				for sd in [-1.0, 1.0]:
+					_piece(_sphere(), hair, c + Vector3(sd * rx * 0.62, ry * 0.88, -rz * 0.12), Vector3.ONE * rx * 0.36)
+			"spiky":
+				for i in 9:
+					var cone := CylinderMesh.new(); cone.top_radius = 0.0; cone.bottom_radius = rx * 0.22; cone.height = ry * 0.6
+					var a := float(i) / 9.0 * TAU
+					var off := Vector3(sin(a) * rx * 0.5, ry * 0.95, cos(a) * rz * 0.45 - rz * 0.1)
+					_piece(cone, hair, c + off, Vector3.ONE, Vector3(cos(a) * 0.55, 0, -sin(a) * 0.55))
+			"mohawk":
+				_piece(_sphere(), hair, c + Vector3(0, ry * 0.92, -rz * 0.12), Vector3(rx * 0.14, ry * 0.42, rz * 0.95))
+	# face details sit on the front of the head (+Z in skeleton space)
+	var fz := func(x: float, y: float) -> float:
+		var k := 1.0 - pow(x / rx, 2.0) - pow((y - c.y) / ry, 2.0)
+		return c.z + rz * sqrt(maxf(k, 0.05))
+	var eye_y := c.y - ry * 0.08
+	var eye_x := rx * 0.36
+	match face:
+		"beard":
+			_piece(_sphere(), hair, Vector3(0, c.y - ry * 0.62, fz.call(0.0, c.y - ry * 0.62) - rz * 0.25), Vector3(rx * 0.62, ry * 0.4, rz * 0.32))
+			_piece(_boxm(rx * 0.7, ry * 0.09, rz * 0.12), hair, Vector3(0, c.y - ry * 0.38, fz.call(0.0, c.y - ry * 0.38)))
+		"mustache":
+			for sd in [-1.0, 1.0]:
+				_piece(_boxm(rx * 0.34, ry * 0.08, rz * 0.08), hair, Vector3(sd * rx * 0.16, c.y - ry * 0.4, fz.call(sd * rx * 0.16, c.y - ry * 0.4)), Vector3.ONE, Vector3(0, 0, sd * -0.35))
+		"eyepatch":
+			var d := CylinderMesh.new(); d.top_radius = rx * 0.17; d.bottom_radius = rx * 0.17; d.height = 0.03
+			_piece(d, _look_mat(Color(0.05, 0.05, 0.05), 0.5), Vector3(eye_x, eye_y, fz.call(eye_x, eye_y) + 0.01), Vector3.ONE, Vector3(PI / 2, 0, 0))
+			var band := TorusMesh.new(); band.inner_radius = 0.97; band.outer_radius = 1.03; band.rings = 32; band.ring_segments = 6
+			if not covered:
+				_piece(band, _look_mat(Color(0.08, 0.06, 0.05)), Vector3(0, eye_y + ry * 0.18, c.z), Vector3(rx * 1.0, ry * 0.5, rz * 1.0), Vector3(0, 0, -0.3))
+		"scar":
+			_piece(_boxm(rx * 0.05, ry * 0.42, 0.03), _look_mat(Color(0.6, 0.22, 0.2), 0.6), Vector3(-eye_x, eye_y - ry * 0.02, fz.call(-eye_x, eye_y) + 0.01), Vector3.ONE, Vector3(0, 0, 0.4))
+		"warpaint":
+			var paint := _look_mat(Color(0.15, 0.35, 0.95), 0.5)
+			for sd in [-1.0, 1.0]:
+				for k in 2:
+					var yy := c.y - ry * (0.26 + 0.12 * k)
+					_piece(_boxm(rx * 0.32, ry * 0.05, 0.02), paint, Vector3(sd * rx * 0.48, yy, fz.call(sd * rx * 0.48, yy) + 0.005), Vector3.ONE, Vector3(0, sd * 0.45, 0))
+		"blush":
+			var pink := _look_mat(Color(1.0, 0.5, 0.55), 0.6)
+			for sd in [-1.0, 1.0]:
+				var yy2 := c.y - ry * 0.3
+				var d2 := CylinderMesh.new(); d2.top_radius = rx * 0.13; d2.bottom_radius = rx * 0.13; d2.height = 0.02
+				_piece(d2, pink, Vector3(sd * rx * 0.5, yy2, fz.call(sd * rx * 0.5, yy2) - 0.005), Vector3.ONE, Vector3(PI / 2, sd * 0.5, 0))

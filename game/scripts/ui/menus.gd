@@ -119,43 +119,145 @@ func _build_title() -> void:
 	v.add_child(t2)
 	var sp := Control.new(); sp.custom_minimum_size.y = 40; v.add_child(sp)
 	v.add_child(_button("Begin Adventure", func() -> void: show_panel("creator")))
-	_mute_btn = _button("Sound: On", func() -> void: _toggle_mute())
+	_mute_btn = _button(_sound_label(), func() -> void: _toggle_mute())
 	v.add_child(_mute_btn)
 	v.add_child(_button("Quit", func() -> void: quit_requested.emit()))
+	var cover := TextureRect.new()
+	cover.texture = load("res://assets/ui/cover_art.png")
+	cover.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cover.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cover.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	cover.offset_left = -560; cover.offset_right = -70; cover.offset_top = -245; cover.offset_bottom = 245
+	cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(cover)
 	var foot := UIKit.label("An open-source experiment · Godot 4.5 · Assets: KayKit (CC0), Poly Haven (CC0), original procedural art & sound", 14, UIKit.DIM)
 	foot.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	foot.position = Vector2(110, -50)
 	c.add_child(foot)
+	# Browsers keep audio locked until the first tap. On the web, the first screen
+	# asks for that tap, so the music starts the moment the title appears.
+	if OS.has_feature("web"):
+		var gate := Button.new()
+		gate.set_anchors_preset(Control.PRESET_FULL_RECT)
+		var sb := StyleBoxFlat.new(); sb.bg_color = Color(0, 0, 0, 0.94)
+		for st in ["normal", "hover", "pressed", "focus"]:
+			gate.add_theme_stylebox_override(st, sb)
+		var art := TextureRect.new()
+		art.texture = load("res://assets/ui/cover_art.png")
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		art.set_anchors_preset(Control.PRESET_FULL_RECT)
+		art.anchor_bottom = 0.82
+		art.offset_top = 30
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gate.add_child(art)
+		var tap := UIKit.label("Tap anywhere to begin  ·  this turns the sound on", 30, UIKit.GOLD, true)
+		tap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tap.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		tap.offset_top = -120; tap.offset_bottom = -60
+		tap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gate.add_child(tap)
+		var tw := tap.create_tween().set_loops()
+		tw.tween_property(tap, "modulate:a", 0.45, 0.9)
+		tw.tween_property(tap, "modulate:a", 1.0, 0.9)
+		gate.pressed.connect(func() -> void:
+			gate.queue_free()
+			Sfx.set_muted(false)
+			_mute_btn.text = _sound_label()
+			Sfx.restart_music()
+			Sfx.play("levelup", -8.0, 0.0))
+		c.add_child(gate)
+		_audio_gate = gate
+
+func _sound_label() -> String:
+	return "Sound is OFF  (tap to turn on)" if Sfx.muted else "Sound is ON  (tap to mute)"
 
 func _toggle_mute() -> void:
 	Sfx.set_muted(not Sfx.muted)
-	_mute_btn.text = "Sound: Off" if Sfx.muted else "Sound: On"
+	_mute_btn.text = _sound_label()
+	if _pause_sound_btn:
+		_pause_sound_btn.text = _sound_label()
 
 # ---------------------------------------------------------------------------
+func _swatch(col: Color, tip: String, cb: Callable, w := 48.0, txt := "") -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(w, 42)
+	b.tooltip_text = tip
+	b.toggle_mode = true
+	b.text = txt
+	var sb := StyleBoxFlat.new(); sb.bg_color = col
+	sb.set_corner_radius_all(6); sb.border_color = Color(0, 0, 0, 0.6); sb.set_border_width_all(2)
+	var sbp := sb.duplicate() as StyleBoxFlat; sbp.border_color = UIKit.GOLD; sbp.set_border_width_all(4)
+	b.add_theme_stylebox_override("normal", sb); b.add_theme_stylebox_override("hover", sbp)
+	b.add_theme_stylebox_override("pressed", sbp); b.add_theme_stylebox_override("focus", sbp)
+	b.pressed.connect(func() -> void:
+		Sfx.play("footstep", -10.0, 0.0)
+		cb.call())
+	return b
+
+func _choice(text: String, cb: Callable, w := 118.0) -> Button:
+	var b := Button.new(); b.text = text; b.toggle_mode = true
+	b.custom_minimum_size = Vector2(w, 42)
+	b.add_theme_font_size_override("font_size", 17)
+	b.pressed.connect(func() -> void:
+		Sfx.play("footstep", -10.0, 0.0)
+		cb.call())
+	return b
+
+func _grid(cols: int, parent: Control) -> GridContainer:
+	var g := GridContainer.new(); g.columns = cols
+	g.add_theme_constant_override("h_separation", 6); g.add_theme_constant_override("v_separation", 6)
+	parent.add_child(g)
+	return g
+
+func _heading(t: String, parent: Control) -> void:
+	parent.add_child(UIKit.label(t, 17, UIKit.DIM, true))
+
+func _slider(lo: float, hi: float, key: String, left: String, right: String, parent: Control) -> HSlider:
+	var r := HBoxContainer.new(); r.add_theme_constant_override("separation", 10); parent.add_child(r)
+	var l1 := UIKit.label(left, 16, UIKit.PARCH); l1.custom_minimum_size.x = 64; r.add_child(l1)
+	var sl := HSlider.new(); sl.min_value = lo; sl.max_value = hi; sl.step = 0.01
+	sl.custom_minimum_size = Vector2(300, 42); sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sl.value = float(Game.profile.get(key, 1.0))
+	sl.value_changed.connect(func(v: float) -> void:
+		Game.profile[key] = v
+		_refresh_preview())
+	r.add_child(sl)
+	r.add_child(UIKit.label(right, 16, UIKit.PARCH))
+	return sl
+
+var _skin_btns: Array[Button] = []
+var _hair_btns := {}
+var _hcol_btns: Array[Button] = []
+var _face_btns := {}
+var _build_sl: HSlider
+var _height_sl: HSlider
+var _hair_note: Label
+
 func _build_creator() -> void:
-	var p := _center_panel("creator", 1180, 720)
-	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 24)
+	var p := _center_panel("creator", 1540, 820)
+	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 22)
 	p.add_child(h)
 	# preview
 	var svc := SubViewportContainer.new()
-	svc.custom_minimum_size = Vector2(520, 680)
+	svc.custom_minimum_size = Vector2(440, 780)
 	svc.stretch = true
 	h.add_child(svc)
 	_preview_vp = SubViewport.new()
 	_preview_vp.own_world_3d = true
 	_preview_vp.transparent_bg = false
-	_preview_vp.size = Vector2i(520, 680)
+	_preview_vp.size = Vector2i(440, 780)
 	_preview_vp.msaa_3d = Viewport.MSAA_4X
 	svc.add_child(_preview_vp)
 	var w := Node3D.new(); _preview_vp.add_child(w)
 	var we := WorldEnvironment.new(); var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR; e.background_color = Color(0.05, 0.05, 0.07)
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR; e.ambient_light_color = Color(0.35, 0.33, 0.45); e.ambient_light_energy = 0.6
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR; e.ambient_light_color = Color(0.4, 0.38, 0.48); e.ambient_light_energy = 0.7
 	e.tonemap_mode = Environment.TONE_MAPPER_AGX
 	e.glow_enabled = true
 	we.environment = e; w.add_child(we)
-	var key := SpotLight3D.new(); key.light_color = Color(1.0, 0.75, 0.5); key.light_energy = 14.0; key.spot_range = 12.0; key.spot_angle = 30.0
-	key.position = Vector3(1.8, 3.4, 2.6); key.look_at_from_position(key.position, Vector3(0, 1.0, 0)); key.shadow_enabled = true
+	var key := SpotLight3D.new(); key.light_color = Color(1.0, 0.8, 0.6); key.light_energy = 14.0; key.spot_range = 12.0; key.spot_angle = 30.0
+	key.position = Vector3(1.6, 3.4, 3.0); key.look_at_from_position(key.position, Vector3(0, 1.0, 0)); key.shadow_enabled = true
 	w.add_child(key)
 	var rim := OmniLight3D.new(); rim.light_color = Color(0.3, 0.6, 1.0); rim.light_energy = 3.0; rim.omni_range = 6.0
 	rim.position = Vector3(-1.5, 2.2, -1.6); w.add_child(rim)
@@ -164,69 +266,119 @@ func _build_creator() -> void:
 	var fm := ShaderMaterial.new(); fm.shader = load("res://shaders/stone.gdshader"); fm.set_shader_parameter("mode", 1)
 	floor_m.material_override = fm; floor_m.position.y = -0.1
 	w.add_child(floor_m)
-	var cam := Camera3D.new(); cam.position = Vector3(0, 1.35, 6.2); cam.fov = 30
+	var cam := Camera3D.new(); cam.position = Vector3(0, 1.4, 6.6); cam.fov = 30
 	w.add_child(cam)
-	cam.look_at(Vector3(0, 1.05, 0))
+	cam.look_at(Vector3(0, 1.1, 0))
 	_preview = CharacterModel.new()
 	w.add_child(_preview)
-	# options
-	var opts := VBoxContainer.new(); opts.add_theme_constant_override("separation", 12)
-	opts.custom_minimum_size.x = 580
-	h.add_child(opts)
-	opts.add_child(UIKit.label("Create Your Adventurer", 34, UIKit.GOLD, true))
-	opts.add_child(UIKit.label("Hero", 18, UIKit.DIM, true))
-	var hg := GridContainer.new(); hg.columns = 3; hg.add_theme_constant_override("h_separation", 8); hg.add_theme_constant_override("v_separation", 8)
-	opts.add_child(hg)
+	# ---- column A: who you are + body
+	var ca := VBoxContainer.new(); ca.add_theme_constant_override("separation", 9)
+	ca.custom_minimum_size.x = 500
+	h.add_child(ca)
+	ca.add_child(UIKit.label("Create Your Adventurer", 32, UIKit.GOLD, true))
+	_heading("Hero", ca)
+	var hg := _grid(3, ca)
 	for hero in Game.HERO_ORDER:
-		var hb := Button.new(); hb.text = hero; hb.toggle_mode = true; hb.custom_minimum_size = Vector2(180, 44)
-		hb.pressed.connect(func() -> void:
+		var hb := _choice(hero, func() -> void:
 			Game.profile.hero = hero
-			_refresh_preview(true))
+			_refresh_preview(true), 160)
 		hg.add_child(hb)
 		_hero_btns[hero] = hb
-	_hero_desc = UIKit.label("", 17, UIKit.PARCH)
+	_hero_desc = UIKit.label("", 16, UIKit.PARCH)
 	_hero_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	opts.add_child(_hero_desc)
-	opts.add_child(UIKit.label("Cloak colour", 18, UIKit.DIM, true))
-	var cg := HBoxContainer.new(); cg.add_theme_constant_override("separation", 8)
-	opts.add_child(cg)
-	for i in Game.CAPE_COLORS.size():
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(62, 40)
-		b.tooltip_text = Game.CAPE_NAMES[i]
-		b.toggle_mode = true
-		var sb := StyleBoxFlat.new(); sb.bg_color = Game.CAPE_COLORS[i] if i > 0 else Color(0.5, 0.45, 0.4)
-		sb.set_corner_radius_all(4); sb.border_color = Color(0, 0, 0, 0.6); sb.set_border_width_all(2)
-		var sbp := sb.duplicate() as StyleBoxFlat; sbp.border_color = UIKit.GOLD; sbp.set_border_width_all(4)
-		b.add_theme_stylebox_override("normal", sb); b.add_theme_stylebox_override("hover", sbp)
-		b.add_theme_stylebox_override("pressed", sbp); b.add_theme_stylebox_override("focus", sbp)
-		if i == 0:
-			b.text = "—"
+	_hero_desc.custom_minimum_size.y = 70
+	ca.add_child(_hero_desc)
+	_heading("Skin", ca)
+	var sg := _grid(9, ca)
+	for i in Game.SKIN_COLORS.size():
 		var idx := i
-		b.pressed.connect(func() -> void:
-			Game.profile.cape = idx
+		var col: Color = Game.SKIN_COLORS[i] if i > 0 else Color(0.45, 0.42, 0.4)
+		var b := _swatch(col, Game.SKIN_NAMES[i], func() -> void:
+			Game.profile.skin = idx
+			_refresh_preview(), 48, "—" if i == 0 else "")
+		sg.add_child(b); _skin_btns.append(b)
+	_heading("Build", ca)
+	_build_sl = _slider(0.82, 1.3, "build", "Skinny", "Big", ca)
+	_heading("Height", ca)
+	_height_sl = _slider(0.86, 1.14, "height", "Short", "Tall", ca)
+	_heading("Name", ca)
+	var nr := HBoxContainer.new(); nr.add_theme_constant_override("separation", 8); ca.add_child(nr)
+	_name_edit = LineEdit.new(); _name_edit.custom_minimum_size = Vector2(330, 46); _name_edit.max_length = 22
+	_name_edit.text = Game.profile.name
+	nr.add_child(_name_edit)
+	nr.add_child(_button("Random", func() -> void: _name_edit.text = NAMES.pick_random(), 150))
+	var spa := Control.new(); spa.size_flags_vertical = Control.SIZE_EXPAND_FILL; ca.add_child(spa)
+	var br := HBoxContainer.new(); br.add_theme_constant_override("separation", 12); ca.add_child(br)
+	br.add_child(_button("Back", func() -> void: show_panel("title"), 150))
+	br.add_child(_button("Randomize look", func() -> void: _randomize_look(), 240))
+	# ---- column B: hair, face, gear
+	var cb := VBoxContainer.new(); cb.add_theme_constant_override("separation", 9)
+	cb.custom_minimum_size.x = 510
+	h.add_child(cb)
+	var top_sp := Control.new(); top_sp.custom_minimum_size.y = 40; cb.add_child(top_sp)
+	_heading("Hair style", cb)
+	var hsg := _grid(4, cb)
+	for i in Game.HAIR_STYLES2.size():
+		var st: String = Game.HAIR_STYLES2[i]
+		var b := _choice(Game.HAIR_STYLE_NAMES[st], func() -> void:
+			Game.profile.hair_style = st
+			if st != "natural":
+				Game.profile.show_hat = false     # show off the new hair
 			_refresh_preview())
-		cg.add_child(b)
-		_cape_btns.append(b)
+		hsg.add_child(b); _hair_btns[st] = b
+	_hair_note = UIKit.label("", 14, UIKit.DIM)
+	cb.add_child(_hair_note)
+	_heading("Hair colour", cb)
+	var hcg := _grid(10, cb)
+	for i in Game.HAIR_COLORS2.size():
+		var idx := i
+		var b := _swatch(Game.HAIR_COLORS2[i] if i > 0 else Color(0.45, 0.42, 0.4), Game.HAIR_COLOR_NAMES[i], func() -> void:
+			Game.profile.hair_color = idx
+			_refresh_preview(), 44, "—" if i == 0 else "")
+		hcg.add_child(b); _hcol_btns.append(b)
+	_heading("Face", cb)
+	var fg := _grid(4, cb)
+	for i in Game.FACES.size():
+		var f: String = Game.FACES[i]
+		var b := _choice(Game.FACE_NAMES[f], func() -> void:
+			Game.profile.face = f
+			_refresh_preview())
+		fg.add_child(b); _face_btns[f] = b
+	_heading("Armor & cloak colour", cb)
+	var cg := _grid(7, cb)
+	for i in Game.CAPE_COLORS.size():
+		var idx := i
+		var b := _swatch(Game.CAPE_COLORS[i] if i > 0 else Color(0.5, 0.45, 0.4), Game.CAPE_NAMES[i], func() -> void:
+			Game.profile.cape = idx
+			_refresh_preview(), 62, "—" if i == 0 else "")
+		cg.add_child(b); _cape_btns.append(b)
 	_hat_btn = CheckButton.new(); _hat_btn.text = "Show helm / hat"; _hat_btn.button_pressed = true
 	_hat_btn.toggled.connect(func(on: bool) -> void:
 		Game.profile.show_hat = on
 		_refresh_preview())
-	opts.add_child(_hat_btn)
-	opts.add_child(UIKit.label("Name", 18, UIKit.DIM, true))
-	var nr := HBoxContainer.new(); nr.add_theme_constant_override("separation", 8); opts.add_child(nr)
-	_name_edit = LineEdit.new(); _name_edit.custom_minimum_size = Vector2(380, 46); _name_edit.max_length = 22
-	_name_edit.text = Game.profile.name
-	nr.add_child(_name_edit)
-	nr.add_child(_button("Random", func() -> void: _name_edit.text = NAMES.pick_random(), 150))
-	var sp := Control.new(); sp.size_flags_vertical = Control.SIZE_EXPAND_FILL; opts.add_child(sp)
-	opts.add_child(UIKit.label("Every hero fights with sword, shield and the arcane bolt.\nYour choice is how you look and who you are.", 15, UIKit.DIM))
-	var br := HBoxContainer.new(); br.add_theme_constant_override("separation", 12); opts.add_child(br)
-	br.add_child(_button("Back", func() -> void: show_panel("title"), 160))
-	br.add_child(_button("Enter the Vault", func() -> void:
+	cb.add_child(_hat_btn)
+	var spb := Control.new(); spb.size_flags_vertical = Control.SIZE_EXPAND_FILL; cb.add_child(spb)
+	cb.add_child(UIKit.label("Every hero fights with sword, shield, arcane bolt and a special move.", 14, UIKit.DIM))
+	var er := HBoxContainer.new(); er.alignment = BoxContainer.ALIGNMENT_END; cb.add_child(er)
+	er.add_child(_button("Enter the Vault", func() -> void:
 		var nm := _name_edit.text.strip_edges()
 		Game.profile.name = nm if nm != "" else "Nameless"
-		start_requested.emit(), 300))
+		start_requested.emit(), 320))
+
+func _randomize_look() -> void:
+	var p := Game.profile
+	p.skin = randi() % Game.SKIN_COLORS.size()
+	p.hair_style = Game.HAIR_STYLES2.pick_random()
+	p.hair_color = randi() % Game.HAIR_COLORS2.size()
+	p.face = Game.FACES.pick_random()
+	p.cape = randi() % Game.CAPE_COLORS.size()
+	p.build = snappedf(randf_range(0.85, 1.25), 0.01)
+	p.height = snappedf(randf_range(0.88, 1.12), 0.01)
+	if p.hair_style != "natural":
+		p.show_hat = false
+	_build_sl.set_value_no_signal(p.build)
+	_height_sl.set_value_no_signal(p.height)
+	_refresh_preview(true)
 
 func _refresh_preview(cheer := false) -> void:
 	var p := Game.profile
@@ -234,11 +386,30 @@ func _refresh_preview(cheer := false) -> void:
 		(_hero_btns[k] as Button).button_pressed = k == p.hero
 	for i in _cape_btns.size():
 		_cape_btns[i].button_pressed = i == p.cape
-	_hero_desc.text = Game.HERO_BLURB.get(p.hero, "")
-	_hat_btn.visible = CharacterModel.HEROES[p.hero].hat != ""
+	for i in _skin_btns.size():
+		_skin_btns[i].button_pressed = i == int(p.skin)
+	for i in _hcol_btns.size():
+		_hcol_btns[i].button_pressed = i == int(p.hair_color)
+	for k in _hair_btns:
+		(_hair_btns[k] as Button).button_pressed = k == p.hair_style
+	for k in _face_btns:
+		(_face_btns[k] as Button).button_pressed = k == p.face
+	var ab := Game.ability()
+	_hero_desc.text = "%s\nSpecial: %s. %s" % [Game.HERO_BLURB.get(p.hero, ""), ab.name, ab.desc]
+	var hero: Dictionary = CharacterModel.HEROES[p.hero]
+	_hat_btn.visible = hero.hat != ""
+	_hat_btn.set_pressed_no_signal(p.show_hat)
+	if String(hero.path).contains("Hooded"):
+		_hair_note.text = "The Ranger's hood hides the hair (face details still show)."
+	elif hero.hat != "" and p.show_hat and p.hair_style != "natural":
+		_hair_note.text = "Turn the helm off to see the hair."
+	else:
+		_hair_note.text = ""
 	var cfg := {"kind": "hero", "hero": p.hero, "show_hat": p.show_hat, "weapon": "rusty_sword", "shield": "shield_round", "scale": 1.0}
 	if p.cape > 0:
 		cfg["cape_color"] = Game.CAPE_COLORS[p.cape]
+		cfg["outfit_color"] = Game.CAPE_COLORS[p.cape]
+	Player._apply_profile_looks(cfg)
 	_preview.setup(cfg)
 	if cheer:
 		_preview.play_role("cheer")
@@ -256,7 +427,8 @@ func _build_pause() -> void:
 	v.add_child(t)
 	v.add_child(_button("Resume", func() -> void: resume_requested.emit(), 360))
 	v.add_child(_button("Inventory & Character", func() -> void: show_panel("inventory"), 360))
-	v.add_child(_button("Toggle sound", func() -> void: _toggle_mute(), 360))
+	_pause_sound_btn = _button(_sound_label(), func() -> void: _toggle_mute(), 360)
+	v.add_child(_pause_sound_btn)
 	var mv := _button("", func() -> void: pass, 360)
 	mv.text = "Movement: Strafe (face camera)"
 	mv.pressed.connect(func() -> void:
@@ -281,18 +453,32 @@ func _build_inventory() -> void:
 	_stats_label = UIKit.label("", 17)
 	left.add_child(_stats_label)
 	var right := VBoxContainer.new(); right.size_flags_horizontal = Control.SIZE_EXPAND_FILL; right.add_theme_constant_override("separation", 8); h.add_child(right)
-	right.add_child(UIKit.label("Equipped", 26, UIKit.GOLD, true))
+	var head := HBoxContainer.new()
+	head.add_child(UIKit.label("Equipped", 26, UIKit.GOLD, true))
+	var spacer := Control.new(); spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL; head.add_child(spacer)
+	var x := Button.new(); x.text = "✕  Close"; x.custom_minimum_size = Vector2(150, 50)
+	x.pressed.connect(func() -> void: resume_requested.emit())
+	head.add_child(x)
+	_bag_close = x
+	right.add_child(head)
 	_equipped_box = VBoxContainer.new(); _equipped_box.add_theme_constant_override("separation", 6)
 	right.add_child(_equipped_box)
 	right.add_child(UIKit.label("Bag", 26, UIKit.GOLD, true))
-	var sc := ScrollContainer.new(); sc.custom_minimum_size = Vector2(760, 400); right.add_child(sc)
+	var sc := ScrollContainer.new(); sc.custom_minimum_size = Vector2(760, 370); right.add_child(sc)
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_inv_list = VBoxContainer.new(); _inv_list.add_theme_constant_override("separation", 8)
 	_inv_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(_inv_list)
-	right.add_child(UIKit.label("[I] or [Esc] to close  ·  green numbers = better than what you wear", 14, UIKit.DIM))
+	var foot := HBoxContainer.new(); foot.add_theme_constant_override("separation", 16)
+	foot.add_child(_button("Close", func() -> void: resume_requested.emit(), 200))
+	foot.add_child(UIKit.label("▲ green = better than what you wear", 14, UIKit.DIM))
+	right.add_child(foot)
+
 
 var _equipped_box: VBoxContainer
+var _bag_close: Button
+var _pause_sound_btn: Button
+var _audio_gate: Button
 
 func _refresh_stats() -> void:
 	if _stats_label == null:

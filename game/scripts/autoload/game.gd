@@ -17,15 +17,49 @@ var profile := {
 	"hero": "Knight",       # key of CharacterModel.HEROES
 	"cape": 0,              # index into CAPE_COLORS
 	"show_hat": true,
+	"skin": 0,              # index into SKIN_COLORS (0 = the hero's own)
+	"hair_style": "natural",
+	"hair_color": 0,        # index into HAIR_COLORS2 (0 = the hero's own)
+	"face": "none",
+	"build": 1.0,           # 0.82 skinny .. 1.3 big
+	"height": 1.0,          # 0.86 short .. 1.14 tall
 }
+const SKIN_COLORS := [Color(0.97, 0.8, 0.67), Color(1.0, 0.86, 0.76), Color(0.93, 0.72, 0.55), Color(0.82, 0.6, 0.42),
+	Color(0.66, 0.45, 0.3), Color(0.47, 0.31, 0.21), Color(0.33, 0.21, 0.15), Color(0.55, 0.8, 0.5), Color(0.6, 0.7, 0.95)]
+const SKIN_NAMES := ["Hero's own", "Pale", "Fair", "Tan", "Olive", "Brown", "Deep", "Goblin green", "Frost blue"]
+const HAIR_STYLES2 := ["natural", "cropped", "long", "ponytail", "buns", "spiky", "mohawk", "bald"]
+const HAIR_STYLE_NAMES := {"natural": "Natural", "cropped": "Cropped", "long": "Long", "ponytail": "Ponytail",
+	"buns": "Buns", "spiky": "Spiky", "mohawk": "Mohawk", "bald": "Bald"}
+const HAIR_COLORS2 := [Color(0.5, 0.3, 0.2), Color(0.12, 0.08, 0.06), Color(0.32, 0.19, 0.1), Color(0.55, 0.3, 0.14), Color(0.85, 0.66, 0.35),
+	Color(0.78, 0.33, 0.12), Color(0.9, 0.9, 0.92), Color(0.25, 0.45, 0.95), Color(0.95, 0.4, 0.7), Color(0.3, 0.75, 0.35)]
+const HAIR_COLOR_NAMES := ["Hero's own", "Black", "Dark brown", "Chestnut", "Blonde", "Ginger", "White", "Blue", "Pink", "Green"]
+const FACES := ["none", "beard", "mustache", "eyepatch", "scar", "warpaint", "blush"]
+const FACE_NAMES := {"none": "Plain", "beard": "Beard", "mustache": "Mustache", "eyepatch": "Eyepatch",
+	"scar": "Scar", "warpaint": "War paint", "blush": "Rosy cheeks"}
 const HERO_ORDER := ["Knight", "Rogue", "Barbarian", "Ranger", "Mage"]
 const HERO_BLURB := {
-	"Knight": "A sworn blade of the old roads. (Male)",
-	"Rogue": "Quick hands, sharper eyes. (Female)",
-	"Barbarian": "Northland strength, few words. (Male)",
-	"Ranger": "A hooded tracker of deep places. (Female)",
-	"Mage": "A hedge-wizard who learned the sword. (Male)",
+	"Knight": "A sworn blade of the old roads.",
+	"Rogue": "Quick hands, sharper eyes. Bobek's favourite.",
+	"Barbarian": "Northland strength, few words.",
+	"Ranger": "A hooded tracker of deep places.",
+	"Mage": "A hedge-wizard who learned the sword.",
 }
+## Each hero's special ability (X key, or the big purple button on a touchscreen).
+const ABILITIES := {
+	"Rogue": {"name": "Backstab", "short": "STAB", "cd": 6.0, "color": Color(0.75, 0.35, 1.0),
+		"desc": "Vanish and strike the nearest enemy from behind for a huge critical hit."},
+	"Mage": {"name": "Shadow Step", "short": "BLINK", "cd": 5.0, "color": Color(0.55, 0.3, 1.0),
+		"desc": "Blink across the room the way you are looking, bursting shadow where you leave and land."},
+	"Knight": {"name": "Shield Charge", "short": "CHARGE", "cd": 7.0, "color": Color(0.5, 0.75, 1.0),
+		"desc": "Rush forward behind your shield, smashing and stunning everything in the way."},
+	"Barbarian": {"name": "Whirlwind", "short": "SPIN", "cd": 8.0, "color": Color(1.0, 0.55, 0.25),
+		"desc": "Spin with your blade out, hitting every enemy around you twice."},
+	"Ranger": {"name": "Volley", "short": "VOLLEY", "cd": 7.0, "color": Color(0.55, 1.0, 0.45),
+		"desc": "Loose a fan of five glowing arrows across a wide arc."},
+}
+func ability() -> Dictionary:
+	return ABILITIES.get(profile.hero, ABILITIES.Knight)
+
 const CAPE_COLORS := [
 	Color(1, 1, 1), Color(0.75, 0.15, 0.12), Color(0.2, 0.45, 0.85), Color(0.25, 0.6, 0.3),
 	Color(0.55, 0.3, 0.75), Color(0.2, 0.2, 0.22), Color(0.95, 0.75, 0.3),
@@ -312,7 +346,7 @@ func _register_inputs() -> void:
 		"interact": [KEY_E], "inventory": [KEY_I], "character": [KEY_TAB],
 		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1], "mana_potion": [KEY_F, KEY_2],
 		"zoom_in_key": [KEY_EQUAL, KEY_KP_ADD], "zoom_out_key": [KEY_MINUS, KEY_KP_SUBTRACT],
-		"toggle_view": [KEY_V],
+		"toggle_view": [KEY_V], "special": [KEY_X],
 	}
 	for action in keys:
 		if not InputMap.has_action(action):
@@ -330,7 +364,7 @@ func _register_inputs() -> void:
 	var pad_buttons := {"jump": JOY_BUTTON_A, "attack": JOY_BUTTON_X, "interact": JOY_BUTTON_Y,
 		"block": JOY_BUTTON_LEFT_SHOULDER, "spell": JOY_BUTTON_RIGHT_SHOULDER,
 		"dodge": JOY_BUTTON_B, "pause": JOY_BUTTON_START, "inventory": JOY_BUTTON_BACK,
-		"potion": JOY_BUTTON_DPAD_UP, "mana_potion": JOY_BUTTON_DPAD_DOWN}
+		"potion": JOY_BUTTON_DPAD_UP, "mana_potion": JOY_BUTTON_DPAD_DOWN, "special": JOY_BUTTON_RIGHT_STICK}
 	for action in pad_buttons:
 		var jb := InputEventJoypadButton.new()
 		jb.button_index = pad_buttons[action]

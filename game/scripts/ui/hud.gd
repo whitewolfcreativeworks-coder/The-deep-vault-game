@@ -10,6 +10,7 @@ var st_bar: ProgressBar
 var xp_bar: ProgressBar
 var gold_label: Label
 var potion_label: Label
+var special_label: Label
 var objective_label: Label
 var prompt_label: Label
 var msg_box: VBoxContainer
@@ -59,6 +60,8 @@ func _ready() -> void:
 	xp_bar = UIKit.bar(Color(0.55, 0.35, 0.85), 280, 6); sv.add_child(xp_bar)
 	var res_row := HBoxContainer.new(); res_row.add_theme_constant_override("separation", 22); sv.add_child(res_row)
 	potion_label = UIKit.label("", 16, Color(1, 0.55, 0.55)); res_row.add_child(potion_label)
+	special_label = UIKit.label("", 16, Color(0.8, 0.65, 1.0))
+	sv.add_child(special_label)
 	gold_label = UIKit.label("", 16, Color(1, 0.82, 0.35)); res_row.add_child(gold_label)
 
 	# --- objective (top-centre)
@@ -113,7 +116,7 @@ func _ready() -> void:
 		crosshair.draw_arc(Vector2.ZERO, 9.0, 0, TAU, 24, Color(1, 1, 1, 0.25), 1.5))
 	root.add_child(crosshair)
 
-	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · Esc menu", 15, UIKit.DIM)
+	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt · X special\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · Esc menu", 15, UIKit.DIM)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	hint.position = Vector2(-600, -70); hint.size = Vector2(1200, 50)
@@ -180,6 +183,10 @@ func _process(delta: float) -> void:
 	st_bar.max_value = Game.max_stamina(); st_bar.value = Game.stamina
 	xp_bar.max_value = Game.xp_to_next(); xp_bar.value = Game.xp
 	potion_label.text = ("Heal %d   Mana %d" if Game.touch_active else "Heal %d [R]   Mana %d [F]") % [Game.potions, Game.mana_potions]
+	var ab := Game.ability()
+	var ab_state := "ready" if player.special_cd <= 0.0 else "%ds" % ceili(player.special_cd)
+	special_label.text = ("%s: %s" if Game.touch_active else "%s [X]: %s") % [ab.name, ab_state]
+	special_label.modulate = Color(1, 1, 1) if player.special_cd <= 0.0 else Color(0.6, 0.6, 0.6)
 	gold_label.text = "Gold: %d" % Game.gold
 	# damage / low-health vignette
 	var vm := vignette.material as ShaderMaterial

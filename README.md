@@ -55,6 +55,7 @@ A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without
 | Left mouse | Sword attack (press again mid-swing for a 3-hit combo) |
 | Right mouse (hold) | Raise shield / block |
 | Q | Arcane bolt (homing, costs mana) |
+| **X** | **Hero special ability** (on a cooldown; big purple button on touchscreens) |
 | Space / Shift / C | Jump (press against a ledge to climb up) / Sprint / Dodge roll |
 | E | Interact (chests, levers, shrines, inscriptions) |
 | R or 1 | Drink a healing draught |
@@ -62,9 +63,16 @@ A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without
 | I or Tab | Inventory and character sheet |
 | Esc | Pause menu |
 
-Basic gamepad support is included: left stick to move, A jump, X attack, LB block, RB spell, B dodge, Y interact.
+Basic gamepad support is included: left stick to move, A jump, X attack, LB block, RB spell, B dodge, Y interact, right-stick click special.
 
 ## What's in it
+
+- **Hero special abilities (new).** Each hero has a special move on its own button, with a cooldown:
+  - **Rogue: Backstab** (6 s). Vanish and reappear behind the nearest enemy, striking for a 3.5x critical.
+  - **Mage: Shadow Step** (5 s). Blink up to 11 m the way you look (or move), with a shadow burst that damages and staggers enemies where you leave and where you land.
+  - **Knight: Shield Charge** (7 s). Rush forward, smashing and stunning everything in the way.
+  - **Barbarian: Whirlwind** (8 s). Spin twice, hitting every enemy around you.
+  - **Ranger: Volley** (7 s). A fan of five glowing arrows.
 
 - **Random loot (new).**
   - Weapons, armor, trinkets and *skins* come in five rarities: Common, Uncommon, Rare, Epic and Legendary.
@@ -73,7 +81,8 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 - **Gear changes your look.** Weapons glow in their rarity colour, armor changes your shield and colours, and Epic or Legendary gear gives you an aura. Skins transform you: Lizardfolk, Bone Ward (you become a skeleton), Gilded, Spectral, Ember and Frost.
 - **Healing and mana potions.** Your sword hits recharge mana, so the rhythm is: cast, slash to recharge, cast again.
 
-- Character creation with five hero presets (male and female), cloak colours, helm toggle, name, and a live 3D preview.
+- Character creation with a live 3D preview: five heroes, skin tone (9, including goblin green and frost blue), 8 hair styles, 10 hair colours, face details (beard, mustache, eyepatch, scar, war paint, rosy cheeks), build (skinny to big) and height (short to tall) sliders, armor & cloak colour, helm toggle, a "Randomize look" button and a Bobek-themed random name.
+- App icon, loading screen and title art use the Bobek's Adventure cover art (green-hooded Rogue).
 - A continuous first-/third-person camera that collides with walls.
 - Real-time combat: a combo chain, block with guard break, dodge with i-frames, a homing spell, hit-stop, screen shake and damage numbers.
 - Four enemy types plus a three-phase boss. Skeletons rise out of the floor, mages kite and shoot, the Revenant telegraphs heavy slams, and the Warden leaps, summons and enrages, then shatters into physics debris.

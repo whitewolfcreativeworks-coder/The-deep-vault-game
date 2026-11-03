@@ -94,6 +94,14 @@ func music(name: String, vol_db := -10.0) -> void:
 		tw.tween_property(outgoing, "volume_db", -60.0, 2.5)
 		tw.chain().tween_callback(outgoing.stop)
 
+## Start the current track again (used once the browser lets audio play).
+func restart_music() -> void:
+	for p: AudioStreamPlayer in [_music_a, _music_b]:
+		if p.playing:
+			var at: float = p.get_playback_position()
+			p.stop()
+			p.play(at)
+
 func set_muted(m: bool) -> void:
 	muted = m
 	AudioServer.set_bus_mute(0, m)

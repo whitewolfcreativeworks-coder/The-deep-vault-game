@@ -140,6 +140,24 @@ func _run() -> void:
 	await wait(1.0)
 	if mode == "shots":
 		await _shots()
+	elif mode == "gate":
+		await wait(4.0)
+		var g: Button = main.menus._audio_gate
+		check("web_tap_gate_shown", g != null and is_instance_valid(g) and g.is_visible_in_tree())
+		await shot("g_tap_to_begin")
+		await wait(6.0)
+		if g and is_instance_valid(g):
+			g.pressed.emit()
+		await wait(1.0)
+		check("tap_gate_dismissed_sound_on", (g == null or not is_instance_valid(g)) and not Sfx.muted, main.menus._mute_btn.text)
+		await shot("g_title_after_tap")
+		await wait(6.0)
+	elif mode == "ui":
+		await _ui_test()
+	elif mode == "looks":
+		await _looks_test()
+	elif mode == "special":
+		await _special_test()
 	elif mode == "loot":
 		await _loot_test()
 	elif mode == "balance":
@@ -1074,6 +1092,171 @@ func _found_and_best(slot: String, before: Array) -> bool:
 			if not before.has(id):
 				found = true
 	return found and Game.score(Game.equipped[slot]) >= best - 0.01
+
+# --- hero special abilities -----------------------------------------------------
+func _dummy(pos: Vector3) -> Enemy:
+	var e := Enemy.new(); e.configure("revenant", "dummy"); e.position = pos; world().add_child(e)
+	return e
+
+func _special_test() -> void:
+	await _start()
+	god = true
+	var at := Vector3(0, -5.9, -62)
+	for hero in ["Rogue", "Mage", "Knight", "Barbarian", "Ranger"]:
+		for e in get_tree().get_nodes_in_group("enemy"):
+			e.queue_free()
+		Game.profile.hero = hero
+		player.rebuild_body()
+		player.special_cd = 0.0
+		await tp(at, 0.0)
+		player.facing = 0.0; player.yaw = 0.0; player.zoom_target = 4.5; player.zoom = 4.5; player.snap_view()
+		var foes: Array = []
+		match hero:
+			"Rogue": foes = [_dummy(at + Vector3(0.5, -0.1, -5.0))]
+			"Mage": foes = [_dummy(at + Vector3(0.6, -0.1, -1.2))]
+			"Knight": foes = [_dummy(at + Vector3(0, -0.1, -4.0))]
+			"Barbarian": foes = [_dummy(at + Vector3(1.6, -0.1, 0)), _dummy(at + Vector3(-1.6, -0.1, 0.3)), _dummy(at + Vector3(0, -0.1, -1.8))]
+			"Ranger": foes = [_dummy(at + Vector3(-1.5, -0.1, -7.0)), _dummy(at + Vector3(1.5, -0.1, -7.0))]
+		await wait(0.6)
+		var hp0: Array = foes.map(func(f: Enemy) -> float: return f.hp)
+		var p0 := player.global_position
+		var d0 := player.special_damage
+		await tap("special")
+		await wait(0.12)
+		await shot("s_%s_a" % hero)
+		await wait(0.9)
+		await shot("s_%s_b" % hero)
+		var hurt := 0
+		for i in foes.size():
+			var f: Enemy = foes[i]
+			if not is_instance_valid(f) or f.dead or f.hp < hp0[i] - 1.0:
+				hurt += 1
+		var moved := player.global_position.distance_to(p0)
+		match hero:
+			"Rogue":
+				var f: Enemy = foes[0]
+				check("rogue_backstab_behind", is_instance_valid(f) and player.global_position.z < f.global_position.z, "player z %.1f enemy z %.1f" % [player.global_position.z, f.global_position.z if is_instance_valid(f) else 0.0])
+				check("rogue_backstab_hits", hurt == 1 and player.special_damage - d0 > Game.attack_damage() * 3.0, "%.0f dmg" % (player.special_damage - d0))
+			"Mage":
+				check("mage_shadow_step_moves", moved > 4.0, "%.1f m" % moved)
+				check("mage_shadow_burst_hits", hurt == 1, "%d hit" % hurt)
+			"Knight":
+				check("knight_charge_moves", moved > 2.0, "%.1f m" % moved)
+				check("knight_charge_hits", hurt == 1, "%d hit" % hurt)
+			"Barbarian":
+				check("barbarian_whirlwind_hits_all", hurt == 3, "%d of 3 hit, %.0f dmg" % [hurt, player.special_damage - d0])
+			"Ranger":
+				check("ranger_volley_hits", hurt >= 1, "%d of 2 hit" % hurt)
+		check("%s_on_cooldown" % hero.to_lower(), player.special_cd > 0.0)
+		var used := player.specials_used
+		player.use_special()
+		check("%s_cooldown_blocks_reuse" % hero.to_lower(), player.specials_used == used)
+	# no enemy in reach: backstab does nothing and costs no cooldown
+	for e in get_tree().get_nodes_in_group("enemy"):
+		e.queue_free()
+	await wait(0.3)
+	Game.profile.hero = "Rogue"; player.rebuild_body(); player.special_cd = 0.0
+	player.use_special()
+	check("backstab_needs_target", player.special_cd == 0.0)
+
+# --- character creator looks: close-ups of every hero with each option --------
+func _looks_test() -> void:
+	var m = main.menus
+	m.show_panel("creator")
+	await wait(0.5)
+	await shot("k_creator_default")
+	m.current = "looks"   # stop the turntable
+	var cam: Camera3D = m._preview_vp.find_children("*", "Camera3D", true, false)[0]
+	var combos := [
+		{"hair_style": "cropped", "face": "beard", "hair_color": 4, "skin": 5},
+		{"hair_style": "long", "face": "blush", "hair_color": 3, "skin": 2},
+		{"hair_style": "ponytail", "face": "eyepatch", "hair_color": 0, "skin": 4},
+		{"hair_style": "buns", "face": "warpaint", "hair_color": 7, "skin": 1},
+		{"hair_style": "spiky", "face": "scar", "hair_color": 6, "skin": 3},
+		{"hair_style": "mohawk", "face": "mustache", "hair_color": 8, "skin": 6},
+		{"hair_style": "bald", "face": "beard", "hair_color": 5, "skin": 7},
+		{"hair_style": "natural", "face": "none", "hair_color": 1, "skin": 0},
+	]
+	var heroes: Array = Game.HERO_ORDER if OS.get_environment("LOOKS_ALL") != "" else ["Knight", "Rogue"]
+	for hero in heroes:
+		for i in combos.size():
+			var c: Dictionary = combos[i]
+			Game.profile.hero = hero
+			Game.profile.show_hat = false
+			for k in c:
+				Game.profile[k] = c[k]
+			m._refresh_preview()
+			for side in [PI, PI + 0.9]:
+				m._preview.rotation.y = side
+				cam.position = Vector3(0, 1.8, 5.2); cam.look_at(Vector3(0, 1.62, 0))
+				await frames(4)
+				await RenderingServer.frame_post_draw
+				m._preview_vp.get_texture().get_image().save_png(out_dir.path_join("k_%s_%d_%s.png" % [hero, i, "f" if side == PI else "s"]))
+	# body shapes
+	cam.position = Vector3(0, 1.4, 6.6); cam.look_at(Vector3(0, 1.1, 0))
+	Game.profile.hero = "Rogue"; Game.profile.hair_style = "natural"; Game.profile.face = "none"; Game.profile.skin = 0
+	for bh in [[0.82, 0.86], [1.0, 1.0], [1.3, 1.14]]:
+		Game.profile.build = bh[0]; Game.profile.height = bh[1]
+		m._refresh_preview(); m._preview.rotation.y = PI
+		await frames(4)
+		await RenderingServer.frame_post_draw
+		m._preview_vp.get_texture().get_image().save_png(out_dir.path_join("k_body_%s.png" % str(bh[0])))
+	cam.position = Vector3(0, 1.4, 6.6); cam.look_at(Vector3(0, 1.1, 0))
+	Game.profile.build = 1.0; Game.profile.height = 1.0
+	m.current = "creator"
+	m._randomize_look()
+	await wait(0.6)
+	await shot("k_creator_random")
+	check("looks_rendered", true)
+
+# --- small UI checks -----------------------------------------------------------
+func _ui_test() -> void:
+	check("sound_starts_on", not Sfx.muted and main.menus._mute_btn.text.begins_with("Sound is ON"), main.menus._mute_btn.text)
+	Game.profile.cape = 1   # crimson
+	main.menus.show_panel("creator")
+	main.menus._refresh_preview()
+	await wait(1.0)
+	await shot("u_creator_crimson")
+	Game.profile.cape = 2   # azure
+	main.menus._refresh_preview()
+	await wait(1.0)
+	await shot("u_creator_azure")
+	Game.profile.cape = 3   # verdant
+	Game.profile.hero = "Rogue"
+	main.menus._refresh_preview()
+	await wait(1.0)
+	await shot("u_creator_rogue_green")
+	Game.profile.hero = "Knight"
+	Game.profile.cape = 2
+	Game.profile.name = "Testa"
+	Game.profile.merge({"show_hat": false, "hair_style": "spiky", "hair_color": 5, "skin": 5, "face": "beard", "build": 1.2, "height": 1.1}, true)
+	main._start_game()
+	player = main.player
+	await wait(1.0)
+	player.facing = PI; player.yaw = 0.0; player.zoom_target = 3.0; player.zoom = 3.0; player.snap_view()
+	await wait(0.6)
+	await shot("u_ingame_azure")
+	var cm: CharacterModel = player.find_children("*", "CharacterModel", true, false)[0]
+	check("custom_looks_in_game", cm.looks_root != null and cm.looks_root.get_child_count() > 2)
+	# the bag can be closed with its own button
+	main._open("inventory")
+	await wait(0.4)
+	var btn: Button = main.menus._bag_close
+	check("bag_has_close_button", btn != null and btn.is_visible_in_tree())
+	await shot("u_bag")
+	var r := btn.get_global_rect()
+	check("bag_close_button_small", r.size.x < 300 and r.size.y < 120, "%s" % r.size)
+	btn.pressed.emit()
+	await wait(0.4)
+	check("bag_close_button_works", main.menus.current == "" and not get_tree().paused, main.menus.current)
+	main._open("pause")
+	await wait(0.3)
+	check("pause_sound_label", main.menus._pause_sound_btn.text.begins_with("Sound is ON"), main.menus._pause_sound_btn.text)
+	main.menus._toggle_mute()
+	check("mute_toggles", Sfx.muted and main.menus._pause_sound_btn.text.begins_with("Sound is OFF") and AudioServer.is_bus_mute(0))
+	main.menus._toggle_mute()
+	check("unmute_toggles", not Sfx.muted and not AudioServer.is_bus_mute(0))
+	main._resume()
 
 func world() -> VaultWorld:
 	return main.world

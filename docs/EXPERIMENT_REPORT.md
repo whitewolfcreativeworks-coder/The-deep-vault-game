@@ -213,3 +213,30 @@ In the "geared" setup the bot is level 4 with everything a player would find bef
 | Starting gear, seed 21 | **died**, Warden at 59% | 439 | 0% | all |
 
 A human player swings less relentlessly than the bot, so expect longer fights and more potions than this.
+
+## Follow-up 3: cover art, character looks and hero specials (Nov 3)
+
+**Requests:**
+- Use the player's own artwork (green-hooded Rogue, "Bobek's Adventure" logo) as the app icon.
+- Expand the character creator: hairstyles, hair colour, skin colour, fat/skinny, tall/short, and small face details.
+- A special-ability button with a different move per hero.
+
+**What was built:**
+- The artwork is the project icon. The web export turns it into the iPad Home Screen icon (`index.apple-touch-icon.png`). It is also the loading screen, the title art and the tap-to-begin screen.
+- **Looks:**
+  - The recolour shader finds skin and hair texels in KayKit's shared texture atlas. It converts the sampled linear colours back to sRGB first; the first version compared linear values against sRGB thresholds and matched nothing.
+  - Hair styles and face details are procedural meshes on the head bone, sized from each hero's head bounds.
+  - Build and height scale the model, and first-person eye height follows height.
+- **Specials:** one per hero, defined in `Game.ABILITIES` and implemented in `player.gd`. They use key X, right-stick click, or a purple touch button with a cooldown ring.
+
+**How it was verified:**
+- The `looks` autotest renders close-ups of all 5 heroes × 8 combinations from the front and the side. These close-ups were used to tune the pieces. One bug they caught: the test camera was looking at the backs of the heads.
+- The `ui` autotest checks that custom looks appear in the game.
+- The `special` autotest puts each hero in front of real enemies and confirms the ability works (19/19 checks):
+  - Backstab lands behind the target for over 3× damage.
+  - Shadow Step moves 11 m and damages the enemy it leaves behind.
+  - Shield Charge moves and hits.
+  - Whirlwind hits all 3 surrounding enemies.
+  - Volley hits both targets.
+  - Every ability goes on cooldown, and the cooldown blocks reuse.
+  - Backstab with no target does nothing and costs no cooldown.
