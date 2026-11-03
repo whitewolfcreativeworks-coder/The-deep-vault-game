@@ -19,6 +19,18 @@ Alternatively, run `godot --path game` from the repo root.
 
 A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without Vulkan, Godot falls back to OpenGL automatically and everything except volumetric fog still works.
 
+## Screenshots
+
+*Captured by the automated test harness under software rendering (no GPU), so expect smoother lighting and higher frame rates on real hardware.*
+
+| | |
+|---|---|
+| ![Title](docs/screenshots/01_title.jpg) | ![Character creator](docs/screenshots/02_character_creator.jpg) |
+| ![Outpost](docs/screenshots/03_outpost.jpg) | ![Skeletons rise](docs/screenshots/04_skeletons_rise.jpg) |
+| ![Fire vents](docs/screenshots/05_fire_vents.jpg) | ![The Glowing Deep](docs/screenshots/06_glowing_deep_bridge.jpg) |
+| ![River, first person](docs/screenshots/07_river_first_person.jpg) | ![Amulet heals](docs/screenshots/08_amulet_heals.jpg) |
+| ![The Vault Warden](docs/screenshots/10_warden.jpg) | ![Victory](docs/screenshots/12_victory.jpg) |
+
 ## Controls
 
 | Input | Action |

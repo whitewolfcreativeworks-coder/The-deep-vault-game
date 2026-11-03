@@ -79,6 +79,7 @@ var checkpoint_yaw := 0.0
 var checkpoint_name := "the outpost"
 var objective := ""
 var in_game := false
+var mouse_sens := 0.0024
 var game_over := false
 
 const BASE_HP := 100.0

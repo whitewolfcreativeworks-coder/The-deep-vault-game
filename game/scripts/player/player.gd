@@ -128,8 +128,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not input_enabled:
 		return
 	if event is InputEventMouseMotion and mouse_captured:
-		yaw -= event.relative.x * MOUSE_SENS
-		pitch = clampf(pitch - event.relative.y * MOUSE_SENS, -1.35, 1.25)
+		yaw -= event.relative.x * Game.mouse_sens
+		pitch = clampf(pitch - event.relative.y * Game.mouse_sens, -1.35, 1.25)
 	elif event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			zoom_step(-1)

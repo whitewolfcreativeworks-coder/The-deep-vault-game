@@ -1,0 +1,154 @@
+{
+  "mode": "flow",
+  "passed": 29,
+  "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+  "results": [
+    {
+      "check": "game_started",
+      "detail": "",
+      "ok": true
+    },
+    {
+      "check": "movement_wasd",
+      "detail": "moved 4.41m",
+      "ok": true
+    },
+    {
+      "check": "camera_first_person",
+      "detail": "zoom=0.00",
+      "ok": true
+    },
+    {
+      "check": "camera_third_person",
+      "detail": "zoom=5.36",
+      "ok": true
+    },
+    {
+      "check": "jump",
+      "detail": "dy=1.02",
+      "ok": true
+    },
+    {
+      "check": "interact_inscription",
+      "detail": "",
+      "ok": true
+    },
+    {
+      "check": "chest_loot_pickup",
+      "detail": "potions 3 gold 15",
+      "ok": true
+    },
+    {
+      "check": "skeletons_awaken",
+      "detail": "1 awake",
+      "ok": true
+    },
+    {
+      "check": "melee_combat_kills",
+      "detail": "3 killed",
+      "ok": true
+    },
+    {
+      "check": "xp_gained",
+      "detail": "level 2 xp 10",
+      "ok": true
+    },
+    {
+      "check": "player_took_damage",
+      "detail": "9 damage taken",
+      "ok": true
+    },
+    {
+      "check": "level_up",
+      "detail": "level 2",
+      "ok": true
+    },
+    {
+      "check": "spell_cast",
+      "detail": "bolts 1",
+      "ok": true
+    },
+    {
+      "check": "fire_trap_damage",
+      "detail": "hp 118 -> 88",
+      "ok": true
+    },
+    {
+      "check": "lever_opens_gate",
+      "detail": "",
+      "ok": true
+    },
+    {
+      "check": "armory_cleared_incl_revenant",
+      "detail": "3 killed",
+      "ok": true
+    },
+    {
+      "check": "weapon_upgrade_equipped",
+      "detail": "knight_sword",
+      "ok": true
+    },
+    {
+      "check": "armor_upgrade_equipped",
+      "detail": "chainmail",
+      "ok": true
+    },
+    {
+      "check": "deep_cleared",
+      "detail": "3 killed",
+      "ok": true
+    },
+    {
+      "check": "river_burns",
+      "detail": "hp 130 -> 106 in_river=true",
+      "ok": true
+    },
+    {
+      "check": "amulet_equipped",
+      "detail": "amulet_deep",
+      "ok": true
+    },
+    {
+      "check": "amulet_river_heals",
+      "detail": "hp 73 -> 88",
+      "ok": true
+    },
+    {
+      "check": "runeblade_equipped",
+      "detail": "vault_blade",
+      "ok": true
+    },
+    {
+      "check": "boss_awakens",
+      "detail": "after walking 1.4s",
+      "ok": true
+    },
+    {
+      "check": "boss_gate_sealed",
+      "detail": "",
+      "ok": true
+    },
+    {
+      "check": "boss_defeated",
+      "detail": "after 8s, phase 3, player took 237 damage",
+      "ok": true
+    },
+    {
+      "check": "boss_dealt_damage",
+      "detail": "237",
+      "ok": true
+    },
+    {
+      "check": "boss_gate_reopens",
+      "detail": "",
+      "ok": true
+    },
+    {
+      "check": "victory",
+      "detail": "victory",
+      "ok": true
+    }
+  ],
+  "seconds": 1017.718,
+  "total": 29
+}

@@ -46,7 +46,9 @@ func shot(name: String) -> void:
 	img.save_png(out_dir.path_join(name + ".png"))
 	print("AUTOTEST SHOT ", name)
 
-func _process(_d: float) -> void:
+var game_time := 0.0
+func _process(d: float) -> void:
+	game_time += d
 	if god and player:
 		Game.hp = maxf(Game.hp, Game.max_hp() * 0.8)
 		Game.stamina = Game.max_stamina()
@@ -308,6 +310,7 @@ func _boss_fight() -> void:
 	var next_log := 0.0
 	var phase2_shot := false
 	var dmg0 := player.damage_taken
+	var gt0 := game_time
 	while t < 180.0 and is_instance_valid(w) and not w.dead:
 		if t >= next_log:
 			next_log += 2.0
@@ -330,7 +333,7 @@ func _boss_fight() -> void:
 		t += 0.1
 	Input.action_release("move_forward")
 	var won := is_instance_valid(w) and w.dead
-	check("boss_defeated", won, "after %.0fs, phase %d, player took %.0f damage" % [t, w.phase if is_instance_valid(w) else -1, player.damage_taken - dmg0])
+	check("boss_defeated", won, "after %.0fs of game time, phase %d, player took %.0f damage" % [game_time - gt0, w.phase if is_instance_valid(w) else -1, player.damage_taken - dmg0])
 	check("boss_dealt_damage", player.damage_taken > dmg0, "%.0f" % (player.damage_taken - dmg0))
 	await wait(2.5)
 	await shot("14_warden_shattered")

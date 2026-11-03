@@ -11,8 +11,8 @@ signal health_changed(hp: float, max_hp: float)
 
 enum S { DORMANT, AWAKEN, CHASE, SWIPE, SLAM, LEAP, SUMMON, RECOVER, DEAD }
 
-var max_hp := 1450.0
-var hp := 1450.0
+var max_hp := 1700.0
+var hp := 1700.0
 const ARMOR := 0.8   # stone hide: takes 80% of incoming damage
 var dead := false
 var state := S.DORMANT

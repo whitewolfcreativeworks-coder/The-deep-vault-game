@@ -6,8 +6,8 @@ class_name Enemy
 signal died(enemy: Enemy)
 
 const TYPES := {
-	"minion": {"name": "Risen Bones", "variant": "minion", "hp": 42.0, "dmg": 9.0, "speed": 3.2, "range": 1.8,
-		"windup": 0.42, "cooldown": 1.2, "xp": 30, "weapon": "skel_blade", "shield": "", "eye": Color(0.3, 0.85, 1.0),
+	"minion": {"name": "Risen Bones", "variant": "minion", "hp": 48.0, "dmg": 11.0, "speed": 3.4, "range": 1.8,
+		"windup": 0.42, "cooldown": 1.0, "xp": 30, "weapon": "skel_blade", "shield": "", "eye": Color(0.3, 0.85, 1.0),
 		"scale": 0.84, "aggro": 11.0, "poise": 0.0, "gold": [2, 8]},
 	"warrior": {"name": "Vault Sentinel", "variant": "warrior", "hp": 80.0, "dmg": 13.0, "speed": 2.9, "range": 1.9,
 		"windup": 0.5, "cooldown": 1.35, "xp": 55, "weapon": "skel_axe", "shield": "Skeleton_Shield_Small_A", "eye": Color(1.0, 0.7, 0.2),

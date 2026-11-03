@@ -249,7 +249,7 @@ func _process(delta: float) -> void:
 
 # ---------------------------------------------------------------------------
 func _build_pause() -> void:
-	var p := _center_panel("pause", 420, 470)
+	var p := _center_panel("pause", 420, 520)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.alignment = BoxContainer.ALIGNMENT_CENTER
 	p.add_child(v)
 	var t := UIKit.label("Paused", 40, UIKit.GOLD, true); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -257,6 +257,13 @@ func _build_pause() -> void:
 	v.add_child(_button("Resume", func() -> void: resume_requested.emit(), 360))
 	v.add_child(_button("Inventory & Character", func() -> void: show_panel("inventory"), 360))
 	v.add_child(_button("Toggle sound", func() -> void: _toggle_mute(), 360))
+	var sl_row := HBoxContainer.new(); sl_row.add_theme_constant_override("separation", 10)
+	sl_row.add_child(UIKit.label("Mouse", 17, UIKit.DIM))
+	var sl := HSlider.new(); sl.min_value = 0.0006; sl.max_value = 0.006; sl.step = 0.0002
+	sl.value = Game.mouse_sens; sl.custom_minimum_size = Vector2(280, 30)
+	sl.value_changed.connect(func(val: float) -> void: Game.mouse_sens = val)
+	sl_row.add_child(sl)
+	v.add_child(sl_row)
 	v.add_child(_button("Restart adventure", func() -> void: restart_requested.emit(), 360))
 	v.add_child(_button("Quit game", func() -> void: quit_requested.emit(), 360))
 

@@ -1,0 +1,34 @@
+{
+  "mode": "boss",
+  "passed": 5,
+  "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+  "results": [
+    {
+      "check": "boss_awakens",
+      "detail": "after walking 1.4s",
+      "ok": true
+    },
+    {
+      "check": "boss_gate_sealed",
+      "detail": "",
+      "ok": true
+    },
+    {
+      "check": "boss_defeated",
+      "detail": "after 33s of game time, phase 3, player took 381 damage",
+      "ok": true
+    },
+    {
+      "check": "boss_dealt_damage",
+      "detail": "381",
+      "ok": true
+    },
+    {
+      "check": "boss_gate_reopens",
+      "detail": "",
+      "ok": true
+    }
+  ],
+  "seconds": 136.772,
+  "total": 5
+}
