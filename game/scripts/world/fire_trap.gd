@@ -79,7 +79,7 @@ func _build() -> void:
 	_smoke.position.y = 2.5
 	_smoke.direction = Vector3.UP; _smoke.initial_velocity_min = 0.5; _smoke.initial_velocity_max = 1.0
 	_smoke.gravity = Vector3(0, 0.3, 0)
-	_smoke.color_ramp = FX._fade_ramp(Color(0.12, 0.1, 0.09, 0.5))
+	_smoke.color_ramp = FX._fade_ramp(Color(0.35, 0.32, 0.3, 0.22))
 	add_child(_smoke)
 	_light = OmniLight3D.new()
 	_light.light_color = Color(1.0, 0.5, 0.2); _light.light_energy = 0.0; _light.omni_range = 7.0

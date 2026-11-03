@@ -7,6 +7,7 @@ uniform float density = 0.35;
 uniform vec2 drift = vec2(0.08, 0.03);
 uniform float scale = 0.18;
 uniform float glow = 0.0;
+uniform bool use_depth = true;
 uniform sampler2D depth_tex : hint_depth_texture, filter_linear_mipmap;
 varying vec3 wpos;
 
@@ -25,7 +26,7 @@ void fragment() {
 	vec4 ndc = vec4(SCREEN_UV * 2.0 - 1.0, depth_raw, 1.0);
 	vec4 view = INV_PROJECTION_MATRIX * ndc;
 	float scene_z = -view.z / view.w;
-	float soft = clamp((scene_z + VERTEX.z) / 1.2, 0.0, 1.0);
+	float soft = use_depth ? clamp((scene_z + VERTEX.z) / 1.2, 0.0, 1.0) : 1.0;
 	float near = smoothstep(0.5, 3.0, -VERTEX.z);
 	vec2 e = abs(UV - 0.5) * 2.0;
 	float edge = (1.0 - smoothstep(0.6, 1.0, e.x)) * (1.0 - smoothstep(0.6, 1.0, e.y));

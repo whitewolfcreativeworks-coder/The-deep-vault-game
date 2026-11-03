@@ -18,6 +18,7 @@ uniform float shore_fade = 0.9;
 uniform vec3 ripple_pos = vec3(0.0, -999.0, 0.0);
 uniform float ripple_strength = 0.0;
 uniform float pulse = 0.0;          // brief flash on splash
+uniform bool use_depth = true;     // off on the web renderer
 uniform sampler2D depth_tex : hint_depth_texture, filter_linear_mipmap;
 
 varying vec3 wpos;
@@ -71,7 +72,7 @@ void fragment() {
 	vec4 view = INV_PROJECTION_MATRIX * ndc;
 	float scene_z = -view.z / view.w;
 	float water_z = -VERTEX.z;
-	float thickness = clamp((scene_z - water_z) / shore_fade, 0.0, 1.0);
+	float thickness = use_depth ? clamp((scene_z - water_z) / shore_fade, 0.0, 1.0) : 0.75;
 	float foam = (1.0 - smoothstep(0.0, 0.35, thickness)) * (0.6 + n2 * 0.8);
 
 	float r = ripple(wpos);

@@ -96,6 +96,10 @@ func _process(delta: float) -> void:
 		play_time += delta
 
 # ---------------------------------------------------------------------------
+## True on the WebGL / OpenGL "Compatibility" renderer (browser builds, old GPUs).
+static func is_compat() -> bool:
+	return RenderingServer.get_current_rendering_method() == "gl_compatibility"
+
 func max_hp() -> float:
 	return BASE_HP + (level - 1) * 18.0
 

@@ -9,6 +9,14 @@
   - Expect to want to tweak these values: they live in the `TYPES` table in `scripts/enemies/enemy.gd` and at the top of `scripts/enemies/warden.gd`.
 - **Windows and macOS builds** were exported but never launched. The macOS build is unsigned, so the first launch needs right-click → Open.
 - **Gamepad** bindings exist but are untested.
+- **The iPad / browser version has not been tried on a real iPad.**
+  - What was checked: it was tested in desktop Chrome emulating an iPad (touch input, iPad screen size and user agent), and all 11 touch and trackpad checks passed in the browser.
+  - What only a real iPad will show:
+    - Safari performance
+    - memory limits with the roughly 66 MB download
+    - multi-touch feel
+    - whether Safari grants pointer lock with a trackpad (if it doesn't, the game falls back to drag-to-look)
+    - audio unlocking after the first tap
 
 ## Known limitations
 - **Character style.** The KayKit models are stylised (big heads, chunky proportions), not realistic. Customization is preset-based: 5 heroes, cloak colour, headgear toggle and name. There are no separate skin-tone or hair options, because those are baked into the models' shared texture atlas. See `docs/DESIGN.md`, decision 1.
@@ -21,6 +29,7 @@
   - Dodge clips are played in place while code moves the character.
 - **No save files.** Progress, checkpoints and loot persist through deaths within a session, but quitting the game starts a fresh run.
 - **The editor view is empty.** The world is built from code at runtime (see the design notes), so opening `scenes/main.tscn` in the Godot editor shows almost nothing until you press Play.
+- **Web renderer.** The browser build always uses Godot's Compatibility (WebGL 2) renderer. There is no volumetric fog or light shaft, and each surface can be lit by at most 8 nearby lights, so a few large floors in the river cavern may light slightly unevenly.
 - **OpenGL fallback.** On machines without Vulkan the game switches automatically to OpenGL. It still looks good, but volumetric fog, fog volumes and the light shaft are not rendered there.
 - **Settings.** The only setting in the pause menu is mouse sensitivity. There are no key rebinding, resolution or graphics-quality options yet.
 - **Single hard-coded dungeon.** There is no procedural generation and no replay variation beyond hero choice.

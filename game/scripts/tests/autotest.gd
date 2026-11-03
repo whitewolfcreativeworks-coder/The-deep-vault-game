@@ -375,6 +375,21 @@ func _touch_test() -> void:
 	await tp(Vector3(0, 0.1, 26), 0.0)
 	var r := get_viewport().get_visible_rect().size
 	var tc: TouchControls = main.touch
+	# desktop mouse first: a real left click attacks, right button blocks
+	if not OS.has_feature("web"):
+		var swm := player.swings
+		var lc := InputEventMouseButton.new(); lc.button_index = MOUSE_BUTTON_LEFT; lc.pressed = true; lc.position = r * 0.5
+		Input.parse_input_event(lc); await frames(3)
+		var lcu := lc.duplicate(); lcu.pressed = false
+		Input.parse_input_event(lcu); await frames(2)
+		check("mouse_click_attacks", player.swings > swm and player.mouse_captured)
+		await wait(0.8)
+		var rc := InputEventMouseButton.new(); rc.button_index = MOUSE_BUTTON_RIGHT; rc.pressed = true; rc.position = r * 0.5
+		Input.parse_input_event(rc); await frames(4)
+		var blocked := player.blocking
+		var rcu := rc.duplicate(); rcu.pressed = false
+		Input.parse_input_event(rcu); await frames(3)
+		check("mouse_right_blocks", blocked and not player.blocking)
 	# first touch reveals the overlay (no pointer lock)
 	await touch_ev(5, Vector2(r.x * 0.6, r.y * 0.3), true)
 	await touch_ev(5, Vector2(r.x * 0.6, r.y * 0.3), false)

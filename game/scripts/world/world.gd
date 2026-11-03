@@ -43,6 +43,18 @@ func build() -> void:
 	_armory()
 	_glowing_deep()
 	_sanctum()
+	if Game.is_compat():
+		_tune_for_compat()
+
+## Browser / OpenGL renderer: no positional shadows (each costs extra passes),
+## gentler glow, and brighter ambient since there is no volumetric fog or SSAO.
+func _tune_for_compat() -> void:
+	for l in find_children("*", "Light3D", true, false):
+		if l is OmniLight3D or l is SpotLight3D:
+			(l as Light3D).shadow_enabled = false
+	env.glow_intensity = 0.55
+	env.glow_hdr_threshold = 1.2
+	env.tonemap_exposure = 1.25
 
 # ---------------------------------------------------------------------------
 func _environment() -> void:

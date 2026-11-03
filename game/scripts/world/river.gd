@@ -45,6 +45,9 @@ func _build() -> void:
 	if is_pool:
 		mat.set_shader_parameter("flow_speed", 0.12)
 		mat.set_shader_parameter("wave_height", 0.025)
+	if Game.is_compat():
+		mat.set_shader_parameter("use_depth", false)
+		mat.set_shader_parameter("glow_strength", 0.75)
 	mi.material_override = mat
 	mi.position = Vector3(rect.get_center().x, surface_y, rect.get_center().y)
 	add_child(mi)
@@ -76,6 +79,9 @@ func _build() -> void:
 		mm.set_shader_parameter("glow", 0.6)
 		mm.set_shader_parameter("drift", Vector2(flow.x, flow.y) * (0.12 + k * 0.08))
 		mm.set_shader_parameter("scale", 0.14 + k * 0.06)
+		if Game.is_compat():
+			mm.set_shader_parameter("use_depth", false)
+			mm.set_shader_parameter("density", 0.16 - k * 0.05)
 		mist.material_override = mm
 		mist.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mist.position = Vector3(rect.get_center().x, surface_y + 0.35 + k * 0.55, rect.get_center().y)
