@@ -415,6 +415,22 @@ func _touch_test() -> void:
 	await touch_ev(0, c + Vector2(0, -80), false)
 	var moved := p0.distance_to(player.global_position)
 	check("touch_joystick_moves", moved > 1.5, "moved %.2fm" % moved)
+	# the stick base must stay near home even if the thumb slides across the screen
+	await tp(Vector3(2, 0.1, 10), 0.0)
+	await touch_ev(0, c, true)
+	await drag_ev(0, c, c + Vector2(700, -350), 10)
+	await wait(0.4)
+	var drift: float = tc._stick_origin.distance_to(tc._stick_home)
+	var vec: Vector2 = tc._stick_vec
+	await shot("t1a_stick_far")
+	await touch_ev(0, c + Vector2(700, -350), false)
+	check("stick_stays_put", drift <= 56.0 and vec.length() > 0.95 and vec.x > 0.7, "base drifted %.0f px, stick %s" % [drift, vec])
+	# a touch far from the corner still spawns the stick inside the home zone
+	await touch_ev(0, Vector2(600, 300), true)
+	var home: Vector2 = tc._stick_home
+	await touch_ev(0, Vector2(600, 300), false)
+	check("stick_home_zone", home.x <= 430.0 and home.y >= r.y - 430.0, "spawned at %s" % home)
+	await wait(0.3)
 	# strafing: stick right / back / diagonal while the view stays put or swings
 	await tp(Vector3(2, 0.1, 10), 0.0)
 	await _stick_hold(c, Vector2(85, 0), 1.2)

@@ -17,6 +17,9 @@ const LOOK_VERTICAL := 0.6   # vertical swipes move the view less than horizonta
 var _stick_id := -1
 var _stick_origin := Vector2.ZERO
 var _stick_pos := Vector2.ZERO
+var _stick_home := Vector2.ZERO      # where the base appeared for this touch
+const STICK_R := 95.0                # knob travel
+const STICK_DRIFT := 55.0            # how far (about an inch) the base may follow the thumb
 var _stick_vec := Vector2.ZERO
 var _look := {}            # touch index -> last position
 var _pinch_dist := -1.0
@@ -93,7 +96,10 @@ func _on_touch(e: InputEventScreenTouch) -> void:
 			_press_button(b)
 		elif e.position.x < get_viewport().get_visible_rect().size.x * 0.42 and _stick_id == -1:
 			_stick_id = e.index
-			_stick_origin = e.position
+			# the base appears under the thumb, but only inside the bottom-left home zone
+			var r := get_viewport().get_visible_rect().size
+			_stick_home = Vector2(clampf(e.position.x, 120.0, 430.0), clampf(e.position.y, r.y - 430.0, r.y - 120.0))
+			_stick_origin = _stick_home
 			_stick_pos = e.position
 			_update_stick()
 		else:
@@ -138,10 +144,18 @@ func _on_drag(e: InputEventScreenDrag) -> void:
 	pad.queue_redraw()
 
 func _update_stick() -> void:
-	var v := (_stick_pos - _stick_origin) / 95.0
+	var v := (_stick_pos - _stick_origin) / STICK_R
 	if v.length() > 1.0:
-		_stick_origin = _stick_pos - v.normalized() * 95.0   # drag the base along
-		v = v.normalized()
+		# let the base follow a little, then stay put: the thumb can slide anywhere
+		# and the stick keeps pushing at full strength toward it
+		var want := _stick_pos - v.normalized() * STICK_R
+		var drift := want - _stick_home
+		if drift.length() > STICK_DRIFT:
+			drift = drift.normalized() * STICK_DRIFT
+		_stick_origin = _stick_home + drift
+		v = (_stick_pos - _stick_origin) / STICK_R
+		if v.length() > 1.0:
+			v = v.normalized()
 	_stick_vec = v
 	_apply_stick()
 
