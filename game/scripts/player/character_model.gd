@@ -554,36 +554,72 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 	var hair_c: Color = cfg.get("hair_color", Color(0.32, 0.19, 0.1))
 	var skin_c: Color = cfg.get("skin_color", Color(0.97, 0.8, 0.67))
 	var hair := _look_mat(hair_c, 0.7)
-	if not covered and style != "natural":
-		var cap_mat: Material = hair
-		if style in ["bald", "mohawk"]:
-			cap_mat = _look_mat(skin_c, 0.45)
-		# skull cap (top half) and nape: cover the hero's own hair
-		_piece(_sphere(true), cap_mat, c + Vector3(0, ry * 0.1, -rz * 0.04), Vector3(rx * 1.11, ry * 1.13, rz * 1.13))
-		_piece(_sphere(), cap_mat, c + Vector3(0, ry * 0.06, -rz * 0.3), Vector3(rx * 1.05, ry * 0.9, rz * 0.82))
+	# Hair styles are added on top of the hero's own (recoloured) hair rather
+	# than covering it with a cap, so they read as hair and not as a helmet.
+	# Points on the head surface: an ellipsoid fitted to the head bounds.
+	var surf := func(yaw_a: float, pitch_a: float, out := 1.0) -> Vector3:
+		return c + Vector3(sin(yaw_a) * cos(pitch_a) * rx, sin(pitch_a) * ry, cos(yaw_a) * cos(pitch_a) * rz) * out
+	if not covered:
 		match style:
-			"cropped":
-				_piece(_boxm(sz.x * 0.7, ry * 0.2, rz * 0.3), hair, c + Vector3(0, ry * 0.62, rz * 0.62), Vector3.ONE, Vector3(-0.35, 0, 0))
+			"curly":
+				# a mop of bumpy curls over the top, back and sides
+				var k := 0
+				for row in [[1.35, 1], [0.95, 7], [0.55, 10], [0.15, 9]]:
+					var pa: float = row[0]
+					var cnt: int = row[1]
+					for i in cnt:
+						var ya := TAU * (float(i) + 0.5 * (k % 2)) / cnt
+						if cos(ya) > 0.55 and pa < 0.8:
+							continue   # keep the face clear
+						var pr: Vector3 = surf.call(ya, pa, 0.98)
+						_piece(_sphere(), hair, pr, Vector3.ONE * rx * (0.3 + 0.04 * sin(i * 2.7 + pa * 5.0)))
+					k += 1
 			"long":
-				_piece(_sphere(), hair, c + Vector3(0, -ry * 0.45, -rz * 0.62), Vector3(rx * 0.98, ry * 0.95, rz * 0.45))
+				# strands falling from the crown down the back and past the ears
+				for i in 7:
+					var ya := PI + (float(i) - 3.0) * 0.32
+					var top: Vector3 = surf.call(ya, 0.55, 0.92)
+					var cap := CapsuleMesh.new(); cap.radius = rx * 0.15; cap.height = sz.y * 1.05
+					_piece(cap, hair, top + Vector3(0, -sz.y * 0.42, 0) + Vector3(sin(ya), 0, cos(ya)) * rz * 0.12, Vector3.ONE, Vector3(-cos(ya) * 0.12, 0, sin(ya) * 0.12))
 				for sd in [-1.0, 1.0]:
-					_piece(_sphere(), hair, c + Vector3(sd * rx * 0.92, -ry * 0.35, -rz * 0.2), Vector3(rx * 0.2, ry * 0.75, rz * 0.55))
-				_piece(_boxm(sz.x * 0.72, ry * 0.2, rz * 0.3), hair, c + Vector3(0, ry * 0.62, rz * 0.62), Vector3.ONE, Vector3(-0.35, 0, 0))
+					for j in 2:
+						var ya2: float = sd * (PI * 0.5 - 0.05 + 0.32 * j)
+						var top2: Vector3 = surf.call(ya2, 0.35, 1.0)
+						var cap2 := CapsuleMesh.new(); cap2.radius = rx * 0.14; cap2.height = sz.y * 0.9
+						_piece(cap2, hair, top2 + Vector3(0, -sz.y * 0.38, 0), Vector3.ONE, Vector3(0, 0, sd * 0.1))
 			"ponytail":
-				var cap := CapsuleMesh.new(); cap.radius = rx * 0.2; cap.height = sz.y * 0.85
-				_piece(cap, hair, c + Vector3(0, -ry * 0.1, -rz * 1.12), Vector3.ONE, Vector3(-0.45, 0, 0))
-				_piece(_sphere(), _look_mat(Color(0.75, 0.2, 0.2)), c + Vector3(0, ry * 0.42, -rz * 0.98), Vector3.ONE * rx * 0.16)
+				var tie: Vector3 = surf.call(PI, 0.55, 1.0)
+				_piece(_sphere(), _look_mat(Color(0.8, 0.15, 0.2), 0.5), tie, Vector3.ONE * rx * 0.17)
+				var cap3 := CapsuleMesh.new(); cap3.radius = rx * 0.2; cap3.height = sz.y * 0.95
+				_piece(cap3, hair, tie + Vector3(0, -sz.y * 0.36, -rz * 0.28), Vector3.ONE, Vector3(-0.5, 0, 0))
+				_piece(_sphere(), hair, tie + Vector3(0, -sz.y * 0.78, -rz * 0.52), Vector3(rx * 0.17, ry * 0.2, rz * 0.17))
 			"buns":
 				for sd in [-1.0, 1.0]:
-					_piece(_sphere(), hair, c + Vector3(sd * rx * 0.62, ry * 0.88, -rz * 0.12), Vector3.ONE * rx * 0.36)
+					var bp: Vector3 = surf.call(sd * 0.95, 0.85, 1.0)
+					_piece(_sphere(), hair, bp, Vector3.ONE * rx * 0.36)
+					_piece(_sphere(), _look_mat(Color(0.8, 0.15, 0.2), 0.5), bp.lerp(c, 0.25), Vector3(rx * 0.3, rx * 0.1, rx * 0.3))
 			"spiky":
-				for i in 9:
-					var cone := CylinderMesh.new(); cone.top_radius = 0.0; cone.bottom_radius = rx * 0.22; cone.height = ry * 0.6
-					var a := float(i) / 9.0 * TAU
-					var off := Vector3(sin(a) * rx * 0.5, ry * 0.95, cos(a) * rz * 0.45 - rz * 0.1)
-					_piece(cone, hair, c + off, Vector3.ONE, Vector3(cos(a) * 0.55, 0, -sin(a) * 0.55))
+				for row in [[1.4, 1], [1.0, 6], [0.6, 8]]:
+					var pa2: float = row[0]
+					var cnt2: int = row[1]
+					for i in cnt2:
+						var ya3 := TAU * float(i) / cnt2 + pa2
+						if cos(ya3) > 0.6 and pa2 < 0.8:
+							continue
+						var n: Vector3 = (surf.call(ya3, pa2, 1.0) - c).normalized()
+						var cone := CylinderMesh.new(); cone.top_radius = 0.0; cone.bottom_radius = rx * 0.2; cone.height = ry * 0.75
+						var pc := _piece(cone, hair, surf.call(ya3, pa2, 0.95) + n * ry * 0.3)
+						pc.basis = Basis(Quaternion(Vector3.UP, n))
 			"mohawk":
-				_piece(_sphere(), hair, c + Vector3(0, ry * 0.92, -rz * 0.12), Vector3(rx * 0.14, ry * 0.42, rz * 0.95))
+				# shaved head (hair recoloured to skin) with a tall crest front to back
+				for i in 8:
+					var ang := 1.0 + float(i) * 0.27    # from the hairline over the crown to the back
+					var pt := c + Vector3(0, sin(ang) * ry, cos(ang) * rz) * 0.96
+					var n2 := (pt - c).normalized()
+					var cone2 := CylinderMesh.new(); cone2.top_radius = 0.0; cone2.bottom_radius = rx * 0.17
+					cone2.height = ry * (0.5 + 0.45 * sin(float(i) / 7.0 * PI))
+					var pc2 := _piece(cone2, hair, pt + n2 * cone2.height * 0.45, Vector3(0.45, 1.0, 1.0))
+					pc2.basis = Basis(Quaternion(Vector3.UP, n2)) * Basis.from_scale(Vector3(0.45, 1.0, 1.0))
 	# face details sit on the front of the head (+Z in skeleton space)
 	var fz := func(x: float, y: float) -> float:
 		var k := 1.0 - pow(x / rx, 2.0) - pow((y - c.y) / ry, 2.0)
@@ -604,7 +640,22 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 			if not covered:
 				_piece(band, _look_mat(Color(0.08, 0.06, 0.05)), Vector3(0, eye_y + ry * 0.18, c.z), Vector3(rx * 1.0, ry * 0.5, rz * 1.0), Vector3(0, 0, -0.3))
 		"scar":
-			_piece(_boxm(rx * 0.05, ry * 0.42, 0.03), _look_mat(Color(0.6, 0.22, 0.2), 0.6), Vector3(-eye_x, eye_y - ry * 0.02, fz.call(-eye_x, eye_y) + 0.01), Vector3.ONE, Vector3(0, 0, 0.4))
+			# a jagged slash from the brow, across the eye, down the cheek, with stitches
+			var red := _look_mat(Color(0.55, 0.1, 0.12), 0.55)
+			var stitch := _look_mat(Color(0.12, 0.07, 0.05), 0.8)
+			var pts := [Vector2(-eye_x - rx * 0.12, eye_y + ry * 0.38), Vector2(-eye_x + rx * 0.02, eye_y + ry * 0.05),
+				Vector2(-eye_x - rx * 0.08, eye_y - ry * 0.2), Vector2(-eye_x + rx * 0.06, eye_y - ry * 0.48)]
+			for i in pts.size() - 1:
+				var p0: Vector2 = pts[i]; var p1: Vector2 = pts[i + 1]
+				var mid := (p0 + p1) * 0.5
+				var seg := p1 - p0
+				var zc: float = fz.call(mid.x, mid.y) + 0.012
+				var bx := _boxm(rx * 0.085, seg.length() + rx * 0.06, 0.035)
+				_piece(bx, red, Vector3(mid.x, mid.y, zc), Vector3.ONE, Vector3(0, mid.x / rx * 0.9, atan2(-seg.x, seg.y)))
+				for k in 2:
+					var sp := p0.lerp(p1, 0.33 + 0.34 * k)
+					var st := _boxm(rx * 0.24, rx * 0.035, 0.03)
+					_piece(st, stitch, Vector3(sp.x, sp.y, fz.call(sp.x, sp.y) + 0.022), Vector3.ONE, Vector3(0, sp.x / rx * 0.9, atan2(-seg.x, seg.y)))
 		"warpaint":
 			var paint := _look_mat(Color(0.15, 0.35, 0.95), 0.5)
 			for sd in [-1.0, 1.0]:

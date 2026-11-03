@@ -10,6 +10,7 @@ var dir := Vector3.FORWARD
 var life := 3.0
 var homing := 2.5
 var size := 1.0
+var splash := 0.0       # >0: the explosion also hurts enemies within this radius
 var _done := false
 var _light: OmniLight3D
 
@@ -83,6 +84,11 @@ func _on_body(b: Node) -> void:
 
 func _explode() -> void:
 	_done = true
+	if splash > 0.0 and team == "player":
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if is_instance_valid(e) and e.get("dead") != true and e is Node3D and (e as Node3D).global_position.distance_to(global_position) < splash + 0.8:
+				e.take_damage(damage * 0.5, global_position, 3.0, false)
+		FX.dome(global_position - Vector3(0, 0.6, 0), color, splash, 0.3)
 	FX.burst(global_position, color, int(26 * size), 4.0 * size, 0.22 * size, 0.5, 0.0)
 	FX.flash_light(global_position, color, 5.0, 6.0, 0.3)
 	Sfx.play_at("spell_hit", global_position, -4.0)

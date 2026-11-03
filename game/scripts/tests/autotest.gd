@@ -158,6 +158,25 @@ func _run() -> void:
 		await _looks_test()
 	elif mode == "special":
 		await _special_test()
+	elif mode == "djump":
+		await _start()
+		god = true
+		await tp(Vector3(0, -5.9, -62), 0.0)
+		await wait(0.8)
+		for seq in [[0.0], [0.0, 0.18], [0.0, 0.3]]:
+			var y0 := player.global_position.y
+			var top := y0
+			var dj0 := player.double_jumps
+			for k in seq.size():
+				if k > 0:
+					await wait(seq[k])
+				await press("jump", 0.07)
+				print("DJ tap %d y=%.2f vy=%.2f floor=%s air=%d buf=%.2f coy=%.2f mant=%s ts=%.2f inp=%s dead=%s dodge=%s" % [k, player.global_position.y - y0, player.velocity.y, player.is_on_floor(), player._air_jumps, player._jump_buffer, player._coyote, player.mantling, Engine.time_scale, player.input_enabled, player.dead, player.dodging])
+			for i in 90:
+				await frames(1)
+				top = maxf(top, player.global_position.y)
+			print("DJ seq %s top=%.2f doubles=%d" % [str(seq), top - y0, player.double_jumps - dj0])
+			await wait(0.6)
 	elif mode == "loot":
 		await _loot_test()
 	elif mode == "balance":
@@ -852,7 +871,7 @@ func _feel_test() -> void:
 				Game.stamina = 0.0
 			Input.action_press("move_forward")
 			if int(t3 * 10) % 5 == 0:
-				var jb: Dictionary = tc._buttons[4]
+				var jb: Dictionary = tc._buttons.filter(func(b: Dictionary) -> bool: return b.name == "jump")[0]
 				await touch_ev(7, jb.center, true); await touch_ev(7, jb.center, false)
 			await wait(0.1)
 			t3 += 0.1
@@ -1158,6 +1177,27 @@ func _special_test() -> void:
 	Game.profile.hero = "Rogue"; player.rebuild_body(); player.special_cd = 0.0
 	player.use_special()
 	check("backstab_needs_target", player.special_cd == 0.0)
+	# double jump: one tap is a hop, a second tap in the air is a big jump
+	await tp(at, 0.0)
+	await wait(0.6)
+	var y0 := player.global_position.y
+	var top1 := y0
+	await press("jump", 0.07)
+	for i in 40:
+		await frames(1)
+		top1 = maxf(top1, player.global_position.y)
+	await wait(0.8)
+	var top2 := y0
+	var dj0 := player.double_jumps
+	await press("jump", 0.07)
+	await wait(0.18)
+	await press("jump", 0.07)
+	await frames(1)
+	await shot("s_double_jump")
+	for i in 60:
+		await frames(1)
+		top2 = maxf(top2, player.global_position.y)
+	check("double_jump_higher", player.double_jumps == dj0 + 1 and top2 - y0 > (top1 - y0) * 1.8, "single %.2f m, double %.2f m" % [top1 - y0, top2 - y0])
 
 # --- character creator looks: close-ups of every hero with each option --------
 func _looks_test() -> void:
@@ -1168,7 +1208,7 @@ func _looks_test() -> void:
 	m.current = "looks"   # stop the turntable
 	var cam: Camera3D = m._preview_vp.find_children("*", "Camera3D", true, false)[0]
 	var combos := [
-		{"hair_style": "cropped", "face": "beard", "hair_color": 4, "skin": 5},
+		{"hair_style": "curly", "face": "beard", "hair_color": 4, "skin": 5},
 		{"hair_style": "long", "face": "blush", "hair_color": 3, "skin": 2},
 		{"hair_style": "ponytail", "face": "eyepatch", "hair_color": 0, "skin": 4},
 		{"hair_style": "buns", "face": "warpaint", "hair_color": 7, "skin": 1},

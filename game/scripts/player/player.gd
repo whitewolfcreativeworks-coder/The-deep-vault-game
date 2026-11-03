@@ -10,7 +10,8 @@ const SPRINT := 7.2
 const ACCEL := 14.0
 const AIR_ACCEL := 4.0
 const GRAVITY := 22.0
-const JUMP_V := 7.6
+const JUMP_V := 7.0          # a tap: a modest hop
+const DOUBLE_JUMP_V := 11.0  # tap again in the air: a big boosted jump
 const EYE_H := 1.62
 const FP_THRESHOLD := 0.45
 const MAX_ZOOM := 9.0
@@ -136,6 +137,8 @@ static func _apply_profile_looks(cfg: Dictionary) -> void:
 	cfg["hair_color"] = Game.HAIR_COLORS2[hc]
 	if hc > 0:
 		cfg["hair_tint"] = Game.HAIR_COLORS2[hc]
+	if cfg.hair_style in ["bald", "mohawk"]:
+		cfg["hair_tint"] = cfg.get("skin_color", Game.SKIN_COLORS[0]).darkened(0.08)   # shaved
 	cfg["face"] = p.get("face", "none")
 	cfg["build"] = float(p.get("build", 1.0))
 	cfg["height"] = float(p.get("height", 1.0))
@@ -302,6 +305,8 @@ func _physics_process(delta: float) -> void:
 		_move_input = Vector2.ZERO
 	if is_on_floor():
 		_coyote = 0.14
+		if velocity.y <= 0.0:
+			_air_jumps = 0
 	else:
 		_coyote -= delta
 	if _jump_buffer > 0.0:
@@ -316,6 +321,9 @@ func _physics_process(delta: float) -> void:
 				Game.stamina = maxf(0.0, Game.stamina - 6.0)
 				_coyote = 0.0
 				_jump_buffer = 0.0
+				_air_jumps = 1
+			elif _air_jumps == 1:
+				_double_jump()
 	var sprinting := input_enabled and Input.is_action_pressed("sprint") and dir.length() > 0.1 and Game.stamina > 1 and not blocking
 	var speed := SPRINT if sprinting else WALK
 	if blocking:
@@ -849,7 +857,8 @@ func _update_camera(delta: float) -> void:
 	camera.v_offset = cos(tt * 41.0) * 0.12 * sh
 	camera.rotation.z = sin(tt * 23.0) * 0.04 * sh
 	var sprint_kick := 5.0 if hspeed > WALK + 0.8 else 0.0
-	camera.fov = lerpf(camera.fov, (80.0 if fp else 74.0) + sprint_kick, 1.0 - exp(-5.0 * delta))
+	fov_kick = maxf(0.0, fov_kick - delta * 30.0)
+	camera.fov = lerpf(camera.fov, (80.0 if fp else 74.0) + sprint_kick + fov_kick, 1.0 - exp(-(5.0 if fov_kick < 0.5 else 14.0) * delta))
 
 var _head_hidden := false
 var _move_input := Vector2.ZERO
@@ -865,15 +874,19 @@ var _hold := 0.0
 var _off_now := Vector3.ZERO
 
 # ---------------------------------------------------------------------------
-# Special abilities: one per hero (Game.ABILITIES), on a cooldown.
+# Special abilities: one per hero (Game.ABILITIES), on a cooldown. Each one is
+# meant to be a "wow" moment: big damage, slow motion, light and a camera punch.
 var special_cd := 0.0
 var special_kind := ""
 var specials_used := 0
 var special_damage := 0.0
+var fov_kick := 0.0
 var _special_t := 0.0
 var _charge_dir := Vector3.ZERO
 var _special_hit := {}
 var _whirl_hits := 0
+var _whirl_marks := [0.12, 0.42, 0.72, 1.02]
+var _shield_fx: MeshInstance3D
 
 func special_ready() -> bool:
 	return special_cd <= 0.0 and special_kind == ""
@@ -905,11 +918,29 @@ func _special_hit_enemy(e: Node, dmg: float, knock: float, crit := false, stun :
 	if Game.lifesteal() > 0.0:
 		heal(dmg * Game.lifesteal())
 
+func _aoe(at: Vector3, radius: float, dmg: float, knock: float, stun := false, crit_bonus := false) -> int:
+	var n := 0
+	for e in _live_enemies():
+		var to: Vector3 = e.global_position - at
+		if absf(to.y) > 2.8:
+			continue
+		to.y = 0
+		if to.length() < radius + _hit_radius(e):
+			var c := crit_bonus or randf() < Game.crit_chance()
+			_special_hit_enemy(e, dmg * randf_range(0.92, 1.08) * (1.5 if c and not crit_bonus else 1.0), knock, c, stun)
+			n += 1
+	return n
+
 func _teleport(to: Vector3) -> void:
 	global_position = to
 	velocity = Vector3.ZERO
 	reset_physics_interpolation()
 	body.reset_physics_interpolation()
+
+func _slowmo(scale: float, real_t: float) -> void:
+	Engine.time_scale = scale
+	await get_tree().create_timer(real_t, true, false, true).timeout
+	Engine.time_scale = 1.0
 
 func use_special() -> void:
 	if dead or mantling or not input_enabled:
@@ -937,41 +968,63 @@ func _special_step(delta: float) -> void:
 	match special_kind:
 		"charge":
 			invuln = maxf(invuln, 0.05)
-			if int(_special_t * 30.0) % 2 == 0:
-				FX.burst(global_position + Vector3(0, 0.3, 0), Color(0.55, 0.5, 0.45), 3, 1.5, 0.3, 0.4, -2.0)
+			fov_kick = maxf(fov_kick, 16.0)
+			if int(_special_t * 40.0) % 2 == 0:
+				FX.burst(global_position + Vector3(0, 0.25, 0), Color(0.6, 0.55, 0.5), 4, 2.0, 0.35, 0.5, -2.0)
+				FX.burst(global_position + Vector3(0, 1.0, 0) + _charge_dir * 0.9, Color(0.45, 0.7, 1.0), 3, 2.5, 0.2, 0.3, 0.0)
 			for e in _live_enemies():
 				if _special_hit.has(e):
 					continue
 				var to: Vector3 = e.global_position - global_position
 				to.y = 0
-				if to.length() < 1.4 + _hit_radius(e) and to.normalized().dot(_charge_dir) > -0.2:
+				if to.length() < 1.9 + _hit_radius(e) and to.normalized().dot(_charge_dir) > -0.3:
 					_special_hit[e] = true
-					_special_hit_enemy(e, Game.attack_damage() * 1.8, 9.0, false, true)
-					FX.flash_light(e.global_position + Vector3(0, 1, 0), Color(0.6, 0.8, 1.0), 5.0, 6.0, 0.25)
-					add_trauma(0.35)
-					_hitstop(0.06)
-			if _special_t > 0.45 or (_special_t > 0.12 and get_real_velocity().length() < 3.0):
-				special_kind = ""
-				FX.shockwave(global_position, Color(0.5, 0.7, 1.0), 2.5, 0.35)
+					_special_hit_enemy(e, Game.attack_damage() * 2.6, 13.0, false, true)
+					FX.sparks(e.global_position + Vector3(0, 1.1, 0), Color(0.6, 0.85, 1.0))
+					FX.flash_light(e.global_position + Vector3(0, 1, 0), Color(0.6, 0.8, 1.0), 7.0, 7.0, 0.3)
+					add_trauma(0.45)
+					_hitstop(0.07)
+			if _special_t > 0.6 or (_special_t > 0.15 and get_real_velocity().length() < 3.0):
+				_end_charge()
 		"whirl":
-			for m in [0.18, 0.5]:
+			fov_kick = maxf(fov_kick, 8.0)
+			for i in _whirl_marks.size():
+				var m: float = _whirl_marks[i]
 				if _special_t >= m and _special_t - delta < m:
-					var n := 0
-					for e in _live_enemies():
-						var to: Vector3 = e.global_position - global_position
-						to.y = 0
-						if to.length() < 3.4 + _hit_radius(e) and absf(e.global_position.y - global_position.y) < 2.5:
-							_special_hit_enemy(e, Game.attack_damage() * 1.15 * randf_range(0.9, 1.1), 6.0, randf() < Game.crit_chance())
-							n += 1
+					var last := i == _whirl_marks.size() - 1
+					var n := _aoe(global_position, 4.6 if last else 4.0, Game.attack_damage() * (2.0 if last else 1.25), 12.0 if last else 4.0, last)
 					_whirl_hits += n
-					FX.shockwave(global_position, Color(1.0, 0.55, 0.25), 3.6, 0.35)
-					Sfx.play("swing", -4.0, 0.1)
+					FX.slash(global_position + Vector3(0, 1.0, 0), Color(1.0, 0.55, 0.2), 4.2, randf_range(-0.25, 0.25), facing, 0.28)
+					FX.shockwave(global_position, Color(1.0, 0.5, 0.15), 4.8 if last else 3.8, 0.4)
+					Sfx.play("swing", -2.0, 0.15)
 					if n > 0:
-						add_trauma(0.3)
-			if _special_t > 0.75:
+						add_trauma(0.25)
+					if last:
+						FX.pillar(global_position, Color(1.0, 0.45, 0.12), 3.2, 6.0, 0.5)
+						FX.burst(global_position + Vector3(0, 0.5, 0), Color(1.0, 0.6, 0.2), 70, 9.0, 0.3, 0.9, -6.0)
+						FX.screen_flash(Color(1.0, 0.5, 0.15), 0.25, 0.35)
+						add_trauma(0.55)
+						_hitstop(0.1)
+			if _special_t > 1.15:
 				special_kind = ""
 
-## Rogue: appear behind the nearest enemy in reach and strike for a big crit.
+func _end_charge() -> void:
+	special_kind = ""
+	if _shield_fx and is_instance_valid(_shield_fx):
+		_shield_fx.queue_free()
+	# finishing shield slam
+	var at := global_position + _charge_dir * 0.8
+	_aoe(at, 3.6, Game.attack_damage() * 1.6, 9.0, true)
+	FX.shockwave(at, Color(0.5, 0.75, 1.0), 5.0, 0.45)
+	FX.dome(at, Color(0.45, 0.7, 1.0), 3.6, 0.4)
+	FX.slash(at + Vector3(0, 0.3, 0), Color(0.6, 0.85, 1.0), 3.2, 0.0, facing, 0.35)
+	FX.burst(at + Vector3(0, 0.4, 0), Color(0.7, 0.85, 1.0), 50, 7.0, 0.25, 0.7, -8.0)
+	FX.screen_flash(Color(0.6, 0.8, 1.0), 0.25, 0.3)
+	Sfx.play("hit", -1.0, 0.05)
+	add_trauma(0.6)
+	_hitstop(0.08)
+
+## Rogue: appear behind the nearest enemy in reach and strike for a huge crit.
 func _backstab() -> bool:
 	var head := global_position + Vector3(0, 1.3, 0)
 	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
@@ -980,7 +1033,7 @@ func _backstab() -> bool:
 	for e in _live_enemies():
 		var to: Vector3 = e.global_position - global_position
 		var d := to.length()
-		if d > 11.0 or absf(to.y) > 3.0:
+		if d > 13.0 or absf(to.y) > 3.0:
 			continue
 		if not _blocked(head, e.global_position + Vector3(0, 1.0, 0)).is_empty():
 			continue
@@ -1007,28 +1060,41 @@ func _backstab() -> bool:
 		fl = _floor_at(dest)
 	if fl != null:
 		dest.y = (fl as Vector3).y + 0.05
-	FX.burst(global_position + Vector3(0, 1, 0), Color(0.7, 0.35, 1.0), 34, 3.0, 0.3, 0.6, 1.0)
+	var purple := Color(0.7, 0.3, 1.0)
+	var from := global_position
+	FX.burst(from + Vector3(0, 1, 0), purple, 60, 4.0, 0.4, 0.9, 1.0)
+	FX.dome(from, purple, 2.2, 0.35, true)
+	FX.beam(from + Vector3(0, 1.0, 0), dest + Vector3(0, 1.0, 0), purple, 0.3, 0.45)
 	_teleport(dest)
 	var look := ep - dest
 	facing = atan2(-look.x, -look.z)
 	yaw = facing
 	body.rotation.y = facing
 	snap_view()
-	invuln = maxf(invuln, 0.5)
-	FX.burst(global_position + Vector3(0, 1, 0), Color(0.6, 0.3, 1.0), 26, 2.5, 0.25, 0.5, 1.0)
-	_special_hit_enemy(best, Game.attack_damage() * 3.5 * randf_range(0.95, 1.05), 4.0, true, true)
-	FX.flash_light(ep + Vector3(0, 1, 0), Color(0.8, 0.4, 1.0), 6.0, 6.0, 0.3)
-	Sfx.play("swing", -3.0, 0.05)
+	invuln = maxf(invuln, 0.8)
+	var crit_hit := Game.attack_damage() * 5.0 * randf_range(0.95, 1.05)
+	_special_hit_enemy(best, crit_hit, 7.0, true, true)
+	var chest := ep + Vector3(0, 1.1, 0)
+	FX.slash(chest, Color(1.0, 0.35, 0.9), 1.8, 0.8, facing, 0.35)
+	FX.slash(chest, Color(0.7, 0.4, 1.0), 1.8, -0.8, facing, 0.35)
+	FX.burst(chest, Color(1.0, 0.25, 0.35), 45, 5.0, 0.2, 0.7, -6.0)
+	FX.burst(dest + Vector3(0, 1, 0), purple, 50, 3.5, 0.35, 0.8, 1.0)
+	FX.flash_light(chest, Color(0.9, 0.4, 1.0), 10.0, 8.0, 0.45)
+	FX.screen_flash(Color(0.6, 0.2, 0.9), 0.35, 0.4)
+	Sfx.play("swing", 0.0, 0.05)
+	Sfx.play("hit", 0.0, 0.05)
 	combo = 2
 	attacking = true
 	attack_dur = 0.72
 	attack_time = 0.25
 	hit_done = true
-	add_trauma(0.4)
-	_hitstop(0.09)
+	fov_kick = 14.0
+	add_trauma(0.55)
+	_slowmo(0.2, 0.28)
 	return true
 
-## Mage: blink up to 11 m the way you look (or move), with a shadow burst at both ends.
+## Mage: blink up to 13 m, imploding where you leave (and leaving a damaging
+## shadow pool) and exploding in a shadow nova where you land.
 func _shadow_step() -> bool:
 	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
 	var mv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
@@ -1036,7 +1102,7 @@ func _shadow_step() -> bool:
 		fwd = Vector3(mv.x, 0, mv.y).rotated(Vector3.UP, view_yaw).normalized()
 	var start := global_position
 	var chest := start + Vector3(0, 1.0, 0)
-	var dist := 11.0
+	var dist := 13.0
 	var hit := _blocked(chest, chest + fwd * dist)
 	if not hit.is_empty():
 		dist = chest.distance_to(hit.position) - 0.7
@@ -1053,25 +1119,34 @@ func _shadow_step() -> bool:
 	if not found:
 		Game.say("No room to shadow step.", Color(0.75, 0.7, 1.0))
 		return false
-	_shadow_burst(start)
+	var violet := Color(0.6, 0.3, 1.0)
+	var dmg := Game.attack_damage() * 1.8 + Game.spell_damage() * 0.8
+	# leaving: implosion and a lingering shadow pool
+	FX.dome(start, violet, 3.5, 0.4, true)
+	FX.burst(start + Vector3(0, 1.0, 0), violet, 70, 5.0, 0.4, 0.9, 1.5)
+	_aoe(start, 3.5, dmg * 0.6, 6.0, true)
+	FX.shadow_pool(start, Color(0.45, 0.2, 0.9), 3.0, 2.5, Game.attack_damage() * 0.5)
+	FX.beam(start + Vector3(0, 1.1, 0), dest + Vector3(0, 1.1, 0), violet, 0.45, 0.6)
 	_teleport(dest)
 	snap_view()
-	invuln = maxf(invuln, 0.6)
-	_shadow_burst(dest)
-	Sfx.play("spell", -3.0, 0.05)
+	invuln = maxf(invuln, 0.8)
+	# landing: shadow nova
+	var n := _aoe(dest, 5.0, dmg, 11.0, true)
+	FX.dome(dest, violet, 5.0, 0.45)
+	FX.shockwave(dest, violet, 6.0, 0.5)
+	FX.pillar(dest, violet, 1.0, 8.0, 0.55)
+	FX.burst(dest + Vector3(0, 1.0, 0), violet, 80, 7.0, 0.35, 0.9, 1.5)
+	FX.screen_flash(Color(0.45, 0.15, 0.85), 0.4, 0.4)
+	Sfx.play("spell", 0.0, 0.05)
+	Sfx.play("spell_hit", -2.0, 0.05)
 	casting = true
 	cast_time = 0.2
+	fov_kick = 18.0
+	add_trauma(0.5 if n > 0 else 0.3)
+	_slowmo(0.3, 0.18)
 	return true
 
-func _shadow_burst(at: Vector3) -> void:
-	FX.burst(at + Vector3(0, 1.0, 0), Color(0.7, 0.35, 1.0), 50, 4.5, 0.35, 0.8, 1.5)
-	FX.shockwave(at, Color(0.5, 0.25, 1.0), 3.0, 0.4)
-	FX.flash_light(at + Vector3(0, 1, 0), Color(0.6, 0.3, 1.0), 5.0, 7.0, 0.3)
-	for e in _live_enemies():
-		if (e.global_position - at).length() < 3.0 + _hit_radius(e):
-			_special_hit_enemy(e, Game.attack_damage() * 1.3 + Game.spell_damage() * 0.4, 5.0, false, true)
-
-## Knight: a short shield rush that stuns whatever it hits.
+## Knight: a shield rush behind a barrier of light that ends in a shield slam.
 func _start_charge() -> bool:
 	var mv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	_charge_dir = -Vector3(sin(view_yaw), 0, cos(view_yaw))
@@ -1080,36 +1155,86 @@ func _start_charge() -> bool:
 	special_kind = "charge"
 	_special_t = 0.0
 	_special_hit.clear()
-	Sfx.play("swing", -2.0, 0.05)
-	add_trauma(0.15)
+	_shield_fx = MeshInstance3D.new()
+	var sm := SphereMesh.new(); sm.radius = 1.0; sm.height = 2.0; sm.is_hemisphere = false; sm.radial_segments = 24; sm.rings = 12
+	_shield_fx.mesh = sm
+	_shield_fx.material_override = FX._add_mat(Color(0.35, 0.6, 1.0), 0.8)
+	(_shield_fx.material_override as StandardMaterial3D).albedo_color.a = 0.45
+	add_child(_shield_fx)
+	_shield_fx.position = Vector3(0, 1.0, 0) + _charge_dir.rotated(Vector3.UP, 0.0) * 0.0
+	_shield_fx.scale = Vector3(1.3, 1.3, 1.3)
+	FX.shockwave(global_position, Color(0.5, 0.75, 1.0), 2.5, 0.3)
+	FX.flash_light(global_position + Vector3(0, 1, 0), Color(0.5, 0.75, 1.0), 6.0, 7.0, 0.6)
+	Sfx.play("swing", 0.0, 0.05)
+	add_trauma(0.25)
 	return true
 
-## Barbarian: spin twice, hitting everything around.
+## Barbarian: a burning whirlwind that hits everything around four times,
+## the last spin hurling enemies away.
 func _start_whirl() -> bool:
 	special_kind = "whirl"
 	_special_t = 0.0
 	combo = 2
 	attacking = true
-	attack_dur = 0.75
+	attack_dur = 1.15
 	attack_time = 0.0
 	hit_done = true
+	FX.vortex(self, Color(1.0, 0.45, 0.12), 2.8, 1.15)
+	FX.flash_light(global_position + Vector3(0, 1, 0), Color(1.0, 0.55, 0.2), 3.5, 8.0, 1.1)
 	return true
 
-## Ranger: five arrows in a fan toward where the camera looks.
+## Ranger: two waves of exploding arrows across a wide arc.
 func _volley() -> bool:
+	_volley_wave(0.0)
+	get_tree().create_timer(0.22).timeout.connect(func() -> void:
+		if not dead:
+			_volley_wave(5.0))
+	var green := Color(0.5, 1.0, 0.4)
+	FX.shockwave(global_position, green, 3.0, 0.35)
+	FX.burst(global_position + Vector3(0, 1.3, 0) - Vector3(sin(facing), 0, cos(facing)) * 0.8, green, 50, 6.0, 0.25, 0.6, 0.0)
+	FX.screen_flash(Color(0.4, 1.0, 0.35), 0.18, 0.3)
+	Sfx.play("spell", -1.0, 0.1)
+	casting = true
+	cast_time = 0.15
+	fov_kick = 10.0
+	add_trauma(0.3)
+	return true
+
+func _volley_wave(offset_deg: float) -> void:
 	var fwd := -camera.global_transform.basis.z
 	fwd.y = clampf(fwd.y, -0.25, 0.25)
 	var start := global_position + Vector3(0, 1.35, 0) + (-Vector3(sin(facing), 0, cos(facing))) * 0.6
-	for i in 5:
-		var d := fwd.rotated(Vector3.UP, deg_to_rad(-24.0 + 12.0 * i)).normalized()
+	for i in 9:
+		var d := fwd.rotated(Vector3.UP, deg_to_rad(-36.0 + 9.0 * i + offset_deg * (1 if i % 2 == 0 else -1) * 0.5)).normalized()
 		var b := Area3D.new()
 		b.set_script(bolt_scene_script)
 		b.position = start
 		get_tree().current_scene.add_child(b)
-		b.size = 0.8
-		b.homing = 0.8
-		b.launch(d, "player", Game.attack_damage() * 1.1, Color(0.55, 1.0, 0.45), 30.0)
-	Sfx.play("spell", -4.0, 0.1)
-	casting = true
-	cast_time = 0.15
-	return true
+		b.size = 1.15
+		b.homing = 1.2
+		b.splash = 1.6
+		b.launch(d, "player", Game.attack_damage() * 1.3, Color(0.5, 1.0, 0.4), 34.0)
+	Sfx.play("swing", -4.0, 0.2)
+
+# ---------------------------------------------------------------------------
+# Double jump: a second tap while in the air launches a much bigger jump.
+var _air_jumps := 0      # 0 on the ground, 1 after the first jump, 2 after the double
+var double_jumps := 0
+
+func _double_jump() -> void:
+	_air_jumps = 2
+	_jump_buffer = 0.0
+	velocity.y = DOUBLE_JUMP_V
+	var hv := Vector2(velocity.x, velocity.z)
+	var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	if iv.length() > 0.2:
+		var d := Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, view_yaw)
+		hv = Vector2(d.x, d.z) * maxf(hv.length(), WALK) * 1.15
+		velocity.x = hv.x; velocity.z = hv.y
+	double_jumps += 1
+	var c := Color(0.75, 0.9, 1.0)
+	FX.shockwave(global_position - Vector3(0, 0.1, 0), c, 2.2, 0.35)
+	FX.burst(global_position + Vector3(0, 0.2, 0), c, 30, 4.0, 0.2, 0.5, -4.0)
+	FX.flash_light(global_position, c, 3.0, 4.0, 0.25)
+	Sfx.play("swing", -6.0, 0.1)
+	fov_kick = maxf(fov_kick, 6.0)

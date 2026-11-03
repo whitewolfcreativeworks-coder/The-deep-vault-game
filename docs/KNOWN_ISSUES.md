@@ -21,7 +21,7 @@
     - audio unlocking after the first tap
 
 ## Known limitations
-- **Character style.** The KayKit models are stylised (big heads, chunky proportions), not realistic. Hair styles are simple chunky shapes (caps, spheres, cones) on the head bone, in keeping with the blocky look; the hair cap has a straight front edge, a little like a helmet. Helmets and the Ranger's hood hide custom hair (face details still show). Build and height are visual only and do not change hit boxes. See `docs/DESIGN.md`, decision 1.
+- **Character style.** The KayKit models are stylised (big heads, chunky proportions), not realistic. Hair styles are simple chunky shapes (curls, strands, spikes, a crest) added on top of the hero's own recoloured hair, in keeping with the blocky look. On the Rogue, the built-in side locks stay (in skin colour) for the bald and mohawk styles. Helmets and the Ranger's hood hide custom hair (face details still show). Build and height are visual only and do not change hit boxes. See `docs/DESIGN.md`, decision 1.
 - **First person.** The head is hidden and the camera sits at eye height. When you look straight down you see the chunky body and the cape, and some clipping is possible at extreme angles.
 - **Enemy pathing.**
   - No navigation mesh. Enemies steer straight toward you, slide along obstacles and circle when close, which works in these open rooms.

@@ -27,8 +27,8 @@ var profile := {
 const SKIN_COLORS := [Color(0.97, 0.8, 0.67), Color(1.0, 0.86, 0.76), Color(0.93, 0.72, 0.55), Color(0.82, 0.6, 0.42),
 	Color(0.66, 0.45, 0.3), Color(0.47, 0.31, 0.21), Color(0.33, 0.21, 0.15), Color(0.55, 0.8, 0.5), Color(0.6, 0.7, 0.95)]
 const SKIN_NAMES := ["Hero's own", "Pale", "Fair", "Tan", "Olive", "Brown", "Deep", "Goblin green", "Frost blue"]
-const HAIR_STYLES2 := ["natural", "cropped", "long", "ponytail", "buns", "spiky", "mohawk", "bald"]
-const HAIR_STYLE_NAMES := {"natural": "Natural", "cropped": "Cropped", "long": "Long", "ponytail": "Ponytail",
+const HAIR_STYLES2 := ["natural", "curly", "long", "ponytail", "buns", "spiky", "mohawk", "bald"]
+const HAIR_STYLE_NAMES := {"natural": "Natural", "curly": "Curly", "long": "Long", "ponytail": "Ponytail",
 	"buns": "Buns", "spiky": "Spiky", "mohawk": "Mohawk", "bald": "Bald"}
 const HAIR_COLORS2 := [Color(0.5, 0.3, 0.2), Color(0.12, 0.08, 0.06), Color(0.32, 0.19, 0.1), Color(0.55, 0.3, 0.14), Color(0.85, 0.66, 0.35),
 	Color(0.78, 0.33, 0.12), Color(0.9, 0.9, 0.92), Color(0.25, 0.45, 0.95), Color(0.95, 0.4, 0.7), Color(0.3, 0.75, 0.35)]
@@ -47,15 +47,15 @@ const HERO_BLURB := {
 ## Each hero's special ability (X key, or the big purple button on a touchscreen).
 const ABILITIES := {
 	"Rogue": {"name": "Backstab", "short": "STAB", "cd": 6.0, "color": Color(0.75, 0.35, 1.0),
-		"desc": "Vanish and strike the nearest enemy from behind for a huge critical hit."},
+		"desc": "Vanish in a puff of shadow, reappear behind the nearest enemy and strike for a massive 5x critical."},
 	"Mage": {"name": "Shadow Step", "short": "BLINK", "cd": 5.0, "color": Color(0.55, 0.3, 1.0),
-		"desc": "Blink across the room the way you are looking, bursting shadow where you leave and land."},
+		"desc": "Blink 13 m across the room. Shadow implodes where you leave (and lingers, burning enemies) and explodes where you land."},
 	"Knight": {"name": "Shield Charge", "short": "CHARGE", "cd": 7.0, "color": Color(0.5, 0.75, 1.0),
-		"desc": "Rush forward behind your shield, smashing and stunning everything in the way."},
+		"desc": "Rush forward inside a barrier of light, smashing through enemies, and finish with a stunning shield slam."},
 	"Barbarian": {"name": "Whirlwind", "short": "SPIN", "cd": 8.0, "color": Color(1.0, 0.55, 0.25),
-		"desc": "Spin with your blade out, hitting every enemy around you twice."},
+		"desc": "Become a burning whirlwind: four spinning hits on everything around you, the last one hurling them away."},
 	"Ranger": {"name": "Volley", "short": "VOLLEY", "cd": 7.0, "color": Color(0.55, 1.0, 0.45),
-		"desc": "Loose a fan of five glowing arrows across a wide arc."},
+		"desc": "Two waves of nine glowing arrows that burst on impact."},
 }
 func ability() -> Dictionary:
 	return ABILITIES.get(profile.hero, ABILITIES.Knight)

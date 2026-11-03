@@ -56,7 +56,7 @@ A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without
 | Right mouse (hold) | Raise shield / block |
 | Q | Arcane bolt (homing, costs mana) |
 | **X** | **Hero special ability** (on a cooldown; big purple button on touchscreens) |
-| Space / Shift / C | Jump (press against a ledge to climb up) / Sprint / Dodge roll |
+| Space / Shift / C | Jump (tap again in the air to double jump; press against a ledge to climb up) / Sprint / Dodge roll |
 | E | Interact (chests, levers, shrines, inscriptions) |
 | R or 1 | Drink a healing draught |
 | F or 2 | Drink a mana potion |
@@ -68,11 +68,12 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 ## What's in it
 
 - **Hero special abilities (new).** Each hero has a special move on its own button, with a cooldown:
-  - **Rogue: Backstab** (6 s). Vanish and reappear behind the nearest enemy, striking for a 3.5x critical.
-  - **Mage: Shadow Step** (5 s). Blink up to 11 m the way you look (or move), with a shadow burst that damages and staggers enemies where you leave and where you land.
-  - **Knight: Shield Charge** (7 s). Rush forward, smashing and stunning everything in the way.
-  - **Barbarian: Whirlwind** (8 s). Spin twice, hitting every enemy around you.
-  - **Ranger: Volley** (7 s). A fan of five glowing arrows.
+  - **Rogue: Backstab** (6 s). Vanish in shadow, reappear behind the nearest enemy and strike for a 5x critical, with a crossed slash, slow motion and a purple flash.
+  - **Mage: Shadow Step** (5 s). Blink up to 13 m the way you look (or move). An implosion at the start leaves a shadow pool that keeps burning enemies; a shadow nova, light pillar and shockwave hit everything within 5 m of where you land.
+  - **Knight: Shield Charge** (7 s). Rush forward inside a barrier of light, smashing and stunning everything in the way, and finish with a shield slam shockwave.
+  - **Barbarian: Whirlwind** (8 s). A burning vortex: four spinning hits on every enemy around you, the last one hurling them away with a pillar of fire.
+  - **Ranger: Volley** (7 s). Two waves of nine arrows that burst on impact, damaging enemies nearby.
+- **Double jump.** Tap jump for a small hop; tap again in the air for a much bigger jump (about 3x higher).
 
 - **Random loot (new).**
   - Weapons, armor, trinkets and *skins* come in five rarities: Common, Uncommon, Rare, Epic and Legendary.
@@ -81,7 +82,7 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 - **Gear changes your look.** Weapons glow in their rarity colour, armor changes your shield and colours, and Epic or Legendary gear gives you an aura. Skins transform you: Lizardfolk, Bone Ward (you become a skeleton), Gilded, Spectral, Ember and Frost.
 - **Healing and mana potions.** Your sword hits recharge mana, so the rhythm is: cast, slash to recharge, cast again.
 
-- Character creation with a live 3D preview: five heroes, skin tone (9, including goblin green and frost blue), 8 hair styles, 10 hair colours, face details (beard, mustache, eyepatch, scar, war paint, rosy cheeks), build (skinny to big) and height (short to tall) sliders, armor & cloak colour, helm toggle, a "Randomize look" button and a Bobek-themed random name.
+- Character creation with a live 3D preview: five heroes, skin tone (9, including goblin green and frost blue), 8 hair styles, 10 hair colours, face details (beard, mustache, eyepatch, scar, war paint, rosy cheeks), build (skinny to big) and height (short to tall) sliders. Hair styles: natural, curly, long, ponytail, buns, spiky, mohawk, bald, armor & cloak colour, helm toggle, a "Randomize look" button and a Bobek-themed random name.
 - App icon, loading screen and title art use the Bobek's Adventure cover art (green-hooded Rogue).
 - A continuous first-/third-person camera that collides with walls.
 - Real-time combat: a combo chain, block with guard break, dodge with i-frames, a homing spell, hit-stop, screen shake and damage numbers.
