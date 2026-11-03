@@ -4,6 +4,8 @@ class_name Builder
 
 var root: Node3D
 var mats := {}
+var boxes: Array = []    # [{mi, shape, lo, hi}] for the z-fighting pass
+var zfight_fixed := 0
 
 func _init(r: Node3D) -> void:
 	root = r
@@ -66,16 +68,80 @@ func box(a: Vector3, b: Vector3, mat: Material, collide := true, shadows := true
 	if not shadows:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(mi)
+	var bs: BoxShape3D = null
 	if collide:
 		var sb := StaticBody3D.new()
 		sb.collision_layer = 1
 		sb.collision_mask = 0
 		var cs := CollisionShape3D.new()
-		var bs := BoxShape3D.new(); bs.size = size
+		bs = BoxShape3D.new(); bs.size = size
 		cs.shape = bs
 		sb.add_child(cs)
 		mi.add_child(sb)
+	boxes.append({"mi": mi, "shape": bs, "lo": lo, "hi": hi})
 	return mi
+
+## Overlapping boxes that share a face plane (same facing) make the GPU flicker
+## between the two surfaces ("z-fighting"), worst on the 24-bit depth buffers of
+## browsers. Nudge every such face but the biggest one inward by a centimetre
+## or two so exactly one surface wins.
+func fix_coplanar() -> int:
+	var buckets := {}
+	for i in boxes.size():
+		var bx: Dictionary = boxes[i]
+		for ax in 3:
+			for side in 2:
+				var c: float = (bx.lo as Vector3)[ax] if side == 0 else (bx.hi as Vector3)[ax]
+				var key := "%d|%d|%d" % [ax, side, int(round(c * 500.0))]
+				if not buckets.has(key):
+					buckets[key] = []
+				buckets[key].append(i)
+	var nudges := {}   # "i|ax|side" -> amount
+	var fixed := 0
+	for key in buckets:
+		var lst: Array = buckets[key]
+		if lst.size() < 2:
+			continue
+		var ax := int(String(key).get_slice("|", 0))
+		var side := int(String(key).get_slice("|", 1))
+		var u := (ax + 1) % 3; var v := (ax + 2) % 3
+		var involved := {}
+		for a_i in lst.size():
+			for b_i in range(a_i + 1, lst.size()):
+				var A: Dictionary = boxes[lst[a_i]]; var B: Dictionary = boxes[lst[b_i]]
+				var ou := minf(A.hi[u], B.hi[u]) - maxf(A.lo[u], B.lo[u])
+				var ov := minf(A.hi[v], B.hi[v]) - maxf(A.lo[v], B.lo[v])
+				if ou > 0.02 and ov > 0.02:
+					involved[lst[a_i]] = true; involved[lst[b_i]] = true
+					fixed += 1
+		if involved.is_empty():
+			continue
+		var ids: Array = involved.keys()
+		ids.sort_custom(func(a, b) -> bool:
+			var A: Dictionary = boxes[a]; var B: Dictionary = boxes[b]
+			return (A.hi[u] - A.lo[u]) * (A.hi[v] - A.lo[v]) > (B.hi[u] - B.lo[u]) * (B.hi[v] - B.lo[v]))
+		for k in range(1, ids.size()):
+			nudges["%d|%d|%d" % [ids[k], ax, side]] = 0.012 * k
+	for nk in nudges:
+		var i := int(String(nk).get_slice("|", 0))
+		var ax2 := int(String(nk).get_slice("|", 1))
+		var side2 := int(String(nk).get_slice("|", 2))
+		var bx: Dictionary = boxes[i]
+		var lo: Vector3 = bx.lo; var hi: Vector3 = bx.hi
+		if side2 == 0:
+			lo[ax2] += nudges[nk]
+		else:
+			hi[ax2] -= nudges[nk]
+		if hi[ax2] - lo[ax2] < 0.005:
+			continue
+		bx.lo = lo; bx.hi = hi
+		var mi: MeshInstance3D = bx.mi
+		(mi.mesh as BoxMesh).size = hi - lo
+		mi.position = (lo + hi) * 0.5
+		if bx.shape:
+			(bx.shape as BoxShape3D).size = hi - lo
+	zfight_fixed = fixed
+	return fixed
 
 ## Invisible collider (ramps, blockers).
 func collider(center: Vector3, size: Vector3, rot := Vector3.ZERO) -> StaticBody3D:

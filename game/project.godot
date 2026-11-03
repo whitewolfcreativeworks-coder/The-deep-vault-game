@@ -1,5 +1,5 @@
 ; Engine configuration file.
-; The Deep Vault — Godot 4.5 project.
+; Bobek's Adventure (Project 001, "The Deep Vault") — Godot 4.5 project.
 ; Input actions are registered at runtime in scripts/autoload/game.gd so they
 ; stay readable in code (see Game._register_inputs).
 
@@ -7,7 +7,7 @@ config_version=5
 
 [application]
 
-config/name="The Deep Vault"
+config/name="Bobek's Adventure"
 config/description="A small atmospheric dungeon crawler."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")

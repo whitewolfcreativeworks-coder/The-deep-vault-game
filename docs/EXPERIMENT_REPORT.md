@@ -139,3 +139,36 @@ New automated checks:
 - `strafe_right_faces_camera`
 - `backpedal_keeps_facing`
 - `move_and_look_no_flip`, which runs forward-left while swiping the view; the worst deviation between body and view was 0.00 rad.
+
+### Third playtest (iPad): "can't do both thumbs at once", flicker close to walls, stuck in pits
+
+Each issue was first measured on the old build with a new `feel` autotest, then fixed and re-measured with the same test:
+
+| Check | Before | After |
+|---|---|---|
+| Animation flips while backpedalling left and swiping right (3 s) | 4 (it even played *walking forward*) | 1 |
+| Character off-centre, worst / mean | 0.19 / 0.04 rad | 0.15 / 0.04 rad |
+| Frames with the camera inside a wall, hugging walls and pillars | 1 / 246 | 0 / 244 |
+| Overlapping same-plane surfaces (z-fighting flicker) | **151** | **0** |
+| Jump out of the river with no stamina | stuck until death | out in 0.6 s |
+| Attack button radius | 78 px | 94 px (all buttons about 20% larger, no overlaps) |
+
+**Fixes:**
+- **Two thumbs at once.**
+  - Safari treats two moving fingers as a page pinch-zoom, so the web page now blocks Safari's gesture, multi-touch scroll and double-tap zoom handling. This is the probable main cause, and it can only be confirmed on a real iPad.
+  - Movement is now relative to the view actually on screen, not the target view.
+  - The camera follows the body tightly side-to-side. Each finger's swipe is measured independently.
+  - Walk, backpedal and sidestep are chosen from the stick direction with hysteresis, so they no longer flicker.
+  - "Compatibility" mouse events that Safari synthesizes after a touch are ignored.
+- **Flicker near walls.**
+  - Builder now runs a z-fighting pass that nudges one face of every overlapping coplanar pair by 1–2 cm.
+  - The camera near plane went from 0.04 to 0.08 m for better depth precision.
+  - The camera now sweeps from the head out to its shoulder position before sweeping backwards, so hugging a wall can't start it inside the wall.
+  - When a wall squeezes the camera in, it rises over the shoulder instead of pressing into the helmet.
+- **Pits.**
+  - Jumping no longer needs stamina. Standing in the burning river blocked stamina from refilling, which caused the trap.
+  - Added coyote time (0.14 s) and jump buffering (0.18 s).
+  - New **ledge climb**: press jump facing a ledge up to 2 m high.
+  - The river and pool beds were raised from 1.5 m to 1.0 m deep.
+
+**Renamed** to **Bobek's Adventure**. The random-name button now offers twenty variations of "Bobek".

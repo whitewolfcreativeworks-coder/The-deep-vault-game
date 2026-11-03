@@ -140,6 +140,33 @@ func _run() -> void:
 	await wait(1.0)
 	if mode == "shots":
 		await _shots()
+	elif mode == "river":
+		await _start()
+		god = false
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and e.global_position.z < -90.0:
+				e.queue_free()
+		await wait(0.3)
+		for spot in [Vector3(-8, -6.8, -112), Vector3(14, -6.6, -129), Vector3(-9.0, -6.6, -126)]:
+			Game.equipped.artifact = ""
+			Game.hp = Game.max_hp()
+			await tp(spot, PI / 2)
+			var h0 := Game.hp
+			await wait(1.6)
+			check("burns_at_%s" % spot, Game.hp < h0 and player.in_river, "hp %.0f -> %.0f in_river=%s y=%.2f" % [h0, Game.hp, player.in_river, player.global_position.y])
+			Game.add_item("amulet_deep")
+			Game.equip("amulet_deep")
+			Game.hp = Game.max_hp() * 0.5
+			var h1 := Game.hp
+			await wait(1.6)
+			check("heals_at_%s" % spot, Game.hp > h1, "hp %.0f -> %.0f in_river=%s dmg_taken=%.0f" % [h1, Game.hp, player.in_river, player.damage_taken])
+	elif mode == "boot":
+		await _start()
+		await wait(1.0)
+		check("boots_and_plays", main.state == "play" and player != null, ProjectSettings.get_setting("application/config/name"))
+		await shot("b_boot")
+	elif mode == "feel":
+		await _feel_test()
 	elif mode == "camera":
 		await _camera_test()
 	elif mode == "touch":
@@ -266,7 +293,12 @@ func _flow() -> void:
 	await tp(Vector3(-3, -5.9, -100), 0.0, -0.3)
 	var dk := await clear_enemies(40.0, 120.0)
 	check("deep_cleared", dk >= 3, "%d killed" % dk)
-	# river burns without the amulet
+	# river burns without the amulet (first remove stragglers, e.g. mages across the
+	# cavern, so the check measures the river and not stray bolts)
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e is Enemy and e.global_position.z < -90.0 and e.global_position.z > -134.0:
+			e.queue_free()
+	await wait(0.2)
 	god = false
 	Game.hp = Game.max_hp()
 	await tp(Vector3(-8, -6.8, -112), PI / 2)
@@ -628,6 +660,198 @@ func _camera_test() -> void:
 func corridor_off() -> void:
 	for tr in world().corridor_traps:
 		tr.disabled = true
+
+# --- "feel" checks from the second playtest -----------------------------------
+## How far (radians, left/right) the character drifts from the centre of view.
+func _screen_dev() -> float:
+	var cam: Camera3D = player.camera
+	var to := player.global_position - cam.global_position
+	to.y = 0
+	if to.length() < 1.2:
+		return 0.0   # camera tucked against the head: angle is meaningless, the head is hidden
+	var fwd := -cam.global_transform.basis.z
+	fwd.y = 0
+	return absf(fwd.normalized().signed_angle_to(to.normalized(), Vector3.UP))
+
+func _cam_inside() -> bool:
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sh := SphereShape3D.new(); sh.radius = 0.05
+	q.shape = sh
+	q.transform = Transform3D(Basis.IDENTITY, player.camera.global_position)
+	q.collision_mask = 1
+	q.exclude = [player.get_rid()]
+	return not player.get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
+
+## Coplanar, same-facing, overlapping faces between box meshes = z-fighting.
+func _count_zfight() -> int:
+	var boxes := []
+	for mi in world().find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh is BoxMesh and m.visible:
+			var a := m.global_transform * m.get_aabb()
+			boxes.append(a)
+	var n := 0
+	var buckets := {}
+	for i in boxes.size():
+		var a: AABB = boxes[i]
+		for ax in 3:
+			for side in 2:
+				var c: float = a.position[ax] if side == 0 else a.end[ax]
+				var key := "%d|%d|%d" % [ax, side, int(round(c * 500.0))]
+				if not buckets.has(key):
+					buckets[key] = []
+				buckets[key].append(i)
+	for key in buckets:
+		var lst: Array = buckets[key]
+		if lst.size() < 2:
+			continue
+		var ax := int(String(key).get_slice("|", 0))
+		var u := (ax + 1) % 3; var v := (ax + 2) % 3
+		for i in lst.size():
+			for j in range(i + 1, lst.size()):
+				var a: AABB = boxes[lst[i]]; var b: AABB = boxes[lst[j]]
+				var ou := minf(a.end[u], b.end[u]) - maxf(a.position[u], b.position[u])
+				var ov := minf(a.end[v], b.end[v]) - maxf(a.position[v], b.position[v])
+				if ou > 0.02 and ov > 0.02:
+					n += 1
+	return n
+
+func _feel_test() -> void:
+	await _start()
+	god = true
+	var r := get_viewport().get_visible_rect().size
+	var tc = main.touch
+	var c := Vector2(190, r.y - 190)
+	# --- 1. two fingers: stick back-left while swiping the view right
+	await touch_ev(9, Vector2(r.x * 0.6, r.y * 0.3), true); await touch_ev(9, Vector2(r.x * 0.6, r.y * 0.3), false)
+	await tp(Vector3(0, -5.9, -100), 0.0, -0.2)
+	await wait(0.5)
+	var clips := {}
+	var switches := 0
+	var last_clip := ""
+	var worst_face := 0.0
+	var worst_dev := 0.0
+	var dev_sum := 0.0
+	var dir_err_sum := 0.0
+	var samples := 0
+	await touch_ev(0, c, true)
+	await drag_ev(0, c, c + Vector2(-62, 62))
+	await wait(0.5)
+	var sw := Vector2(r.x * 0.62, r.y * 0.4)
+	await touch_ev(1, sw, true)
+	var pos := sw
+	for i in 60:
+		var nxt := sw + Vector2(fmod(i * 9.0, 300.0), sin(i * 0.4) * 12.0)
+		if nxt.x < pos.x:   # lift and re-place the finger, like a real repeated swipe
+			await touch_ev(1, pos, false); await touch_ev(1, nxt, true)
+		else:
+			await drag_ev(1, pos, nxt, 1)
+		pos = nxt
+		await RenderingServer.frame_post_draw   # sample what was actually drawn this frame
+		var clip: String = player.body.anim.current_animation
+		if player.body.get("_oneshot") != null and player.body._oneshot != "":
+			clip = last_clip   # one-shot actions are not locomotion flicker
+		if clip != last_clip:
+			if last_clip != "":
+				switches += 1
+			last_clip = clip
+		clips[clip] = true
+		worst_face = maxf(worst_face, absf(angle_difference(player.facing, player.view_yaw if "view_yaw" in player else player.yaw)))
+		var dv := _screen_dev()
+		worst_dev = maxf(worst_dev, dv); dev_sum += dv
+		var hv := Vector3(player.velocity.x, 0, player.velocity.z)
+		if hv.length() > 1.0:
+			var shown_yaw: float = player.view_yaw if "view_yaw" in player else player.yaw
+			var want := Vector3(-0.707, 0, 0.707).rotated(Vector3.UP, shown_yaw)
+			dir_err_sum += hv.normalized().angle_to(want)
+		samples += 1
+	await touch_ev(1, pos, false)
+	await touch_ev(0, c + Vector2(-62, 62), false)
+	print("FEEL two_finger switches=%d clips=%s worst_face=%.2f worst_screen_dev=%.3f mean_dev=%.3f mean_dir_err=%.2f" % [switches, clips.keys(), worst_face, worst_dev, dev_sum / samples, dir_err_sum / samples])
+	check("two_finger_steady_animation", switches <= 2, "%d clip switches %s" % [switches, clips.keys()])
+	check("two_finger_character_centred", worst_dev < 0.3, "worst %.2f rad off centre, mean %.2f" % [worst_dev, dev_sum / samples])
+	check("two_finger_moves_where_pushed", dir_err_sum / samples < 0.25, "mean direction error %.2f rad" % (dir_err_sum / samples))
+	await shot("f1_two_finger")
+	if OS.has_environment("FEEL_PART1"):
+		return
+	# --- 2. hug walls and pillars while turning: is the camera ever inside geometry?
+	var inside := 0
+	var frames_n := 0
+	var hugs := [[Vector3(-8.3, -5.9, -14.5), Vector3(-8.3, -5.9, -32.5)], [Vector3(2.1, -5.9, -35.5), Vector3(2.1, -5.9, -58.5)],
+		[Vector3(10.3, -5.9, -62.5), Vector3(10.3, -5.9, -82.5)], [Vector3(0, -5.9, -14), Vector3(-1.5, -5.9, -34.5)]]
+	for wl in [3.6, 6.5]:
+		for hg in hugs:
+			for t in world().corridor_traps:
+				t.disabled = true
+			player.zoom_target = wl; player.zoom = wl
+			await tp(hg[0], 0.0)
+			await wait(0.4)
+			var t2 := 0.0
+			Input.action_press("move_forward")
+			while t2 < 4.0 and player.global_position.distance_to(hg[1]) > 1.2:
+				face(hg[1])
+				player.yaw += sin(t2 * 2.6) * 1.4
+				player.pitch = sin(t2 * 1.7) * 0.4 - 0.15
+				await frames(1)
+				if _cam_inside():
+					inside += 1
+				frames_n += 1
+				t2 += get_process_delta_time()
+			Input.action_release("move_forward")
+	print("FEEL camera_inside_geometry frames=%d of %d" % [inside, frames_n])
+	check("camera_never_inside_walls", inside == 0, "%d of %d frames" % [inside, frames_n])
+	var zf := _count_zfight()
+	print("FEEL zfight_face_pairs=%d" % zf)
+	check("no_zfighting_faces", zf == 0, "%d overlapping coplanar face pairs" % zf)
+	# --- 3. pits: get out using only the stick and the jump button
+	var Yf := -6.0
+	var pits := [["river", Vector3(-8, Yf - 0.9, -112), Vector3(-8, Yf, -104)],
+		["pool_to_island", Vector3(12.5, Yf - 0.9, -126), Vector3(15, Yf, -126)],
+		["channel", Vector3(ch_x(), Yf - 0.7, -126), Vector3(ch_x() + 2.5, Yf, -126)],
+		["river_no_stamina", Vector3(8, Yf - 0.9, -112), Vector3(8, Yf, -119)]]
+	for pt in pits:
+		await tp(pt[1], 0.0)
+		await wait(0.6)
+		if String(pt[0]).ends_with("no_stamina"):
+			Game.stamina = 0.0
+		var goal: Vector3 = pt[2]
+		var t3 := 0.0
+		var out := false
+		while t3 < 6.0:
+			face(goal)
+			if String(pt[0]).ends_with("no_stamina"):
+				Game.stamina = 0.0
+			Input.action_press("move_forward")
+			if int(t3 * 10) % 5 == 0:
+				var jb: Dictionary = tc._buttons[4]
+				await touch_ev(7, jb.center, true); await touch_ev(7, jb.center, false)
+			await wait(0.1)
+			t3 += 0.1
+			if player.global_position.y > goal.y - 0.25 and Vector2(player.global_position.x - goal.x, player.global_position.z - goal.z).length() < 3.0:
+				out = true
+				break
+		Input.action_release("move_forward")
+		check("escape_%s" % pt[0], out, "%.1fs, ended at y=%.2f" % [t3, player.global_position.y])
+	# --- 4. touch buttons: bigger, non-overlapping, on screen
+	var bs: Array = tc._buttons
+	var overlap := false
+	var off := false
+	var big := 0.0
+	for i in bs.size():
+		big = maxf(big, bs[i].radius)
+		var cc: Vector2 = bs[i].center
+		if cc.x - bs[i].radius < 0 or cc.y - bs[i].radius < 0 or cc.x + bs[i].radius > r.x or cc.y + bs[i].radius > r.y:
+			off = true
+		for j in range(i + 1, bs.size()):
+			if cc.distance_to(bs[j].center) < bs[i].radius + bs[j].radius + 6.0:
+				overlap = true
+	check("buttons_layout", not overlap and not off, "attack radius %.0f" % big)
+	await touch_ev(9, Vector2(r.x * 0.6, r.y * 0.3), true); await touch_ev(9, Vector2(r.x * 0.6, r.y * 0.3), false)
+	await tp(Vector3(0, -5.9, -100), 0.0, -0.2)
+	await shot("f4_buttons")
+
+func ch_x() -> float:
+	return -9.0
 
 func world() -> VaultWorld:
 	return main.world

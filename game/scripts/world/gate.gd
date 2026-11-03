@@ -37,8 +37,8 @@ func _build() -> void:
 		tip.position = Vector3(bar.position.x, -0.05, 0)
 		_bars.add_child(tip)
 	for y in [0.4, height * 0.5, height - 0.3]:
-		var cross := MeshInstance3D.new(); var b := BoxMesh.new(); b.size = Vector3(width, 0.08, 0.08)
-		cross.mesh = b; cross.material_override = iron; cross.position = Vector3(0, y, 0)
+		var cross := MeshInstance3D.new(); var b := BoxMesh.new(); b.size = Vector3(width - 0.06, 0.08, 0.08)
+		cross.mesh = b; cross.material_override = iron; cross.position = Vector3(0, y, 0.02)
 		_bars.add_child(cross)
 	_body = StaticBody3D.new()
 	_body.collision_layer = 1

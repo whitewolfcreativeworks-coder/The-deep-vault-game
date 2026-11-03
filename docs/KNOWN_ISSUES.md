@@ -9,7 +9,8 @@
   - Expect to want to tweak these values: they live in the `TYPES` table in `scripts/enemies/enemy.gd` and at the top of `scripts/enemies/warden.gd`.
 - **Windows and macOS builds** were exported but never launched. The macOS build is unsigned, so the first launch needs right-click → Open.
 - **Gamepad** bindings exist but are untested.
-- **The iPad / browser version has not been tried on a real iPad.**
+- **The iPad / browser version** is now played regularly on a real iPad by the designer, but every fix is first checked only in desktop Chrome with iPad emulation. That includes the Safari two-finger gesture blocking added in the third round, which is the main remaining unknown.
+- *(original note)* **The iPad / browser version had not been tried on a real iPad when first built.**
   - What was checked: it was tested in desktop Chrome emulating an iPad (touch input, iPad screen size and user agent), and all 11 touch and trackpad checks passed in the browser.
   - What only a real iPad will show:
     - Safari performance

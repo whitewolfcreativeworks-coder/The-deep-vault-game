@@ -28,7 +28,7 @@ var _victory_stats: Label
 var _death_label: Label
 var _mute_btn: Button
 
-const NAMES := ["Aldric", "Brenna", "Corin", "Dagna", "Edric", "Fiora", "Gareth", "Halla", "Ivo", "Jessa", "Kael", "Liora", "Maelis", "Noren", "Orla", "Perrin", "Rhosyn", "Soren", "Tamsin", "Wren"]
+const NAMES := ["Bobek", "Sir Bobek", "Lady Bobeka", "Bobek the Bold", "Bobek the Brave", "Bobekus Maximus", "Little Bobek", "Big Bobek", "Bobek Jr.", "Bobekovich", "Bobekson", "Bobekina", "Bo'Bek", "Bobbek", "Archmage Bobek", "Bobek the Unkillable", "Bobek of the Deep", "Grandmaster Bobek", "Bobekzilla", "Bobek Bobekington"]
 
 func _ready() -> void:
 	layer = 10
@@ -113,9 +113,9 @@ func _build_title() -> void:
 	v.position = Vector2(110, 180)
 	v.add_theme_constant_override("separation", 14)
 	c.add_child(v)
-	var t1 := UIKit.label("THE DEEP VAULT", 76, UIKit.GOLD, true)
+	var t1 := UIKit.label("BOBEK'S ADVENTURE", 76, UIKit.GOLD, true)
 	v.add_child(t1)
-	var t2 := UIKit.label("Beneath the cliffs of Ashkar, a light still beats in the dark.", 22, UIKit.PARCH)
+	var t2 := UIKit.label("Into the Deep Vault. Beneath the cliffs of Ashkar, a light still beats in the dark.", 22, UIKit.PARCH)
 	v.add_child(t2)
 	var sp := Control.new(); sp.custom_minimum_size.y = 40; v.add_child(sp)
 	v.add_child(_button("Begin Adventure", func() -> void: show_panel("creator")))
@@ -215,7 +215,7 @@ func _build_creator() -> void:
 	opts.add_child(_hat_btn)
 	opts.add_child(UIKit.label("Name", 18, UIKit.DIM, true))
 	var nr := HBoxContainer.new(); nr.add_theme_constant_override("separation", 8); opts.add_child(nr)
-	_name_edit = LineEdit.new(); _name_edit.custom_minimum_size = Vector2(380, 46); _name_edit.max_length = 18
+	_name_edit = LineEdit.new(); _name_edit.custom_minimum_size = Vector2(380, 46); _name_edit.max_length = 22
 	_name_edit.text = Game.profile.name
 	nr.add_child(_name_edit)
 	nr.add_child(_button("Random", func() -> void: _name_edit.text = NAMES.pick_random(), 150))

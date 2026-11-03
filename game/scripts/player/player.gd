@@ -89,7 +89,7 @@ func _ready() -> void:
 	arm = Node3D.new(); arm.name = "Arm"; cam_pitch.add_child(arm)
 	camera = Camera3D.new()
 	camera.fov = 74.0
-	camera.near = 0.04
+	camera.near = 0.08
 	camera.far = 300.0
 	arm.add_child(camera)
 	_probe = SphereShape3D.new(); _probe.radius = 0.3
@@ -179,6 +179,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	# touchscreens also send emulated mouse events; the touch overlay handles touch
 	if (event is InputEventMouse) and event.device == InputEvent.DEVICE_ID_EMULATION:
 		return
+	if (event is InputEventMouse) and Game.touch_active and Time.get_ticks_msec() - Game.last_touch_ms < 900:
+		return   # Safari/iPad can fire "compatibility" mouse events after a touch
 	if event is InputEventMouseMotion:
 		if mouse_captured and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			_look(event.relative)
@@ -247,6 +249,9 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 	_update_timers(delta)
+	if mantling:
+		_mantle_step(delta)
+		return
 	in_river = false
 	for r in get_tree().get_nodes_in_group("river"):
 		if r.contains(global_position):
@@ -261,10 +266,28 @@ func _physics_process(delta: float) -> void:
 			_look_idle = 0.0
 		_handle_actions()
 		var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-		dir = Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, yaw)
-		if Input.is_action_just_pressed("jump") and is_on_floor() and not dodging and Game.stamina >= 8:
-			velocity.y = JUMP_V
-			_use_stamina(8)
+		_move_input = iv
+		dir = Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, view_yaw)
+		if Input.is_action_just_pressed("jump"):
+			_jump_buffer = 0.18
+	else:
+		_move_input = Vector2.ZERO
+	if is_on_floor():
+		_coyote = 0.14
+	else:
+		_coyote -= delta
+	if _jump_buffer > 0.0:
+		_jump_buffer -= delta
+		if not dodging:
+			var fwd := dir if dir.length() > 0.1 else -Vector3(sin(facing), 0, cos(facing))
+			if _try_mantle(fwd):
+				_jump_buffer = 0.0
+				return
+			if _coyote > 0.0:
+				velocity.y = JUMP_V   # jumping never needs stamina: it must always get you out of trouble
+				Game.stamina = maxf(0.0, Game.stamina - 6.0)
+				_coyote = 0.0
+				_jump_buffer = 0.0
 	var sprinting := input_enabled and Input.is_action_pressed("sprint") and dir.length() > 0.1 and Game.stamina > 1 and not blocking
 	var speed := SPRINT if sprinting else WALK
 	if blocking:
@@ -318,8 +341,11 @@ func _physics_process(delta: float) -> void:
 	var local_dodge := dodge_dir.rotated(Vector3.UP, -facing)
 	body.dodge_dir = Vector2(local_dodge.x, local_dodge.z)
 	var local_v := Vector3(velocity.x, 0, velocity.z).rotated(Vector3.UP, -facing)
-	body.local_move = Vector2(local_v.x, local_v.z)
-	body.backwards = local_v.z > 0.5 and local_v.z > absf(local_v.x)
+	if strafe and _move_input.length() > 0.15:
+		body.local_move = _move_input.normalized() * hspeed
+	else:
+		body.local_move = Vector2(local_v.x, local_v.z)
+	body.backwards = body.local_move.y > 0.5 and body.local_move.y > absf(body.local_move.x)
 	body.cast_t = cast_time / 0.45 if casting else -1.0
 	body.dodge_t = dodge_time / 0.42 if dodging else -1.0
 	body.hurt_t = hurt_time / 0.3 if hurt_time >= 0.0 else -1.0
@@ -585,6 +611,60 @@ func _update_interact() -> void:
 		_last_prompt = txt
 		interact_target_changed.emit(txt)
 
+## Climb onto a ledge in front (river banks, the island, low walls).
+func _try_mantle(fwd: Vector3) -> bool:
+	if fwd.length() < 0.1:
+		return false
+	fwd = Vector3(fwd.x, 0, fwd.z).normalized()
+	var space := get_world_3d().direct_space_state
+	var feet := global_position
+	var q := PhysicsRayQueryParameters3D.create(feet + Vector3(0, 0.35, 0), feet + Vector3(0, 0.35, 0) + fwd * 0.95, 1)
+	q.exclude = [get_rid()]
+	var wall := space.intersect_ray(q)
+	if wall.is_empty():
+		return false
+	var probe_xz: Vector3 = wall.position + fwd * 0.5
+	var q2 := PhysicsRayQueryParameters3D.create(Vector3(probe_xz.x, feet.y + 2.2, probe_xz.z), Vector3(probe_xz.x, feet.y + 0.2, probe_xz.z), 1)
+	q2.exclude = [get_rid()]
+	var top := space.intersect_ray(q2)
+	if top.is_empty() or (top.normal as Vector3).y < 0.7:
+		return false
+	var h: float = top.position.y - feet.y
+	if h < 0.45 or h > 2.0:
+		return false
+	var target: Vector3 = top.position + Vector3(0, 0.03, 0)
+	var sq := PhysicsShapeQueryParameters3D.new()
+	var cap := CapsuleShape3D.new(); cap.radius = 0.3; cap.height = 1.7
+	sq.shape = cap
+	sq.transform = Transform3D(Basis.IDENTITY, target + Vector3(0, 0.9, 0))
+	sq.collision_mask = 1
+	sq.exclude = [get_rid()]
+	if not space.intersect_shape(sq, 1).is_empty():
+		return false
+	mantling = true
+	mantles += 1
+	_mantle_t = 0.0
+	_mantle_from = feet
+	_mantle_to = target
+	velocity = Vector3.ZERO
+	attacking = false; casting = false; blocking = false
+	body.play_role("interact", MANTLE_TIME)
+	Sfx.play("footstep", -10.0, 0.1)
+	return true
+
+func _mantle_step(delta: float) -> void:
+	_mantle_t += delta
+	var k := clampf(_mantle_t / MANTLE_TIME, 0.0, 1.0)
+	var up := smoothstep(0.0, 0.6, k)
+	var over := smoothstep(0.35, 1.0, k)
+	var p := _mantle_from.lerp(_mantle_to, over)
+	p.y = lerpf(_mantle_from.y, _mantle_to.y + 0.08, up)
+	global_position = p
+	body.move_speed = 0.0
+	if k >= 1.0:
+		mantling = false
+		velocity = Vector3.ZERO
+
 ## Jump the camera to where it should be (after teleports / respawn).
 func snap_view() -> void:
 	reset_physics_interpolation()
@@ -602,7 +682,7 @@ func _update_camera(delta: float) -> void:
 	zoom = lerpf(zoom, zoom_target, 1.0 - exp(-9.0 * delta))
 	var fp := zoom < FP_THRESHOLD
 	# --- look smoothing (touch input is noisier, so it gets more)
-	var tc := 0.09 if Game.touch_active else 0.035
+	var tc := 0.05 if Game.touch_active else 0.03
 	var k := 1.0 - exp(-delta / tc)
 	view_yaw = lerp_angle(view_yaw, yaw, k)
 	view_pitch = lerpf(view_pitch, pitch, k)
@@ -625,16 +705,41 @@ func _update_camera(delta: float) -> void:
 		var bob := sin(_bob) * 0.028 * clampf(hspeed / WALK, 0.0, 1.4)
 		cam_yaw.global_position = head_pos + Vector3(0, bob, 0) + (-Vector3(sin(view_yaw), 0, cos(view_yaw))) * 0.12
 	else:
-		var follow := 1.0 - exp(-(30.0 if zoom < 1.5 else 14.0) * delta)
-		cam_yaw.global_position = cam_yaw.global_position.lerp(head_pos, follow)
+		var fh := 1.0 - exp(-45.0 * delta)
+		var fv := 1.0 - exp(-(30.0 if zoom < 1.5 else 12.0) * delta)
+		var cp := cam_yaw.global_position
+		cp.x = lerpf(cp.x, head_pos.x, fh)
+		cp.z = lerpf(cp.z, head_pos.z, fh)
+		cp.y = lerpf(cp.y, head_pos.y, fv)
+		cam_yaw.global_position = cp
 	cam_yaw.rotation = Vector3(0, view_yaw, 0)
 	cam_pitch.rotation = Vector3(view_pitch, 0, 0)
 	# --- shoulder offset shrinks when the camera is squeezed by walls
 	var squeeze := clampf(cam_len / maxf(zoom, 0.01), 0.0, 1.0)
 	var shoulder := clampf((zoom - 0.6) / 3.0, 0.0, 1.0) * 0.38 * clampf(1.0 - (zoom - 4.0) / 5.0, 0.3, 1.0) * squeeze
 	var lift := clampf((zoom - 0.5) * 0.08, 0.0, 0.35)
-	arm.position = Vector3(shoulder, lift, 0)
-	# --- collision: sphere-cast from the head to the wanted camera spot
+	# when a wall behind squeezes the camera in, rise up over the shoulder so you
+	# look down at your hero instead of into the back of their helmet
+	if not fp:
+		lift += (1.0 - squeeze) * 0.75 * clampf(zoom / 2.0, 0.0, 1.0)
+	var space := get_world_3d().direct_space_state
+	# sweep from the head to the shoulder/raised point first: hugging a wall or a
+	# low ceiling must never start the camera inside it
+	arm.position = Vector3.ZERO
+	var off := Vector3(shoulder, lift, 0)
+	if off.length() > 0.01:
+		var qs := PhysicsShapeQueryParameters3D.new()
+		qs.shape = _probe
+		qs.transform = Transform3D(Basis.IDENTITY, arm.global_position)
+		qs.motion = arm.global_transform.basis * off
+		qs.collision_mask = 1
+		qs.exclude = [get_rid()]
+		var rs := space.cast_motion(qs)
+		if rs.size() == 2:
+			off *= rs[0]
+	_off_now = _off_now.lerp(off, 1.0 - exp(-10.0 * delta)) if off.length() >= _off_now.length() else off
+	arm.position = _off_now
+	# --- collision: sphere-cast from there to the wanted camera spot
 	var want := zoom if zoom > 0.05 else 0.0
 	var safe := want
 	if want > 0.05:
@@ -646,7 +751,7 @@ func _update_camera(delta: float) -> void:
 		q.motion = back
 		q.collision_mask = 1
 		q.exclude = [get_rid()]
-		var res := get_world_3d().direct_space_state.cast_motion(q)
+		var res := space.cast_motion(q)
 		if res.size() == 2 and res[0] < 1.0:
 			safe = maxf(0.0, want * res[0] - 0.05)
 	if safe < cam_len - 0.01:
@@ -674,4 +779,14 @@ func _update_camera(delta: float) -> void:
 	camera.fov = lerpf(camera.fov, (80.0 if fp else 74.0) + sprint_kick, 1.0 - exp(-5.0 * delta))
 
 var _head_hidden := false
+var _move_input := Vector2.ZERO
+var _coyote := 0.0
+var _jump_buffer := 0.0
+var mantling := false
+var _mantle_t := 0.0
+var _mantle_from := Vector3.ZERO
+var _mantle_to := Vector3.ZERO
+var mantles := 0
+const MANTLE_TIME := 0.42
 var _hold := 0.0
+var _off_now := Vector3.ZERO

@@ -43,6 +43,7 @@ func build() -> void:
 	_armory()
 	_glowing_deep()
 	_sanctum()
+	b.fix_coplanar()
 	if Game.is_compat():
 		_tune_for_compat()
 
@@ -422,8 +423,8 @@ func _glowing_deep() -> void:
 	# channel beds
 	var bed := b.wall_mat(Color(0.18, 0.2, 0.22), 0.5, Y - 2.0)
 	(bed as ShaderMaterial).set_shader_parameter("wet", 1.0)
-	b.box(Vector3(x0 - 2, Y - 2.6, -116), Vector3(x1 + 2, Y - 1.5, -108), bed)
-	b.box(Vector3(pool.position.x, Y - 2.6, pool.position.y), Vector3(pool.end.x, Y - 1.5, pool.end.y), bed)
+	b.box(Vector3(x0 - 2, Y - 2.6, -116), Vector3(x1 + 2, Y - 1.0, -108), bed)
+	b.box(Vector3(pool.position.x, Y - 2.6, pool.position.y), Vector3(pool.end.x, Y - 1.0, pool.end.y), bed)
 	for c in [ch_w, ch_e]:
 		b.box(Vector3(c.position.x, Y - 1.6, c.position.y), Vector3(c.end.x, Y - 0.8, c.end.y), bed)
 	# river inlet / outlet tunnels plug the void beyond the walls

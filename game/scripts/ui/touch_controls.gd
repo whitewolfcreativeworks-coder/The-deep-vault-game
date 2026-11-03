@@ -45,16 +45,16 @@ func _layout() -> void:
 	var r := get_viewport().get_visible_rect().size
 	var w := r.x; var h := r.y
 	_buttons = [
-		{"name": "attack", "action": "attack", "label": "ATTACK", "center": Vector2(w - 165, h - 175), "radius": 78.0, "hold": true},
-		{"name": "block", "action": "block", "label": "BLOCK", "center": Vector2(w - 345, h - 110), "radius": 56.0, "hold": true},
-		{"name": "spell", "action": "spell", "label": "BOLT", "center": Vector2(w - 330, h - 270), "radius": 52.0, "hold": false},
-		{"name": "dodge", "action": "dodge", "label": "DODGE", "center": Vector2(w - 165, h - 355), "radius": 52.0, "hold": false},
-		{"name": "jump", "action": "jump", "label": "JUMP", "center": Vector2(w - 55 - 20, h - 300), "radius": 44.0, "hold": false},
-		{"name": "interact", "action": "interact", "label": "USE", "center": Vector2(w - 495, h - 95), "radius": 46.0, "hold": false},
-		{"name": "potion", "action": "potion", "label": "POTION", "center": Vector2(w - 480, h - 225), "radius": 40.0, "hold": false},
-		{"name": "pause", "action": "pause", "label": "II", "center": Vector2(w - 60, 60), "radius": 34.0, "hold": false},
-		{"name": "inventory", "action": "inventory", "label": "BAG", "center": Vector2(w - 145, 60), "radius": 34.0, "hold": false},
-		{"name": "view", "action": "toggle_view", "label": "VIEW", "center": Vector2(w - 230, 60), "radius": 34.0, "hold": false},
+		{"name": "attack", "action": "attack", "label": "ATTACK", "center": Vector2(w - 178, h - 188), "radius": 94.0, "hold": true},
+		{"name": "block", "action": "block", "label": "BLOCK", "center": Vector2(w - 392, h - 112), "radius": 68.0, "hold": true},
+		{"name": "spell", "action": "spell", "label": "BOLT", "center": Vector2(w - 378, h - 300), "radius": 63.0, "hold": false},
+		{"name": "dodge", "action": "dodge", "label": "DODGE", "center": Vector2(w - 178, h - 398), "radius": 63.0, "hold": false},
+		{"name": "jump", "action": "jump", "label": "JUMP", "center": Vector2(w - 70, h - 318), "radius": 56.0, "hold": false},
+		{"name": "interact", "action": "interact", "label": "USE", "center": Vector2(w - 572, h - 100), "radius": 57.0, "hold": false},
+		{"name": "potion", "action": "potion", "label": "POTION", "center": Vector2(w - 560, h - 250), "radius": 49.0, "hold": false},
+		{"name": "pause", "action": "pause", "label": "II", "center": Vector2(w - 62, 66), "radius": 42.0, "hold": false},
+		{"name": "inventory", "action": "inventory", "label": "BAG", "center": Vector2(w - 164, 66), "radius": 42.0, "hold": false},
+		{"name": "view", "action": "toggle_view", "label": "VIEW", "center": Vector2(w - 266, 66), "radius": 42.0, "hold": false},
 	]
 
 func bind(p: Player, m: Node) -> void:
@@ -66,6 +66,7 @@ func _playing() -> bool:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		Game.last_touch_ms = Time.get_ticks_msec()
 		if not active:
 			_set_active(true)
 		if not _playing():
@@ -136,10 +137,11 @@ func _on_drag(e: InputEventScreenDrag) -> void:
 			_pinch_dist = d
 		else:
 			if player:
-				# small, careful swipes stay precise; fast flicks turn quicker
-				var spd := e.relative.length()
+				# per-finger delta from our own record (independent of other fingers)
+				var rel: Vector2 = e.position - (_look[e.index] as Vector2)
+				var spd := rel.length()
 				var accel := lerpf(0.65, 1.35, clampf(spd / 28.0, 0.0, 1.0))
-				player._look(e.relative * Vector2(1.0, LOOK_VERTICAL), LOOK_SENS * accel)
+				player._look(rel * Vector2(1.0, LOOK_VERTICAL), LOOK_SENS * accel)
 			_look[e.index] = e.position
 	pad.queue_redraw()
 
@@ -240,5 +242,5 @@ func _draw_pad() -> void:
 			fill = Color(0.45, 0.33, 0.12, 0.7)
 		pad.draw_circle(b.center, b.radius, fill)
 		pad.draw_arc(b.center, b.radius, 0, TAU, 40, gold if not held else UIKit.GOLD, 3.0 if not held else 4.0)
-		var fs := 18 if b.radius > 45 else 14
+		var fs := 20 if b.radius > 60 else (17 if b.radius > 45 else 15)
 		pad.draw_string(_font, b.center + Vector2(-b.radius, fs * 0.35), b.label, HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, fs, Color(1, 0.95, 0.85, 0.9))

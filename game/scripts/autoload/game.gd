@@ -13,7 +13,7 @@ signal victory
 
 # --- Character profile (set by the character creator) ----------------------
 var profile := {
-	"name": "Aldric",
+	"name": "Bobek",
 	"hero": "Knight",       # key of CharacterModel.HEROES
 	"cape": 0,              # index into CAPE_COLORS
 	"show_hat": true,
@@ -81,7 +81,8 @@ var objective := ""
 var in_game := false
 var mouse_sens := 0.0024
 var strafe_mode := true      # character faces the camera direction; move any way (sidestep/backpedal)
-var touch_active := false     # set by the touch overlay once the screen is touched
+var touch_active := false
+var last_touch_ms := -100000     # set by the touch overlay once the screen is touched
 var free_cursor := false      # pointer lock unavailable (e.g. some browsers): drag to look
 var game_over := false
 

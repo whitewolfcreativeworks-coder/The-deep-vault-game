@@ -1,4 +1,6 @@
-# The Deep Vault
+# Bobek's Adventure
+
+*(Project 001, "The Deep Vault")*
 
 A small, atmospheric 3D fantasy dungeon crawler built with **Godot 4.5** during an overnight autonomous-development experiment (Project 001).
 
@@ -7,7 +9,7 @@ Descend from a ruined outpost at dusk into the Vault of Ashkar. Fight risen skel
 ## Play it
 
 **On iPad (or any modern browser):** open **https://whitewolfcreativeworks-coder.github.io/The-deep-vault-game/** in Safari. The first load downloads about 66 MB.
-- **Touch:** the on-screen controls appear as soon as you touch the screen:
+- **Touch:** the on-screen controls appear as soon as you touch the screen. Use both thumbs at once, move with the left and look with the right:
   - left thumb to move (push all the way to sprint)
   - swipe on the right side to look
   - pinch to zoom between first and third person
@@ -17,7 +19,7 @@ Descend from a ruined outpost at dusk into the Vault of Ashkar. Fight risen skel
 
 The browser version uses Godot's web renderer, which has no volumetric fog or light shafts. Everything else is the same game.
 
-**Download a build** from the [`builds` branch](https://github.com/whitewolfcreativeworks-coder/The-deep-vault-game/tree/builds): Windows, macOS (Apple Silicon and Intel) and Linux zips, with run instructions in that branch's README. Only the Linux build has actually been launched and tested so far.
+**Download a build** (`BobeksAdventure-Windows.zip`, `-macOS.zip`, `-Linux.zip`) from the [`builds` branch](https://github.com/whitewolfcreativeworks-coder/The-deep-vault-game/tree/builds): Windows, macOS (Apple Silicon and Intel) and Linux zips, with run instructions in that branch's README. Only the Linux build has actually been launched and tested so far.
 
 **Run from source (any OS):**
 
@@ -53,7 +55,7 @@ A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without
 | Left mouse | Sword attack (press again mid-swing for a 3-hit combo) |
 | Right mouse (hold) | Raise shield / block |
 | Q | Arcane bolt (homing, costs mana) |
-| Space / Shift / C | Jump / Sprint / Dodge roll |
+| Space / Shift / C | Jump (press against a ledge to climb up) / Sprint / Dodge roll |
 | E | Interact (chests, levers, shrines, inscriptions) |
 | R or 1 | Drink a healing draught |
 | I or Tab | Inventory and character sheet |

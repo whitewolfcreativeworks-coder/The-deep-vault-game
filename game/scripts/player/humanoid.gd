@@ -269,7 +269,7 @@ func _build_warden() -> void:
 	mk(spine, box(0.8, 0.08, 0.52), iron, Vector3(0, 0.25, 0))
 	mk(spine, sphere(0.11), core, Vector3(0, 0.45, -0.24))
 	for i in 3:
-		mk(spine, box(0.03, 0.4 - i * 0.1, 0.02), rune, Vector3(-0.22 + i * 0.22, 0.47, -0.255))
+		mk(spine, box(0.03, 0.4 - i * 0.1, 0.02), rune, Vector3(-0.22 + i * 0.22, 0.47, -0.262))
 	var cl := OmniLight3D.new(); cl.light_color = Color(1, 0.6, 0.3); cl.light_energy = 2.0; cl.omni_range = 4.0
 	cl.position = Vector3(0, 0.45, -0.5); spine.add_child(cl)
 	neck = pivot(spine, Vector3(0, 0.72, 0), "Neck")

@@ -17,7 +17,11 @@ var dodge_dir := Vector2(0, -1)   # local x/z of the roll direction
 var hurt_t := -1.0
 var dead := false
 var backwards := false
-var local_move := Vector2.ZERO   # velocity in the body frame: x = right, y = back (m/s)
+var local_move := Vector2.ZERO
+var _loco := ""          # locomotion clip currently shown
+var _pend := ""          # clip the input is asking for
+var _pend_t := 0.0
+var loco_switches := 0   # velocity in the body frame: x = right, y = back (m/s)
 
 var model: Node3D
 var anim: AnimationPlayer
@@ -212,17 +216,8 @@ func _process(delta: float) -> void:
 		_play(anims.block, 0.12)
 	elif not grounded:
 		_play(anims.jump, 0.2)
-	elif move_speed > 0.4 and absf(local_move.x) > absf(local_move.y) * 1.1 and absf(local_move.x) > 0.6:
-		# sidestep: strafe clip, playback speed matched to ground speed
-		_play(anims.strafe_r if local_move.x > 0.0 else anims.strafe_l, 0.18, clampf(move_speed / 5.0, 0.55, 1.3))
-	elif move_speed > 0.4 and backwards:
-		_play(anims.back, 0.18, clampf(move_speed / 2.6, 0.6, 1.6))
-	elif move_speed > 5.0:
-		_play(anims.run, 0.2, clampf(move_speed / 6.5, 0.8, 1.3))
-	elif move_speed > 0.4:
-		_play(anims.walk, 0.2, clampf(move_speed / 3.2, 0.6, 1.5))
 	else:
-		_play(anims.idle, 0.25)
+		_locomotion(get_process_delta_time())
 
 # ---------------------------------------------------------------------------
 func _attach(bone: String) -> BoneAttachment3D:
@@ -302,3 +297,43 @@ func head_height() -> float:
 		if i >= 0:
 			return (skel.global_transform * skel.get_bone_global_pose(i)).origin.y - global_position.y
 	return 1.6
+
+## Choose walk / run / backpedal / sidestep from the body-relative movement,
+## with hysteresis so diagonals and turning do not flicker between clips.
+func _want_loco() -> Array:
+	if move_speed <= 0.4:
+		return [anims.idle, 1.0]
+	var ax := absf(local_move.x)
+	var ay := absf(local_move.y)
+	var is_side: bool = _loco == anims.strafe_l or _loco == anims.strafe_r
+	var side_wins := ax > ay * (0.7 if is_side else 1.35)
+	if side_wins:
+		var right := local_move.x > 0.0
+		if is_side and absf(local_move.x) < 0.3:
+			right = _loco == anims.strafe_r
+		return [anims.strafe_r if right else anims.strafe_l, clampf(move_speed / 5.0, 0.55, 1.3)]
+	var was_back: bool = _loco == anims.back
+	if local_move.y > (0.0 if was_back else 0.35):
+		return [anims.back, clampf(move_speed / 2.6, 0.6, 1.6)]
+	if move_speed > 5.0:
+		return [anims.run, clampf(move_speed / 6.5, 0.8, 1.3)]
+	return [anims.walk, clampf(move_speed / 3.2, 0.6, 1.5)]
+
+func _locomotion(delta: float) -> void:
+	var w := _want_loco()
+	var clip: String = w[0]
+	if clip != _loco:
+		var immediate: bool = _loco == "" or _loco == anims.idle or clip == anims.idle \
+			or (clip == anims.run and _loco == anims.walk) or (clip == anims.walk and _loco == anims.run)
+		if clip == _pend:
+			_pend_t += delta
+		else:
+			_pend = clip
+			_pend_t = 0.0
+		if immediate or _pend_t >= 0.16:
+			if _loco != "" and _loco != anims.idle and clip != anims.idle:
+				loco_switches += 1
+			_loco = clip
+	else:
+		_pend = ""
+	_play(_loco, 0.24, w[1] if clip == _loco else anim.speed_scale)
