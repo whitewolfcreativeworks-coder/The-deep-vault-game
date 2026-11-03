@@ -142,7 +142,9 @@ func interact(by: Node) -> void:
 			var i := 0
 			for l in loot:
 				var k: String = l.get("kind", "gold")
-				var pos := global_position + Vector3(0, 1.0, 0) + (-global_transform.basis.z) * 0.6
+				var toward := (by as Node3D).global_position - global_position if by is Node3D else Vector3.BACK
+				toward.y = 0
+				var pos := global_position + Vector3(0, 1.0, 0) + toward.normalized() * 0.9
 				Pickup.spawn(pos + Vector3(i * 0.15, 0, 0), "item" if k == "item" else k, int(l.get("amount", 1)), String(l.get("id", "")))
 				i += 1
 			FX.burst(global_position + Vector3(0, 0.9, 0), Color(1, 0.85, 0.4), 30, 3.0, 0.18, 0.9, 0.5)

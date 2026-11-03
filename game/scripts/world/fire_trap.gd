@@ -87,7 +87,7 @@ func _build() -> void:
 	_light.light_volumetric_fog_energy = 2.0
 	add_child(_light)
 	_area = Area3D.new()
-	_area.collision_layer = 0; _area.collision_mask = 2
+	_area.collision_layer = 0; _area.collision_mask = 2 | 4
 	var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(size.x * 0.95, 3.0, size.y * 0.95)
 	cs.shape = bs; cs.position.y = 1.5
 	_area.add_child(cs)
@@ -126,7 +126,11 @@ func _process(delta: float) -> void:
 	if on:
 		_tick -= delta
 		if _tick <= 0.0:
+			_tick = 0.45
 			for b in _area.get_overlapping_bodies():
-				if b.is_in_group("player") and b.has_method("take_damage"):
+				if not b.has_method("take_damage") or b.get("dead") == true:
+					continue
+				if b.is_in_group("player"):
 					b.take_damage(16.0, global_position + Vector3(0, 0, 3.0), 2.0)
-					_tick = 0.45
+				elif b.is_in_group("enemy"):
+					b.take_damage(14.0, global_position, 1.0, false)

@@ -157,6 +157,11 @@ func _physics_process(delta: float) -> void:
 		_update_camera(delta)
 		return
 	_update_timers(delta)
+	in_river = false
+	for r in get_tree().get_nodes_in_group("river"):
+		if r.contains(global_position):
+			in_river = true
+			break
 	var dir := Vector3.ZERO
 	if input_enabled:
 		_handle_actions()

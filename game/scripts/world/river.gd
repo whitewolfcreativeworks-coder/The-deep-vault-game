@@ -29,6 +29,7 @@ static func create(parent: Node, r: Rect2, y: float, flow_dir: Vector2, glow_c :
 	return g
 
 func _build() -> void:
+	add_to_group("river")
 	var mi := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = rect.size
@@ -110,9 +111,9 @@ func _build() -> void:
 	fog.size = Vector3(rect.size.x + 2, 3.0, rect.size.y + 2)
 	fog.shape = RenderingServer.FOG_VOLUME_SHAPE_BOX
 	var fm := FogMaterial.new()
-	fm.density = 0.12
+	fm.density = 0.045
 	fm.albedo = glow.lerp(Color.WHITE, 0.5)
-	fm.emission = glow * 0.35
+	fm.emission = glow * 0.18
 	fm.height_falloff = 0.6
 	fm.edge_fade = 0.5
 	fog.material = fm
@@ -131,7 +132,6 @@ func _physics_process(delta: float) -> void:
 	_splash_cd -= delta
 	var inside: bool = contains(_player.global_position) and _player.get("dead") != true
 	var protected: bool = Game.equipped.artifact == "amulet_deep"
-	_player.set("in_river", inside or (_player.get("in_river") == true and contains(_player.global_position)))
 	var hspeed: float = Vector2(_player.velocity.x, _player.velocity.z).length() if "velocity" in _player else 0.0
 	_ripple = lerpf(_ripple, (1.0 if inside else 0.0) * clampf(0.35 + hspeed / 5.0, 0.0, 1.2), 1.0 - exp(-4.0 * delta))
 	_corrupt = lerpf(_corrupt, 1.0 if (inside and protected) else 0.0, 1.0 - exp(-1.5 * delta))

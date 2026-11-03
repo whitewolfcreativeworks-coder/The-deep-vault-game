@@ -132,11 +132,23 @@ func _run() -> void:
 	await wait(1.0)
 	if mode == "shots":
 		await _shots()
+	elif mode == "boss":
+		await _start()
+		god = true
+		Game.level = 4
+		Game.add_item("vault_blade"); Game.add_item("chainmail")
+		var w0 := world().warden
+		print("BOSS pre: valid=%s pos=%s state=%s hp=%s body=%s meshes=%d" % [is_instance_valid(w0), w0.global_position, w0.state, w0.hp, w0.body.global_position, w0.body.all_meshes.size()])
+		await tp(Vector3(0, -5.9, -139), 0.0)
+		await shot("b0_arena_before")
+		await _boss_fight()
 	else:
 		await _flow()
 	_finish()
 
 func _start() -> void:
+	await wait(1.5)
+	await shot("00_title")
 	main.menus.show_panel("creator")
 	await wait(0.8)
 	await shot("00_character_creator")
@@ -199,8 +211,12 @@ func _flow() -> void:
 	check("level_up", Game.level >= 2, "level %d" % Game.level)
 	# arcane bolt
 	var b0 := player.bolts_fired
-	await tap("spell")
-	await wait(0.6)
+	await wait(1.2)   # let any queued sword combo finish; casting is blocked mid-swing
+	for attempt in 3:
+		await tap("spell")
+		await wait(0.8)
+		if player.bolts_fired > b0:
+			break
 	check("spell_cast", player.bolts_fired > b0, "bolts %d" % player.bolts_fired)
 	# fire vents hurt
 	god = false
@@ -266,36 +282,7 @@ func _flow() -> void:
 	await shot("11_bridge_view")
 	# boss
 	await tp(Vector3(0, -5.9, -139), 0.0)
-	Input.action_press("move_forward"); await wait(1.6); Input.action_release("move_forward")
-	await wait(2.5)
-	check("boss_awakens", world().boss_started and world().warden.state != Warden.S.DORMANT)
-	check("boss_gate_sealed", not world().boss_gate.is_open)
-	await shot("12_warden")
-	var w := world().warden
-	var t := 0.0
-	while t < 150.0 and is_instance_valid(w) and not w.dead:
-		var e := nearest_enemy(30.0)
-		if e and e != w and player.global_position.distance_to(e.global_position) < 6.0:
-			face(e.global_position)
-		else:
-			face(w.global_position)
-		var d := player.global_position.distance_to(w.global_position)
-		if d > 3.2:
-			Input.action_press("move_forward")
-		else:
-			Input.action_release("move_forward")
-			await tap("attack")
-		if int(t * 10) % 37 == 0 and Game.mana >= 20:
-			await tap("spell")
-		if t > 30.0 and int(t) == 30 and w.phase >= 2:
-			await shot("13_warden_phase2")
-		await wait(0.1)
-		t += 0.1
-	Input.action_release("move_forward")
-	check("boss_defeated", is_instance_valid(w) == false or w.dead, "after %.0fs, phase reached" % t)
-	await wait(2.5)
-	await shot("14_warden_shattered")
-	check("boss_gate_reopens", world().boss_gate.is_open)
+	await _boss_fight()
 	await clear_enemies(30.0, 20.0)
 	await wait(2.0)
 	await tp(Vector3(0, -5.9, -167.2), 0.0)
@@ -303,6 +290,51 @@ func _flow() -> void:
 	await wait(3.5)
 	check("victory", victory and main.state == "victory", main.state)
 	await shot("15_victory")
+
+func _boss_fight() -> void:
+	# walk through the sanctum doors until the encounter triggers
+	var tw := 0.0
+	face(Vector3(0, -6, -157))
+	Input.action_press("move_forward")
+	while not world().boss_started and tw < 8.0:
+		await wait(0.2); tw += 0.2
+	Input.action_release("move_forward")
+	await wait(2.6)
+	var w := world().warden
+	check("boss_awakens", world().boss_started and is_instance_valid(w) and w.state != Warden.S.DORMANT, "after walking %.1fs" % tw)
+	check("boss_gate_sealed", not world().boss_gate.is_open)
+	await shot("12_warden")
+	var t := 0.0
+	var next_log := 0.0
+	var phase2_shot := false
+	var dmg0 := player.damage_taken
+	while t < 180.0 and is_instance_valid(w) and not w.dead:
+		if t >= next_log:
+			next_log += 2.0
+			print("BOSS t=%.0f hp=%.0f state=%d phase=%d pos=%s player=%s php=%.0f" % [t, w.hp, w.state, w.phase, w.global_position, player.global_position, Game.hp])
+		var e := nearest_enemy(30.0)
+		if e and e != w and player.global_position.distance_to(e.global_position) < 5.0:
+			face(e.global_position)
+		else:
+			face(w.global_position)
+		var d := player.global_position.distance_to(w.global_position)
+		if d > 3.4:
+			Input.action_press("move_forward")
+		else:
+			Input.action_release("move_forward")
+			await tap("attack")
+		if w.phase >= 2 and not phase2_shot:
+			phase2_shot = true
+			await shot("13_warden_phase2")
+		await wait(0.1)
+		t += 0.1
+	Input.action_release("move_forward")
+	var won := is_instance_valid(w) and w.dead
+	check("boss_defeated", won, "after %.0fs, phase %d, player took %.0f damage" % [t, w.phase if is_instance_valid(w) else -1, player.damage_taken - dmg0])
+	check("boss_dealt_damage", player.damage_taken > dmg0, "%.0f" % (player.damage_taken - dmg0))
+	await wait(2.5)
+	await shot("14_warden_shattered")
+	check("boss_gate_reopens", world().boss_gate.is_open)
 
 func world() -> VaultWorld:
 	return main.world

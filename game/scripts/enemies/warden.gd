@@ -11,8 +11,9 @@ signal health_changed(hp: float, max_hp: float)
 
 enum S { DORMANT, AWAKEN, CHASE, SWIPE, SLAM, LEAP, SUMMON, RECOVER, DEAD }
 
-var max_hp := 760.0
-var hp := 760.0
+var max_hp := 1450.0
+var hp := 1450.0
+const ARMOR := 0.8   # stone hide: takes 80% of incoming damage
 var dead := false
 var state := S.DORMANT
 var st := 0.0
@@ -249,6 +250,7 @@ func _impact(p: Vector3, radius: float, dmg: float) -> void:
 func take_damage(amount: float, from_pos: Vector3, _knock := 0.0, crit := false) -> void:
 	if dead or state == S.DORMANT:
 		return
+	amount *= ARMOR
 	hp -= amount
 	body.flash(Color(1, 1, 1), 0.6)
 	Sfx.play_at("hit", global_position + Vector3(0, 2, 0), 0.0, 0.1)
