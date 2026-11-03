@@ -1,6 +1,6 @@
 # The Deep Vault — playable builds
 
-Built from `main` at commit dc4c025 with Godot 4.5.1 on Nov 2, 2026.
+Built from `main` at commit 4e8233c with Godot 4.5.1 on Nov 2, 2026.
 
 | File | Platform | How to run |
 |---|---|---|
