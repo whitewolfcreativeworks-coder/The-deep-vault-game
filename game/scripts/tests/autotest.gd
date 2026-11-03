@@ -56,6 +56,7 @@ func shot(name: String) -> void:
 var game_time := 0.0
 func _process(d: float) -> void:
 	game_time += d
+	_track_camera(d)
 	if god and player:
 		Game.hp = maxf(Game.hp, Game.max_hp() * 0.8)
 		Game.stamina = Game.max_stamina()
@@ -65,7 +66,7 @@ func tp(pos: Vector3, yaw: float, pitch := -0.2) -> void:
 	player.global_position = pos
 	player.velocity = Vector3.ZERO
 	player.yaw = yaw; player.facing = yaw; player.pitch = pitch
-	player.cam_yaw.global_position = pos + Vector3(0, Player.EYE_H, 0)
+	player.snap_view()
 	await frames(4)
 
 func press(action: String, sec: float) -> void:
@@ -107,7 +108,7 @@ func nearest_enemy(max_d := 30.0) -> Node3D:
 
 ## Walk toward and melee every live enemy within radius until none remain.
 func clear_enemies(radius: float, timeout: float) -> int:
-	var killed := 0
+	var kills0 := Game.kills
 	var t := 0.0
 	while t < timeout:
 		var e := nearest_enemy(radius)
@@ -122,10 +123,8 @@ func clear_enemies(radius: float, timeout: float) -> int:
 			await tap("attack")
 		await wait(0.1)
 		t += 0.1
-		if not is_instance_valid(e) or e.dead:
-			killed += 1
 	Input.action_release("move_forward")
-	return killed
+	return Game.kills - kills0   # the game's own kill counter (any swing, any target)
 
 func use_nearest_interactable() -> bool:
 	await frames(3)
@@ -141,6 +140,8 @@ func _run() -> void:
 	await wait(1.0)
 	if mode == "shots":
 		await _shots()
+	elif mode == "camera":
+		await _camera_test()
 	elif mode == "touch":
 		await _touch_test()
 	elif mode == "boss":
@@ -238,7 +239,7 @@ func _flow() -> void:
 	check("fire_trap_damage", Game.hp < hp_v, "hp %.0f -> %.0f" % [hp_v, Game.hp])
 	await shot("05_fire_vents")
 	god = true
-	await tp(Vector3(1.0, -5.9, -58.4), -PI / 2)
+	await tp(Vector3(1.7, -5.9, -58.6), -PI / 2)
 	var lever_ok := await use_nearest_interactable()
 	await wait(2.6)
 	check("lever_opens_gate", lever_ok and world().corridor_gate.is_open)
@@ -492,6 +493,87 @@ func _touch_test() -> void:
 	var y2 := player.yaw
 	Input.action_press("look_left"); await wait(0.5); Input.action_release("look_left")
 	check("arrow_keys_look", player.yaw > y2 + 0.2, "yaw %.2f -> %.2f" % [y2, player.yaw])
+
+# --- camera smoothness ------------------------------------------------------
+# Measures what a player feels: the camera's distance from the head pumping in
+# and out as it hits walls, and frame-to-frame jerk in where it points.
+var _cam_track := false
+var _cam_frames := 0
+var _dist_prev := -1.0
+var _dist_dir := 0
+var _dist_extreme := 0.0
+var _pumps := 0
+var _dist_travel := 0.0
+var _fwd_prev := Vector3.ZERO
+var _fwd_rate_prev := 0.0
+var _jerk_sum := 0.0
+var _track_time := 0.0
+
+func _track_camera(delta: float) -> void:
+	if not _cam_track or player == null or delta <= 0.0:
+		return
+	var cam: Camera3D = player.camera
+	var head := player.global_position + Vector3(0, Player.EYE_H, 0)
+	var d := cam.global_position.distance_to(head)
+	var fwd := -cam.global_transform.basis.z
+	_track_time += delta
+	if _cam_frames > 0:
+		_dist_travel += absf(d - _dist_prev)
+		var dir := signi(int(signf(d - _dist_prev))) if absf(d - _dist_prev) > 0.02 else 0
+		if dir != 0:
+			if _dist_dir != 0 and dir != _dist_dir and absf(_dist_extreme - d) > 0.0:
+				if absf(_dist_extreme - _dist_prev) > 0.35:
+					_pumps += 1
+				_dist_extreme = _dist_prev
+			elif _dist_dir == 0:
+				_dist_extreme = _dist_prev
+			_dist_dir = dir
+		var rate := fwd.angle_to(_fwd_prev) / delta
+		if _cam_frames > 1:
+			_jerk_sum += absf(rate - _fwd_rate_prev)
+		_fwd_rate_prev = rate
+	_dist_prev = d
+	_fwd_prev = fwd
+	_cam_frames += 1
+
+func _camera_test() -> void:
+	await _start()
+	god = true
+	var spots := [
+		["hall_pillars", Vector3(-4.2, -5.9, -15.5), Vector3(-4.2, -5.9, -31)],
+		["vent_corridor", Vector3(0, -5.9, -35.5), Vector3(0, -5.9, -57.5)],
+		["armory_pillars", Vector3(-5.3, -5.9, -62.5), Vector3(-5.3, -5.9, -81)],
+		["tunnel_stairs", Vector3(0, 0.1, 2.0), Vector3(0, -5.9, -11.5)],
+	]
+	var total_pumps := 0
+	for sp in spots:
+		for zoom_m in [3.6, 6.5]:
+			player.zoom_target = zoom_m; player.zoom = zoom_m
+			await tp(sp[1], 0.0)
+			corridor_off()
+			await wait(0.6)
+			_cam_track = true; _cam_frames = 0; _pumps = 0; _dist_travel = 0.0; _jerk_sum = 0.0
+			_dist_dir = 0; _track_time = 0.0
+			var t := 0.0
+			Input.action_press("move_forward")
+			while t < 6.0 and player.global_position.distance_to(sp[2]) > 1.5:
+				face(sp[2])
+				player.yaw += sin(t * 2.2) * 1.2   # sweep the view like a player looking around
+				player.pitch = clampf(sin(t * 1.3) * 0.5 - 0.2, -1.0, 0.8)
+				await frames(1)
+				t += get_process_delta_time()
+			Input.action_release("move_forward")
+			_cam_track = false
+			total_pumps += _pumps
+			print("CAMSTAT %s zoom=%.1f pumps=%d dist_travel_per_s=%.2f jerk_per_s=%.1f frames=%d" % [sp[0], zoom_m, _pumps, _dist_travel / maxf(_track_time, 0.01), _jerk_sum / maxf(_track_time, 0.01), _cam_frames])
+			# threshold set from measurement: the original camera averaged ~3.8 m/s of in/out motion here
+			check("camera_settled_%s_%.0fm" % [sp[0], zoom_m], _dist_travel / maxf(_track_time, 0.01) < 2.5, "pumps %d, in/out travel %.2f m/s" % [_pumps, _dist_travel / maxf(_track_time, 0.01)])
+		await shot("c_" + sp[0])
+	print("CAMSTAT total_pumps=%d" % total_pumps)
+
+func corridor_off() -> void:
+	for tr in world().corridor_traps:
+		tr.disabled = true
 
 func world() -> VaultWorld:
 	return main.world

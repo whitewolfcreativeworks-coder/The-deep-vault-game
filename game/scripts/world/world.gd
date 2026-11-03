@@ -343,17 +343,17 @@ func _entry_hall() -> void:
 
 func _corridor() -> void:
 	var wm: Material = b.wall_mat(Color(0.30, 0.28, 0.27), 0.2, Y, 0.9, 0.45)
-	b.room(-2, 2, -60, -34, Y, 4.6, wm, b.mats.floor, {"s": [[-2.0, 2.0, 3.6]], "n": [[-2.0, 2.0, 3.6]]})
+	b.room(-2.75, 2.75, -60, -34, Y, 5.0, wm, b.mats.floor, {"s": [[-2.0, 2.0, 3.6]], "n": [[-2.0, 2.0, 3.6]]})
 	var offs := [0.0, 0.8, 1.6, 2.4]
 	var zs := [-38.5, -43.0, -47.5, -52.0]
 	for i in 4:
-		corridor_traps.append(FireTrap.create(self, Vector3(0, Y, zs[i]), Vector2(3.9, 1.8), 3.2, offs[i]))
-	Props.torch(self, Vector3(-1.95, Y + 2.6, -36), 90.0, true)
-	Props.torch(self, Vector3(1.95, Y + 2.6, -56.5), -90.0, true, true)
-	Props.place(self, "sword_shield_broken", Vector3(-1.2, Y, -45), 30.0)
-	Props.place(self, "rubble_half", Vector3(1.3, Y, -55), 60.0)
+		corridor_traps.append(FireTrap.create(self, Vector3(0, Y, zs[i]), Vector2(5.4, 1.8), 3.2, offs[i]))
+	Props.torch(self, Vector3(-2.7, Y + 2.6, -36), 90.0, true)
+	Props.torch(self, Vector3(2.7, Y + 2.6, -56.5), -90.0, true, true)
+	Props.place(self, "sword_shield_broken", Vector3(-2.0, Y, -45), 30.0)
+	Props.place(self, "rubble_half", Vector3(2.0, Y, -55), 60.0)
 	corridor_gate = Gate.create(self, Vector3(0, Y, -60.0), 4.0, 3.6, 0.0, "gate_corridor")
-	var lever := Interactable.create(self, "lever", Vector3(1.7, Y, -58.8), -90.0, "lever_corridor")
+	var lever := Interactable.create(self, "lever", Vector3(2.45, Y, -58.8), -90.0, "lever_corridor")
 	lever.used.connect(func(_by: Node) -> void:
 		corridor_gate.open()
 		for t in corridor_traps:

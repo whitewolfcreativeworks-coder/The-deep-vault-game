@@ -16,6 +16,9 @@ var _death_timer := -1.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Only the player opts in to physics interpolation (see Player._ready);
+	# everything else keeps its exact per-tick transforms.
+	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	if not quick_restart:
 		Game.reset_run()
 	Game.hp = Game.max_hp(); Game.mana = Game.max_mana(); Game.stamina = Game.max_stamina()

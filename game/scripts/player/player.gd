@@ -19,7 +19,15 @@ const MOUSE_SENS := 0.0024
 var body: CharacterModel
 var cam_yaw: Node3D
 var cam_pitch: Node3D
-var spring: SpringArm3D
+var arm: Node3D
+var _probe: SphereShape3D
+var view_yaw := 0.0     # smoothed yaw/pitch actually rendered
+var view_pitch := -0.25
+var cam_len := 3.6      # current camera distance after collision
+var _look_idle := 0.0
+var _bob := 0.0
+const PITCH_MIN := -1.05
+const PITCH_MAX := 0.85
 var camera: Camera3D
 var zoom := 3.6
 var zoom_target := 3.6
@@ -76,18 +84,17 @@ func _ready() -> void:
 	# camera rig is top-level so body rotation never drags it
 	cam_yaw = Node3D.new(); cam_yaw.name = "CamYaw"; cam_yaw.top_level = true
 	add_child(cam_yaw)
+	cam_yaw.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	cam_pitch = Node3D.new(); cam_yaw.add_child(cam_pitch)
-	spring = SpringArm3D.new()
-	spring.collision_mask = 1
-	spring.margin = 0.25
-	var probe := SphereShape3D.new(); probe.radius = 0.22
-	spring.shape = probe
-	cam_pitch.add_child(spring)
+	arm = Node3D.new(); arm.name = "Arm"; cam_pitch.add_child(arm)
 	camera = Camera3D.new()
-	camera.fov = 72.0
+	camera.fov = 74.0
 	camera.near = 0.04
 	camera.far = 300.0
-	spring.add_child(camera)
+	arm.add_child(camera)
+	_probe = SphereShape3D.new(); _probe.radius = 0.3
+	# the body moves in physics ticks; interpolate it so it glides at any refresh rate
+	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_ON
 	Game.inventory_changed.connect(_on_inventory_changed)
 	cam_yaw.global_position = global_position + Vector3(0, EYE_H, 0)
 
@@ -100,7 +107,7 @@ func rebuild_body() -> void:
 	if p.cape > 0:
 		cfg["cape_color"] = Game.CAPE_COLORS[p.cape]
 	body.setup(cfg)
-	body.set_head_visible(not first_person)
+	body.set_head_visible(not _head_hidden)
 	_equipped_sig = _equip_signature()
 
 func _shield_for_armor() -> String:
@@ -143,6 +150,7 @@ func set_mouse_captured(c: bool) -> void:
 		_lock_wait = -1.0
 
 func _process(delta: float) -> void:
+	_update_camera(delta)
 	# detect a pointer lock that never took (browser) or was dropped
 	if _lock_wait >= 0.0:
 		_lock_wait -= delta
@@ -158,7 +166,8 @@ func _process(delta: float) -> void:
 
 func _look(rel: Vector2, mult := 1.0) -> void:
 	yaw -= rel.x * Game.mouse_sens * mult
-	pitch = clampf(pitch - rel.y * Game.mouse_sens * mult, -1.35, 1.25)
+	pitch = clampf(pitch - rel.y * Game.mouse_sens * mult, PITCH_MIN, PITCH_MAX)
+	_look_idle = 0.0
 
 func _tap_action(action: String) -> void:
 	Input.action_press(action)
@@ -236,7 +245,6 @@ func _physics_process(delta: float) -> void:
 		velocity.x = 0; velocity.z = 0
 		velocity.y -= GRAVITY * delta
 		move_and_slide()
-		_update_camera(delta)
 		return
 	_update_timers(delta)
 	in_river = false
@@ -248,8 +256,9 @@ func _physics_process(delta: float) -> void:
 	if input_enabled:
 		var lk := Input.get_vector("look_left", "look_right", "look_up", "look_down")
 		if lk.length() > 0.05:
-			yaw -= lk.x * 2.4 * delta
-			pitch = clampf(pitch - lk.y * 1.6 * delta, -1.35, 1.25)
+			yaw -= lk.x * 2.2 * delta
+			pitch = clampf(pitch - lk.y * 1.3 * delta, PITCH_MIN, PITCH_MAX)
+			_look_idle = 0.0
 		_handle_actions()
 		var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 		dir = Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, yaw)
@@ -314,7 +323,6 @@ func _physics_process(delta: float) -> void:
 			if in_river:
 				Sfx.play("splash", -22.0, 0.2)
 	_update_interact()
-	_update_camera(delta)
 
 func _update_timers(delta: float) -> void:
 	invuln = maxf(0.0, invuln - delta)
@@ -537,7 +545,7 @@ func respawn_at(pos: Vector3, yaw_r: float) -> void:
 	body.rotation.y = facing
 	Game.hp = Game.max_hp(); Game.stamina = Game.max_stamina(); Game.mana = Game.max_mana()
 	invuln = 2.0
-	cam_yaw.global_position = global_position + Vector3(0, EYE_H, 0)
+	snap_view()
 	Game.stats_changed.emit()
 
 func add_trauma(t: float) -> void:
@@ -568,30 +576,93 @@ func _update_interact() -> void:
 		_last_prompt = txt
 		interact_target_changed.emit(txt)
 
+## Jump the camera to where it should be (after teleports / respawn).
+func snap_view() -> void:
+	reset_physics_interpolation()
+	view_yaw = yaw; view_pitch = pitch
+	cam_len = zoom
+	cam_yaw.global_position = global_position + Vector3(0, EYE_H, 0)
+
+## Runs every rendered frame (not per physics tick) so motion stays smooth on
+## 60/120 Hz displays. Techniques: smoothed look, interpolated follow target,
+## collision that pulls in fast but eases back out slowly, pitch auto-levelling
+## while moving, a slightly wider field of view, gentle first-person head bob.
 func _update_camera(delta: float) -> void:
-	zoom = lerpf(zoom, zoom_target, 1.0 - exp(-10.0 * delta))
+	if camera == null:
+		return
+	zoom = lerpf(zoom, zoom_target, 1.0 - exp(-9.0 * delta))
 	var fp := zoom < FP_THRESHOLD
-	if fp != first_person:
-		first_person = fp
-		body.set_head_visible(not fp)
-	var head_pos := global_position + Vector3(0, EYE_H * (body.scale.y), 0)
+	# --- look smoothing (touch input is noisier, so it gets more)
+	var tc := 0.09 if Game.touch_active else 0.035
+	var k := 1.0 - exp(-delta / tc)
+	view_yaw = lerp_angle(view_yaw, yaw, k)
+	view_pitch = lerpf(view_pitch, pitch, k)
+	# --- ease the view back toward the horizon while travelling in third person
+	_look_idle += delta
+	var hspeed := Vector2(velocity.x, velocity.z).length()
+	if _look_idle > 1.2 and hspeed > 1.0 and (not fp or Game.touch_active) and not dead:
+		pitch = lerpf(pitch, -0.18, 1.0 - exp(-0.9 * delta))
+	# --- follow the interpolated body position
+	var base := get_global_transform_interpolated().origin
+	var head_pos := base + Vector3(0, EYE_H, 0)
 	if body.dead:
-		head_pos = global_position + Vector3(0, 0.6, 0)
-	# follow: snappy vertically when close (first person must not lag)
-	var follow := 1.0 - exp(-(40.0 if zoom < 1.5 else 16.0) * delta)
-	cam_yaw.global_position = cam_yaw.global_position.lerp(head_pos, follow)
+		head_pos = base + Vector3(0, 0.6, 0)
 	if fp:
-		cam_yaw.global_position = head_pos + (-Vector3(sin(yaw), 0, cos(yaw))) * 0.12
-	cam_yaw.rotation = Vector3(0, yaw, 0)
-	cam_pitch.rotation = Vector3(pitch, 0, 0)
-	var shoulder := clampf((zoom - 0.6) / 3.0, 0.0, 1.0) * 0.5 * clampf(1.0 - (zoom - 4.0) / 5.0, 0.3, 1.0)
-	spring.position = Vector3(shoulder, clampf((zoom - 0.5) * 0.08, 0.0, 0.35), 0)
-	spring.spring_length = zoom if zoom > 0.05 else 0.0
-	# shake
+		# true first person: no lag, small head bob while walking
+		if is_on_floor() and hspeed > 0.5:
+			_bob += delta * hspeed * 1.9
+		else:
+			_bob = lerpf(_bob, round(_bob / PI) * PI, 1.0 - exp(-6.0 * delta))
+		var bob := sin(_bob) * 0.028 * clampf(hspeed / WALK, 0.0, 1.4)
+		cam_yaw.global_position = head_pos + Vector3(0, bob, 0) + (-Vector3(sin(view_yaw), 0, cos(view_yaw))) * 0.12
+	else:
+		var follow := 1.0 - exp(-(30.0 if zoom < 1.5 else 14.0) * delta)
+		cam_yaw.global_position = cam_yaw.global_position.lerp(head_pos, follow)
+	cam_yaw.rotation = Vector3(0, view_yaw, 0)
+	cam_pitch.rotation = Vector3(view_pitch, 0, 0)
+	# --- shoulder offset shrinks when the camera is squeezed by walls
+	var squeeze := clampf(cam_len / maxf(zoom, 0.01), 0.0, 1.0)
+	var shoulder := clampf((zoom - 0.6) / 3.0, 0.0, 1.0) * 0.38 * clampf(1.0 - (zoom - 4.0) / 5.0, 0.3, 1.0) * squeeze
+	var lift := clampf((zoom - 0.5) * 0.08, 0.0, 0.35)
+	arm.position = Vector3(shoulder, lift, 0)
+	# --- collision: sphere-cast from the head to the wanted camera spot
+	var want := zoom if zoom > 0.05 else 0.0
+	var safe := want
+	if want > 0.05:
+		var from := arm.global_position
+		var back := arm.global_transform.basis.z * want
+		var q := PhysicsShapeQueryParameters3D.new()
+		q.shape = _probe
+		q.transform = Transform3D(Basis.IDENTITY, from)
+		q.motion = back
+		q.collision_mask = 1
+		q.exclude = [get_rid()]
+		var res := get_world_3d().direct_space_state.cast_motion(q)
+		if res.size() == 2 and res[0] < 1.0:
+			safe = maxf(0.0, want * res[0] - 0.05)
+	if safe < cam_len - 0.01:
+		cam_len = lerpf(cam_len, safe, 1.0 - exp(-delta / 0.03))   # pull in almost instantly
+		_hold = 0.55                                                # then wait before easing out
+	elif _hold > 0.0:
+		_hold -= delta
+	else:
+		cam_len = move_toward(cam_len, safe, delta * (0.9 + cam_len * 0.2))  # ease back out slowly
+	camera.position = Vector3(0, 0, cam_len)
+	# hide the head whenever the camera is inside or right behind it
+	var head_hidden := fp or cam_len < 1.15
+	if head_hidden != _head_hidden:
+		_head_hidden = head_hidden
+		body.set_head_visible(not head_hidden)
+	first_person = fp
+	# --- shake
 	trauma = maxf(0.0, trauma - delta * 1.6)
 	var sh := trauma * trauma
 	var tt := Time.get_ticks_msec() * 0.001
 	camera.h_offset = sin(tt * 37.0) * 0.12 * sh
 	camera.v_offset = cos(tt * 41.0) * 0.12 * sh
 	camera.rotation.z = sin(tt * 23.0) * 0.04 * sh
-	camera.fov = lerpf(camera.fov, 78.0 if (fp) else 70.0, 1.0 - exp(-6.0 * delta))
+	var sprint_kick := 5.0 if hspeed > WALK + 0.8 else 0.0
+	camera.fov = lerpf(camera.fov, (80.0 if fp else 74.0) + sprint_kick, 1.0 - exp(-5.0 * delta))
+
+var _head_hidden := false
+var _hold := 0.0

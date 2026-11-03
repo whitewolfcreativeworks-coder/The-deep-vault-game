@@ -100,3 +100,31 @@ Several later stages ran with the bot made invulnerable (`god` flag in `autotest
 2. Supply character assets up front, or allow more asset hosts, and decide on the art style before the night starts (realistic versus stylised).
 3. Ask for a short human playtest checkpoint partway through. Feel and balance are where automated testing is weakest.
 4. Have the repo created with the GitHub token working in advance, so the agent can create releases and attach builds itself.
+
+
+## Follow-up after the first human playtest (iPad, same evening)
+
+**Feedback:**
+- Looking around in tight rooms and corridors felt glitchy, and it was hard to get a sense of the space.
+- The Mage's spells were unimpressive.
+- Combat lacked strategy.
+
+**Camera changes, based on standard third-person camera practice and Godot's jitter guidance:**
+- The camera now updates every rendered frame instead of every physics tick. The player body uses Godot's physics interpolation so it glides smoothly on 60 and 120 Hz screens.
+- **Look input is smoothed** (light for mouse, more for touch). Touch has a gentler vertical response and an acceleration curve. Pitch is limited to about ±60° so a swipe can't flip you from floor to ceiling.
+- **Wall collision:** a sphere cast pulls the camera in almost instantly when it hits a wall, then **waits 0.55 s and eases back out slowly**. The old SpringArm snapped both ways.
+- The shoulder offset shrinks when squeezed, the head hides when the camera is close, and the view auto-levels toward the horizon while you travel.
+- Slightly wider field of view (74° in third person, 80° in first person), a small sprint FOV kick, and subtle first-person head bob.
+- The fire-vent corridor was widened from 4 m to 5.5 m.
+
+**Measured** with a new `camera` autotest. It walks four tight spots while sweeping the view, at 3.6 m and 6.5 m zoom, and runs the same test on both versions:
+
+| | Original camera | New camera |
+|---|---|---|
+| Camera distance pumping in/out (average) | ~3.7 m/s | **~1.7 m/s** |
+| Pull-in/push-out cycles (total) | 59 | **38** |
+| Aim jerk | baseline | about 12% lower |
+
+The sandbox renders at about 7 fps, so these numbers can't capture the frame-rate-related part of the fix. Only a playtest will show it.
+
+**Not addressed yet:** per-hero spells and deeper combat, and an open-world direction. Both are proposed for the next session.

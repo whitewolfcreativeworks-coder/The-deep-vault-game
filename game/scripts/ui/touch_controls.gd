@@ -12,7 +12,8 @@ var main: Node
 var pad: Control
 var active := false
 
-const LOOK_SENS := 1.7
+const LOOK_SENS := 1.35
+const LOOK_VERTICAL := 0.6   # vertical swipes move the view less than horizontal ones
 var _stick_id := -1
 var _stick_origin := Vector2.ZERO
 var _stick_pos := Vector2.ZERO
@@ -129,7 +130,10 @@ func _on_drag(e: InputEventScreenDrag) -> void:
 			_pinch_dist = d
 		else:
 			if player:
-				player._look(e.relative, LOOK_SENS)
+				# small, careful swipes stay precise; fast flicks turn quicker
+				var spd := e.relative.length()
+				var accel := lerpf(0.65, 1.35, clampf(spd / 28.0, 0.0, 1.0))
+				player._look(e.relative * Vector2(1.0, LOOK_VERTICAL), LOOK_SENS * accel)
 			_look[e.index] = e.position
 	pad.queue_redraw()
 
