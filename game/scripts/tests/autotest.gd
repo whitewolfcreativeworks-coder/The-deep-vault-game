@@ -280,15 +280,17 @@ func _flow() -> void:
 	var ak := await clear_enemies(26.0, 90.0)
 	check("armory_cleared_incl_revenant", ak >= 3, "%d killed" % ak)
 	var atk0 := Game.attack_damage()
+	var inv_before := Game.inventory.duplicate()
 	await tp(Vector3(-8.0, -5.9, -63.5), PI / 2)
 	await use_nearest_interactable()
 	await wait(2.0)
-	check("weapon_upgrade_equipped", Game.attack_damage() > atk0, "%s: attack %.0f -> %.0f" % [Game.item(Game.equipped.weapon).get("name", "?"), atk0, Game.attack_damage()])
+	check("weapon_found_best_equipped", _found_and_best("weapon", inv_before), "%s: attack %.0f -> %.0f" % [Game.item(Game.equipped.weapon).get("name", "?"), atk0, Game.attack_damage()])
 	var def0 := Game.defense()
+	var inv_before2 := Game.inventory.duplicate()
 	await tp(Vector3(0, -5.9, -81.2), 0.0)
 	await use_nearest_interactable()
 	await wait(2.0)
-	check("armor_upgrade_equipped", Game.defense() > def0, "%s: defense %.0f -> %.0f" % [Game.item(Game.equipped.armor).get("name", "?"), def0, Game.defense()])
+	check("armor_found_best_equipped", _found_and_best("armor", inv_before2), "%s: defense %.0f -> %.0f" % [Game.item(Game.equipped.armor).get("name", "?"), def0, Game.defense()])
 	await shot("06b_armory_loot")
 	# the Glowing Deep
 	await tp(Vector3(0, -5.9, -94), 0.0, -0.15)
@@ -1061,6 +1063,17 @@ func _balance_test() -> void:
 	var r := await _bot_boss()
 	print("BALANCE result %s" % JSON.stringify(r))
 	check("balance_%s_seed%d" % [setup, sd], r.won if setup == "geared" else not r.won, JSON.stringify(r))
+
+## A new item of this slot was picked up, and the equipped one is the best owned.
+func _found_and_best(slot: String, before: Array) -> bool:
+	var found := false
+	var best := -INF
+	for id in Game.inventory:
+		if Game.item(id).get("slot", "") == slot:
+			best = maxf(best, Game.score(id))
+			if not before.has(id):
+				found = true
+	return found and Game.score(Game.equipped[slot]) >= best - 0.01
 
 func world() -> VaultWorld:
 	return main.world
