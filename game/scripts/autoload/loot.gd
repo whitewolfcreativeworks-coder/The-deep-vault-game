@@ -61,6 +61,8 @@ static func rarity_color(r: int) -> Color:
 
 ## Item level from how deep in the dungeon (z) the loot appears.
 static func area_level(z: float) -> int:
+	if Game.zone == "forest":
+		return 5 if z < -120.0 else 4    # the Goblin Forest, deeper in the Warren
 	if z > -12.0: return 1
 	if z > -60.0: return 2
 	if z > -92.0: return 3

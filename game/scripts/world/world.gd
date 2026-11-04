@@ -184,6 +184,19 @@ func _story(z: float) -> void:
 
 # ---------------------------------------------------------------------------
 func _outpost() -> void:
+	# the ancient portal you arrive through (from the opening movie)
+	var arch: Node3D = (load("res://assets/kaykit/forest/arch_gate.gltf") as PackedScene).instantiate()
+	add_child(arch)
+	arch.position = Vector3(0, -0.05, 36.0)
+	arch.scale = Vector3.ONE * 1.5
+	var disc := MeshInstance3D.new(); var q := QuadMesh.new(); q.size = Vector2(4.4, 5.2); disc.mesh = q
+	var pm := ShaderMaterial.new(); pm.shader = load("res://shaders/portal.gdshader"); pm.set_shader_parameter("intensity", 1.2)
+	disc.material_override = pm; disc.position = Vector3(0, 3.0, 35.95); add_child(disc)
+	var pl := OmniLight3D.new(); pl.light_color = Color(0.4, 1.0, 0.8); pl.light_energy = 2.0; pl.omni_range = 9.0
+	pl.position = Vector3(0, 3.0, 35.0); add_child(pl)
+	var asb := StaticBody3D.new(); add_child(asb)
+	var acs := CollisionShape3D.new(); var abs := BoxShape3D.new(); abs.size = Vector3(6.5, 6.5, 1.2)
+	acs.shape = abs; acs.position = Vector3(0, 3.2, 36.0); asb.add_child(acs)
 	# ground and boundary
 	b.box(Vector3(-40, -1, -2), Vector3(40, 0, 50), b.mats.cliff)
 	b.box(Vector3(-11, -0.98, 4), Vector3(11, 0.02, 32), b.mats.cobble, false)
@@ -580,7 +593,8 @@ func _sanctum() -> void:
 	var fm := (b.mats.floor as ShaderMaterial).duplicate() as ShaderMaterial
 	fm.set_shader_parameter("base_color", Color(0.27, 0.25, 0.25))
 	b.room(-2.5, 2.5, -142, -134, Y, 5.0, wm, fm, {"s": [[-2.5, 2.5, 4.6]], "n": [[-2.5, 2.5, 4.6]]})
-	b.room(-15, 15, -172, -142, Y, 14.0, wm, fm, {"s": [[-2.5, 2.5, 4.6]]})
+	b.room(-15, 15, -172, -142, Y, 14.0, wm, fm, {"s": [[-2.5, 2.5, 4.6]], "n": [[-3.5, 3.5, 6.5]]})
+	_portal_chamber(wm, fm)
 	boss_gate = Gate.create(self, Vector3(0, Y, -141.6), 5.0, 4.6, 0.0, "")
 	boss_gate.open(true)
 	# ring of pillars with braziers
@@ -615,6 +629,86 @@ func _sanctum() -> void:
 	if Game.flags.get("warden_dead", false):
 		warden.queue_free()
 		warden = null
+
+# ---------------------------------------------------------------------------
+# End of Level 1: behind the altar a stone door grinds open onto an ancient
+# portal. Walking into it carries you to the portal glade of the Goblin Forest.
+var secret_door: MeshInstance3D
+var _portal_disc: MeshInstance3D
+var _portal_light: OmniLight3D
+var _portal_area: Area3D
+var _portal_open := false
+
+func _portal_chamber(wm: Material, fm: Material) -> void:
+	var mossy: Material = b.wall_mat(Color(0.26, 0.3, 0.24), 0.7, Y, 1.4, 0.6)
+	b.room(-7, 7, -186, -172.6, Y, 9.0, mossy, fm, {"s": [[-7.0, 7.0, 9.0]]})
+	secret_door = b.box(Vector3(-3.6, Y, -172.6), Vector3(3.6, Y + 6.6, -171.4), wm)
+	var arch: Node3D = (load("res://assets/kaykit/forest/arch_gate.gltf") as PackedScene).instantiate()
+	add_child(arch)
+	arch.position = Vector3(0, Y - 0.1, -182.0)
+	arch.scale = Vector3.ONE * 1.5
+	_portal_disc = MeshInstance3D.new(); var q := QuadMesh.new(); q.size = Vector2(4.4, 5.2)
+	_portal_disc.mesh = q
+	var pm := ShaderMaterial.new(); pm.shader = load("res://shaders/portal.gdshader")
+	pm.set_shader_parameter("intensity", 0.0)
+	_portal_disc.material_override = pm
+	_portal_disc.position = Vector3(0, Y + 3.0, -182.05)
+	add_child(_portal_disc)
+	_portal_light = OmniLight3D.new(); _portal_light.light_color = Color(0.4, 1.0, 0.8); _portal_light.light_energy = 0.0
+	_portal_light.omni_range = 14.0; _portal_light.position = Vector3(0, Y + 3.0, -180.5); add_child(_portal_light)
+	# old roots and rubble: nobody has used this portal in a very long time
+	Props.place(self, "rubble_half", Vector3(-5, Y, -184), 30.0)
+	Props.place(self, "rubble_large", Vector3(5.2, Y, -178), -20.0)
+	for sx in [-5.8, 5.8]:
+		Props.torch(self, Vector3(sx, Y + 3.2, -180.0), 90.0 if sx < 0 else -90.0, true)
+	_portal_area = Area3D.new(); _portal_area.collision_layer = 0; _portal_area.collision_mask = 2
+	var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(3.6, 4.0, 1.4)
+	cs.shape = bs; _portal_area.add_child(cs)
+	_portal_area.position = Vector3(0, Y + 2.0, -182.0)
+	_portal_area.monitoring = false
+	add_child(_portal_area)
+	_portal_area.body_entered.connect(func(bd: Node) -> void:
+		if bd.is_in_group("player") and _portal_open:
+			_enter_portal())
+	if Game.flags.get("altar", false):
+		_open_portal(true)
+
+func _open_portal(instant := false) -> void:
+	_portal_open = true
+	var pm := _portal_disc.material_override as ShaderMaterial
+	if instant:
+		secret_door.position.y -= 6.8
+		secret_door.get_child(0).queue_free()   # its collider
+		pm.set_shader_parameter("intensity", 2.2)
+		_portal_light.light_energy = 4.0
+		_portal_area.set_deferred("monitoring", true)
+		return
+	Sfx.play("rumble", 0.0, 0.0)
+	var p := get_tree().get_first_node_in_group("player")
+	if p and p.has_method("add_trauma"):
+		p.add_trauma(0.5)
+	for k in 6:
+		FX.burst(Vector3(-3.0 + k * 1.2, Y + 0.4, -171.0), Color(0.55, 0.5, 0.45), 18, 3.0, 0.5, 1.4, -2.0)
+	var tw := create_tween()
+	tw.tween_property(secret_door, "position:y", secret_door.position.y - 6.8, 3.5).set_trans(Tween.TRANS_SINE)
+	tw.tween_callback(func() -> void:
+		secret_door.get_child(0).queue_free()
+		Sfx.play("portal", -2.0, 0.0)
+		FX.burst(_portal_disc.global_position, Color(0.4, 1.0, 0.8), 80, 5.0, 0.3, 1.2, 0.0)
+		FX.flash_light(_portal_disc.global_position, Color(0.5, 1.0, 0.85), 10.0, 16.0, 1.0)
+		Game.say("An ancient portal flickers to life! Step into it.", Color(0.5, 1.0, 0.85))
+		Game.set_objective("Step into the ancient portal behind the altar.")
+		_portal_area.set_deferred("monitoring", true))
+	tw.tween_method(func(v: float) -> void: pm.set_shader_parameter("intensity", v), 0.0, 2.2, 1.6)
+	tw.parallel().tween_property(_portal_light, "light_energy", 4.0, 1.6)
+
+func _enter_portal() -> void:
+	_portal_open = false
+	Sfx.play("portal", 0.0, 0.0)
+	FX.screen_flash(Color(0.85, 1.0, 0.95), 1.0, 1.2)
+	var sc := get_tree().current_scene
+	if sc.has_method("go_to_forest"):
+		get_tree().create_timer(0.5).timeout.connect(sc.go_to_forest)
 
 func _brazier(p: Vector3) -> void:
 	var n := Node3D.new(); add_child(n); n.position = p
@@ -703,7 +797,10 @@ func _on_warden_defeated() -> void:
 
 func _on_altar_used(_by: Node) -> void:
 	Game.game_over = true
-	Game.set_objective("The Deep Vault is conquered.")
+	Game.flags["victory"] = true
+	Game.set_objective("The Heart is yours! Something rumbles behind the altar...")
+	Game.say("LEVEL 1 COMPLETE!  The Heart of the Vault is yours.", Color(1.0, 0.85, 0.4))
 	var sc := get_tree().current_scene
-	if sc.has_method("on_victory"):
-		get_tree().create_timer(2.5).timeout.connect(sc.on_victory)
+	if sc.has_method("autosave"):
+		sc.autosave()
+	get_tree().create_timer(2.2).timeout.connect(func() -> void: _open_portal())

@@ -211,6 +211,77 @@ def music_boss():
         end = min(len(x), s + len(seg)); x[s:end] += lowpass(b, 400)[: end - s] * .5
     return loopify(x, 0.1)
 
+# --- intro movie and Level 1 ending ---------------------------------------------
+def birds_loop():
+    d = 9.0; x = np.zeros(int(d * SR))
+    for k in range(26):
+        s = int(rng.uniform(0, d - 0.6) * SR)
+        f0 = rng.uniform(2600, 4200); n = int(rng.uniform(0.06, 0.16) * SR); seg = np.arange(n) / SR
+        sweep = f0 * (1 + 0.35 * np.sin(2 * np.pi * rng.uniform(18, 35) * seg))
+        ph = 2 * np.pi * np.cumsum(sweep) / SR
+        chirp = np.sin(ph) * np.sin(np.linspace(0, np.pi, n)) ** 2
+        for r in range(int(rng.integers(1, 4))):
+            o = s + int(r * 0.13 * SR)
+            if o + n < len(x): x[o:o + n] += chirp * rng.uniform(0.3, 1.0)
+    return loopify(x + lowpass(noise(d), 300) * 0.02, 0.4)
+def whistle_tune():
+    # a jaunty whistled walking tune
+    notes = [(784, .3), (880, .3), (988, .3), (784, .3), (1175, .6), (988, .3), (880, .3), (784, .6), (0, .2),
+             (659, .3), (784, .3), (880, .45), (784, .15), (659, .3), (587, .3), (784, .9)]
+    out = []
+    for f, dur in notes:
+        seg = t(dur)
+        if f == 0: out.append(np.zeros(len(seg))); continue
+        vib = 1 + 0.012 * np.sin(2 * np.pi * 6 * seg)
+        ph = 2 * np.pi * np.cumsum(f * vib) / SR
+        tone = np.sin(ph) + 0.08 * lowpass(noise(dur), 4000)
+        e = np.clip(seg / 0.03, 0, 1) * np.clip((dur - seg) / 0.05, 0, 1)
+        out.append(tone * e)
+    return np.concatenate(out)
+def kettle():
+    d = 2.6; seg = t(d)
+    f = 1400 + 900 * np.clip(seg / 1.6, 0, 1)
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    tone = np.sin(ph) * np.clip(seg / 1.2, 0, 1) * np.clip((d - seg) / 0.3, 0, 1)
+    hiss = highpass(noise(d), 2500) * np.clip(seg / 0.8, 0, 1) * 0.5
+    return tone * 0.6 + hiss
+def brush():
+    d = 2.4; x = np.zeros(int(d * SR))
+    for k in range(10):
+        s = int(k * 0.22 * SR); n = int(0.18 * SR)
+        b = highpass(lowpass(noise(0.18), 6000), 1800) * np.sin(np.linspace(0, np.pi, n))
+        x[s:s + n] += b[: len(x) - s]
+    return x
+def sip():
+    d = 0.7; seg = t(d)
+    s1 = lowpass(highpass(noise(d), 600), 2500) * np.exp(-((seg - 0.25) / 0.12) ** 2)
+    return s1 + 0.3 * np.sin(2 * np.pi * 300 * seg) * np.exp(-((seg - 0.5) / 0.05) ** 2)
+def rumble():
+    d = 3.8; seg = t(d)
+    grind = lowpass(noise(d), 220) * (0.6 + 0.4 * np.sin(2 * np.pi * 3.3 * seg) ** 2)
+    sub = np.sin(2 * np.pi * 38 * seg) * 0.5
+    e = np.clip(seg / 0.3, 0, 1) * np.clip((d - seg) / 0.8, 0, 1)
+    return (grind * 2.2 + sub) * e
+def portal_whoosh():
+    d = 2.4; seg = t(d)
+    f = 120 + 500 * (seg / d) ** 2
+    hum = np.sin(2 * np.pi * np.cumsum(f) / SR) * 0.5
+    air = lowpass(noise(d), 800 + 4000 * (seg / d))
+    e = np.clip(seg / 0.4, 0, 1) * np.clip((d - seg) / 0.3, 0, 1)
+    return (hum + air) * e
+def music_morning():
+    # warm major pad for the opening: C - G - Am - F, 5s each
+    d = 20.5; x = np.zeros(int(d * SR))
+    chords = [[130.8, 164.8, 196.0], [98.0, 123.5, 146.8], [110, 130.8, 164.8], [87.3, 110, 130.8]]
+    for i, ch in enumerate(chords):
+        s = int(i * 5 * SR); seg = t(5.6)
+        e = np.clip(seg / 1.2, 0, 1) * np.clip((5.6 - seg) / 1.2, 0, 1)
+        for f in ch:
+            for det in (0.998, 1.002):
+                tone = np.sin(2 * np.pi * f * 2 * det * seg) + .25 * np.sin(2 * np.pi * f * 3 * det * seg)
+                end = min(len(x), s + len(seg)); x[s:end] += (tone * e)[: end - s]
+    return loopify(lowpass(x, 2200), 0.5)
+
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
     "pickup": pickup, "coins": coins, "levelup": levelup, "spell": spell, "spell_hit": spell_hit,
@@ -219,11 +290,17 @@ SOUNDS = {
     "death": death_sting, "victory": victory,
     "loop_cave": cave_drone, "loop_river": river_loop, "loop_fire": fire_loop,
     "music_explore": music_explore, "music_boss": music_boss,
+    "loop_birds": birds_loop, "whistle": whistle_tune, "kettle": kettle, "brush": brush, "sip": sip,
+    "rumble": rumble, "portal": portal_whoosh, "music_morning": music_morning,
 }
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "game/assets/audio"
     os.makedirs(out, exist_ok=True)
+    only = sys.argv[2].split(",") if len(sys.argv) > 2 else None
     for name, fn in SOUNDS.items():
+        if only and name not in only:
+            fn()   # keep the random sequence identical for the other sounds
+            continue
         save(os.path.join(out, name + ".wav"), fn(), 0.8 if name.startswith(("loop", "music")) else 0.9)
         print("wrote", name)

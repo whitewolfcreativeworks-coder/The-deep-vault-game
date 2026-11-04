@@ -18,7 +18,25 @@ const TYPES := {
 	"revenant": {"name": "Hollow Revenant", "variant": "warrior", "hp": 190.0, "dmg": 24.0, "speed": 2.5, "range": 2.6,
 		"windup": 0.85, "cooldown": 1.9, "xp": 120, "weapon": "skel_axe", "shield": "Skeleton_Shield_Large_A", "eye": Color(1.0, 0.25, 0.15),
 		"scale": 1.25, "aggro": 13.0, "poise": 30.0, "gold": [20, 35], "heavy": true},
+	# --- Goblin Forest: goblins are built on the hero rigs (green skin, ears, small)
+	"goblin": {"name": "Goblin Cutter", "hp": 42.0, "dmg": 9.0, "speed": 4.3, "range": 1.7,
+		"windup": 0.38, "cooldown": 0.95, "xp": 30, "weapon": "skel_blade", "shield": "", "eye": Color(1.0, 0.85, 0.2),
+		"scale": 0.62, "aggro": 14.0, "poise": 0.0, "gold": [3, 9], "leash": 30.0,
+		"look": {"hero": "Rogue", "hair_style": "mohawk", "hair_color": Color(0.12, 0.08, 0.06), "face": "warpaint", "outfit": Color(0.42, 0.3, 0.16)}},
+	"goblin_archer": {"name": "Goblin Archer", "hp": 34.0, "dmg": 9.0, "speed": 3.8, "range": 15.0,
+		"windup": 0.6, "cooldown": 2.0, "xp": 36, "weapon": "", "shield": "", "eye": Color(0.75, 1.0, 0.3),
+		"scale": 0.6, "aggro": 18.0, "poise": 0.0, "gold": [4, 10], "ranged": true, "leash": 32.0,
+		"look": {"hero": "Ranger", "hair_style": "natural", "hair_color": Color(0.1, 0.1, 0.1), "face": "none", "outfit": Color(0.3, 0.36, 0.15)}},
+	"goblin_brute": {"name": "Goblin Brute", "hp": 160.0, "dmg": 19.0, "speed": 3.0, "range": 2.4,
+		"windup": 0.75, "cooldown": 1.7, "xp": 95, "weapon": "skel_axe", "shield": "", "eye": Color(1.0, 0.45, 0.15),
+		"scale": 0.95, "aggro": 14.0, "poise": 25.0, "gold": [12, 24], "heavy": true, "leash": 26.0,
+		"look": {"hero": "Barbarian", "hair_style": "bald", "hair_color": Color(0.1, 0.1, 0.1), "face": "scar", "outfit": Color(0.35, 0.22, 0.14), "build": 1.25}},
+	"goblin_chief": {"name": "Chief Gruk", "hp": 720.0, "dmg": 24.0, "speed": 3.3, "range": 2.9,
+		"windup": 0.8, "cooldown": 1.45, "xp": 450, "weapon": "skel_axe", "shield": "Skeleton_Shield_Large_A", "eye": Color(1.0, 0.3, 0.1),
+		"scale": 1.35, "aggro": 16.0, "poise": 70.0, "gold": [60, 90], "heavy": true, "leash": 40.0, "summon": true,
+		"look": {"hero": "Barbarian", "hair_style": "mohawk", "hair_color": Color(0.85, 0.12, 0.08), "face": "warpaint", "outfit": Color(0.5, 0.12, 0.1), "build": 1.3, "hat": true}},
 }
+const GOBLIN_SKIN := Color(0.42, 0.62, 0.24)
 
 enum S { DORMANT, AWAKEN, IDLE, CHASE, WINDUP, STRIKE, RECOVER, STAGGER, RETURN, DEAD }
 
@@ -43,6 +61,7 @@ var bounds := AABB()        # optional room bounds the enemy will not leave
 var _strafe := 1.0
 var _hurt_t := -1.0
 var _stagger_acc := 0.0
+var _summoned := false
 
 func configure(type_name: String, id: String, wake_range := 0.0) -> void:
 	type_id = type_name
@@ -65,7 +84,16 @@ func _ready() -> void:
 	add_child(cs)
 	body = CharacterModel.new()
 	add_child(body)
-	body.setup({"kind": "skeleton", "variant": t.variant, "weapon": t.weapon, "shield": t.shield, "eye": t.eye, "scale": t.scale})
+	if t.has("look"):
+		var lk: Dictionary = t.look
+		body.setup({"kind": "hero", "hero": lk.hero, "show_hat": lk.get("hat", false), "weapon": t.weapon, "shield": t.shield,
+			"scale": t.scale, "skin_color": GOBLIN_SKIN, "hair_style": lk.hair_style, "hair_color": lk.hair_color,
+			"hair_tint": GOBLIN_SKIN.darkened(0.1) if lk.hair_style in ["bald", "mohawk"] else lk.hair_color,
+			"face": lk.face, "ears": true, "outfit_color": lk.outfit, "cape_color": lk.outfit.darkened(0.2),
+			"build": lk.get("build", 1.05), "height": 0.95})
+	else:
+		body.setup({"kind": "skeleton", "variant": t.variant, "weapon": t.weapon, "shield": t.shield, "eye": t.eye, "scale": t.scale})
+	leash = t.get("leash", leash)
 	home = global_position
 	facing = rotation.y
 	rotation.y = 0
@@ -262,6 +290,10 @@ func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) 
 	if state == S.DORMANT:
 		_awaken()
 	hp -= amount
+	if t.get("summon", false) and not _summoned and hp < max_hp * 0.5 and hp > 0.0:
+		_summoned = true
+		if get_parent().has_method("summon_for"):
+			get_parent().summon_for(self)
 	body.flash(Color(1, 1, 1), 0.85)
 	Sfx.play_at("hit", global_position + Vector3(0, 1, 0), -3.0, 0.15)
 	FX.hit(global_position + Vector3(0, 1.1, 0), Color(1.0, 0.9, 0.7))
@@ -301,6 +333,7 @@ func _die(away: Vector3) -> void:
 	Game.add_xp(t.xp)
 	if uid != "":
 		Game.flags[uid] = true
+	Game.on_enemy_killed(type_id, uid)
 	_drop_loot()
 	died.emit(self)
 	var tw := create_tween()

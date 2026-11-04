@@ -7,7 +7,7 @@ static var continue_pending := false   # a save slot was loaded: rebuild the wor
 const AUTOSAVE_EVERY := 15.0
 var _autosave_t := 0.0
 
-var world: VaultWorld
+var world   # VaultWorld (Level 1) or ForestWorld (Level 2)
 var player: Player
 var hud: HUD
 var menus: Menus
@@ -26,7 +26,7 @@ func _ready() -> void:
 		Game.reset_run()
 	if not continue_pending:
 		Game.hp = Game.max_hp(); Game.mana = Game.max_mana(); Game.stamina = Game.max_stamina()
-	world = VaultWorld.new()
+	world = ForestWorld.new() if Game.zone == "forest" else VaultWorld.new()
 	world.name = "World"
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(world)
@@ -38,18 +38,20 @@ func _ready() -> void:
 	player.global_position = world.spawn_point
 	player.input_enabled = false
 	world.player = player
-	if not continue_pending:
+	if not continue_pending or Game.checkpoint_pos == Vector3.ZERO:
 		Game.checkpoint_pos = world.spawn_point
 		Game.checkpoint_yaw = 0.0
-		Game.checkpoint_name = "the Outpost"
+		Game.checkpoint_name = "the Portal Glade" if Game.zone == "forest" else "the Outpost"
 	hud = HUD.new()
 	add_child(hud)
 	hud.bind_player(player)
 	hud.visible = false
 	menus = Menus.new()
 	add_child(menus)
-	menus.start_requested.connect(_start_game)
+	menus.start_requested.connect(_play_intro)
 	menus.continue_requested.connect(_continue_slot)
+	menus.forest_requested.connect(go_to_forest)
+	Game.quests_changed.connect(_check_forest_done)
 	menus.exit_to_title_requested.connect(_save_and_exit)
 	Game.leveled_up.connect(func(_l: int) -> void: autosave())
 	menus.resume_requested.connect(_resume)
@@ -134,10 +136,92 @@ func _continue_game() -> void:
 	player.set_mouse_captured(true)
 	hud.visible = true
 	Game.in_game = true
+	if Game.zone == "forest":
+		Game.objective = Game.forest_objective()
 	Game.set_objective(Game.objective if Game.objective != "" else "Enter the Deep Vault beneath the cliffs.")
-	Game.say("Welcome back, %s. Level %d." % [Game.profile.name, Game.level], UIKit.GOLD)
+	if Game.zone == "forest" and Game.play_time > 0.0 and Game.resume_pos == Vector3.ZERO:
+		Game.say("You step out of the portal into the Goblin Forest.", UIKit.GOLD)
+	else:
+		Game.say("Welcome back, %s. Level %d." % [Game.profile.name, Game.level], UIKit.GOLD)
 	menus.fade.color.a = 1.0
 	menus.fade_to(0.0, 1.2)
+
+# --- the opening movie --------------------------------------------------------
+var intro: IntroMovie
+
+func _play_intro() -> void:
+	menus.close_all()
+	state = "intro"
+	hud.visible = false
+	Sfx.music("", -16.0)
+	# the movie has its own sky and valley: take the Vault out while it plays
+	remove_child(world)
+	remove_child(player)
+	intro = IntroMovie.new()
+	add_child(intro)
+	intro.build()
+	intro.finished.connect(_end_intro, CONNECT_ONE_SHOT)
+	intro.play()
+
+func _end_intro() -> void:
+	if intro == null:
+		return
+	intro.queue_free()
+	intro = null
+	add_child(world)
+	add_child(player)
+	Sfx.music("music_explore", -16.0)
+	_start_game()
+	FX.screen_flash(Color(0.85, 1.0, 0.95), 0.9, 1.4)
+	Sfx.play("portal", -4.0, 0.0)
+	Game.say("You tumble out of the old portal... at the gates of the Deep Vault!", UIKit.GOLD)
+
+## Level 1 -> Level 2: through the portal that opens when the Vault is won.
+func go_to_forest() -> void:
+	Game.zone = "forest"
+	Game.flags["victory"] = true
+	Game.checkpoint_pos = Vector3.ZERO
+	Game.resume_pos = Vector3.ZERO
+	Game.objective = ""
+	Game.game_over = false
+	Game.in_game = true
+	if Game.active_slot < 0:
+		Game.active_slot = maxi(Game.first_empty_slot(), 0)
+	Game.save_slot()
+	get_tree().paused = false
+	continue_pending = true
+	get_tree().reload_current_scene()
+
+## Doors and ladders: fade out, move the player, fade back in.
+func teleport_player(dest: Vector3, yaw: float, label: String) -> void:
+	player.input_enabled = false
+	await menus.fade_to(1.0, 0.35).finished
+	player.global_position = dest
+	player.velocity = Vector3.ZERO
+	player.yaw = yaw; player.facing = yaw
+	player.reset_physics_interpolation()
+	player.snap_view()
+	Game.resume_pos = dest
+	player.input_enabled = true
+	menus.fade_to(0.0, 0.5)
+	Game.say(label, UIKit.GOLD)
+	autosave()
+
+func open_dialogue(npc: NPC) -> void:
+	menus.show_dialogue(npc)
+	get_tree().paused = true
+	player.set_mouse_captured(false)
+
+func _check_forest_done() -> void:
+	if Game.zone == "forest" and Game.quest_state("warren") == "done" and not Game.flags.get("forest_won", false):
+		Game.flags["forest_won"] = true
+		Game.set_objective("The Goblin Forest is safe. (Level 3 is coming!)")
+		autosave()
+		get_tree().create_timer(2.5).timeout.connect(func() -> void:
+			if menus.current == "":
+				menus.show_forest_victory()
+				get_tree().paused = true
+				player.set_mouse_captured(false))
 
 func autosave() -> void:
 	if state == "play" and Game.active_slot >= 0 and not player.dead:

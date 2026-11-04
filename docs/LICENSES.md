@@ -22,6 +22,8 @@ Not used (evaluated, see `docs/DESIGN.md`): Blender, Godot Voxel Tools, glslView
 | KayKit Character Pack: Adventurers 1.0 (Knight, Barbarian, Mage, Rogue, Rogue Hooded, swords, shields) | Kay Lousberg, <https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0> | CC0 1.0 | `game/assets/kaykit/adventurers`, `game/assets/kaykit/items` |
 | KayKit Character Pack: Skeletons 1.0 (Minion, Warrior, Rogue, Mage, weapons, shields) | Kay Lousberg, <https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0> | CC0 1.0 | `game/assets/kaykit/skeletons`, `game/assets/kaykit/items` |
 | KayKit Dungeon Remastered 1.0 (props: torches, chests, barrels, banners, pillars, ruins…) | Kay Lousberg, <https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0> | CC0 1.0 | `game/assets/kaykit/dungeon` |
+| KayKit Medieval Hexagon Pack 1.0 (trees, rocks, mountains, mine entrance, buildings, bridge, tents, props) | Kay Lousberg, <https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0> | CC0 1.0 | `game/assets/kaykit/forest` |
+| KayKit Halloween Bits 1.0 (autumn pines, dead trees, arch gate used as the portal, lanterns, skull posts, pumpkins) | Kay Lousberg, <https://github.com/KayKit-Game-Assets/KayKit-Halloween-Bits-1.0> | CC0 1.0 | `game/assets/kaykit/forest` |
 | Poly Haven textures: `castle_brick_07`, `cobblestone_floor_08`, `rock_wall_08` (1k diffuse / normal / roughness) | <https://polyhaven.com> | CC0 1.0 | `game/assets/textures` |
 
 The original license files are kept next to the assets (`game/assets/kaykit/LICENSE_*.txt`).

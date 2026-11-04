@@ -211,6 +211,8 @@ func reset_run() -> void:
 	inventory = ["rusty_sword", "traveler_garb"]
 	equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
 	flags = {}
+	quests = {}
+	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
 	game_over = false
 	stats_changed.emit(); inventory_changed.emit()
@@ -427,6 +429,7 @@ func save_slot(i := -1) -> bool:
 		"checkpoint_pos": checkpoint_pos, "checkpoint_yaw": checkpoint_yaw, "checkpoint_name": checkpoint_name,
 		"objective": objective,
 		"resume_pos": resume_pos, "resume_yaw": resume_yaw,
+		"zone": zone, "quests": quests.duplicate(true),
 	}
 	var f := FileAccess.open(_slot_path(i), FileAccess.WRITE)
 	if f == null:
@@ -474,6 +477,8 @@ func load_slot(i: int) -> bool:
 	objective = String(d.get("objective", ""))
 	resume_pos = d.get("resume_pos", Vector3.ZERO)
 	resume_yaw = float(d.get("resume_yaw", 0.0))
+	zone = String(d.get("zone", "vault"))
+	quests = d.get("quests", {}).duplicate(true)
 	hp = clampf(float(d.get("hp", max_hp())), max_hp() * 0.5, max_hp())
 	mana = clampf(float(d.get("mana", max_mana())), 0.0, max_mana())
 	stamina = max_stamina()
@@ -510,5 +515,158 @@ func slot_summary(i: int) -> Dictionary:
 		"time": "%dh %02dm" % [secs / 3600, (secs / 60) % 60] if secs >= 3600 else "%d min" % maxi(1, secs / 60),
 		"ago": ago_s,
 		"won": d.get("flags", {}).get("victory", false),
+		"forest_won": d.get("flags", {}).get("forest_won", false),
 		"gold": int(d.get("gold", 0)),
+		"zone": ZONE_NAMES.get(String(d.get("zone", "vault")), "The Deep Vault"),
 	}
+
+# ---------------------------------------------------------------------------
+# Levels and quests.
+signal quests_changed
+signal quest_event(text: String)
+var zone := "vault"               # "vault" (Level 1) or "forest" (Level 2: the Goblin Forest)
+var quests := {}                  # quest id -> {"state": "active"|"ready"|"done", "n": progress}
+
+const ZONE_NAMES := {"vault": "The Deep Vault", "forest": "The Goblin Forest"}
+const GOBLINS := ["goblin", "goblin_archer", "goblin_brute", "goblin_chief"]
+
+## Quest givers and their quests (Level 2). Goals: kill (enemy types), collect (quest items), boss (enemy uid).
+const QUESTS := {
+	"goblin_trouble": {"giver": "fenn", "title": "Goblin Trouble",
+		"goal": {"type": "kill", "count": 6}, "track": "Goblins defeated",
+		"offer": "Well met, traveller! You came through the old portal? Then you're just in time.\n\nGoblins have been pouring out of the Warren and raiding the road. Thin their numbers: defeat six of them and come back to me.",
+		"busy": "Six goblins. They roam the road and the woods. Watch for the archers: they hang back and shoot.",
+		"thanks": "Six! You fight like three rangers. Take this, and go and talk to the others in the forest: they need help too. Captain Aldric guards the Warren to the north.",
+		"reward": {"xp": 160, "gold": 40, "potions": 2, "roll": "weapon"}},
+	"stolen_axes": {"giver": "bram", "title": "Bram's Stolen Axes",
+		"goal": {"type": "collect", "item": "axe", "count": 3}, "track": "Axes found",
+		"offer": "Those thieving goblins took my three good axes! Can't cut a single log without them.\n\nThey'll have carried them back to their camps in the woods. Bring them back and I'll make it worth your while.",
+		"busy": "Three axes. Look around the goblin camps: you'll see them glinting.",
+		"thanks": "My axes! Back where they belong. Here, this armour was my father's. It'll serve you better than it serves my wall.",
+		"reward": {"xp": 180, "gold": 50, "roll": "armor"}},
+	"moonpetals": {"giver": "maera", "title": "Moonpetals",
+		"goal": {"type": "collect", "item": "moonpetal", "count": 5}, "track": "Moonpetals gathered",
+		"offer": "Ah, a visitor. Hush now, the forest is listening.\n\nI brew my potions from moonpetals, little glowing flowers that grow in the quiet places of this forest. My knees aren't what they were. Could you gather five for me?",
+		"busy": "Moonpetals glow blue in the shade. Look near the stream and under the big trees.",
+		"thanks": "Five perfect moonpetals. Here, take some of my brews, and a little something I've been saving.",
+		"reward": {"xp": 160, "gold": 30, "potions": 2, "mana_potions": 3, "roll": "skin"}},
+	"strongbox": {"giver": "tobble", "title": "The Stolen Strongbox",
+		"goal": {"type": "collect", "item": "strongbox", "count": 1}, "track": "Strongbox recovered",
+		"offer": "Oh, thank goodness, a hero! The goblins ambushed my wagon and dragged off my strongbox: everything I own is in it!\n\nThey took it down into the Warren. Please, bring it back!",
+		"busy": "My strongbox is somewhere down in the Warren. I'd bet that brute of a chief is sitting on it.",
+		"thanks": "My strongbox! Everything's still here! Please, take a fair share. You've earned it ten times over.",
+		"reward": {"xp": 260, "gold": 150, "roll": "big"}},
+	"warren": {"giver": "aldric", "title": "Into the Warren", "requires": "goblin_trouble",
+		"goal": {"type": "boss", "uid": "gruk", "count": 1}, "track": "Chief Gruk defeated",
+		"locked": "Halt. The Warren is no place for someone untested.\n\nRanger Fenn by the portal has goblin work that needs doing. Help Fenn first, and then we'll talk.",
+		"offer": "Fenn says you're the real thing. Good.\n\nThe goblins answer to Chief Gruk, a brute twice the size of the others. He's holed up at the bottom of the Warren. End him, and the forest will be safe again.\n\nI've unbarred the door. Go carefully.",
+		"busy": "Gruk is at the bottom of the Warren. He calls for help when he's hurt, so be ready.",
+		"thanks": "Gruk is beaten? The whole forest will sing about this. You have my thanks and the thanks of the realm. Here, from the garrison vault.",
+		"reward": {"xp": 450, "gold": 200, "roll": "boss"}},
+}
+
+func quest_state(id: String) -> String:
+	if quests.has(id):
+		return String(quests[id].state)
+	var q: Dictionary = QUESTS.get(id, {})
+	if q.has("requires") and quest_state(q.requires) != "done":
+		return "locked"
+	return "available"
+
+func quest_progress(id: String) -> int:
+	return int(quests.get(id, {}).get("n", 0))
+
+func quest_accept(id: String) -> void:
+	if quests.has(id):
+		return
+	quests[id] = {"state": "active", "n": 0}
+	set_objective(forest_objective())
+	quest_event.emit("New quest: %s" % QUESTS[id].title)
+	message.emit("New quest: %s" % QUESTS[id].title, Color(1.0, 0.85, 0.35))
+	quests_changed.emit()
+	save_slot()
+
+func _advance(id: String, n := 1) -> void:
+	var q: Dictionary = QUESTS[id]
+	var st: Dictionary = quests[id]
+	if st.state != "active":
+		return
+	st.n = mini(int(st.n) + n, int(q.goal.count))
+	message.emit("%s: %d/%d" % [q.track, st.n, q.goal.count], Color(1.0, 0.85, 0.35))
+	if int(st.n) >= int(q.goal.count):
+		st.state = "ready"
+		message.emit("Quest complete! Return to %s." % NPC_NAMES.get(q.giver, "the quest giver"), Color(0.6, 1.0, 0.5))
+		quest_event.emit("ready")
+		set_objective(forest_objective())
+	quests_changed.emit()
+
+func on_enemy_killed(type_id: String, uid: String) -> void:
+	for id in quests:
+		if quests[id].state != "active":
+			continue
+		var g: Dictionary = QUESTS[id].goal
+		if g.type == "kill" and type_id in GOBLINS:
+			_advance(id)
+		elif g.type == "boss" and uid == g.uid:
+			_advance(id)
+
+func on_quest_item(item: String) -> void:
+	for id in quests:
+		var g: Dictionary = QUESTS[id].goal
+		if quests[id].state == "active" and g.type == "collect" and g.item == item:
+			_advance(id)
+			save_slot()
+			return
+
+## Turn a finished quest in: rewards, then the quest is done.
+func quest_turn_in(id: String) -> Array:
+	if quest_state(id) != "ready":
+		return []
+	quests[id].state = "done"
+	var r: Dictionary = QUESTS[id].reward
+	add_xp(int(r.get("xp", 0)))
+	if r.has("gold"):
+		add_gold(int(r.gold))
+	potions += int(r.get("potions", 0))
+	mana_potions += int(r.get("mana_potions", 0))
+	var items_got: Array = []
+	if r.has("roll"):
+		for d in Loot.roll_chest(String(r.roll), 5 if r.roll == "boss" else 4):
+			if d.kind == "item":
+				add_item(d.id)
+				items_got.append(d.id)
+			elif d.kind == "gold":
+				add_gold(int(d.amount))
+			elif d.kind == "potion":
+				potions += int(d.get("amount", 1))
+			elif d.kind == "mana":
+				mana_potions += int(d.get("amount", 1))
+	message.emit("Quest done: %s" % QUESTS[id].title, Color(0.6, 1.0, 0.5))
+	set_objective(forest_objective())
+	stats_changed.emit()
+	quests_changed.emit()
+	save_slot()
+	return items_got
+
+const NPC_NAMES := {"fenn": "Ranger Fenn", "bram": "Bram the Woodcutter", "maera": "Old Maera", "tobble": "Tobble the Merchant", "aldric": "Captain Aldric"}
+
+## Quests listed in the tracker: active and ready ones.
+func forest_objective() -> String:
+	if zone != "forest":
+		return objective
+	if quest_state("warren") == "done":
+		return "The Goblin Forest is safe. (Level 3 is coming!)"
+	if quest_state("warren") in ["active", "ready"]:
+		return "Defeat Chief Gruk at the bottom of the Goblin Warren." if quest_state("warren") == "active" else "Tell Captain Aldric that Gruk is beaten."
+	if quests.is_empty():
+		return "Explore the Goblin Forest. Ranger Fenn waits by the portal."
+	if quest_state("goblin_trouble") == "done":
+		return "Help the forest folk, then see Captain Aldric at the Warren gate (north)."
+	return "Help the forest folk: your quests are listed on the left."
+
+func tracked_quests() -> Array:
+	var out: Array = []
+	for id in quests:
+		if quests[id].state in ["active", "ready"]:
+			out.append(id)
+	return out

@@ -10,6 +10,7 @@ signal restart_requested
 signal quit_requested
 signal continue_requested(slot: int)
 signal exit_to_title_requested
+signal forest_requested
 
 var root: Control
 var current := ""
@@ -32,7 +33,7 @@ var _mute_btn: Button
 
 const PREVIEW_COMPAT_EXPOSURE := 0.68
 const PREVIEW_COMPAT_KEY := 0.45
-const NAMES := ["Bobek", "Sir Bobek", "Lady Bobeka", "Bobek the Bold", "Bobek the Brave", "Bobekus Maximus", "Little Bobek", "Big Bobek", "Bobek Jr.", "Bobekovich", "Bobekson", "Bobekina", "Bo'Bek", "Bobbek", "Archmage Bobek", "Bobek the Unkillable", "Bobek of the Deep", "Grandmaster Bobek", "Bobekzilla", "Bobek Bobekington"]
+const NAMES := ["Bobek", "Sir Bobek", "Lady Bobeka", "Bobek the Bold", "Bobek the Brave", "Bobekus Maximus", "Little Bobek", "Big Bobek", "Bobek Jr.", "Bobekovich", "Bobekson", "Bobekina", "Bo'Bek", "Bobbek", "Archmage Bobek", "Bobek the Unkillable", "Bobek of the Deep", "Grandmaster Bobek", "Bobekzilla", "Bobek Bobekington", "Bobek the Snack-Sized", "Bobek McBobface", "Bobek the Sneaky", "Captain Bobek", "Bobek the Tea-Drinker", "Bobek Sparklepants", "Baron von Bobek", "Bobek the Unbonked", "Bobek Supreme", "Teeny Tiny Bobek", "Bobek the Magnificent", "Bobekachu", "Bobek of the Forest", "Bob-Ek", "Bobek the Goblin Bonker", "Bobek Prime", "Bobeky Boo", "Bobek the Brushed (Teeth)", "Sir Bobs-a-Lot", "Bobek the Untrippable", "Bobek Danger", "Professor Bobek", "Bobek the Wise-ish", "B. O. Bek", "Bobek the Snorer", "Bobek Thunderpants", "Dr. Bobek", "Bobek the Bouncy", "Kingbobek", "Bobek the Legend", "Bobek Quickfingers", "Bobek the Pancake Lover", "Bobekasaurus Rex", "Bobek 3000", "Bobek the Unstoppable", "Mega Bobek", "Bobek Shadowstep", "Bobek of the Seven Snacks", "Bobek the Kettle Master", "Bobek von Sneakypants"]
 
 func _ready() -> void:
 	layer = 10
@@ -50,6 +51,8 @@ func _ready() -> void:
 	_build_lore()
 	_build_death()
 	_build_victory()
+	_build_dialogue()
+	_build_forest_victory()
 	fade = ColorRect.new()
 	fade.color = Color(0, 0, 0, 1)
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -471,7 +474,17 @@ func _build_creator() -> void:
 	nr.add_child(_button("Random name", func() -> void: _name_edit.text = NAMES.pick_random(), 200))
 	var br := HBoxContainer.new(); br.add_theme_constant_override("separation", 12); col.add_child(br)
 	br.add_child(_button("Back", func() -> void: show_panel("title"), 150))
-	br.add_child(_button("Randomize look", func() -> void: _randomize_look(), 240))
+	var dice := _button("Surprise me!", func() -> void: _randomize_look(), 300)
+	dice.custom_minimum_size.y = 64
+	dice.add_theme_font_size_override("font_size", 26)
+	var dsb := StyleBoxFlat.new(); dsb.bg_color = Color(0.55, 0.36, 0.08); dsb.set_corner_radius_all(12)
+	dsb.border_color = Color(1.0, 0.85, 0.35); dsb.set_border_width_all(3)
+	var dsh := dsb.duplicate() as StyleBoxFlat; dsh.bg_color = Color(0.72, 0.48, 0.1)
+	dice.add_theme_stylebox_override("normal", dsb); dice.add_theme_stylebox_override("hover", dsh)
+	dice.add_theme_stylebox_override("pressed", dsh); dice.add_theme_stylebox_override("focus", dsb)
+	dice.add_theme_color_override("font_color", Color(1, 0.97, 0.85))
+	dice.tooltip_text = "Random look, colours and a silly Bobek name"
+	br.add_child(dice)
 	var spc := Control.new(); spc.size_flags_horizontal = Control.SIZE_EXPAND_FILL; br.add_child(spc)
 	br.add_child(_button("Enter the Vault", func() -> void:
 		var nm := _name_edit.text.strip_edges()
@@ -489,6 +502,7 @@ func _randomize_look() -> void:
 	p.build = snappedf(randf_range(0.85, 1.25), 0.01)
 	p.height = snappedf(randf_range(0.88, 1.12), 0.01)
 	p.show_hat = false
+	_name_edit.text = NAMES.pick_random()
 	_build_sl.set_value_no_signal(p.build)
 	_height_sl.set_value_no_signal(p.height)
 	_refresh_preview(true)
@@ -613,10 +627,11 @@ func _refresh_slots() -> void:
 		var ab: Dictionary = Game.ABILITIES.get(info.hero, {})
 		cv.add_child(UIKit.label("Level %d %s" % [info.level, info.hero], 24, UIKit.PARCH, true))
 		cv.add_child(UIKit.label("Special: %s" % ab.get("name", ""), 17, ab.get("color", UIKit.DIM)))
-		var where := UIKit.label(("Conquered the Vault!" if info.won else "Last shrine: " + info.where), 18, UIKit.PARCH)
+		cv.add_child(UIKit.label(info.zone, 19, Color(0.6, 0.95, 0.6) if info.zone.contains("Forest") else Color(0.75, 0.8, 1.0), true))
+		var where := UIKit.label(("Forest saved: Level 2 complete!" if info.forest_won else "Last shrine: " + info.where), 18, UIKit.PARCH)
 		where.autowrap_mode = TextServer.AUTOWRAP_WORD
 		cv.add_child(where)
-		if info.objective != "" and not info.won:
+		if info.objective != "" and not info.forest_won:
 			var ob := UIKit.label(info.objective, 16, UIKit.DIM)
 			ob.autowrap_mode = TextServer.AUTOWRAP_WORD
 			cv.add_child(ob)
@@ -826,7 +841,7 @@ func show_death() -> void:
 	show_panel("death")
 
 func _build_victory() -> void:
-	var p := _center_panel("victory", 760, 560)
+	var p := _center_panel("victory", 820, 660)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 16); v.alignment = BoxContainer.ALIGNMENT_CENTER; p.add_child(v)
 	var t := UIKit.label("THE HEART IS YOURS", 46, UIKit.GOLD, true); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
@@ -836,10 +851,120 @@ func _build_victory() -> void:
 	_victory_stats = UIKit.label("", 18, UIKit.PARCH); _victory_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(_victory_stats)
 	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 16); v.add_child(hb)
-	hb.add_child(_button("Play again", func() -> void: restart_requested.emit(), 240))
+	var go := _button("Step through the portal  →  Level 2: The Goblin Forest", func() -> void: forest_requested.emit(), 640)
+	go.custom_minimum_size.y = 62
+	go.add_theme_font_size_override("font_size", 22)
+	v.add_child(go)
+	hb.add_child(_button("Play the Vault again", func() -> void: restart_requested.emit(), 300))
 	hb.add_child(_button("Quit", func() -> void: quit_requested.emit(), 200))
 
 func show_victory() -> void:
 	var t := int(Game.play_time)
-	_victory_stats.text = "%s the %s  ·  Level %d\nFoes defeated: %d   ·   Gold: %d\nTime: %d:%02d" % [Game.profile.name, Game.profile.hero, Game.level, Game.kills, Game.gold, t / 60, t % 60]
+	_victory_stats.text = "Level 1 complete!\nA shimmering portal has opened behind the altar.\n\n%s the %s  ·  Level %d\nFoes defeated: %d   ·   Gold: %d\nTime: %d:%02d" % [Game.profile.name, Game.profile.hero, Game.level, Game.kills, Game.gold, t / 60, t % 60]
 	show_panel("victory")
+
+# ---------------------------------------------------------------------------
+# NPC dialogue: who they are, what they need, and the quest buttons.
+var _dlg_name: Label
+var _dlg_title: Label
+var _dlg_text: Label
+var _dlg_buttons: HBoxContainer
+var _dlg_npc: NPC
+
+func _build_dialogue() -> void:
+	var p := _center_panel("dialogue", 980, 560)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 14); p.add_child(v)
+	_dlg_name = UIKit.label("", 34, UIKit.GOLD, true)
+	v.add_child(_dlg_name)
+	_dlg_title = UIKit.label("", 20, Color(1.0, 0.82, 0.3), true)
+	v.add_child(_dlg_title)
+	_dlg_text = UIKit.label("", 22, UIKit.PARCH)
+	_dlg_text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_dlg_text.custom_minimum_size = Vector2(920, 260)
+	_dlg_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(_dlg_text)
+	_dlg_buttons = HBoxContainer.new(); _dlg_buttons.add_theme_constant_override("separation", 16)
+	_dlg_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(_dlg_buttons)
+
+func _dlg_button(text: String, cb: Callable, primary := false) -> void:
+	var b := _button(text, cb, 330 if primary else 230)
+	b.custom_minimum_size.y = 60 if primary else 52
+	b.add_theme_font_size_override("font_size", 23 if primary else 19)
+	_dlg_buttons.add_child(b)
+
+func _close_dialogue() -> void:
+	var m := get_parent()
+	if m and m.has_method("_resume"):
+		m._resume()
+
+func show_dialogue(npc: NPC) -> void:
+	_dlg_npc = npc
+	show_panel("dialogue")
+	_refresh_dialogue()
+
+func _refresh_dialogue(extra := "") -> void:
+	for c in _dlg_buttons.get_children():
+		c.queue_free()
+	var q: Dictionary = Game.QUESTS.get(_dlg_npc.quest, {})
+	var st := Game.quest_state(_dlg_npc.quest)
+	_dlg_name.text = _dlg_npc.display_name
+	_dlg_title.text = "Quest: " + String(q.get("title", "")) + {"active": "  (in progress)", "ready": "  (complete!)", "done": "  (done)"}.get(st, "")
+	match st:
+		"available":
+			_dlg_text.text = q.offer
+			_dlg_button("Accept quest", func() -> void:
+				Game.quest_accept(_dlg_npc.quest)
+				_refresh_dialogue(), true)
+			_dlg_button("Not now", _close_dialogue)
+		"locked":
+			_dlg_text.text = q.locked
+			_dlg_button("Farewell", _close_dialogue)
+		"active":
+			_dlg_text.text = "%s\n\n%s: %d / %d" % [q.busy, q.track, Game.quest_progress(_dlg_npc.quest), q.goal.count]
+			_dlg_button("On my way", _close_dialogue, true)
+		"ready":
+			_dlg_text.text = q.thanks
+			_dlg_button("Complete quest", func() -> void:
+				var got := Game.quest_turn_in(_dlg_npc.quest)
+				Sfx.play("levelup", -4.0, 0.0)
+				var lines := PackedStringArray()
+				var r: Dictionary = q.reward
+				lines.append("+%d XP   +%d gold" % [r.get("xp", 0), r.get("gold", 0)])
+				if r.get("potions", 0) > 0 or r.get("mana_potions", 0) > 0:
+					lines.append("+%d healing   +%d mana potions" % [r.get("potions", 0), r.get("mana_potions", 0)])
+				for id in got:
+					var it := Game.item(id)
+					lines.append("Received: %s (%s)" % [it.get("name", id), Loot.RARITY_NAMES[clampi(int(it.get("rarity", 0)), 0, 4)]])
+				_refresh_dialogue("\n".join(lines)), true)
+		"done":
+			_dlg_text.text = (extra + "\n\n" if extra != "" else "") + "Thank you again, friend. The forest won't forget you."
+			_dlg_button("Farewell", _close_dialogue, true)
+	if extra != "" and st != "done":
+		_dlg_text.text = extra + "\n\n" + _dlg_text.text
+
+# ---------------------------------------------------------------------------
+var _forest_stats: Label
+func _build_forest_victory() -> void:
+	var p := _center_panel("forest_victory", 820, 560)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 16); v.alignment = BoxContainer.ALIGNMENT_CENTER; p.add_child(v)
+	var t := UIKit.label("THE FOREST IS SAFE", 46, UIKit.GOLD, true); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	var s2 := UIKit.label("Chief Gruk is beaten and the goblins are scattered.\nLevel 2 complete! The next adventure is on its way.", 20, UIKit.PARCH)
+	s2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(s2)
+	_forest_stats = UIKit.label("", 18, UIKit.PARCH); _forest_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(_forest_stats)
+	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 16); v.add_child(hb)
+	hb.add_child(_button("Keep exploring", func() -> void: _close_dialogue(), 280))
+	hb.add_child(_button("Save & exit to title", func() -> void: exit_to_title_requested.emit(), 300))
+
+func show_forest_victory() -> void:
+	var done := 0
+	for q in Game.QUESTS:
+		if Game.quest_state(q) == "done":
+			done += 1
+	var t := int(Game.play_time)
+	_forest_stats.text = "%s the %s  ·  Level %d\nQuests done: %d / %d   ·   Foes defeated: %d   ·   Gold: %d\nTime played: %d:%02d" % [
+		Game.profile.name, Game.profile.hero, Game.level, done, Game.QUESTS.size(), Game.kills, Game.gold, t / 60, t % 60]
+	show_panel("forest_victory")

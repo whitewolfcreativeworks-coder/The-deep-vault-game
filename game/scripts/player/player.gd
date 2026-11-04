@@ -371,7 +371,7 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	move_and_slide()
-	if global_position.y < -40.0:
+	if global_position.y < kill_y:
 		take_damage(9999.0, global_position, 0.0)
 
 	# facing
@@ -922,6 +922,7 @@ func _update_camera(delta: float) -> void:
 	camera.fov = lerpf(camera.fov, (80.0 if fp else 74.0) + sprint_kick + fov_kick, 1.0 - exp(-(5.0 if fov_kick < 0.5 else 14.0) * delta))
 
 var _head_hidden := false
+var kill_y := -40.0      # falling below this is death (the forest Warren sits deeper)
 var _crane := 0.0
 var _move_input := Vector2.ZERO
 var _coyote := 0.0

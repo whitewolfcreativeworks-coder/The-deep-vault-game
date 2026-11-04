@@ -67,6 +67,26 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+- **Opening movie (new).** After you create your hero, a short real-time movie plays with your own character. It has a Skip button.
+  - The sun rises over the mountains into a quiet valley and Bobek's little cabin.
+  - Your hero wakes up in pajamas, changes into their outfit, brushes their teeth, boils the kettle and sits down for a cup of tea.
+  - Then they walk out whistling down the forest trail, find a forgotten portal that flickers to life, and step through to arrive at the gates of the Deep Vault.
+- **Portal to Level 2.** After you defeat the Warden and claim the Heart, the wall behind the altar grinds open on an ancient portal. Walk into it and you come out of the portal in the Goblin Forest.
+- **Character creator.** A big **Surprise me!** button gives you a random look, colours and a silly Bobek name. There are 60 names, from *Bobek McBobface* and *Bobekasaurus Rex* to *Bobek the Kettle Master*.
+- **Level 2: The Goblin Forest (new).** Win the Vault and a portal opens behind the altar. Step through to arrive in a sunlit forest valley.
+  - **The valley:** hills, a road with lantern posts, a stream with a stone bridge, about 650 trees (green and autumn), and mountains all around.
+  - **The Warren:** its beacon fire burns on the northern ridge, in view straight up the road from the portal.
+  - **Five NPCs, five quests.** This is the first introduction to questing. A gold **!** means a new quest, **?** means it's ready to hand in, and the quest list appears on the left.
+    1. **Ranger Fenn** (by the portal): *Goblin Trouble*. Defeat six goblins.
+    2. **Bram the Woodcutter** (lumber camp, west): *Bram's Stolen Axes*. Recover three axes from the goblin camps.
+    3. **Old Maera** (herbalist's hut by the stream, east): *Moonpetals*. Gather five glowing flowers.
+    4. **Tobble the Merchant** (robbed wagon on the road): *The Stolen Strongbox*. It's in the Warren.
+    5. **Captain Aldric** (Warren gate, north): *Into the Warren*. Defeat Chief Gruk. He only unbars the door after Fenn's quest is done.
+  - **Rewards:** XP, gold, potions, and gear from the same random loot tables as chests, up to Legendary.
+  - **The Goblin Warren** is the zone's dungeon. It has an entry cavern, a goblin den, and Chief Gruk's hall. Gruk calls for help at half health, and his reward chest sits behind his throne.
+  - **Goblins:** Goblin Cutters, Goblin Archers, Goblin Brutes and Chief Gruk. They're built on the hero rigs, with green skin, pointy ears and warpaint.
+  - **Saving:** the level, quest progress, collected quest items and defeated goblins are all saved in your slot.
+
 - **Hero special abilities (new).** Each hero has a special move on its own button, with a cooldown:
   - **Rogue: Backstab** (6 s). Vanish in shadow, reappear behind the nearest enemy and strike for a 5x critical, with a crossed slash, slow motion and a purple flash.
   - **Mage: Shadow Step** (5 s). Blink up to 13 m the way you look (or move). An implosion at the start leaves a shadow pool that keeps burning enemies; a shadow nova, light pillar and shockwave hit everything within 5 m of where you land.

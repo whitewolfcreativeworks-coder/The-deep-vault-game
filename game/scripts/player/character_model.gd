@@ -31,6 +31,7 @@ var weapon_root: BoneAttachment3D
 var offhand_root: BoneAttachment3D
 var weapon_tip: Node3D
 var head_meshes: Array[MeshInstance3D] = []
+var hold_clip := ""      # cutscenes: keep playing this clip instead of walking/idling
 var all_meshes: Array[MeshInstance3D] = []
 var kind := "hero"            # "hero" | "skeleton"
 var anims := {}               # role -> clip name
@@ -354,6 +355,9 @@ func _process(delta: float) -> void:
 	if _clock < _oneshot_until:
 		return
 	_oneshot = ""
+	if hold_clip != "":
+		_play(hold_clip, 0.25)   # scripted pose for cutscenes (lying in bed, sitting...)
+		return
 	# locomotion
 	if blocking:
 		_play(anims.block, 0.12)
@@ -542,7 +546,8 @@ func _boxm(x: float, y: float, z: float) -> BoxMesh:
 func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 	var style: String = cfg.get("hair_style", "natural")
 	var face: String = cfg.get("face", "none")
-	if (style == "natural" or covered) and face == "none":
+	var ears: bool = cfg.get("ears", false)
+	if (style == "natural" or covered) and face == "none" and not ears:
 		return
 	if skel == null or skel.find_bone("head") < 0:
 		return
@@ -624,6 +629,14 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 					cone2.height = ry * (0.5 + 0.45 * sin(float(i) / 7.0 * PI))
 					var pc2 := _piece(cone2, hair, pt + n2 * cone2.height * 0.45, Vector3(0.45, 1.0, 1.0))
 					pc2.basis = Basis(Quaternion(Vector3.UP, n2)) * Basis.from_scale(Vector3(0.45, 1.0, 1.0))
+	if ears:
+		# long pointy goblin ears sticking out sideways
+		var ear_m := _look_mat(cfg.get("skin_color", Color(0.42, 0.62, 0.24)), 0.6)
+		for sd in [-1.0, 1.0]:
+			var cone := CylinderMesh.new(); cone.top_radius = 0.0; cone.bottom_radius = rx * 0.2; cone.height = rx * 1.15
+			cone.radial_segments = 8
+			var pe := _piece(cone, ear_m, c + Vector3(sd * rx * 1.25, ry * 0.12, -rz * 0.05), Vector3(1.0, 1.0, 0.45))
+			pe.rotation = Vector3(0, 0, -sd * 1.2)
 	# face details sit on the front of the head (+Z in skeleton space)
 	var fz := func(x: float, y: float) -> float:
 		var k := 1.0 - pow(x / rx, 2.0) - pow((y - c.y) / ry, 2.0)

@@ -14,6 +14,24 @@ var special_label: Label
 var objective_label: Label
 var prompt_label: Label
 var msg_box: VBoxContainer
+var quest_box: VBoxContainer
+
+func _refresh_quests() -> void:
+	if quest_box == null:
+		return
+	for c in quest_box.get_children():
+		c.queue_free()
+	var ids := Game.tracked_quests()
+	if ids.is_empty():
+		return
+	quest_box.add_child(UIKit.label("QUESTS", 15, UIKit.GOLD, true))
+	for id in ids:
+		var q: Dictionary = Game.QUESTS[id]
+		var ready: bool = Game.quest_state(id) == "ready"
+		var l := UIKit.label(q.title, 17, Color(1.0, 0.92, 0.7), true)
+		quest_box.add_child(l)
+		var t := ("  Done! Return to %s" % Game.NPC_NAMES.get(q.giver, "")) if ready else ("  %s: %d / %d" % [q.track, Game.quest_progress(id), q.goal.count])
+		quest_box.add_child(UIKit.label(t, 15, Color(0.6, 1.0, 0.5) if ready else UIKit.PARCH))
 var crosshair: Control
 var vignette: ColorRect
 var target_box: VBoxContainer; var target_name: Label; var target_bar: ProgressBar
@@ -100,6 +118,14 @@ func _ready() -> void:
 	prompt_label.position = Vector2(-400, -190); prompt_label.size = Vector2(800, 30)
 	root.add_child(prompt_label)
 
+	# --- quest tracker (left, under the status box)
+	quest_box = VBoxContainer.new()
+	quest_box.position = Vector2(22, 178)
+	quest_box.add_theme_constant_override("separation", 4)
+	quest_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(quest_box)
+	Game.quests_changed.connect(_refresh_quests)
+	_refresh_quests()
 	# --- messages (right)
 	msg_box = VBoxContainer.new()
 	msg_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -182,6 +208,8 @@ func _process(delta: float) -> void:
 	mp_bar.max_value = Game.max_mana(); mp_bar.value = Game.mana
 	st_bar.max_value = Game.max_stamina(); st_bar.value = Game.stamina
 	xp_bar.max_value = Game.xp_to_next(); xp_bar.value = Game.xp
+	if quest_box:
+		quest_box.position.x = 104.0 if Game.touch_active else 22.0
 	potion_label.text = ("Heal %d   Mana %d" if Game.touch_active else "Heal %d [R]   Mana %d [F]") % [Game.potions, Game.mana_potions]
 	var ab := Game.ability()
 	var ab_state := "ready" if player.special_cd <= 0.0 else "%ds" % ceili(player.special_cd)

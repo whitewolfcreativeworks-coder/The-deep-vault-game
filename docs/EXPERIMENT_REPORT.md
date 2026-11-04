@@ -298,3 +298,51 @@ It also found two stale tests that still looked buttons up by list position. But
 **Tests:**
 - `saves` autotest, three phases across scene reloads, all checks pass. Phase 1 plays, levels up, loots and kills an enemy, then saves. Phase 2 continues and checks that level, gold, items, position and the dead enemy came back, then uses Save & exit. Phase 3 checks the title's Continue button and the slot cards.
 - `tools/web_save_test.js` runs the web build in headless Chrome. Visit 1 saves, the browser closes completely, and visit 2 with the same profile finds the save and the Continue button. This confirms that `user://` persists to IndexedDB in the browser build.
+
+## Follow-up 7: Level 2, the Goblin Forest (Nov 4)
+
+**Request:** a second level that feels like open roaming through a goblin forest. It should have a portal with a dungeon entrance in view of it, five NPCs that introduce quests, and one dungeon in the zone.
+
+**What was built:**
+- **Assets:** KayKit has no forest pack on GitHub (theirs is on itch.io, which this workspace can't reach). Two CC0 packs that *are* on GitHub covered it instead: the Medieval Hexagon Pack and Halloween Bits.
+  - The Hexagon models are miniature (a tree is 1.2 units tall) and are scaled about 6×.
+  - Halloween Bits is roughly life-size.
+  - About 650 trees and rocks are drawn with MultiMesh, with cylinder trunk colliders on one shared static body.
+- **Terrain:** a procedural height field: noise hills, a flattened road and clearings, a stream bed, a ridge in the north, and rising edges. It is drawn as one vertex-coloured mesh with a noise-detail shader, with a matching `HeightMapShape3D` for collision.
+- **Goblins:** no goblin models were available, so goblins are built on the KayKit hero rigs. They use the character-creator machinery: green skin via the recolour shader, mohawk or bald hair, warpaint, small scale, plus a new `ears` option. All existing enemy AI, animation and loot code was reused unchanged.
+- **Quests:** definitions live in `Game.QUESTS`. Quest state is saved in the slot, kill events come from `Enemy._die`, and collectible quest items show only while their quest is active.
+- **NPCs:** `NPC` reuses `CharacterModel`, with a `Label3D` name and marker.
+- **Levels:** `Game.zone` decides whether `main.gd` builds `VaultWorld` or `ForestWorld`. The Vault's victory screen offers the portal, which uses the same rebuild-from-save path as Continue.
+
+**Bugs found by the new `forest` test before shipping:**
+- **Instant death in the Warren:** the Warren sits at y = −60, below the Vault-era "fell out of the world" plane at −40. The kill plane is now per level.
+- **Warren not visible from the portal:** fog hid it at 190 m, so the fog was pushed out and a beacon fire added on the ridge. The test now ray-casts from the arrival camera to the beacon.
+- **Mine entrance backwards:** the model faced away from the road.
+- **Quest items:** they toggled `monitoring` inside a physics callback, so that is now deferred.
+
+**Tests:** the `forest` test covers the whole chain end to end, across three phases and a scene reload. It checks:
+- the portal transition and the five NPCs
+- line of sight to the Warren
+- every quest: accept, progress, hand-in and rewards
+- the barred door, the Warren, Gruk's summons, the strongbox and the forest-victory screen
+- saving and continuing in the forest
+
+`forestshots` is a quick visual tour, also run with the web renderer.
+
+## Follow-up 8: opening movie, walk-in portal to Level 2, Surprise me! (Nov 4)
+
+**The opening movie** (`scripts/world/intro.gd`) is built from game parts, not pre-rendered video:
+- It has its own small valley (terrain, mountains, about 140 trees, the cabin with chimney smoke) and a separate cabin-interior set built from boxes and KayKit props.
+- It uses the player's own character, with a pajama recolour and then their real outfit.
+- The KayKit rigs' Lie / Sit_Chair / Use_Item / Interact / Cheer clips cover the morning routine. One new hook, `CharacterModel.hold_clip`, keeps a pose held.
+- Camera moves are tweens, captions sit in a letterbox overlay, and there is a Skip button.
+- New synthesized sounds: birdsong, a whistled tune, a kettle whistle, brushing, sips, a stone rumble, a portal whoosh, and a morning theme.
+- While the movie plays, the Vault world is removed from the scene tree, so its environment and physics don't interfere.
+
+**The end of Level 1** is now diegetic instead of a menu:
+- Claiming the Heart opens a hidden door behind the altar: it slides into the floor with a rumble, dust and camera shake. Behind it, an ancient portal (the same arch as in the movie and the forest) lights up, and walking into it travels to Level 2.
+- The `flow` test now ends by walking into the portal. A second phase, after the scene reload, checks that you arrive at the forest portal.
+
+**Tests:**
+- `intro` checks that all eight shots play and that you end at the Vault outpost.
+- `introskip` checks the Skip button.

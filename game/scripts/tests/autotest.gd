@@ -175,6 +175,60 @@ func _run() -> void:
 		main.menus._open_slots("continue")
 		await wait(0.8)
 		await shot("ws_slots_after_reopen")
+	elif mode == "forestshots":
+		# quick look at forest places (no quests): used while building the level
+		Game.zone = "forest"
+		if not (main.world is ForestWorld):
+			Game.set_meta("fshots", true)
+			await _start()
+			main.go_to_forest()
+			return
+		await wait(2.0)
+		player = main.player
+		god = true
+		var w: ForestWorld = main.world
+		for v in [["fs_gate", w.ground(0, -76), 0.0, 0.15, 7.0], ["fs_lumber", w.ground(-48, 52), -2.4, -0.1, 7.0],
+				["fs_maera", w.ground(46, 14), 2.2, -0.1, 7.0], ["fs_camp", w.ground(-45, -30), -2.3, -0.2, 9.0],
+				["fs_merchant", w.ground(-8, -12), -2.4, -0.15, 7.0], ["fs_bridge", w.ground(10, 30), 0.4, -0.15, 8.0],
+				["fs_den", Vector3(0, ForestWorld.WY + 0.1, -142), 0.0, -0.1, 6.0], ["fs_hall", Vector3(0, ForestWorld.WY + 0.1, -172), 0.0, -0.05, 7.0]]:
+			for e in get_tree().get_nodes_in_group("enemy"):
+				if e is Enemy and e.global_position.distance_to(v[1]) < 25.0:
+					e.set_physics_process(false)
+			await tp(v[1] + Vector3(0, 0.3, 0), v[2], v[3])
+			player.zoom_target = v[4]; player.zoom = v[4]; player.pitch = v[3]; player.snap_view()
+			await wait(1.4)
+			await shot(v[0])
+	elif mode == "intro" or mode == "introskip":
+		await wait(1.5)
+		main.menus.show_panel("creator")
+		await wait(0.5)
+		main.menus.start_requested.emit()   # "Enter the Vault"
+		await wait(0.5)
+		check("intro_starts", main.state == "intro" and main.intro != null, main.state)
+		if mode == "introskip":
+			await wait(3.0)
+			main.intro.skip_now()
+			await wait(1.5)
+			check("skip_goes_to_vault", main.state == "play" and main.intro == null and main.world.is_inside_tree(), main.state)
+		else:
+			var seen := {}
+			var t := 0.0
+			while main.state == "intro" and t < 150.0:
+				var sh: String = main.intro.shot if main.intro else ""
+				if sh != "" and not seen.has(sh):
+					seen[sh] = true
+					await wait(1.6)
+					await shot("in_" + sh)
+				await wait(0.25)
+				t += 0.25
+			for sh2 in ["sunrise", "bed", "dress", "teeth", "kettle", "tea", "trail", "portal"]:
+				check("intro_shot_" + sh2, seen.has(sh2))
+			await wait(2.0)
+			check("intro_ends_at_vault", main.state == "play" and main.world is VaultWorld and main.player.global_position.distance_to(main.world.spawn_point) < 3.0)
+			await shot("in_arrival")
+	elif mode == "forest":
+		if await _forest_test():
+			return
 	elif mode == "saves":
 		if await _saves_test():
 			return   # the scene reloaded: the next phase runs in a fresh test node
@@ -260,7 +314,10 @@ func _run() -> void:
 		await shot("b0_arena_before")
 		await _boss_fight()
 	else:
-		await _flow()
+		if Game.has_meta("flow_phase"):
+			await _flow_after_portal()
+		else:
+			await _flow()
 	_finish()
 
 func _start() -> void:
@@ -415,10 +472,33 @@ func _flow() -> void:
 	await clear_enemies(30.0, 20.0)
 	await wait(2.0)
 	await tp(Vector3(0, -5.9, -167.2), 0.0)
-	var victory := await use_nearest_interactable()
-	await wait(3.5)
-	check("victory", victory and main.state == "victory", main.state)
-	await shot("15_victory")
+	var claimed := await use_nearest_interactable()
+	await wait(7.5)
+	var w = main.world
+	check("level1_complete_portal_opens", claimed and w._portal_open and w.secret_door.position.y < -9.0, "door y %.1f" % w.secret_door.position.y)
+	player.yaw = 0.0; player.pitch = 0.05; player.zoom_target = 6.0; player.zoom = 6.0; player.snap_view()
+	await wait(1.0)
+	await shot("15_ancient_portal")
+	# walk into the portal: the game travels to Level 2 (the scene reloads)
+	Game.set_meta("flow_phase", 2)
+	await tp(Vector3(0, -5.9, -175.5), 0.0)
+	Input.action_press("move_forward")
+	for i in 60:
+		await wait(0.1)
+		if not w._portal_open:     # stepped in: let go before the world changes
+			Input.action_release("move_forward")
+			await wait(5.0)
+	Input.action_release("move_forward")
+	check("portal_reached", false, "still in the Vault at %s" % player.global_position)
+
+func _flow_after_portal() -> void:
+	Game.remove_meta("flow_phase")
+	Input.action_release("move_forward")
+	await wait(2.5)
+	player = main.player
+	check("portal_leads_to_forest", main.world is ForestWorld and Game.zone == "forest" and main.state == "play", Game.zone)
+	check("arrive_at_forest_portal", player.global_position.distance_to(main.world.spawn_point) < 3.0, str(player.global_position))
+	await shot("16_forest_arrival")
 
 func _boss_fight() -> void:
 	# walk through the sanctum doors until the encounter triggers
@@ -1207,6 +1287,160 @@ func _found_and_best(slot: String, before: Array) -> bool:
 			if not before.has(id):
 				found = true
 	return found and Game.score(Game.equipped[slot]) >= best - 0.01
+
+# --- Level 2: the Goblin Forest -------------------------------------------------
+func _npc(id: String) -> NPC:
+	for n in get_tree().get_nodes_in_group("npc"):
+		if (n as NPC).id == id:
+			return n
+	return null
+
+func _talk(id: String) -> void:
+	var n := _npc(id)
+	await tp(n.global_position + Vector3(0, 0.2, 2.2), 0.0)
+	await wait(0.3)
+	main.open_dialogue(n)
+	await wait(0.5)
+
+func _kill_near(types: Array, radius: float, at: Vector3) -> int:
+	var k := 0
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e is Enemy and not e.dead and (e.type_id in types) and e.global_position.distance_to(at) < radius:
+			e.take_damage(99999.0, player.global_position)
+			k += 1
+	return k
+
+func _forest_test() -> bool:
+	var phase: int = Game.get_meta("forest_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("forest_phase", 2)
+		main.go_to_forest()       # as if the Vault was won and the portal taken
+		return true
+	if phase == 2:
+		await wait(2.5)
+		player = main.player
+		god = true
+		check("forest_loaded", main.world is ForestWorld and Game.zone == "forest", str(Game.zone))
+		check("five_npcs", get_tree().get_nodes_in_group("npc").size() == 5)
+		player.zoom_target = 4.2; player.zoom = 4.2; player.pitch = -0.12; player.snap_view()
+		await wait(1.5)
+		await shot("fo_01_arrival")
+		var w: ForestWorld = main.world
+		var entrance := w.ground(0, -101)
+		var cam_to_warren: Vector3 = entrance - player.camera.global_position
+		var q := PhysicsRayQueryParameters3D.create(player.camera.global_position, entrance + Vector3(0, 12.0, -4.0), 1)
+		q.exclude = [player.get_rid()]
+		var hit := player.get_world_3d().direct_space_state.intersect_ray(q)
+		check("warren_in_view_from_portal", hit.is_empty() or (hit.position as Vector3).distance_to(entrance) < 14.0, "%.0f m away" % cam_to_warren.length())
+		player.zoom_target = 9.5; player.zoom = 9.5; player.snap_view()
+		await wait(1.2)
+		await shot("fo_02_arrival_high")
+		player.zoom_target = 5.0; player.zoom = 5.0; player.yaw = PI; player.pitch = -0.05; player.snap_view()
+		await wait(1.2)
+		await shot("fo_02b_portal")
+		player.yaw = 0.0
+		player.zoom_target = 4.2; player.zoom = 4.2
+		# 1. Ranger Fenn: goblin hunt
+		await _talk("fenn")
+		await shot("fo_03_dialogue_fenn")
+		main.menus._dlg_buttons.get_child(0).pressed.emit()
+		await wait(0.3)
+		check("quest_accepted", Game.quest_state("goblin_trouble") == "active")
+		main._resume()
+		await wait(0.3)
+		await shot("fo_04_quest_tracker")
+		check("warren_locked_before", not w.door.is_open())
+		var killed := 0
+		for c in [Vector3(0, 0, 40), Vector3(0, 0, -30), Vector3(-58, 0, -42)]:
+			killed += _kill_near(Enemy.TYPES.keys(), 30.0, w.ground(c.x, c.z))
+			await wait(0.6)
+		check("goblin_hunt_ready", Game.quest_state("goblin_trouble") == "ready", "%d killed, %d/6" % [killed, Game.quest_progress("goblin_trouble")])
+		var lvl0 := Game.level; var g0 := Game.gold; var inv0 := Game.inventory.size()
+		await _talk("fenn")
+		main.menus._dlg_buttons.get_child(0).pressed.emit()
+		await wait(0.4)
+		await shot("fo_05_reward")
+		main._resume()
+		check("quest_reward", Game.quest_state("goblin_trouble") == "done" and Game.gold > g0 and Game.inventory.size() > inv0, "gold %d -> %d" % [g0, Game.gold])
+		# 2. Bram's axes
+		await _talk("bram")
+		main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
+		var axes := get_tree().get_nodes_in_group("quest_item").filter(func(n) -> bool: return n.item == "axe")
+		check("axes_visible_after_accept", axes.size() == 3 and axes.all(func(n) -> bool: return n.visible))
+		await tp(axes[0].global_position + Vector3(0, 0.3, 2.0), 0.0)
+		await wait(0.4)
+		await shot("fo_06_axe")
+		for a in axes:
+			await tp(a.global_position + Vector3(0, 0.3, 0), 0.0)
+			await wait(0.5)
+		check("axes_collected", Game.quest_state("stolen_axes") == "ready", "%d/3" % Game.quest_progress("stolen_axes"))
+		await _talk("bram"); main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
+		# 3. Maera's moonpetals
+		await _talk("maera")
+		await shot("fo_07_maera")
+		main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
+		for n in get_tree().get_nodes_in_group("quest_item"):
+			if n.item == "moonpetal" and Game.quest_state("moonpetals") == "active":
+				await tp(n.global_position + Vector3(0, 0.3, 0), 0.0)
+				await wait(0.5)
+		check("moonpetals_gathered", Game.quest_state("moonpetals") == "ready")
+		await _talk("maera"); main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
+		# 4. Tobble and 5. Captain Aldric
+		await _talk("tobble"); main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
+		await _talk("aldric")
+		await shot("fo_08_aldric")
+		main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
+		check("warren_unbarred", w.door.is_open())
+		await tp(w.ground(0, -78) + Vector3(0, 0.2, 0), 0.0)
+		player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = 0.12; player.snap_view()
+		await wait(1.0)
+		await shot("fo_09_warren_entrance")
+		w.door.interact(player)
+		await wait(1.5)
+		check("entered_warren", player.global_position.y < ForestWorld.WY + 5.0, str(player.global_position))
+		await shot("fo_10_warren_mouth")
+		await tp(Vector3(0, ForestWorld.WY + 0.1, -150), PI * 0.0)
+		await wait(0.8)
+		await shot("fo_11_goblin_den")
+		_kill_near(Enemy.TYPES.keys(), 20.0, Vector3(0, ForestWorld.WY, -150))
+		await tp(Vector3(0, ForestWorld.WY + 0.1, -176), 0.0)
+		await wait(1.5)
+		await shot("fo_12_gruk")
+		var gk: Enemy = w.gruk
+		gk.take_damage(gk.max_hp * 0.55, player.global_position)
+		await wait(1.2)
+		check("gruk_summons_help", get_tree().get_nodes_in_group("enemy").filter(func(e) -> bool: return e.uid == "" and not e.dead).size() >= 2)
+		gk.take_damage(99999.0, player.global_position)
+		_kill_near(Enemy.TYPES.keys(), 30.0, gk.global_position)
+		await wait(1.0)
+		check("gruk_quest_ready", Game.quest_state("warren") == "ready")
+		var box := get_tree().get_nodes_in_group("quest_item").filter(func(n) -> bool: return n.item == "strongbox")
+		await tp(box[0].global_position + Vector3(0, 0.3, 0), 0.0)
+		await wait(0.6)
+		check("strongbox_found", Game.quest_state("strongbox") == "ready")
+		await _talk("tobble"); main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
+		await _talk("aldric"); main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
+		await wait(3.5)
+		check("forest_victory", main.menus.current == "forest_victory", main.menus.current)
+		await shot("fo_13_forest_victory")
+		main._resume()
+		# save and continue in the forest
+		Game.set_meta("forest_phase", 3)
+		Game.set_meta("forest_lvl", Game.level)
+		main.autosave()
+		Game.reset_run()
+		main._continue_slot(0)
+		return true
+	await wait(2.5)
+	player = main.player
+	check("continue_in_forest", main.world is ForestWorld and Game.zone == "forest")
+	check("quests_saved", Game.quest_state("warren") == "done" and Game.quest_state("moonpetals") == "done")
+	check("slot_says_forest", Game.slot_summary(0).get("zone", "") == "The Goblin Forest")
+	Game.remove_meta("forest_phase")
+	return false
 
 # --- save slots: save, "close the app", continue where you left off ------------
 ## Phase 1 plays and saves, then reloads the game like reopening the app.
