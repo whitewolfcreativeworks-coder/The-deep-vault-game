@@ -212,7 +212,7 @@ func _process(delta: float) -> void:
 	crosshair.queue_redraw()
 	prompt_label.text = _prompt.replace("[E]", "USE ▸") if Game.touch_active else _prompt
 	if Game.touch_active:
-		hint.text = "Left thumb: move (push fully to sprint) · Right side: swipe to look · Pinch: zoom 1st/3rd person · Sword hits recharge mana"
+		hint.text = "Left thumb: move · Right side: swipe to look · Left-edge slider or pinch: zoom\nHold any button still to move it (turns yellow) · Pause menu: Arrange / Reset buttons"
 	_hint_time += delta
 	hint.modulate.a = clampf(1.0 - (_hint_time - 40.0) / 3.0, 0.0, 1.0)
 	view_label.text = "First person" if player.first_person else "Third person  ·  zoom %.1fm" % player.zoom

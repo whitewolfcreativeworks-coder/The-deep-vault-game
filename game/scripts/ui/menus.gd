@@ -68,6 +68,9 @@ func show_panel(n: String) -> void:
 		_refresh_preview()
 	if n == "inventory":
 		_refresh_inventory(); _refresh_stats()
+	if n == "pause" and _arrange_btn:
+		_arrange_btn.visible = Game.touch_active
+		_reset_btn.visible = Game.touch_active
 
 func is_open() -> bool:
 	return current != ""
@@ -537,8 +540,10 @@ func _process(delta: float) -> void:
 				_preview.rotation.y += delta * 0.45
 
 # ---------------------------------------------------------------------------
+var _arrange_btn: Button
+var _reset_btn: Button
 func _build_pause() -> void:
-	var p := _center_panel("pause", 420, 580)
+	var p := _center_panel("pause", 420, 700)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.alignment = BoxContainer.ALIGNMENT_CENTER
 	p.add_child(v)
 	var t := UIKit.label("Paused", 40, UIKit.GOLD, true); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -560,6 +565,18 @@ func _build_pause() -> void:
 	sl.value_changed.connect(func(val: float) -> void: Game.mouse_sens = val)
 	sl_row.add_child(sl)
 	v.add_child(sl_row)
+	_arrange_btn = _button("Arrange touch buttons", func() -> void:
+		var m := get_parent()
+		if m and m.get("touch"):
+			close_all()                       # stay paused while arranging
+			m.touch.set_arrange(true), 360)
+	v.add_child(_arrange_btn)
+	_reset_btn = _button("Reset touch buttons", func() -> void:
+		var m := get_parent()
+		if m and m.get("touch"):
+			m.touch.reset_layout()
+			Game.say("Touch buttons back to the default layout.", UIKit.PARCH), 360)
+	v.add_child(_reset_btn)
 	v.add_child(_button("Restart adventure", func() -> void: restart_requested.emit(), 360))
 	v.add_child(_button("Quit game", func() -> void: quit_requested.emit(), 360))
 

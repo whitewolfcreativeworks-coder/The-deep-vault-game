@@ -263,3 +263,25 @@ The looks test is now also run with `--rendering-method gl_compatibility`. **Les
 **Tests:**
 - New `combat2` test, 5/5. Holding block takes 0 damage from 3 hits, a timed block parries, block cancels a swing, and the view button cycles.
 - **Test-harness lesson:** taps of 1–2 frames can fall between physics ticks and never register. Test presses now hold for 0.07 s or more, like a real thumb.
+
+## Follow-up 5: touch layout and zoom (Nov 3, night)
+
+**Playtest findings:**
+- Pinch-zoom out of first person "didn't work".
+- The right thumb had nowhere to steer without hitting buttons. The Mage player kept blinking by accident.
+
+**Cause of the pinch problem:** a pinch only registered if both fingers began in the free gaps between buttons on the right. A finger on the left half became the joystick instead. The test passed because it pinched in an empty area.
+
+**What changed:**
+- A second finger near the first is now always treated as a pinch.
+- Pinching out of first person jumps straight back behind the hero.
+- An always-visible zoom slider sits on the left edge.
+- New default layout: the combat cluster hugs the bottom-right corner, and potions and the view button moved to the top row. Button hit areas are exact circles instead of 1.15× circles, so near misses become camera drags.
+- Players can move buttons themselves. Holding a button still for 1.2 s picks it up; ATTACK and BLOCK are excluded because they're held in normal play, but they can be moved in "Arrange" mode in the pause menu. Positions are saved to `user://touch_layout.cfg`, which is IndexedDB on the web.
+
+**Tests:** the `touch` test grew to 24/24. It now covers:
+- the slider
+- pinching out of first person with one finger on the left half
+- hold-to-move, saving, arrange mode and reset
+
+It also found two stale tests that still looked buttons up by list position. Buttons are now looked up by name.

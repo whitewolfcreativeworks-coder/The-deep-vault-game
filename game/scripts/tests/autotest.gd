@@ -585,7 +585,7 @@ func _touch_test() -> void:
 	player.zoom_target = 3.6
 	await wait(0.6)
 	# attack button
-	var atk: Dictionary = tc._buttons[0]
+	var atk: Dictionary = tc.button("attack")
 	var sw0 := player.swings
 	await touch_ev(4, atk.center, true)
 	await frames(3)
@@ -605,12 +605,71 @@ func _touch_test() -> void:
 	await frames(3)
 	check("emulated_click_ignored", player.swings == sw1)
 	# pause button opens the menu, tapping Resume through the GUI closes it
-	var pz: Dictionary = tc._buttons[7]
+	var pz: Dictionary = tc.button("pause")
 	await touch_ev(6, pz.center, true); await touch_ev(6, pz.center, false)
 	await wait(0.3)
 	check("touch_pause_button", main.menus.current == "pause", main.menus.current)
 	await shot("t3_pause_menu")
 	main._resume()
+	await wait(0.3)
+	# zoom slider on the left edge: top = first person, bottom = high view
+	var zr: Rect2 = tc._zoom_rect()
+	var ztop := Vector2(zr.get_center().x, zr.position.y + 20.0)
+	var zbot := Vector2(zr.get_center().x, zr.end.y - 20.0)
+	await touch_ev(8, zbot, true)
+	await drag_ev(8, zbot, ztop)
+	await wait(0.5)
+	var z_fp := player.zoom_target
+	await drag_ev(8, ztop, zbot)
+	await touch_ev(8, zbot, false)
+	await wait(0.5)
+	check("zoom_slider", z_fp == 0.0 and player.zoom_target > 8.0, "top %.1f bottom %.1f" % [z_fp, player.zoom_target])
+	await shot("t4_zoom_slider_high")
+	# pinch (fingers together) back out of first person, even with one finger on the left half
+	player.zoom_target = 0.0
+	await wait(0.4)
+	var pa := Vector2(r.x * 0.30, r.y * 0.35); var pb := Vector2(r.x * 0.58, r.y * 0.35)
+	await touch_ev(2, pb, true); await touch_ev(3, pa, true)
+	for i in 8:
+		var e3 := InputEventScreenDrag.new(); e3.index = 3
+		e3.position = to_win(pa.lerp(Vector2(r.x * 0.41, r.y * 0.35), (i + 1) / 8.0)); e3.relative = Vector2(8, 0)
+		Input.parse_input_event(e3)
+		var e4 := InputEventScreenDrag.new(); e4.index = 2
+		e4.position = to_win(pb.lerp(Vector2(r.x * 0.47, r.y * 0.35), (i + 1) / 8.0)); e4.relative = Vector2(-8, 0)
+		Input.parse_input_event(e4)
+		await frames(1)
+	await touch_ev(2, pb, false); await touch_ev(3, pa, false)
+	await wait(0.4)
+	check("pinch_out_of_first_person", player.zoom_target > 1.0, "zoom %.1f" % player.zoom_target)
+	# hold a button still: it turns yellow and can be moved; it stays there
+	tc.reset_layout()
+	var jb2: Dictionary = tc.button("jump")
+	var j0: Vector2 = jb2.center
+	await touch_ev(10, j0, true)
+	await wait(1.4)
+	var picked: bool = tc._moving.values().has("jump")
+	await shot("t5_button_picked_up")
+	var dest := Vector2(r.x * 0.8, r.y * 0.5)
+	await drag_ev(10, j0, dest)
+	await touch_ev(10, dest, false)
+	await wait(0.2)
+	var moved_to: Vector2 = tc.button("jump").center
+	check("hold_to_move_button", picked and moved_to.distance_to(dest) < 30.0, "picked=%s now at %s" % [picked, moved_to])
+	tc._layout()   # positions survive a relayout (and are saved to disk)
+	check("moved_button_saved", tc.button("jump").center.distance_to(dest) < 30.0 and FileAccess.file_exists(TouchControls.SAVE_PATH))
+	await shot("t6_button_moved")
+	# arrange mode from the pause menu moves ATTACK too; reset restores everything
+	tc.set_arrange(true)
+	var a1: Vector2 = tc.button("attack").center
+	await touch_ev(11, a1, true)
+	await drag_ev(11, a1, a1 + Vector2(-150, -120))
+	await touch_ev(11, a1 + Vector2(-150, -120), false)
+	await shot("t7_arrange_mode")
+	check("arrange_moves_attack", tc.button("attack").center.distance_to(a1) > 100.0)
+	tc.set_arrange(false)
+	tc.reset_layout()
+	check("reset_layout", tc.button("jump").center.distance_to(j0) < 2.0 and tc.button("attack").center.distance_to(a1) < 2.0)
+	player.zoom_target = 4.2
 	await wait(0.3)
 	# keyboard use hides the overlay; trackpad free-cursor fallback
 	var k := InputEventKey.new(); k.physical_keycode = KEY_W; k.keycode = KEY_W; k.pressed = true
