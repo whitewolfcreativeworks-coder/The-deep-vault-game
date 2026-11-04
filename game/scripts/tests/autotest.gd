@@ -160,6 +160,24 @@ func _run() -> void:
 		await _special_test()
 	elif mode == "combat2":
 		await _combat2_test()
+	elif mode == "websave1":
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.add_gold(42)
+		main.autosave()
+		await wait(3.0)   # let the browser flush user:// to IndexedDB
+		check("web_save_written", Game.has_save(0))
+	elif mode == "websave2":
+		await wait(3.0)
+		check("web_save_survives_reopen", Game.any_save() and Game.slot_summary(0).get("gold", 0) == 42, str(Game.slot_summary(0)))
+		check("web_title_offers_continue", main.menus._continue_btn.visible)
+		main.menus._open_slots("continue")
+		await wait(0.8)
+		await shot("ws_slots_after_reopen")
+	elif mode == "saves":
+		if await _saves_test():
+			return   # the scene reloaded: the next phase runs in a fresh test node
 	elif mode == "swing":
 		await _start()
 		god = true
@@ -1189,6 +1207,70 @@ func _found_and_best(slot: String, before: Array) -> bool:
 			if not before.has(id):
 				found = true
 	return found and Game.score(Game.equipped[slot]) >= best - 0.01
+
+# --- save slots: save, "close the app", continue where you left off ------------
+## Phase 1 plays and saves, then reloads the game like reopening the app.
+## Phase 2 (a new test node after the reload) checks everything came back.
+func _saves_test() -> bool:
+	var phase: int = Game.get_meta("saves_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		god = true
+		check("new_game_gets_slot", Game.active_slot == 0, str(Game.active_slot))
+		Game.add_xp(Game.xp_to_next() + Game.xp_to_next() + 5)   # to level 3
+		Game.add_gold(77)
+		var wid := Loot.make_weapon(3, 3)
+		Game.add_item(wid, false)
+		# kill one enemy for good
+		await tp(Vector3(0, -5.9, -62), 0.0)
+		await wait(0.8)
+		var e := nearest_enemy(40.0) as Enemy
+		var dead_uid := e.uid if e else ""
+		if e:
+			e.take_damage(99999.0, player.global_position)
+		await wait(1.0)
+		var at := player.global_position
+		Game.set_meta("saves_expect", {"level": Game.level, "gold": Game.gold, "item": wid, "uid": dead_uid, "pos": at,
+			"inv": Game.inventory.size(), "flags": Game.flags.size()})
+		main.autosave()
+		check("save_file_written", Game.has_save(0) and Game.slot_summary(0).get("level", 0) == Game.level, str(Game.slot_summary(0)))
+		await shot("sv1_before_close")
+		# "close and reopen the app": wipe the live state, then continue from the slot
+		Game.reset_run()
+		Game.level = 1; Game.gold = 0
+		Game.set_meta("saves_phase", 2)
+		main._continue_slot(0)
+		return true
+	if phase == 2:
+		await wait(2.0)
+		player = main.player
+		var ex: Dictionary = Game.get_meta("saves_expect")
+		check("continue_starts_playing", main.state == "play" and player.input_enabled, main.state)
+		check("level_gold_restored", Game.level == ex.level and Game.gold == ex.gold, "level %d gold %d" % [Game.level, Game.gold])
+		check("items_restored", Game.inventory.has(ex.item) and Game.inventory.size() == ex.inv and not Game.item(ex.item).is_empty(), "%d items" % Game.inventory.size())
+		check("position_restored", player.global_position.distance_to(ex.pos) < 2.0, "%s vs %s" % [player.global_position, ex.pos])
+		var back := false
+		for en in get_tree().get_nodes_in_group("enemy"):
+			if en is Enemy and (en as Enemy).uid == ex.uid:
+				back = true
+		check("killed_enemy_stays_dead", ex.uid != "" and not back and Game.flags.get(ex.uid, false), ex.uid)
+		check("profile_restored", Game.profile.name == "Testa", Game.profile.name)
+		await shot("sv2_after_continue")
+		# save & exit to the title: Continue is offered and shows the slot
+		Game.set_meta("saves_phase", 3)
+		main._save_and_exit()
+		return true
+	await wait(2.0)
+	check("title_offers_continue", main.state == "title" and main.menus._continue_btn.visible)
+	main.menus._open_slots("continue")
+	await wait(0.6)
+	await shot("sv3_slots")
+	check("slot_card_shows_hero", Game.slot_summary(0).get("name", "") == "Testa")
+	check("next_new_game_uses_slot_2", Game.first_empty_slot() == 1)
+	Game.remove_meta("saves_phase")
+	return false
 
 # --- block, parry, swing trails, camera views ---------------------------------
 func combo_hold() -> void:

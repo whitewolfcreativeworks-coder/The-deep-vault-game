@@ -3,6 +3,9 @@ extends Node3D
 ## (title -> creator -> play -> pause / death / victory).
 
 static var quick_restart := false
+static var continue_pending := false   # a save slot was loaded: rebuild the world from it
+const AUTOSAVE_EVERY := 15.0
+var _autosave_t := 0.0
 
 var world: VaultWorld
 var player: Player
@@ -19,9 +22,10 @@ func _ready() -> void:
 	# Only the player opts in to physics interpolation (see Player._ready);
 	# everything else keeps its exact per-tick transforms.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-	if not quick_restart:
+	if not quick_restart and not continue_pending:
 		Game.reset_run()
-	Game.hp = Game.max_hp(); Game.mana = Game.max_mana(); Game.stamina = Game.max_stamina()
+	if not continue_pending:
+		Game.hp = Game.max_hp(); Game.mana = Game.max_mana(); Game.stamina = Game.max_stamina()
 	world = VaultWorld.new()
 	world.name = "World"
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -34,9 +38,10 @@ func _ready() -> void:
 	player.global_position = world.spawn_point
 	player.input_enabled = false
 	world.player = player
-	Game.checkpoint_pos = world.spawn_point
-	Game.checkpoint_yaw = 0.0
-	Game.checkpoint_name = "the Outpost"
+	if not continue_pending:
+		Game.checkpoint_pos = world.spawn_point
+		Game.checkpoint_yaw = 0.0
+		Game.checkpoint_name = "the Outpost"
 	hud = HUD.new()
 	add_child(hud)
 	hud.bind_player(player)
@@ -44,6 +49,9 @@ func _ready() -> void:
 	menus = Menus.new()
 	add_child(menus)
 	menus.start_requested.connect(_start_game)
+	menus.continue_requested.connect(_continue_slot)
+	menus.exit_to_title_requested.connect(_save_and_exit)
+	Game.leveled_up.connect(func(_l: int) -> void: autosave())
 	menus.resume_requested.connect(_resume)
 	menus.respawn_requested.connect(_respawn)
 	menus.restart_requested.connect(_restart)
@@ -64,6 +72,9 @@ func _ready() -> void:
 	if quick_restart:
 		quick_restart = false
 		_start_game()
+	elif continue_pending:
+		continue_pending = false
+		_continue_game()
 	else:
 		menus.show_panel("title")
 	if OS.get_cmdline_user_args().size() > 0 or OS.has_environment("DEEPVAULT_AUTOTEST") or _web_autotest() != "":
@@ -80,6 +91,9 @@ static func _web_autotest() -> String:
 	return ""
 
 func _start_game() -> void:
+	if Game.active_slot < 0:
+		Game.active_slot = maxi(Game.first_empty_slot(), 0)
+	Game.resume_pos = Vector3.ZERO
 	menus.close_all()
 	state = "play"
 	player.rebuild_body()
@@ -94,8 +108,68 @@ func _start_game() -> void:
 	Game.say("Welcome, %s. The Vault waits below." % Game.profile.name, UIKit.GOLD)
 	menus.fade.color.a = 1.0
 	menus.fade_to(0.0, 1.2)
+	autosave()
+
+# --- save slots ---------------------------------------------------------------
+## Menu picked a saved character: load it, then rebuild the world from its state.
+func _continue_slot(i: int) -> void:
+	if not Game.load_slot(i):
+		return
+	get_tree().paused = false
+	continue_pending = true
+	get_tree().reload_current_scene()
+
+func _continue_game() -> void:
+	menus.close_all()
+	state = "play"
+	player.rebuild_body()
+	var at: Vector3 = Game.resume_pos if Game.resume_pos != Vector3.ZERO else Game.checkpoint_pos
+	var yaw: float = Game.resume_yaw if Game.resume_pos != Vector3.ZERO else Game.checkpoint_yaw
+	var hp_saved := Game.hp
+	player.respawn_at(at + Vector3(0, 0.1, 0), yaw)
+	Game.hp = maxf(hp_saved, Game.max_hp() * 0.5)
+	player.invuln = 2.0
+	player.camera.current = true
+	player.input_enabled = true
+	player.set_mouse_captured(true)
+	hud.visible = true
+	Game.in_game = true
+	Game.set_objective(Game.objective if Game.objective != "" else "Enter the Deep Vault beneath the cliffs.")
+	Game.say("Welcome back, %s. Level %d." % [Game.profile.name, Game.level], UIKit.GOLD)
+	menus.fade.color.a = 1.0
+	menus.fade_to(0.0, 1.2)
+
+func autosave() -> void:
+	if state == "play" and Game.active_slot >= 0 and not player.dead:
+		Game.save_slot()
+		_autosave_t = 0.0
+
+func _save_and_exit() -> void:
+	autosave()
+	Game.in_game = false
+	Game.active_slot = -1
+	get_tree().paused = false
+	get_tree().reload_current_scene()
+
+func _notification(what: int) -> void:
+	# closing the app, switching away from it, or the browser tab hiding: save now
+	if what in [NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_WINDOW_FOCUS_OUT]:
+		if state == "play" and player:
+			autosave()
+
+## Remember the last safe spot to continue from, and autosave now and then.
+func _track_save(delta: float) -> void:
+	if state != "play" or player == null or get_tree().paused:
+		return
+	if player.is_on_floor() and not player.in_river and not player.dead and not player.mantling:
+		Game.resume_pos = player.global_position
+		Game.resume_yaw = player.facing
+	_autosave_t += delta
+	if _autosave_t >= AUTOSAVE_EVERY:
+		autosave()
 
 func _process(delta: float) -> void:
+	_track_save(delta)
 	if state == "title" or menus.current == "creator":
 		_orbit += delta * 0.05
 		var c := Vector3(0, 2.0, 12.0)
@@ -128,6 +202,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _open(panel: String) -> void:
+	if panel == "pause":
+		autosave()
 	menus.show_panel(panel)
 	get_tree().paused = true
 	player.set_mouse_captured(false)
@@ -170,6 +246,8 @@ func show_lore(t: String, body: String) -> void:
 	player.set_mouse_captured(false)
 
 func on_victory() -> void:
+	Game.flags["victory"] = true
+	autosave()
 	state = "victory"
 	player.input_enabled = false
 	player.set_mouse_captured(false)

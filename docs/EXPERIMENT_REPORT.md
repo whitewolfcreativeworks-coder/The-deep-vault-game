@@ -285,3 +285,16 @@ The looks test is now also run with `--rendering-method gl_compatibility`. **Les
 - hold-to-move, saving, arrange mode and reset
 
 It also found two stale tests that still looked buttons up by list position. Buttons are now looked up by name.
+
+## Follow-up 6: save slots (Nov 4)
+
+**Request:** keep up to three characters and continue where you left off after closing the app.
+
+**How it works:**
+- Each slot is a Godot text-variant file, `user://save_N.sav`. That format keeps Vector3 values and the generated loot dictionaries without any extra conversion code.
+- A save holds: the profile, stats, items, inventory and equipment, the world `flags`, the checkpoint, the objective, and the last safe spot (on the floor, not in the river).
+- Continuing loads the slot, then reloads the scene. Chests, gates, levers and enemies already read `flags` when they are built, so no other world code had to change.
+
+**Tests:**
+- `saves` autotest, three phases across scene reloads, all checks pass. Phase 1 plays, levels up, loots and kills an enemy, then saves. Phase 2 continues and checks that level, gold, items, position and the dead enemy came back, then uses Save & exit. Phase 3 checks the title's Continue button and the slot cards.
+- `tools/web_save_test.js` runs the web build in headless Chrome. Visit 1 saves, the browser closes completely, and visit 2 with the same profile finds the save and the Continue button. This confirms that `user://` persists to IndexedDB in the browser build.

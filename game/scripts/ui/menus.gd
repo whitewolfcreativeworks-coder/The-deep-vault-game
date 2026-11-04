@@ -8,6 +8,8 @@ signal resume_requested
 signal respawn_requested
 signal restart_requested
 signal quit_requested
+signal continue_requested(slot: int)
+signal exit_to_title_requested
 
 var root: Control
 var current := ""
@@ -42,6 +44,7 @@ func _ready() -> void:
 	add_child(root)
 	_build_title()
 	_build_creator()
+	_build_slots()
 	_build_pause()
 	_build_inventory()
 	_build_lore()
@@ -66,6 +69,8 @@ func show_panel(n: String) -> void:
 		(_panels[k] as Control).visible = k == n
 	if n == "creator":
 		_refresh_preview()
+	if n == "title" and _continue_btn:
+		_continue_btn.visible = Game.any_save()
 	if n == "inventory":
 		_refresh_inventory(); _refresh_stats()
 	if n == "pause" and _arrange_btn:
@@ -123,7 +128,11 @@ func _build_title() -> void:
 	var t2 := UIKit.label("Into the Deep Vault. Beneath the cliffs of Ashkar, a light still beats in the dark.", 22, UIKit.PARCH)
 	v.add_child(t2)
 	var sp := Control.new(); sp.custom_minimum_size.y = 40; v.add_child(sp)
-	v.add_child(_button("Begin Adventure", func() -> void: show_panel("creator")))
+	_continue_btn = _button("Continue", func() -> void: _open_slots("continue"))
+	_continue_btn.custom_minimum_size.y = 58
+	_continue_btn.add_theme_font_size_override("font_size", 24)
+	v.add_child(_continue_btn)
+	v.add_child(_button("New Adventure", func() -> void: _new_adventure()))
 	_mute_btn = _button(_sound_label(), func() -> void: _toggle_mute())
 	v.add_child(_mute_btn)
 	v.add_child(_button("Quit", func() -> void: quit_requested.emit()))
@@ -540,10 +549,108 @@ func _process(delta: float) -> void:
 				_preview.rotation.y += delta * 0.45
 
 # ---------------------------------------------------------------------------
+# Save slots: three characters. "continue" mode picks one to play; "replace"
+# mode (all three in use) picks one to overwrite with a new adventure.
+var _continue_btn: Button
+var _slots_box: HBoxContainer
+var _slots_title: Label
+var _slots_mode := "continue"
+var _delete_armed := -1
+
+func _new_adventure() -> void:
+	var i := Game.first_empty_slot()
+	if i < 0:
+		_open_slots("replace")
+		return
+	Game.active_slot = i
+	show_panel("creator")
+
+func _open_slots(mode: String) -> void:
+	_slots_mode = mode
+	_delete_armed = -1
+	show_panel("slots")
+	_refresh_slots()
+
+func _build_slots() -> void:
+	var p := _center_panel("slots", 1420, 700)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 18); p.add_child(v)
+	_slots_title = UIKit.label("", 36, UIKit.GOLD, true)
+	_slots_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(_slots_title)
+	_slots_box = HBoxContainer.new(); _slots_box.add_theme_constant_override("separation", 24)
+	_slots_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_slots_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(_slots_box)
+	var br := HBoxContainer.new(); br.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(br)
+	br.add_child(_button("Back", func() -> void: show_panel("title"), 220))
+
+func _refresh_slots() -> void:
+	for ch in _slots_box.get_children():
+		ch.queue_free()
+	_slots_title.text = "Choose a hero to continue" if _slots_mode == "continue" else "All three slots are in use: pick one to replace"
+	for i in Game.SAVE_SLOTS:
+		var info := Game.slot_summary(i)
+		var card := PanelContainer.new()
+		card.custom_minimum_size = Vector2(430, 520)
+		var sb := StyleBoxFlat.new(); sb.bg_color = Color(0.07, 0.06, 0.06, 0.92); sb.set_corner_radius_all(10)
+		sb.border_color = UIKit.GOLD if not info.is_empty() else Color(0.35, 0.3, 0.25); sb.set_border_width_all(3)
+		sb.content_margin_left = 24; sb.content_margin_right = 24; sb.content_margin_top = 20; sb.content_margin_bottom = 20
+		card.add_theme_stylebox_override("panel", sb)
+		_slots_box.add_child(card)
+		var cv := VBoxContainer.new(); cv.add_theme_constant_override("separation", 10); card.add_child(cv)
+		cv.add_child(UIKit.label("Slot %d" % (i + 1), 18, UIKit.DIM, true))
+		var idx := i
+		if info.is_empty():
+			cv.add_child(UIKit.label("Empty", 34, Color(0.6, 0.55, 0.5), true))
+			var sp := Control.new(); sp.size_flags_vertical = Control.SIZE_EXPAND_FILL; cv.add_child(sp)
+			cv.add_child(_button("New adventure here", func() -> void:
+				Game.active_slot = idx
+				show_panel("creator"), 380))
+			continue
+		var nm := UIKit.label(info.name, 32, UIKit.GOLD, true)
+		nm.autowrap_mode = TextServer.AUTOWRAP_WORD
+		cv.add_child(nm)
+		var ab: Dictionary = Game.ABILITIES.get(info.hero, {})
+		cv.add_child(UIKit.label("Level %d %s" % [info.level, info.hero], 24, UIKit.PARCH, true))
+		cv.add_child(UIKit.label("Special: %s" % ab.get("name", ""), 17, ab.get("color", UIKit.DIM)))
+		var where := UIKit.label(("Conquered the Vault!" if info.won else "Last shrine: " + info.where), 18, UIKit.PARCH)
+		where.autowrap_mode = TextServer.AUTOWRAP_WORD
+		cv.add_child(where)
+		if info.objective != "" and not info.won:
+			var ob := UIKit.label(info.objective, 16, UIKit.DIM)
+			ob.autowrap_mode = TextServer.AUTOWRAP_WORD
+			cv.add_child(ob)
+		cv.add_child(UIKit.label("Played %s · %d gold" % [info.time, info.gold], 16, UIKit.DIM))
+		cv.add_child(UIKit.label("Saved %s" % info.ago, 16, UIKit.DIM))
+		var sp2 := Control.new(); sp2.size_flags_vertical = Control.SIZE_EXPAND_FILL; cv.add_child(sp2)
+		if _slots_mode == "continue":
+			var go := _button("Continue", func() -> void: continue_requested.emit(idx), 380)
+			go.custom_minimum_size.y = 60
+			go.add_theme_font_size_override("font_size", 24)
+			cv.add_child(go)
+			var del := _button("Tap again to delete" if _delete_armed == idx else "Delete", func() -> void:
+				if _delete_armed == idx:
+					Game.delete_slot(idx)
+					_delete_armed = -1
+					if not Game.any_save():
+						show_panel("title")
+						return
+				else:
+					_delete_armed = idx
+				_refresh_slots(), 380)
+			del.custom_minimum_size.y = 40
+			del.add_theme_font_size_override("font_size", 15)
+			cv.add_child(del)
+		else:
+			cv.add_child(_button("Replace with a new hero", func() -> void:
+				Game.delete_slot(idx)
+				Game.active_slot = idx
+				show_panel("creator"), 380))
+
 var _arrange_btn: Button
 var _reset_btn: Button
 func _build_pause() -> void:
-	var p := _center_panel("pause", 420, 700)
+	var p := _center_panel("pause", 420, 760)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.alignment = BoxContainer.ALIGNMENT_CENTER
 	p.add_child(v)
 	var t := UIKit.label("Paused", 40, UIKit.GOLD, true); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -577,6 +684,7 @@ func _build_pause() -> void:
 			m.touch.reset_layout()
 			Game.say("Touch buttons back to the default layout.", UIKit.PARCH), 360)
 	v.add_child(_reset_btn)
+	v.add_child(_button("Save & exit to title", func() -> void: exit_to_title_requested.emit(), 360))
 	v.add_child(_button("Restart adventure", func() -> void: restart_requested.emit(), 360))
 	v.add_child(_button("Quit game", func() -> void: quit_requested.emit(), 360))
 

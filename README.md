@@ -74,6 +74,11 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - **Barbarian: Whirlwind** (8 s). A burning vortex: four spinning hits on every enemy around you, the last one hurling them away with a pillar of fire.
   - **Ranger: Volley** (7 s). Two waves of nine arrows that burst on impact, damaging enemies nearby.
 - **Double jump.** Tap jump for a small hop; tap again in the air for a much bigger jump (about 3x higher).
+- **Three save slots (new).** Each hero is saved where you left off: looks, level, gear, bag, potions and gold, which chests are open, which enemies are defeated, the last shrine and the exact spot you were standing.
+  - The game autosaves every 15 seconds, at shrines, on level-up, when you pause, and when the app is closed or switched away from.
+  - The title screen has **Continue**, which shows a card per slot with name, hero, level, where you are and play time. **New Adventure** uses an empty slot, or asks which one to replace when all three are used.
+  - The pause menu has **Save & exit to title**, for switching heroes.
+  - Saves live on the device: in the browser/iPad app they are kept in the browser's site storage. Clearing Safari's website data deletes them.
 - **Touch controls you can arrange (iPad).**
   - The combat buttons sit in a tight cluster around ATTACK in the bottom-right corner, so the rest of the right side is free for steering the camera with your thumb.
   - A **zoom slider** on the left edge goes from first person (top, "EYES") to the high overhead view (bottom). Pinching works too, anywhere on the screen.

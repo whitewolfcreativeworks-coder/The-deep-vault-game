@@ -331,7 +331,9 @@ func set_checkpoint(pos: Vector3, yaw: float, label: String) -> void:
 	if checkpoint_name == label:
 		return
 	checkpoint_pos = pos; checkpoint_yaw = yaw; checkpoint_name = label
-	message.emit("Checkpoint: %s" % label, Color(0.6, 0.9, 1.0))
+	message.emit("Checkpoint: %s  (game saved)" % label if active_slot >= 0 else "Checkpoint: %s" % label, Color(0.6, 0.9, 1.0))
+	resume_pos = pos; resume_yaw = yaw
+	save_slot()
 
 func say(text: String, color := Color(0.92, 0.88, 0.80)) -> void:
 	message.emit(text, color)
@@ -376,3 +378,137 @@ func _register_inputs() -> void:
 		jm.axis = axes[action][0]; jm.axis_value = axes[action][1]
 		InputMap.action_add_event(action, jm)
 		InputMap.action_set_deadzone(action, 0.2)
+
+# ---------------------------------------------------------------------------
+# Save slots: three characters, each saved where you left off.
+# Stored as Godot text variants in user:// (IndexedDB in the browser/iPad app).
+const SAVE_SLOTS := 3
+const SAVE_VERSION := 1
+var active_slot := -1                    # the slot this run saves into (-1 = none yet)
+var resume_pos := Vector3.ZERO    # last safe spot (on the ground, not in the river)
+var resume_yaw := 0.0
+var saves_written := 0
+
+func _slot_path(i: int) -> String:
+	return "user://save_%d.sav" % i
+
+func has_save(i: int) -> bool:
+	return FileAccess.file_exists(_slot_path(i))
+
+func any_save() -> bool:
+	for i in SAVE_SLOTS:
+		if has_save(i):
+			return true
+	return false
+
+func first_empty_slot() -> int:
+	for i in SAVE_SLOTS:
+		if not has_save(i):
+			return i
+	return -1
+
+func save_slot(i := -1) -> bool:
+	if i < 0:
+		i = active_slot
+	if i < 0 or not in_game:
+		return false
+	var d := {
+		"version": SAVE_VERSION,
+		"saved_at": Time.get_unix_time_from_system(),
+		"profile": profile.duplicate(true),
+		"level": level, "xp": xp, "gold": gold,
+		"potions": potions, "mana_potions": mana_potions,
+		"hp": hp, "mana": mana,
+		"items": items.duplicate(true),
+		"inventory": Array(inventory),
+		"equipped": equipped.duplicate(),
+		"kills": kills, "play_time": play_time,
+		"flags": flags.duplicate(true),
+		"checkpoint_pos": checkpoint_pos, "checkpoint_yaw": checkpoint_yaw, "checkpoint_name": checkpoint_name,
+		"objective": objective,
+		"resume_pos": resume_pos, "resume_yaw": resume_yaw,
+	}
+	var f := FileAccess.open(_slot_path(i), FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_string(var_to_str(d))
+	f.close()
+	saves_written += 1
+	return true
+
+func read_slot(i: int) -> Dictionary:
+	if not has_save(i):
+		return {}
+	var f := FileAccess.open(_slot_path(i), FileAccess.READ)
+	if f == null:
+		return {}
+	var v = str_to_var(f.get_as_text())
+	f.close()
+	return v if v is Dictionary else {}
+
+## Loads a slot into the live game state. The world is rebuilt afterwards so
+## opened chests, pulled levers and defeated enemies stay that way.
+func load_slot(i: int) -> bool:
+	var d := read_slot(i)
+	if d.is_empty():
+		return false
+	reset_run()
+	active_slot = i
+	var p: Dictionary = d.get("profile", {})
+	for k in p:
+		profile[k] = p[k]
+	level = int(d.get("level", 1)); xp = int(d.get("xp", 0)); gold = int(d.get("gold", 0))
+	potions = int(d.get("potions", 3)); mana_potions = int(d.get("mana_potions", 2))
+	var its: Dictionary = d.get("items", {})
+	for k in its:
+		items[k] = its[k]
+	inventory.assign(d.get("inventory", ["rusty_sword", "traveler_garb"]))
+	var eq: Dictionary = d.get("equipped", {})
+	for k in eq:
+		equipped[k] = eq[k]
+	kills = int(d.get("kills", 0)); play_time = float(d.get("play_time", 0.0))
+	flags = d.get("flags", {}).duplicate(true)
+	checkpoint_pos = d.get("checkpoint_pos", Vector3.ZERO)
+	checkpoint_yaw = float(d.get("checkpoint_yaw", 0.0))
+	checkpoint_name = String(d.get("checkpoint_name", "the Outpost"))
+	objective = String(d.get("objective", ""))
+	resume_pos = d.get("resume_pos", Vector3.ZERO)
+	resume_yaw = float(d.get("resume_yaw", 0.0))
+	hp = clampf(float(d.get("hp", max_hp())), max_hp() * 0.5, max_hp())
+	mana = clampf(float(d.get("mana", max_mana())), 0.0, max_mana())
+	stamina = max_stamina()
+	stats_changed.emit(); inventory_changed.emit()
+	return true
+
+func delete_slot(i: int) -> void:
+	if has_save(i):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_slot_path(i)))
+	if active_slot == i:
+		active_slot = -1
+
+## Short description of a slot for the menu.
+func slot_summary(i: int) -> Dictionary:
+	var d := read_slot(i)
+	if d.is_empty():
+		return {}
+	var p: Dictionary = d.get("profile", {})
+	var secs := int(d.get("play_time", 0.0))
+	var ago := int(Time.get_unix_time_from_system() - float(d.get("saved_at", 0.0)))
+	var ago_s := "just now"
+	if ago >= 86400:
+		ago_s = "%d day%s ago" % [ago / 86400, "" if ago < 172800 else "s"]
+	elif ago >= 3600:
+		ago_s = "%d hour%s ago" % [ago / 3600, "" if ago < 7200 else "s"]
+	elif ago >= 60:
+		ago_s = "%d min ago" % (ago / 60)
+	return {
+		"name": String(p.get("name", "Nameless")),
+		"hero": String(p.get("hero", "Knight")),
+		"level": int(d.get("level", 1)),
+		"where": String(d.get("checkpoint_name", "the Outpost")),
+		"objective": String(d.get("objective", "")),
+		"time": "%dh %02dm" % [secs / 3600, (secs / 60) % 60] if secs >= 3600 else "%d min" % maxi(1, secs / 60),
+		"ago": ago_s,
+		"won": d.get("flags", {}).get("victory", false),
+		"gold": int(d.get("gold", 0)),
+	}
