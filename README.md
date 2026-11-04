@@ -1,6 +1,6 @@
 # Bobek's Adventure — playable builds
 
-Built from `main` at commit 8f87970 with Godot 4.5.1 on Nov 3, 2026.
+Built from `main` at commit e01002e with Godot 4.5.1 on Nov 3, 2026.
 
 | File | Platform | How to run |
 |---|---|---|
