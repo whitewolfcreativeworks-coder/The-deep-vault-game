@@ -316,3 +316,35 @@ static func shadow_pool(pos: Vector3, color: Color, radius: float, dur: float, t
 			for e in mi.get_tree().get_nodes_in_group("enemy"):
 				if is_instance_valid(e) and e.get("dead") != true and e is Node3D and (e as Node3D).global_position.distance_to(pos) < radius + 0.4:
 					e.take_damage(tick_dmg, pos, 0.0, false))
+
+## A curved blade-trail ribbon (sword swings). Fades from the leading edge back.
+static func swipe(pos: Vector3, yaw: float, tilt: float, radius: float, color: Color, arc_deg := 150.0, dur := 0.22, flip := false) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	var n := 20
+	var a0 := deg_to_rad(-arc_deg * 0.5)
+	for i in n + 1:
+		var t := float(i) / n
+		var a := a0 + deg_to_rad(arc_deg) * t
+		var lead := t if not flip else 1.0 - t
+		var c := Color(color.r, color.g, color.b, lead * lead)
+		var dir := Vector3(sin(a), 0, -cos(a))
+		st.set_color(c); st.add_vertex(dir * radius * 0.72)
+		st.set_color(c); st.add_vertex(dir * radius)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.vertex_color_use_as_albedo = true
+	m.albedo_color = Color(1.0, 1.0, 1.0, 0.5)
+	mi.material_override = m
+	if not _spawn(mi, pos):
+		return
+	mi.rotation = Vector3(0, yaw, tilt)
+	var tw := mi.create_tween().set_parallel(true)
+	tw.tween_property(mi, "rotation:y", yaw + (-0.5 if not flip else 0.5), dur)
+	tw.tween_property(m, "albedo_color:a", 0.0, dur).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(mi.queue_free)

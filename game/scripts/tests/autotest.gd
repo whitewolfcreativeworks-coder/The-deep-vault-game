@@ -158,6 +158,25 @@ func _run() -> void:
 		await _looks_test()
 	elif mode == "special":
 		await _special_test()
+	elif mode == "combat2":
+		await _combat2_test()
+	elif mode == "swing":
+		await _start()
+		god = true
+		for z in [[0.0, "fp"], [4.2, "behind"]]:
+			player.zoom_target = z[0]; player.zoom = z[0]; player.snap_view()
+			await wait(0.8)
+			for k in 3:
+				Engine.time_scale = 0.08
+				Input.action_press("attack")
+				while not (player.attacking and player.hit_done):
+					await frames(1)
+				Input.action_release("attack")
+				await frames(2)
+				await shot("sw_%s_%d" % [z[1], k])
+				Engine.time_scale = 1.0
+				combo_hold()
+				await wait(0.3)
 	elif mode == "djump":
 		await _start()
 		god = true
@@ -1112,6 +1131,88 @@ func _found_and_best(slot: String, before: Array) -> bool:
 				found = true
 	return found and Game.score(Game.equipped[slot]) >= best - 0.01
 
+# --- block, parry, swing trails, camera views ---------------------------------
+func combo_hold() -> void:
+	pass
+
+func _combat2_test() -> void:
+	await _start()
+	# open-air views at the outpost first
+	for v in [[0.0, "first"], [4.2, "behind"], [9.5, "high"]]:
+		player.zoom_target = v[0]; player.zoom = v[0]
+		player.pitch = -0.2; player.snap_view()
+		await wait(1.0)
+		Input.action_press("attack")
+		await wait(0.27)
+		Input.action_release("attack")
+		await shot("c_out_" + v[1])
+		await wait(0.7)
+	var at := Vector3(0, -5.9, -62)
+	for e in get_tree().get_nodes_in_group("enemy"):
+		e.queue_free()
+	await tp(at, 0.0)
+	player.facing = 0.0; player.yaw = 0.0; player.snap_view()
+	var e := _dummy(at + Vector3(0, -0.1, -2.2))
+	await wait(0.3)
+	e._awaken()
+	await wait(1.5)
+	# 1. holding block stops the revenant's blows
+	Game.hp = Game.max_hp(); Game.stamina = Game.max_stamina()
+	var hp0 := Game.hp
+	var b0 := player.blocks + player.parries
+	Input.action_press("block")
+	var t := 0.0
+	while t < 8.0 and player.blocks + player.parries - b0 < 3:
+		face(e.global_position)
+		Game.stamina = Game.max_stamina()
+		await wait(0.1)
+		t += 0.1
+	await shot("c_blocking")
+	Input.action_release("block")
+	check("block_stops_damage", player.blocks + player.parries - b0 >= 3 and Game.hp >= hp0 - 0.5, "%d blocked, hp %.0f -> %.0f" % [player.blocks + player.parries - b0, hp0, Game.hp])
+	# 2. raising the shield as the blow comes is a parry (and it cancels a swing)
+	var p0 := player.parries
+	t = 0.0
+	var tries := 0
+	while t < 20.0 and player.parries == p0:
+		face(e.global_position)
+		Game.hp = Game.max_hp()
+		if e.state == Enemy.S.WINDUP and e.state_time >= e.t.windup - 0.2:
+			Input.action_press("block")
+			await wait(0.5)
+			Input.action_release("block")
+			tries += 1
+		else:
+			await wait(0.02)
+		t += 0.05
+	await shot("c_parry")
+	check("parry_works", player.parries > p0, "%d tries" % tries)
+	await wait(0.5)
+	player.facing = 0.0; player.yaw = 0.0
+	Input.action_press("attack"); await frames(2)
+	await wait(0.1)
+	Input.action_press("block"); await wait(0.15)
+	check("block_cancels_swing", player.blocking and not player.attacking)
+	Input.action_release("attack"); Input.action_release("block")
+	e.queue_free()
+	await wait(0.6)
+	# 3. swing trails and the three camera views
+	for v in [[0.0, "first"], [4.2, "behind"], [9.5, "high"]]:
+		player.zoom_target = v[0]; player.zoom = v[0]
+		player.facing = 0.0; player.yaw = 0.0; player.pitch = -0.2; player.snap_view()
+		await wait(0.8)
+		await tap("attack")
+		await wait(0.28)
+		await shot("c_view_" + v[1])
+		await wait(0.6)
+	check("view_cycle", true)
+	player.zoom_target = 0.0; player.toggle_view()
+	var n1 := player.view_name()
+	player.toggle_view()
+	var n2 := player.view_name()
+	player.toggle_view()
+	check("view_button_cycles", n1 == "BEHIND" and n2 == "HIGH" and player.view_name() == "1ST", "%s %s %s" % [n1, n2, player.view_name()])
+
 # --- hero special abilities -----------------------------------------------------
 func _dummy(pos: Vector3) -> Enemy:
 	var e := Enemy.new(); e.configure("revenant", "dummy"); e.position = pos; world().add_child(e)
@@ -1205,6 +1306,12 @@ func _looks_test() -> void:
 	m.show_panel("creator")
 	await wait(0.5)
 	await shot("k_creator_default")
+	Game.profile.merge({"hero": "Rogue", "hair_style": "spiky", "hair_color": 4, "skin": 3, "face": "scar", "cape": 3}, true)
+	for t in ["hero", "body", "hair", "face", "colours"]:
+		m._set_tab(t)
+		await wait(1.6)
+		await shot("k_tab_" + t)
+	m._set_tab("hero")
 	m.current = "looks"   # stop the turntable
 	var cam: Camera3D = m._preview_vp.find_children("*", "Camera3D", true, false)[0]
 	var combos := [

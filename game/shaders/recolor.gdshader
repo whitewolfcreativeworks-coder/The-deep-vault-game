@@ -8,7 +8,9 @@ uniform float skin_protect = 1.0;    // keep warm (skin/hair/leather) texels out
 uniform vec3 skin_tone : source_color = vec3(0.97, 0.8, 0.67);
 uniform float skin_on = 0.0;         // 1 = replace the light-peach skin with skin_tone
 uniform vec3 hair_tone : source_color = vec3(0.3, 0.2, 0.1);
-uniform float hair_on = 0.0;         // head meshes only: recolour the hero's own hair and brows
+uniform float hair_on = 0.0;
+// The web/iPad (Compatibility) renderer hands the texture back in sRGB already.
+uniform bool tex_is_srgb = false;         // head meshes only: recolour the hero's own hair and brows
 uniform float roughness_v = 0.8;
 uniform float metallic_v = 0.0;
 
@@ -21,7 +23,7 @@ void fragment() {
 	c = mix(c, rec, strength * (1.0 - warm));
 	// Masks work on the texture's sRGB values (the sampler hands back linear).
 	// KayKit skin is a light peach (r > 0.8, g > 0.55): hair and leather are darker
-	vec3 s = pow(max(t.rgb, vec3(0.0)), vec3(1.0 / 2.2));
+	vec3 s = tex_is_srgb ? t.rgb : pow(max(t.rgb, vec3(0.0)), vec3(1.0 / 2.2));
 	float ls = dot(s, vec3(0.299, 0.587, 0.114));
 	float skin = smoothstep(0.80, 0.88, s.r) * smoothstep(0.62, 0.72, s.g)
 		* clamp((s.r - s.b) * 6.0 - 0.6, 0.0, 1.0) * clamp((s.g - s.b) * 8.0, 0.0, 1.0);

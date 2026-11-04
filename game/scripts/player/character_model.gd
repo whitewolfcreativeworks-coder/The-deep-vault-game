@@ -56,6 +56,7 @@ const SKELETONS := {
 	"rogue": "res://assets/kaykit/skeletons/Skeleton_Rogue.glb",
 	"mage": "res://assets/kaykit/skeletons/Skeleton_Mage.glb",
 }
+const HERO_WEAPON_LENGTH := 1.45
 const KEEP_MESHES := ["Body", "Head", "Arm", "Leg", "Cape", "Cloak", "Eyes", "Jaw", "Helmet", "Hat", "Hood", "Skull"]
 
 const WEAPON_SCENES := {
@@ -253,6 +254,7 @@ func _recolor(m: MeshInstance3D, c: Color, strength: float, skin_protect: float,
 		r.set_shader_parameter("tint", c)
 		r.set_shader_parameter("strength", strength)
 		r.set_shader_parameter("skin_protect", skin_protect)
+		r.set_shader_parameter("tex_is_srgb", RenderingServer.get_current_rendering_method() == "gl_compatibility")
 		if skin != null:
 			r.set_shader_parameter("skin_tone", skin)
 			r.set_shader_parameter("skin_on", 1.0)
@@ -386,6 +388,8 @@ func set_weapon(id: String) -> void:
 	weapon_root = _attach("handslot.r")
 	var w: Node3D = (load(WEAPON_SCENES[id]) as PackedScene).instantiate()
 	weapon_root.add_child(w)
+	if kind == "hero":
+		w.scale = Vector3(1.12, HERO_WEAPON_LENGTH, 1.12)   # longer blades: easier to see what you hit
 	for mi in w.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = flash_mat
 		if glow != Color.BLACK:
@@ -407,7 +411,7 @@ func set_weapon(id: String) -> void:
 			pass
 	weapon_tip = Node3D.new()
 	weapon_root.add_child(weapon_tip)
-	weapon_tip.position = Vector3(0, 0.9, 0)
+	weapon_tip.position = Vector3(0, 0.9 * (HERO_WEAPON_LENGTH if kind == "hero" else 1.0), 0)
 
 func set_offhand(id: String) -> void:
 	if offhand_root:

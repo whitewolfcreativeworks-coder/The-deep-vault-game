@@ -257,6 +257,8 @@ func _draw_pad() -> void:
 			label = "HEAL %d" % Game.potions
 		elif b.name == "mana":
 			label = "MANA %d" % Game.mana_potions
+		elif b.name == "view" and player:
+			label = player.view_name()
 		elif b.name == "special":
 			label = Game.ability().short
 			if player and player.special_cd > 0.0:

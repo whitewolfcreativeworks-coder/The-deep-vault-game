@@ -28,6 +28,8 @@ var _victory_stats: Label
 var _death_label: Label
 var _mute_btn: Button
 
+const PREVIEW_COMPAT_EXPOSURE := 0.68
+const PREVIEW_COMPAT_KEY := 0.45
 const NAMES := ["Bobek", "Sir Bobek", "Lady Bobeka", "Bobek the Bold", "Bobek the Brave", "Bobekus Maximus", "Little Bobek", "Big Bobek", "Bobek Jr.", "Bobekovich", "Bobekson", "Bobekina", "Bo'Bek", "Bobbek", "Archmage Bobek", "Bobek the Unkillable", "Bobek of the Deep", "Grandmaster Bobek", "Bobekzilla", "Bobek Bobekington"]
 
 func _ready() -> void:
@@ -181,15 +183,18 @@ func _toggle_mute() -> void:
 # ---------------------------------------------------------------------------
 func _swatch(col: Color, tip: String, cb: Callable, w := 48.0, txt := "") -> Button:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(w, 42)
+	b.custom_minimum_size = Vector2(w, 54)
 	b.tooltip_text = tip
 	b.toggle_mode = true
 	b.text = txt
 	var sb := StyleBoxFlat.new(); sb.bg_color = col
 	sb.set_corner_radius_all(6); sb.border_color = Color(0, 0, 0, 0.6); sb.set_border_width_all(2)
-	var sbp := sb.duplicate() as StyleBoxFlat; sbp.border_color = UIKit.GOLD; sbp.set_border_width_all(4)
-	b.add_theme_stylebox_override("normal", sb); b.add_theme_stylebox_override("hover", sbp)
-	b.add_theme_stylebox_override("pressed", sbp); b.add_theme_stylebox_override("focus", sbp)
+	var sbp := sb.duplicate() as StyleBoxFlat; sbp.border_color = Color(1, 0.92, 0.6); sbp.set_border_width_all(6)
+	sbp.expand_margin_left = 3; sbp.expand_margin_right = 3; sbp.expand_margin_top = 3; sbp.expand_margin_bottom = 3
+	b.add_theme_stylebox_override("normal", sb); b.add_theme_stylebox_override("hover", sb)
+	b.add_theme_stylebox_override("pressed", sbp); b.add_theme_stylebox_override("focus", sb)
+	b.add_theme_stylebox_override("hover_pressed", sbp)
+	b.add_theme_color_override("font_color", Color(1, 1, 1)); b.add_theme_font_size_override("font_size", 16)
 	b.pressed.connect(func() -> void:
 		Sfx.play("footstep", -10.0, 0.0)
 		cb.call())
@@ -210,20 +215,42 @@ func _grid(cols: int, parent: Control) -> GridContainer:
 	parent.add_child(g)
 	return g
 
+static var _grab_tex: Texture2D
+func _style_slider(sl: HSlider) -> void:
+	if _grab_tex == null:
+		var img := Image.create(40, 40, false, Image.FORMAT_RGBA8)
+		for y in 40:
+			for x in 40:
+				var d := Vector2(x - 19.5, y - 19.5).length()
+				var a := clampf(19.0 - d, 0.0, 1.0)
+				var c := Color(1.0, 0.86, 0.5) if d < 14.0 else Color(0.35, 0.25, 0.1)
+				img.set_pixel(x, y, Color(c.r, c.g, c.b, a))
+		_grab_tex = ImageTexture.create_from_image(img)
+	for k in ["grabber", "grabber_highlight", "grabber_disabled"]:
+		sl.add_theme_icon_override(k, _grab_tex)
+	var track := StyleBoxFlat.new(); track.bg_color = Color(0.2, 0.17, 0.14); track.set_corner_radius_all(6)
+	track.content_margin_top = 6; track.content_margin_bottom = 6
+	var fillsb := StyleBoxFlat.new(); fillsb.bg_color = Color(0.75, 0.58, 0.28); fillsb.set_corner_radius_all(6)
+	fillsb.content_margin_top = 6; fillsb.content_margin_bottom = 6
+	sl.add_theme_stylebox_override("slider", track)
+	sl.add_theme_stylebox_override("grabber_area", fillsb)
+	sl.add_theme_stylebox_override("grabber_area_highlight", fillsb)
+
 func _heading(t: String, parent: Control) -> void:
-	parent.add_child(UIKit.label(t, 17, UIKit.DIM, true))
+	parent.add_child(UIKit.label(t, 20, UIKit.GOLD, true))
 
 func _slider(lo: float, hi: float, key: String, left: String, right: String, parent: Control) -> HSlider:
 	var r := HBoxContainer.new(); r.add_theme_constant_override("separation", 10); parent.add_child(r)
-	var l1 := UIKit.label(left, 16, UIKit.PARCH); l1.custom_minimum_size.x = 64; r.add_child(l1)
+	var l1 := UIKit.label(left, 19, UIKit.PARCH); l1.custom_minimum_size.x = 80; r.add_child(l1)
 	var sl := HSlider.new(); sl.min_value = lo; sl.max_value = hi; sl.step = 0.01
-	sl.custom_minimum_size = Vector2(300, 42); sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sl.custom_minimum_size = Vector2(520, 56)
+	_style_slider(sl); sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sl.value = float(Game.profile.get(key, 1.0))
 	sl.value_changed.connect(func(v: float) -> void:
 		Game.profile[key] = v
 		_refresh_preview())
 	r.add_child(sl)
-	r.add_child(UIKit.label(right, 16, UIKit.PARCH))
+	r.add_child(UIKit.label(right, 19, UIKit.PARCH))
 	return sl
 
 var _skin_btns: Array[Button] = []
@@ -233,20 +260,60 @@ var _face_btns := {}
 var _build_sl: HSlider
 var _height_sl: HSlider
 var _hair_note: Label
+var _tab_btns := {}
+var _tab_pages := {}
+var _tab := "hero"
+var _preview_cam: Camera3D
+var _spin_hold := 0.0
+var _cam_t := 0.0          # 0 = full body, 1 = face close-up
+
+const CREATOR_TABS := [["hero", "Hero"], ["body", "Body"], ["hair", "Hair"], ["face", "Face"], ["colours", "Colours"]]
+
+func _page(id: String, parent: Control) -> VBoxContainer:
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12)
+	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	parent.add_child(v)
+	_tab_pages[id] = v
+	return v
+
+func _set_tab(id: String) -> void:
+	_tab = id
+	for k in _tab_pages:
+		(_tab_pages[k] as Control).visible = k == id
+	for k in _tab_btns:
+		(_tab_btns[k] as Button).set_pressed_no_signal(k == id)
+	if id in ["hair", "face"]:
+		_spin_hold = 0.0
+	_refresh_preview()
+
+## Any hair choice takes the helm off, otherwise the change would be invisible.
+func _hair_changed() -> void:
+	if CharacterModel.HEROES[Game.profile.hero].hat != "":
+		Game.profile.show_hat = false
+	_refresh_preview()
 
 func _build_creator() -> void:
-	var p := _center_panel("creator", 1540, 820)
-	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 22)
+	var p := _center_panel("creator", 1540, 860)
+	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 26)
 	p.add_child(h)
-	# preview
+	# ---- live preview: drag to spin; zooms to the face for hair and face
 	var svc := SubViewportContainer.new()
-	svc.custom_minimum_size = Vector2(440, 780)
+	svc.custom_minimum_size = Vector2(560, 820)
 	svc.stretch = true
+	svc.gui_input.connect(func(ev: InputEvent) -> void:
+		var dx := 0.0
+		if ev is InputEventMouseMotion and (ev as InputEventMouseMotion).button_mask & MOUSE_BUTTON_MASK_LEFT:
+			dx = (ev as InputEventMouseMotion).relative.x
+		elif ev is InputEventScreenDrag:
+			dx = (ev as InputEventScreenDrag).relative.x
+		if dx != 0.0 and _preview:
+			_preview.rotation.y += dx * 0.012
+			_spin_hold = 3.0)
 	h.add_child(svc)
 	_preview_vp = SubViewport.new()
 	_preview_vp.own_world_3d = true
 	_preview_vp.transparent_bg = false
-	_preview_vp.size = Vector2i(440, 780)
+	_preview_vp.size = Vector2i(560, 820)
 	_preview_vp.msaa_3d = Viewport.MSAA_4X
 	svc.add_child(_preview_vp)
 	var w := Node3D.new(); _preview_vp.add_child(w)
@@ -255,115 +322,150 @@ func _build_creator() -> void:
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR; e.ambient_light_color = Color(0.4, 0.38, 0.48); e.ambient_light_energy = 0.7
 	e.tonemap_mode = Environment.TONE_MAPPER_AGX
 	e.glow_enabled = true
+	# The web/iPad renderer has no AgX tone curve, so the same lights come out much
+	# brighter and pale colours wash to white. Give it its own, gentler lighting.
+	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
+	if compat:
+		e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+		e.tonemap_exposure = PREVIEW_COMPAT_EXPOSURE
+		e.ambient_light_energy = 0.35
+		e.glow_enabled = false
 	we.environment = e; w.add_child(we)
-	var key := SpotLight3D.new(); key.light_color = Color(1.0, 0.8, 0.6); key.light_energy = 14.0; key.spot_range = 12.0; key.spot_angle = 30.0
-	key.position = Vector3(1.6, 3.4, 3.0); key.look_at_from_position(key.position, Vector3(0, 1.0, 0)); key.shadow_enabled = true
+	var key := SpotLight3D.new(); key.light_color = Color(1.0, 0.85, 0.7); key.light_energy = 14.0 * (PREVIEW_COMPAT_KEY if compat else 1.0); key.spot_range = 12.0; key.spot_angle = 32.0
+	key.position = Vector3(1.6, 3.4, 3.4); key.look_at_from_position(key.position, Vector3(0, 1.2, 0)); key.shadow_enabled = true
 	w.add_child(key)
-	var rim := OmniLight3D.new(); rim.light_color = Color(0.3, 0.6, 1.0); rim.light_energy = 3.0; rim.omni_range = 6.0
+	var fill := OmniLight3D.new(); fill.light_color = Color(1.0, 0.95, 0.9); fill.light_energy = 1.2 * (PREVIEW_COMPAT_KEY if compat else 1.0); fill.omni_range = 7.0
+	fill.position = Vector3(-1.8, 1.8, 2.6); w.add_child(fill)
+	var rim := OmniLight3D.new(); rim.light_color = Color(0.3, 0.6, 1.0); rim.light_energy = 3.0 * (0.6 if compat else 1.0); rim.omni_range = 6.0
 	rim.position = Vector3(-1.5, 2.2, -1.6); w.add_child(rim)
 	var floor_m := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 1.1; cm.bottom_radius = 1.2; cm.height = 0.2
 	floor_m.mesh = cm
 	var fm := ShaderMaterial.new(); fm.shader = load("res://shaders/stone.gdshader"); fm.set_shader_parameter("mode", 1)
 	floor_m.material_override = fm; floor_m.position.y = -0.1
 	w.add_child(floor_m)
-	var cam := Camera3D.new(); cam.position = Vector3(0, 1.4, 6.6); cam.fov = 30
-	w.add_child(cam)
-	cam.look_at(Vector3(0, 1.1, 0))
+	_preview_cam = Camera3D.new(); _preview_cam.fov = 30
+	w.add_child(_preview_cam)
 	_preview = CharacterModel.new()
+	_preview.rotation.y = PI
 	w.add_child(_preview)
-	# ---- column A: who you are + body
-	var ca := VBoxContainer.new(); ca.add_theme_constant_override("separation", 9)
-	ca.custom_minimum_size.x = 500
-	h.add_child(ca)
-	ca.add_child(UIKit.label("Create Your Adventurer", 32, UIKit.GOLD, true))
-	_heading("Hero", ca)
-	var hg := _grid(3, ca)
+	_update_preview_cam(1.0)
+	# ---- options
+	var col := VBoxContainer.new(); col.add_theme_constant_override("separation", 14)
+	col.custom_minimum_size.x = 900
+	h.add_child(col)
+	col.add_child(UIKit.label("Create Your Adventurer", 34, UIKit.GOLD, true))
+	var tabs := HBoxContainer.new(); tabs.add_theme_constant_override("separation", 8); col.add_child(tabs)
+	for t in CREATOR_TABS:
+		var id: String = t[0]
+		var tb := _choice(t[1], func() -> void: _set_tab(id), 170)
+		tb.custom_minimum_size.y = 54
+		tb.add_theme_font_size_override("font_size", 21)
+		tabs.add_child(tb)
+		_tab_btns[id] = tb
+	var pages := PanelContainer.new()
+	var psb := StyleBoxFlat.new(); psb.bg_color = Color(0, 0, 0, 0.28); psb.set_corner_radius_all(8)
+	psb.content_margin_left = 22; psb.content_margin_right = 22; psb.content_margin_top = 18; psb.content_margin_bottom = 18
+	pages.add_theme_stylebox_override("panel", psb)
+	pages.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(pages)
+	var stack := VBoxContainer.new(); pages.add_child(stack)
+	# Hero
+	var ph := _page("hero", stack)
+	var hg := _grid(3, ph)
 	for hero in Game.HERO_ORDER:
 		var hb := _choice(hero, func() -> void:
 			Game.profile.hero = hero
-			_refresh_preview(true), 160)
+			_refresh_preview(true), 270)
+		hb.custom_minimum_size.y = 64
+		hb.add_theme_font_size_override("font_size", 22)
 		hg.add_child(hb)
 		_hero_btns[hero] = hb
-	_hero_desc = UIKit.label("", 16, UIKit.PARCH)
+	_hero_desc = UIKit.label("", 19, UIKit.PARCH)
 	_hero_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_hero_desc.custom_minimum_size.y = 70
-	ca.add_child(_hero_desc)
-	_heading("Skin", ca)
-	var sg := _grid(9, ca)
+	_hero_desc.custom_minimum_size = Vector2(840, 120)
+	ph.add_child(_hero_desc)
+	# Body
+	var pb := _page("body", stack)
+	_heading("Skin", pb)
+	var sg := _grid(9, pb)
 	for i in Game.SKIN_COLORS.size():
 		var idx := i
-		var col: Color = Game.SKIN_COLORS[i] if i > 0 else Color(0.45, 0.42, 0.4)
-		var b := _swatch(col, Game.SKIN_NAMES[i], func() -> void:
+		var sc: Color = Game.SKIN_COLORS[i] if i > 0 else Color(0.45, 0.42, 0.4)
+		var b := _swatch(sc, Game.SKIN_NAMES[i], func() -> void:
 			Game.profile.skin = idx
-			_refresh_preview(), 48, "—" if i == 0 else "")
+			_refresh_preview(), 84, "Own" if i == 0 else "")
 		sg.add_child(b); _skin_btns.append(b)
-	_heading("Build", ca)
-	_build_sl = _slider(0.82, 1.3, "build", "Skinny", "Big", ca)
-	_heading("Height", ca)
-	_height_sl = _slider(0.86, 1.14, "height", "Short", "Tall", ca)
-	_heading("Name", ca)
-	var nr := HBoxContainer.new(); nr.add_theme_constant_override("separation", 8); ca.add_child(nr)
-	_name_edit = LineEdit.new(); _name_edit.custom_minimum_size = Vector2(330, 46); _name_edit.max_length = 22
-	_name_edit.text = Game.profile.name
-	nr.add_child(_name_edit)
-	nr.add_child(_button("Random", func() -> void: _name_edit.text = NAMES.pick_random(), 150))
-	var spa := Control.new(); spa.size_flags_vertical = Control.SIZE_EXPAND_FILL; ca.add_child(spa)
-	var br := HBoxContainer.new(); br.add_theme_constant_override("separation", 12); ca.add_child(br)
-	br.add_child(_button("Back", func() -> void: show_panel("title"), 150))
-	br.add_child(_button("Randomize look", func() -> void: _randomize_look(), 240))
-	# ---- column B: hair, face, gear
-	var cb := VBoxContainer.new(); cb.add_theme_constant_override("separation", 9)
-	cb.custom_minimum_size.x = 510
-	h.add_child(cb)
-	var top_sp := Control.new(); top_sp.custom_minimum_size.y = 40; cb.add_child(top_sp)
-	_heading("Hair style", cb)
-	var hsg := _grid(4, cb)
+	_heading("Build", pb)
+	_build_sl = _slider(0.82, 1.3, "build", "Skinny", "Big", pb)
+	_heading("Height", pb)
+	_height_sl = _slider(0.86, 1.14, "height", "Short", "Tall", pb)
+	# Hair
+	var pr := _page("hair", stack)
+	_heading("Style", pr)
+	var hsg := _grid(4, pr)
 	for i in Game.HAIR_STYLES2.size():
 		var st: String = Game.HAIR_STYLES2[i]
 		var b := _choice(Game.HAIR_STYLE_NAMES[st], func() -> void:
 			Game.profile.hair_style = st
-			if st != "natural":
-				Game.profile.show_hat = false     # show off the new hair
-			_refresh_preview())
+			_hair_changed(), 200)
+		b.custom_minimum_size.y = 56
+		b.add_theme_font_size_override("font_size", 20)
 		hsg.add_child(b); _hair_btns[st] = b
-	_hair_note = UIKit.label("", 14, UIKit.DIM)
-	cb.add_child(_hair_note)
-	_heading("Hair colour", cb)
-	var hcg := _grid(10, cb)
+	_heading("Colour", pr)
+	var hcg := _grid(10, pr)
 	for i in Game.HAIR_COLORS2.size():
 		var idx := i
 		var b := _swatch(Game.HAIR_COLORS2[i] if i > 0 else Color(0.45, 0.42, 0.4), Game.HAIR_COLOR_NAMES[i], func() -> void:
 			Game.profile.hair_color = idx
-			_refresh_preview(), 44, "—" if i == 0 else "")
+			_hair_changed(), 76, "Own" if i == 0 else "")
 		hcg.add_child(b); _hcol_btns.append(b)
-	_heading("Face", cb)
-	var fg := _grid(4, cb)
+	_hair_note = UIKit.label("", 17, UIKit.DIM)
+	pr.add_child(_hair_note)
+	# Face
+	var pf := _page("face", stack)
+	_heading("Face detail", pf)
+	var fg := _grid(4, pf)
 	for i in Game.FACES.size():
 		var f: String = Game.FACES[i]
 		var b := _choice(Game.FACE_NAMES[f], func() -> void:
 			Game.profile.face = f
-			_refresh_preview())
+			_refresh_preview(), 200)
+		b.custom_minimum_size.y = 56
+		b.add_theme_font_size_override("font_size", 20)
 		fg.add_child(b); _face_btns[f] = b
-	_heading("Armor & cloak colour", cb)
-	var cg := _grid(7, cb)
+	pf.add_child(UIKit.label("Beards, mustaches and war paint take your hair colour.", 16, UIKit.DIM))
+	# Colours
+	var pc := _page("colours", stack)
+	_heading("Armor & cloak colour", pc)
+	var cg := _grid(7, pc)
 	for i in Game.CAPE_COLORS.size():
 		var idx := i
 		var b := _swatch(Game.CAPE_COLORS[i] if i > 0 else Color(0.5, 0.45, 0.4), Game.CAPE_NAMES[i], func() -> void:
 			Game.profile.cape = idx
-			_refresh_preview(), 62, "—" if i == 0 else "")
+			_refresh_preview(), 110, "Own" if i == 0 else "")
 		cg.add_child(b); _cape_btns.append(b)
-	_hat_btn = CheckButton.new(); _hat_btn.text = "Show helm / hat"; _hat_btn.button_pressed = true
+	_hat_btn = CheckButton.new(); _hat_btn.text = "Wear helm / hat"; _hat_btn.button_pressed = true
+	_hat_btn.add_theme_font_size_override("font_size", 20)
 	_hat_btn.toggled.connect(func(on: bool) -> void:
 		Game.profile.show_hat = on
 		_refresh_preview())
-	cb.add_child(_hat_btn)
-	var spb := Control.new(); spb.size_flags_vertical = Control.SIZE_EXPAND_FILL; cb.add_child(spb)
-	cb.add_child(UIKit.label("Every hero fights with sword, shield, arcane bolt and a special move.", 14, UIKit.DIM))
-	var er := HBoxContainer.new(); er.alignment = BoxContainer.ALIGNMENT_END; cb.add_child(er)
-	er.add_child(_button("Enter the Vault", func() -> void:
+	pc.add_child(_hat_btn)
+	# ---- name and buttons
+	var nr := HBoxContainer.new(); nr.add_theme_constant_override("separation", 10); col.add_child(nr)
+	nr.add_child(UIKit.label("Name", 20, UIKit.DIM, true))
+	_name_edit = LineEdit.new(); _name_edit.custom_minimum_size = Vector2(420, 50); _name_edit.max_length = 22
+	_name_edit.text = Game.profile.name
+	nr.add_child(_name_edit)
+	nr.add_child(_button("Random name", func() -> void: _name_edit.text = NAMES.pick_random(), 200))
+	var br := HBoxContainer.new(); br.add_theme_constant_override("separation", 12); col.add_child(br)
+	br.add_child(_button("Back", func() -> void: show_panel("title"), 150))
+	br.add_child(_button("Randomize look", func() -> void: _randomize_look(), 240))
+	var spc := Control.new(); spc.size_flags_horizontal = Control.SIZE_EXPAND_FILL; br.add_child(spc)
+	br.add_child(_button("Enter the Vault", func() -> void:
 		var nm := _name_edit.text.strip_edges()
 		Game.profile.name = nm if nm != "" else "Nameless"
 		start_requested.emit(), 320))
+	_set_tab("hero")
 
 func _randomize_look() -> void:
 	var p := Game.profile
@@ -374,37 +476,36 @@ func _randomize_look() -> void:
 	p.cape = randi() % Game.CAPE_COLORS.size()
 	p.build = snappedf(randf_range(0.85, 1.25), 0.01)
 	p.height = snappedf(randf_range(0.88, 1.12), 0.01)
-	if p.hair_style != "natural":
-		p.show_hat = false
+	p.show_hat = false
 	_build_sl.set_value_no_signal(p.build)
 	_height_sl.set_value_no_signal(p.height)
 	_refresh_preview(true)
 
 func _refresh_preview(cheer := false) -> void:
+	if _preview == null:
+		return
 	var p := Game.profile
 	for k in _hero_btns:
-		(_hero_btns[k] as Button).button_pressed = k == p.hero
+		(_hero_btns[k] as Button).set_pressed_no_signal(k == p.hero)
 	for i in _cape_btns.size():
-		_cape_btns[i].button_pressed = i == p.cape
+		_cape_btns[i].set_pressed_no_signal(i == p.cape)
 	for i in _skin_btns.size():
-		_skin_btns[i].button_pressed = i == int(p.skin)
+		_skin_btns[i].set_pressed_no_signal(i == int(p.skin))
 	for i in _hcol_btns.size():
-		_hcol_btns[i].button_pressed = i == int(p.hair_color)
+		_hcol_btns[i].set_pressed_no_signal(i == int(p.hair_color))
 	for k in _hair_btns:
-		(_hair_btns[k] as Button).button_pressed = k == p.hair_style
+		(_hair_btns[k] as Button).set_pressed_no_signal(k == p.hair_style)
 	for k in _face_btns:
-		(_face_btns[k] as Button).button_pressed = k == p.face
+		(_face_btns[k] as Button).set_pressed_no_signal(k == p.face)
 	var ab := Game.ability()
-	_hero_desc.text = "%s\nSpecial: %s. %s" % [Game.HERO_BLURB.get(p.hero, ""), ab.name, ab.desc]
+	_hero_desc.text = "%s\n\nSpecial move: %s\n%s" % [Game.HERO_BLURB.get(p.hero, ""), ab.name, ab.desc]
 	var hero: Dictionary = CharacterModel.HEROES[p.hero]
 	_hat_btn.visible = hero.hat != ""
 	_hat_btn.set_pressed_no_signal(p.show_hat)
 	if String(hero.path).contains("Hooded"):
-		_hair_note.text = "The Ranger's hood hides the hair (face details still show)."
-	elif hero.hat != "" and p.show_hat and p.hair_style != "natural":
-		_hair_note.text = "Turn the helm off to see the hair."
+		_hair_note.text = "The Ranger always wears the hood, so hair styles don't show (hair colour still tints the brows and beard)."
 	else:
-		_hair_note.text = ""
+		_hair_note.text = "Picking hair takes the helm off so you can see it (put it back on under Colours)."
 	var cfg := {"kind": "hero", "hero": p.hero, "show_hat": p.show_hat, "weapon": "rusty_sword", "shield": "shield_round", "scale": 1.0}
 	if p.cape > 0:
 		cfg["cape_color"] = Game.CAPE_COLORS[p.cape]
@@ -414,9 +515,26 @@ func _refresh_preview(cheer := false) -> void:
 	if cheer:
 		_preview.play_role("cheer")
 
+func _update_preview_cam(k: float) -> void:
+	var face := _tab in ["hair", "face"]
+	_cam_t = lerpf(_cam_t, 1.0 if face else 0.0, k)
+	var hgt := float(Game.profile.get("height", 1.0))
+	var body_pos := Vector3(0, 1.45, 6.8); var body_at := Vector3(0, 1.1, 0)
+	var face_pos := Vector3(0, 1.85 * hgt, 3.0); var face_at := Vector3(0, 1.62 * hgt, 0)
+	_preview_cam.position = body_pos.lerp(face_pos, _cam_t)
+	_preview_cam.look_at(body_at.lerp(face_at, _cam_t))
+
 func _process(delta: float) -> void:
 	if current == "creator" and _preview:
-		_preview.rotation.y += delta * 0.45
+		_update_preview_cam(1.0 - exp(-6.0 * delta))
+		_spin_hold -= delta
+		if _spin_hold <= 0.0:
+			if _tab in ["hair", "face"]:
+				# turn gently from side to side so the hair can be seen from all angles
+				var want := PI + sin(Time.get_ticks_msec() * 0.0007) * 0.9
+				_preview.rotation.y = lerp_angle(_preview.rotation.y, want, 1.0 - exp(-2.0 * delta))
+			else:
+				_preview.rotation.y += delta * 0.45
 
 # ---------------------------------------------------------------------------
 func _build_pause() -> void:

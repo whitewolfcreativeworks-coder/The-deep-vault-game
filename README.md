@@ -50,10 +50,10 @@ A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without
 |---|---|
 | WASD | Move. **Strafe movement by default**: your hero keeps facing where you look, sidestepping and backpedaling (switch to "Free" movement in the pause menu) |
 | Mouse (or arrow keys) | Look |
-| **Mouse wheel** | Zoom smoothly from wide third person into **first person** |
-| V | Snap between first and third person |
+| **Mouse wheel** (pinch on iPad) | Zoom smoothly from **first person**, to behind your hero, to a **high overhead view** (the camera rises and looks down past ~4.5 m) |
+| V (VIEW button on iPad) | Step through the three views: first person → behind → high |
 | Left mouse | Sword attack (press again mid-swing for a 3-hit combo) |
-| Right mouse (hold) | Raise shield / block |
+| Right mouse (hold) | Raise shield / block. It comes up instantly (even mid-swing) and stops frontal blows completely. Raise it just as an enemy strikes (their eyes flash when they wind up) to **Parry**: no damage, the attacker staggers, +12 mana |
 | Q | Arcane bolt (homing, costs mana) |
 | **X** | **Hero special ability** (on a cooldown; big purple button on touchscreens) |
 | Space / Shift / C | Jump (tap again in the air to double jump; press against a ledge to climb up) / Sprint / Dodge roll |
@@ -74,6 +74,8 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - **Barbarian: Whirlwind** (8 s). A burning vortex: four spinning hits on every enemy around you, the last one hurling them away with a pillar of fire.
   - **Ranger: Volley** (7 s). Two waves of nine arrows that burst on impact, damaging enemies nearby.
 - **Double jump.** Tap jump for a small hop; tap again in the air for a much bigger jump (about 3x higher).
+- **Combat feel.** Hero weapons are about 45% longer with matching reach, and every swing leaves a glowing slash trail (in the weapon's rarity colour) so you can see what you hit. When a wall is behind you, the camera swings up and over instead of squashing into the back of your head.
+- **Character creator** in tabs (Hero, Body, Hair, Face, Colours). The preview zooms in on the face while you pick hair and face details, and can be dragged to spin. Picking any hair option takes the helm off so you can see it.
 
 - **Random loot (new).**
   - Weapons, armor, trinkets and *skins* come in five rarities: Common, Uncommon, Rare, Epic and Legendary.

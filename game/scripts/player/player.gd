@@ -14,7 +14,9 @@ const JUMP_V := 7.0          # a tap: a modest hop
 const DOUBLE_JUMP_V := 11.0  # tap again in the air: a big boosted jump
 const EYE_H := 1.62
 const FP_THRESHOLD := 0.45
-const MAX_ZOOM := 9.0
+const MAX_ZOOM := 11.0
+const VIEW_STEPS := [0.0, 4.2, 9.5]   # first person, behind, high and back
+const HIGH_FROM := 4.5                # past this distance the camera rises and looks down
 const MOUSE_SENS := 0.0024
 
 var body: CharacterModel
@@ -30,8 +32,8 @@ var _bob := 0.0
 const PITCH_MIN := -1.05
 const PITCH_MAX := 0.85
 var camera: Camera3D
-var zoom := 3.6
-var zoom_target := 3.6
+var zoom := 4.2
+var zoom_target := 4.2
 var first_person := false
 var trauma := 0.0
 var input_enabled := true
@@ -271,7 +273,21 @@ func zoom_step(dir: int) -> void:
 		zoom_target = 0.0
 
 func toggle_view() -> void:
-	zoom_target = 3.6 if zoom_target < FP_THRESHOLD else 0.0
+	# cycle first person -> behind -> high -> first person
+	var i := 0
+	for k in VIEW_STEPS.size():
+		if absf(zoom_target - VIEW_STEPS[k]) < absf(zoom_target - VIEW_STEPS[i]):
+			i = k
+	zoom_target = VIEW_STEPS[(i + 1) % VIEW_STEPS.size()]
+
+func view_name() -> String:
+	if zoom_target < FP_THRESHOLD:
+		return "1ST"
+	return "HIGH" if zoom_target > (VIEW_STEPS[1] + VIEW_STEPS[2]) * 0.5 else "BEHIND"
+
+## Extra downward tilt of the camera when zoomed far out (overhead view).
+func high_t() -> float:
+	return clampf((zoom - HIGH_FROM) / (VIEW_STEPS[2] - HIGH_FROM), 0.0, 1.0)
 
 func _physics_process(delta: float) -> void:
 	if dead:
@@ -407,6 +423,8 @@ func _update_timers(delta: float) -> void:
 	invuln = maxf(0.0, invuln - delta)
 	potion_cd = maxf(0.0, potion_cd - delta)
 	special_cd = maxf(0.0, special_cd - delta)
+	if blocking:
+		block_time += delta
 	if special_kind != "":
 		_special_step(delta)
 	if hurt_time >= 0.0:
@@ -450,7 +468,15 @@ func _handle_actions() -> void:
 				_start_attack(0)
 		elif attack_time / attack_dur > 0.45:
 			combo_queued = true
-	blocking = Input.is_action_pressed("block") and not attacking and not dodging and Game.stamina > 2.0
+	# Block raises instantly, even mid-swing (the swing is cancelled), so it can
+	# be used on reaction. The first PARRY_WINDOW seconds count as a parry.
+	var want_block := Input.is_action_pressed("block") and not dodging and special_kind == "" and Game.stamina > 2.0
+	if want_block and attacking:
+		attacking = false; combo = 0; combo_queued = false
+	if want_block and not blocking:
+		block_time = 0.0
+		Sfx.play("swing", -16.0, 0.1)
+	blocking = want_block
 	if blocking:
 		stamina_delay = 0.4
 	if Input.is_action_just_pressed("dodge") and is_on_floor() and not dodging and Game.stamina >= 22:
@@ -502,9 +528,17 @@ func _start_attack(kind: int) -> void:
 func _melee_hit() -> void:
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
 	var origin := global_position + Vector3(0, 1.0, 0)
-	var reach := 2.5 + (0.3 if Game.equipped.weapon != "rusty_sword" else 0.0) + (0.25 if Game.item(Game.equipped.weapon).get("model", "") in ["sword_2handed_color", "skel_staff", "vault_blade"] else 0.0)
+	var reach := 3.0 + (0.3 if Game.equipped.weapon != "rusty_sword" else 0.0) + (0.25 if Game.item(Game.equipped.weapon).get("model", "") in ["sword_2handed_color", "skel_staff", "vault_blade"] else 0.0)
 	var hit_any := false
 	var dealt := 0.0
+	var trail_c := Color(0.9, 0.92, 1.0)
+	var wit := Game.item(Game.equipped.weapon)
+	if int(wit.get("rarity", 0)) >= 2:
+		trail_c = Loot.rarity_color(int(wit.rarity)).lightened(0.3)
+	if Game.equipped.weapon == "vault_blade":
+		trail_c = Color(0.4, 0.85, 1.0)
+	var tilt: float = [0.95, -0.95, 1.45][combo % 3]   # diagonal slashes, then an overhead chop
+	FX.swipe(origin + Vector3(0, 0.15, 0), facing, tilt, reach * 0.95, trail_c, 160.0 if combo < 2 else 200.0, 0.22, combo == 1)
 	for e in get_tree().get_nodes_in_group("damageable"):
 		if not is_instance_valid(e) or e == self or not e.has_method("take_damage"):
 			continue
@@ -554,6 +588,9 @@ func _fire_bolt() -> void:
 		var aim_point: Vector3 = hit.position if hit else from + fwd * 60.0
 		var start := global_position + Vector3(0, 1.35, 0) + (-Vector3(sin(facing), 0, cos(facing))) * 0.6
 		fwd = (aim_point - start).normalized()
+		if high_t() > 0.0:
+			fwd.y = clampf(fwd.y, -0.15, 0.3)   # from the high view, aim across the room, not at the floor
+			fwd = fwd.normalized()
 		b.position = start
 	else:
 		b.position = camera.global_position + fwd * 0.8 + Vector3(0, -0.15, 0)
@@ -606,19 +643,28 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 	var to_src := from_pos - global_position
 	to_src.y = 0
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
-	var blocked := blocking and to_src.length() > 0.01 and fwd.dot(to_src.normalized()) > 0.2
+	var blocked := blocking and to_src.length() > 0.01 and fwd.dot(to_src.normalized()) > -0.15
 	var dmg := Game.mitigate(amount)
 	if blocked:
-		var cost := dmg * 1.1
+		if block_time < PARRY_WINDOW:
+			_parry(from_pos)
+			return
+		var cost := maxf(4.0, dmg * 0.8)
 		if Game.stamina >= cost:
 			Game.stamina -= cost
-			dmg *= 0.2
-			Sfx.play("clang", -4.0)
-			FX.sparks(global_position + Vector3(0, 1.2, 0) + fwd * 0.5, Color(1.0, 0.85, 0.5))
-			knock *= 0.4
+			dmg = 0.0 if amount < 40.0 else dmg * 0.15   # only the Warden's biggest blows get through a little
+			blocks += 1
+			Sfx.play("clang", -3.0)
+			FX.sparks(global_position + Vector3(0, 1.2, 0) + fwd * 0.6, Color(1.0, 0.85, 0.5))
+			FX.flash_light(global_position + Vector3(0, 1.2, 0) + fwd * 0.6, Color(1.0, 0.8, 0.4), 3.0, 4.0, 0.15)
+			knock *= 0.3
+			add_trauma(0.12)
+			if dmg <= 0.0:
+				stamina_delay = 0.4
+				return
 		else:
 			Game.stamina = 0.0
-			dmg *= 0.6
+			dmg *= 0.5
 			blocking = false
 			Game.say("Guard broken!", Color(1, 0.5, 0.3))
 	if not blocked or dmg > 3.0:
@@ -794,11 +840,11 @@ func _update_camera(delta: float) -> void:
 		cp.y = lerpf(cp.y, head_pos.y, fv)
 		cam_yaw.global_position = cp
 	cam_yaw.rotation = Vector3(0, view_yaw, 0)
-	cam_pitch.rotation = Vector3(view_pitch, 0, 0)
+	cam_pitch.rotation = Vector3(clampf(view_pitch - high_t() * 0.55 - (_crane if zoom > FP_THRESHOLD else 0.0), -1.3, PITCH_MAX), 0, 0)
 	# --- shoulder offset shrinks when the camera is squeezed by walls
 	var squeeze := clampf(cam_len / maxf(zoom, 0.01), 0.0, 1.0)
 	var shoulder := clampf((zoom - 0.6) / 3.0, 0.0, 1.0) * 0.38 * clampf(1.0 - (zoom - 4.0) / 5.0, 0.3, 1.0) * squeeze
-	var lift := clampf((zoom - 0.5) * 0.08, 0.0, 0.35)
+	var lift := clampf((zoom - 0.5) * 0.12, 0.0, 0.55)
 	# when a wall behind squeezes the camera in, rise up over the shoulder so you
 	# look down at your hero instead of into the back of their helmet
 	if not fp:
@@ -835,6 +881,21 @@ func _update_camera(delta: float) -> void:
 		var res := space.cast_motion(q)
 		if res.size() == 2 and res[0] < 1.0:
 			safe = maxf(0.0, want * res[0] - 0.05)
+		# crane: if a wall behind would push the camera into the back of the head,
+		# swing it up and over (looking down) instead, if that gives more room
+		var best_extra := 0.0
+		if want > 1.5:
+			var best_score := safe
+			for extra in [0.3, 0.6, 0.9] if high_t() < 0.5 else [0.3, 0.5]:
+				var dir: Vector3 = arm.global_transform.basis.z.rotated(arm.global_transform.basis.x.normalized(), -extra)
+				q.motion = dir * want
+				var r2 := space.cast_motion(q)
+				var s2: float = want if r2.size() < 2 or r2[0] >= 1.0 else maxf(0.0, want * r2[0] - 0.05)
+				var score: float = s2 - extra * 0.9
+				if s2 > safe + 0.8 and score > best_score:
+					best_score = score
+					best_extra = extra
+		_crane = lerpf(_crane, best_extra, 1.0 - exp(-4.0 * delta))
 	if safe < cam_len - 0.01:
 		cam_len = lerpf(cam_len, safe, 1.0 - exp(-delta / 0.03))   # pull in almost instantly
 		_hold = 0.55                                                # then wait before easing out
@@ -861,6 +922,7 @@ func _update_camera(delta: float) -> void:
 	camera.fov = lerpf(camera.fov, (80.0 if fp else 74.0) + sprint_kick + fov_kick, 1.0 - exp(-(5.0 if fov_kick < 0.5 else 14.0) * delta))
 
 var _head_hidden := false
+var _crane := 0.0
 var _move_input := Vector2.ZERO
 var _coyote := 0.0
 var _jump_buffer := 0.0
@@ -1202,7 +1264,7 @@ func _volley() -> bool:
 
 func _volley_wave(offset_deg: float) -> void:
 	var fwd := -camera.global_transform.basis.z
-	fwd.y = clampf(fwd.y, -0.25, 0.25)
+	fwd.y = clampf(fwd.y, -0.15 if high_t() > 0.0 else -0.25, 0.25)
 	var start := global_position + Vector3(0, 1.35, 0) + (-Vector3(sin(facing), 0, cos(facing))) * 0.6
 	for i in 9:
 		var d := fwd.rotated(Vector3.UP, deg_to_rad(-36.0 + 9.0 * i + offset_deg * (1 if i % 2 == 0 else -1) * 0.5)).normalized()
@@ -1238,3 +1300,35 @@ func _double_jump() -> void:
 	FX.flash_light(global_position, c, 3.0, 4.0, 0.25)
 	Sfx.play("swing", -6.0, 0.1)
 	fov_kick = maxf(fov_kick, 6.0)
+
+# ---------------------------------------------------------------------------
+# Parry: raising the shield just as a blow lands stops it completely, staggers
+# the attacker and gives back some mana.
+const PARRY_WINDOW := 0.35
+var block_time := 0.0
+var blocks := 0
+var parries := 0
+
+func _parry(from_pos: Vector3) -> void:
+	parries += 1
+	invuln = maxf(invuln, 0.2)
+	var fwd := -Vector3(sin(facing), 0, cos(facing))
+	var at := global_position + Vector3(0, 1.2, 0) + fwd * 0.7
+	Game.mana = minf(Game.max_mana(), Game.mana + 12.0)
+	Sfx.play("clang", 0.0, 0.05)
+	FX.slash(at, Color(1.0, 0.85, 0.35), 1.4, PI / 2, facing, 0.25)
+	FX.burst(at, Color(1.0, 0.85, 0.4), 30, 5.0, 0.15, 0.4, -4.0)
+	FX.flash_light(at, Color(1.0, 0.85, 0.4), 7.0, 6.0, 0.3)
+	FX.screen_flash(Color(1.0, 0.85, 0.4), 0.15, 0.25)
+	Game.say("Parry!", Color(1.0, 0.85, 0.4))
+	add_trauma(0.2)
+	_slowmo(0.3, 0.12)
+	# stagger whoever struck (the nearest enemy to where the blow came from)
+	var best: Node = null
+	var bd := 3.5
+	for e in _live_enemies():
+		var d: float = (e as Node3D).global_position.distance_to(from_pos)
+		if d < bd:
+			bd = d; best = e
+	if best:
+		_special_hit_enemy(best, Game.attack_damage() * 0.6, 6.0, false, true)

@@ -240,3 +240,26 @@ A human player swings less relentlessly than the bot, so expect longer fights an
   - Volley hits both targets.
   - Every ability goes on cooldown, and the cooldown blocks reuse.
   - Backstab with no target does nothing and costs no cooldown.
+
+## Follow-up 4: hair colour bug, creator redesign, block and parry, camera (Nov 3, evening)
+
+**Bug found by the human playtest that the automated checks missed.** Hair looked "all white" on the iPad. The cause was renderer-specific:
+- The web/iPad build uses Godot's Compatibility (OpenGL) renderer. It hands `source_color` textures to the shader still in sRGB.
+- The desktop Forward+ renderer hands them over in linear.
+- The recolour shader converted linear to sRGB before testing for skin. On the web, that double conversion made the face texels fail the skin test and get recoloured as hair, so white hair meant a white face.
+
+All earlier looks screenshots were rendered with Forward+, so the bug stayed hidden. Fixes:
+- The shader takes a `tex_is_srgb` flag that is set from the active renderer.
+- The creator preview gets gentler lighting on the web renderer, because it has no AgX tone curve and the same lights wash pale colours out.
+
+The looks test is now also run with `--rendering-method gl_compatibility`. **Lesson for the next experiment:** render-check on the renderer the players actually use.
+
+**Other changes:**
+- **Creator:** five tabs. The face zooms in for the hair and face tabs, the preview can be dragged to spin, and the swatches and sliders are bigger.
+- **Block:** it raises instantly and cancels a swing, fully stops frontal hits, and has a 0.35 s parry window.
+- **Camera:** three-step view cycle (first person, behind, high) with an overhead tilt past 4.5 m. A "crane" lifts the camera over walls behind the hero.
+- **Weapons:** 1.45× longer, with slash trails.
+
+**Tests:**
+- New `combat2` test, 5/5. Holding block takes 0 damage from 3 hits, a timed block parries, block cancels a swing, and the view button cycles.
+- **Test-harness lesson:** taps of 1–2 frames can fall between physics ticks and never register. Test presses now hold for 0.07 s or more, like a real thumb.
