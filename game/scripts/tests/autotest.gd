@@ -1339,7 +1339,7 @@ func _forest_test() -> bool:
 		player = main.player
 		god = true
 		check("forest_loaded", main.world is ForestWorld and Game.zone == "forest", str(Game.zone))
-		check("five_npcs", get_tree().get_nodes_in_group("npc").size() == 5)
+		check("six_npcs", get_tree().get_nodes_in_group("npc").size() == 6)
 		player.zoom_target = 4.2; player.zoom = 4.2; player.pitch = -0.12; player.snap_view()
 		await wait(1.5)
 		await shot("fo_01_arrival")
