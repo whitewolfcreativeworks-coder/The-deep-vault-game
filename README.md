@@ -67,7 +67,10 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
-- **Opening movie (new).** After you create your hero, a short real-time movie plays with your own character. It has a Skip button.
+- **New hair.** Real modelled hairstyles from KayKit's Adventurers 2.0 (CC0): short, long, swept (with a goatee), shoulder-length, wild (with a big beard) and bald-with-beard. The buns and spikes are still there, now on top of the modelled hair, and every style takes any hair colour.
+- **Smaller mage hat, clearer close-up camera.** The mage hat is smaller. When you zoom in close, the camera moves over the right shoulder, and hats and helmets disappear until you zoom back out, so they never block your view.
+- **The USE button lights up.** On iPad, whenever there's something to talk to, open or pick up, USE swells, glows gold and says USE!
+- **Opening movie.** After you create your hero, a short real-time movie plays with your own character. It has a Skip button.
   - The sun rises over the mountains into a quiet valley and Bobek's little cabin.
   - Your hero wakes up in striped pajamas, stretches, changes into their outfit and brushes their teeth with a real toothbrush and toothpaste foam (seen from the mirror, so you see their face).
   - The china teapot rumbles, the lid rattles, steam pours from the spout and it whistles. At the table they pour from the spout into a teacup on its saucer, drop in a tea bag, count three while it turns brown, lift the bag out, stir (clink clink) and sip.
@@ -79,7 +82,18 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - **The valley:** hills, a road with lantern posts, a stream with a stone bridge, about 650 trees (green and autumn), and mountains all around.
   - **The Warren:** its beacon fire burns on the northern ridge, in view straight up the road from the portal.
   - **Compass with a quest arrow.** The compass in the top-right corner turns as you look around (N is red; north is the road to the Warren). While you're on a quest, a gold arrow on its outer ring points the way, with the quest name and distance underneath. It points to the nearest goblin, axe or moonpetal, to Chief Gruk, to the Warren door when your target is underground, and to the quest giver once the quest is ready to hand in. Tap a quest in the list (or the compass, or press **T**) to choose which one to follow. A new quest is followed straight away, and when one is finished the compass picks the next sensible one by itself.
-  - **Five NPCs, five quests.** This is the first introduction to questing. A gold **!** means a new quest, **?** means it's ready to hand in, and the quest list appears on the left.
+  - **The Sinkhole of Death (new, designed by Bobek).** Digger Dunstan waits by a patch of cracked, smoking ground in the north-west woods (unlocks after Ranger Fenn's quest).
+    - Accept his quest and the ground caves in under you. You fall into red, fiery caverns far below the forest.
+    - Inside: Ember Goblins, Cinder Slingers and Magma Brutes, a river of lava with a stone bridge and fire geysers, and a den with a treasure chest.
+    - At the bottom is **Grimgor the Cyclops Goblin**: huge, one giant glowing eye, and a stomp that rings the floor red before a wave of fire bursts out. Get clear when you see the ring!
+    - Rope ladders lead back up, and you can jump into the open pit to go back down.
+  - **The Giant Chicken mount.** Beat Grimgor and a Giant Chicken waddles out from behind his throne; use it to claim your first mount.
+    - Ride any time with **G** (or the **RIDE** button on iPad). It's about 75% faster than running and jumps higher.
+    - It has googly eyes, a bobbing head and flapping wings, and it clucks now and then.
+    - Attacking or dodging hops you off.
+  - **Day and night.** The forest has a sunrise every 14 minutes and a sunset seven minutes after each one. Each change takes about a minute and a half, with orange skies, then a moonlit, starry night where the lanterns and campfires glow.
+  - **Tougher goblins.** Goblins hit harder and take more hits. Fenn wants ten goblins, Maera wants seven moonpetals (goblins now camp by her favourite spots), and the goblin camps are bigger.
+  - **Five NPCs, five quests (now six).** This is the first introduction to questing. A gold **!** means a new quest, **?** means it's ready to hand in, and the quest list appears on the left.
     1. **Ranger Fenn** (by the portal): *Goblin Trouble*. Defeat six goblins.
     2. **Bram the Woodcutter** (lumber camp, west): *Bram's Stolen Axes*. Recover three axes from the goblin camps.
     3. **Old Maera** (herbalist's hut by the stream, east): *Moonpetals*. Gather five glowing flowers.

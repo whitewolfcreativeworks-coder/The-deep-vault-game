@@ -28,6 +28,7 @@ var _boss_started := false
 var _chicken: ChickenMount
 var _geysers: Array = []
 var _geyser_t := 0.0
+var _bounce_cd := 0.0
 
 static func build_in(world: ForestWorld) -> SinkholeOfDeath:
 	var s := SinkholeOfDeath.new()
@@ -52,7 +53,7 @@ func _surface() -> void:
 		"hair_style": "natural", "hair_color": Color(0.5, 0.5, 0.5), "hair_tint": Color(0.55, 0.55, 0.55), "face": "beard",
 		"outfit_color": Color(0.45, 0.35, 0.25), "cape_color": Color(0.3, 0.22, 0.15), "build": 1.15, "height": 0.92,
 		"skin_color": Color(0.85, 0.62, 0.45), "weapon": "skel_axe"})
-	w._model("cart", surface(HOLE.x + 7.5, HOLE.y - 3.0), 30.0, 6.0, true)
+	w._model("barrel", surface(HOLE.x + 7.5, HOLE.y - 3.0), 30.0, 6.0, true)
 	w._model("crate_A_big", surface(HOLE.x + 6.5, HOLE.y + 4.0), 15.0, 6.0, true)
 	w._model("sack", surface(HOLE.x + 8.0, HOLE.y + 3.0), 40.0, 6.0)
 	Interactable.create(w, "inscription", surface(HOLE.x - 5.5, HOLE.y + 3.5), 120.0, "", [], "Warning sign",
@@ -140,6 +141,13 @@ func _process(delta: float) -> void:
 		Sfx.play("roar_big", 0.0, 0.0)
 		player.add_trauma(0.6)
 		Game.say("Grimgor: \"ONE EYE SEES ALL! TINY HERO GO SQUISH!\"", Color(1.0, 0.45, 0.2))
+	# lava throws you back out (with a nasty burn) so you can scramble to the bank
+	_bounce_cd -= delta
+	if player.in_river and player.global_position.y < SY - 0.2 and _bounce_cd <= 0.0 and not player.dead:
+		_bounce_cd = 0.9
+		player.velocity.y = 9.5
+		FX.burst(player.global_position + Vector3(0, 0.5, 0), Color(1.0, 0.45, 0.1), 30, 4.0, 0.2, 0.8, -4.0)
+		Sfx.play("fire_burst", -6.0, 0.1)
 	# fire geysers in the lava cavern
 	_geyser_t -= delta
 	if _geyser_t <= 0.0 and player.global_position.y < SY + 20.0:
@@ -236,9 +244,9 @@ func _title(text: String) -> void:
 
 # --- the caverns ---------------------------------------------------------------
 func _caverns() -> void:
-	var wm: Material = b.wall_mat(Color(0.42, 0.13, 0.08), 0.0, SY, 2.4, 1.1)
+	var wm: Material = b.wall_mat(Color(0.46, 0.24, 0.17), 0.0, SY, 2.4, 1.1)
 	var fm := (b.mats.floor as ShaderMaterial).duplicate() as ShaderMaterial
-	fm.set_shader_parameter("base_color", Color(0.22, 0.12, 0.1)); fm.set_shader_parameter("moss", 0.0)
+	fm.set_shader_parameter("base_color", Color(0.3, 0.22, 0.19)); fm.set_shader_parameter("moss", 0.0)
 	var Y := SY
 	# 1. landing cavern (open to the shaft above)
 	b.room(-44, -20, -76, -52, Y, 14.0, wm, fm, {"n": [[X0 - 3.0, X0 + 3.0, 6.0]]}, false)
@@ -320,8 +328,17 @@ func _caverns() -> void:
 		em.direction = Vector3.UP; em.spread = 25; em.initial_velocity_min = 0.4; em.initial_velocity_max = 1.4
 		em.gravity = Vector3(0.1, 0.25, 0); em.color_ramp = FX._fade_ramp(Color(1.0, 0.5, 0.1))
 		add_child(em); em.position = Vector3(room[0], Y + 0.5, room[1])
-		var l := OmniLight3D.new(); l.light_color = Color(1.0, 0.32, 0.1); l.light_energy = 2.2; l.omni_range = room[2]
+		var l := OmniLight3D.new(); l.light_color = Color(1.0, 0.5, 0.25); l.light_energy = 2.0; l.omni_range = room[2]
 		l.position = Vector3(room[0], Y + 6.0, room[1]); l.set_script(load("res://scripts/world/flicker.gd")); add_child(l)
+	for room in [[-44, -20, -76, -52, 10.0], [-54, -10, -128, -92, 11.0], [-48, -16, -168, -142, 8.0], [-60, -4, -226, -182, 12.0]]:
+		var gx: float = room[0] + 6.0
+		while gx < room[1] - 2.0:
+			var gz: float = room[2] + 6.0
+			while gz < room[3] - 2.0:
+				var fl := OmniLight3D.new(); fl.light_color = Color(1.0, 0.78, 0.6); fl.light_energy = 1.7; fl.omni_range = 14.0
+				fl.omni_attenuation = 1.2; fl.position = Vector3(gx, Y + room[4], gz); add_child(fl)
+				gz += 12.0
+			gx += 12.0
 	for p in [Vector3(-43.5, Y + 3, -64), Vector3(-20.5, Y + 3, -64), Vector3(-53.5, Y + 3.5, -98), Vector3(-10.5, Y + 3.5, -98),
 			Vector3(-47.5, Y + 3.2, -150), Vector3(-16.5, Y + 3.2, -160), Vector3(-59.5, Y + 4, -200), Vector3(-4.5, Y + 4, -200)]:
 		Props.torch(self, p, 90.0 if p.x < X0 else -90.0, true)
@@ -393,12 +410,12 @@ func _spawn_chicken() -> void:
 ## Environment for the caverns: red, smoky and hot.
 static func apply_env(env: Environment) -> void:
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.05, 0.005, 0.0)
+	env.background_color = Color(0.03, 0.005, 0.0)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.55, 0.22, 0.14)
-	env.ambient_light_energy = 0.9
-	env.fog_light_color = Color(0.2, 0.04, 0.01)
-	env.fog_depth_begin = 10.0
-	env.fog_depth_end = 80.0
-	env.volumetric_fog_density = 0.03
-	env.volumetric_fog_albedo = Color(1.0, 0.5, 0.3)
+	env.ambient_light_color = Color(0.5, 0.4, 0.35)
+	env.ambient_light_energy = 1.0
+	env.fog_light_color = Color(0.16, 0.05, 0.02)
+	env.fog_depth_begin = 25.0
+	env.fog_depth_end = 150.0
+	env.volumetric_fog_density = 0.007
+	env.volumetric_fog_albedo = Color(0.9, 0.72, 0.6)

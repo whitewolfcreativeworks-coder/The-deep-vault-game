@@ -426,3 +426,54 @@ It also found two stale tests that still looked buttons up by list position. But
 - KayKit publishes its packs on GitHub, so **KayKit Restaurant Bits** (CC0) was added. Its round table, plates, jars, dish rack, pan, cutting board, bread, cheese and vegetable crates now dress the cabin kitchen.
 - It has no teapot or teacup, hence the lathe-built ones.
 - See the README for the libraries worth using if those sites become reachable (or if files are attached).
+
+## Follow-up 11: playtest notes from Bobek (age 11) (Nov 4)
+
+**Notes:**
+- The quests and goblins were too easy.
+- The hair looked funny (he did like the buns and spikes); find real hair models.
+- Add a second forest dungeon, "the Sinkhole of Death": accepting the quest makes the ground open underneath you; red, fiery caverns; a Cyclops goblin boss; a giant funny chicken as your first mount.
+- Add a day/night cycle with 7-minute periods.
+- The mage hat is too big and blocks the view zoomed in.
+- He didn't realise USE was needed, so it should get bigger when it applies.
+
+**How the work was split:**
+- The hair and the mage hat went to a parallel agent working in its own git worktree, and only those files.
+- Everything else was built in the main checkout, then the branch was merged. It merged with no conflicts, after one housekeeping fix: the worktree folder had to be added to `.gitignore`.
+- The agent was told not to run the save-file tests, because both copies share the same `user://` save slots.
+
+**Hair:**
+- KayKit Adventurers 2.0 (CC0) is on GitHub, and its rig is identical to 1.0's: same head bone and rest pose.
+- So a hair style hides the hero's own head and attaches an unskinned copy of a 2.0 head, which has modelled hair, to the head bone. It lines up exactly.
+- Hair colour: the shader recolours the one atlas cell the hair uses (`hair_rect`). Old save style names map to new ones.
+
+**Sinkhole of Death** (`scripts/world/sinkhole.gd`):
+- **The cave-in sequence** is triggered when the quest is accepted and the dialogue closes:
+  - the camera shakes and the cracks widen;
+  - you stumble onto the crack and the chunks fall;
+  - then a fade, and you land in the caverns 140 m below.
+- **The caverns** are built from the forest's room builder, re-themed red. Lava reuses the glowing-river shader in a new lava mode: always burns (the amulet doesn't help), and bounces you out so you can scramble to the bank. Plus rock spires, stalactites, embers and fire geysers.
+- **New enemies:** Ember Goblin, Cinder Slinger, Magma Brute.
+- **Grimgor the Cyclops Goblin:** scale 2.3, a modelled giant eye attached to the head bone, a telegraphed fire-ring stomp (a new `nova` enemy ability), and summons at half health.
+- **The compass** now knows three levels (forest, Warren, Sinkhole) and points to the pit or the ladder as needed.
+
+**Giant Chicken** (`scripts/player/chicken_mount.gd`):
+- A procedural model: googly eyes, a comb that wobbles, scurrying legs, the famous head bob, and wings that flap in the air.
+- The rider uses the Sit pose on the saddle. Riding speed is ×1.75 and jumps are higher.
+- G or the touch RIDE button toggles it. The RIDE button appears only once the mount is unlocked.
+- New synthesized sounds: cluck, BA-GAWK, cave-in, bubbling lava, the Cyclops roar.
+
+**Day/night** (`scripts/world/day_night.gd`):
+- 7-minute blocks, alternating day and night, each starting with a 90 s sunrise or sunset.
+- Sun elevation, energy and colour; a moon light; sky, fog and ambient palettes; a star dome.
+- The clock is saved in the slot. Underground areas switch it off.
+
+**Difficulty:**
+- Goblin HP is up about 1.6× and damage about 1.4×. Gruk now has 1150 HP.
+- Fenn's quest is 6 → 10 goblins and Maera's 5 → 7 moonpetals, with three extra petal spots and goblin guards at five of them.
+- The camps grew from 5 to 7 goblins.
+
+**Tests:**
+- New `daynight` test (7 checks) and `sinkhole` test (20 checks). The sinkhole test plays through: locked → unlocked → accept → fall → lava burns → boss stomp and summons → defeat → claim the chicken → ride (11.8 m in 1.5 s) → G off and on → ladder → hand in → mount saved.
+- Both run in Forward+ and gl_compatibility.
+- **Bug found:** the first lava damage formula killed the hero in about 1.5 s. The damage divisor amplifies at low defence, so the lava rate was halved and the bounce-out added.

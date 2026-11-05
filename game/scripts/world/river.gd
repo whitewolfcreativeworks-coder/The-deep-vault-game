@@ -28,7 +28,7 @@ static func create(parent: Node, r: Rect2, y: float, flow_dir: Vector2, glow_c :
 	if is_lava:
 		g.lava = true
 		g.deep = Color(0.35, 0.03, 0.0)
-		g.damage_per_sec = 46.0
+		g.damage_per_sec = 22.0
 	parent.add_child(g)
 	g._build()
 	return g
