@@ -69,8 +69,8 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 - **Opening movie (new).** After you create your hero, a short real-time movie plays with your own character. It has a Skip button.
   - The sun rises over the mountains into a quiet valley and Bobek's little cabin.
-  - Your hero wakes up in striped pajamas, stretches, changes into their outfit and brushes their teeth (seen from the mirror, so you see their face).
-  - The teapot whistles. At the table they pour from the spout into the cup, drop in a tea bag, count three while it turns brown, stir and sip.
+  - Your hero wakes up in striped pajamas, stretches, changes into their outfit and brushes their teeth with a real toothbrush and toothpaste foam (seen from the mirror, so you see their face).
+  - The china teapot rumbles, the lid rattles, steam pours from the spout and it whistles. At the table they pour from the spout into a teacup on its saucer, drop in a tea bag, count three while it turns brown, lift the bag out, stir (clink clink) and sip.
   - Then it's a few steps across the yard to the family portal. They stand in the middle, and a beam of light carries them away.
   - They beam in at a portal in the west side of the Vault outpost and walk from there to the gate. About 40 seconds in all.
 - **Portal to Level 2.** After you defeat the Warden and claim the Heart, the wall behind the altar grinds open on an ancient portal. Walk into it and you come out of the portal in the Goblin Forest.
@@ -78,6 +78,7 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 - **Level 2: The Goblin Forest (new).** Win the Vault and a portal opens behind the altar. Step through to arrive in a sunlit forest valley.
   - **The valley:** hills, a road with lantern posts, a stream with a stone bridge, about 650 trees (green and autumn), and mountains all around.
   - **The Warren:** its beacon fire burns on the northern ridge, in view straight up the road from the portal.
+  - **Compass with a quest arrow.** The compass in the top-right corner turns as you look around (N is red; north is the road to the Warren). While you're on a quest, a gold arrow on its outer ring points the way, with the quest name and distance underneath. It points to the nearest goblin, axe or moonpetal, to Chief Gruk, to the Warren door when your target is underground, and to the quest giver once the quest is ready to hand in. Tap a quest in the list (or the compass, or press **T**) to choose which one to follow. A new quest is followed straight away, and when one is finished the compass picks the next sensible one by itself.
   - **Five NPCs, five quests.** This is the first introduction to questing. A gold **!** means a new quest, **?** means it's ready to hand in, and the quest list appears on the left.
     1. **Ranger Fenn** (by the portal): *Goblin Trouble*. Defeat six goblins.
     2. **Bram the Woodcutter** (lumber camp, west): *Bram's Stolen Axes*. Recover three axes from the goblin camps.

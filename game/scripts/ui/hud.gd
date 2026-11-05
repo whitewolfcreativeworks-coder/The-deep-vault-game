@@ -15,23 +15,52 @@ var objective_label: Label
 var prompt_label: Label
 var msg_box: VBoxContainer
 var quest_box: VBoxContainer
+var compass: QuestCompass
+var _quest_rows := {}            # quest id -> the row Control (for taps)
 
+## The quest list: the one the compass follows is marked with a gold arrow.
+## Tap a quest (or press T) to follow it.
 func _refresh_quests() -> void:
 	if quest_box == null:
 		return
 	for c in quest_box.get_children():
 		c.queue_free()
+	_quest_rows.clear()
 	var ids := Game.tracked_quests()
 	if ids.is_empty():
 		return
-	quest_box.add_child(UIKit.label("QUESTS", 15, UIKit.GOLD, true))
+	quest_box.add_child(UIKit.label("QUESTS  (tap to follow)" if Game.touch_active else "QUESTS  ([T] next)", 15, UIKit.GOLD, true))
+	var cur := Game.current_quest()
 	for id in ids:
 		var q: Dictionary = Game.QUESTS[id]
 		var ready: bool = Game.quest_state(id) == "ready"
-		var l := UIKit.label(q.title, 17, Color(1.0, 0.92, 0.7), true)
-		quest_box.add_child(l)
-		var t := ("  Done! Return to %s" % Game.NPC_NAMES.get(q.giver, "")) if ready else ("  %s: %d / %d" % [q.track, Game.quest_progress(id), q.goal.count])
-		quest_box.add_child(UIKit.label(t, 15, Color(0.6, 1.0, 0.5) if ready else UIKit.PARCH))
+		var on: bool = id == cur
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 0)
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.gui_input.connect(func(ev: InputEvent) -> void:
+			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+				Game.track_quest(id))
+		var l := UIKit.label(("➤ " if on else "   ") + q.title, 17, Color(1.0, 0.82, 0.25) if on else Color(1.0, 0.92, 0.7, 0.75), true)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(l)
+		var t := ("     Done! Return to %s" % Game.NPC_NAMES.get(q.giver, "")) if ready else ("     %s: %d / %d" % [q.track, Game.quest_progress(id), q.goal.count])
+		var l2 := UIKit.label(t, 15, Color(0.6, 1.0, 0.5) if ready else (UIKit.PARCH if on else Color(0.85, 0.8, 0.7, 0.7)))
+		l2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(l2)
+		quest_box.add_child(row)
+		_quest_rows[id] = row
+
+## Touch: a tap on a quest row follows it; a tap on the compass steps to the next.
+func tap_at(pos: Vector2) -> bool:
+	for id in _quest_rows:
+		var r: Control = _quest_rows[id]
+		if is_instance_valid(r) and r.get_global_rect().grow(6.0).has_point(pos):
+			Game.track_quest(id)
+			return true
+	if compass and compass.visible and compass.tap(pos):
+		return true
+	return false
 var crosshair: Control
 var vignette: ColorRect
 var target_box: VBoxContainer; var target_name: Label; var target_bar: ProgressBar
@@ -120,10 +149,14 @@ func _ready() -> void:
 
 	# --- quest tracker (left, under the status box)
 	quest_box = VBoxContainer.new()
-	quest_box.position = Vector2(22, 178)
+	quest_box.position = Vector2(22, 198)
 	quest_box.add_theme_constant_override("separation", 4)
 	quest_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(quest_box)
+	# --- compass with the quest arrow (top right)
+	compass = QuestCompass.new()
+	root.add_child(compass)
+	add_to_group("hud")
 	Game.quests_changed.connect(_refresh_quests)
 	_refresh_quests()
 	# --- messages (right)
@@ -142,7 +175,7 @@ func _ready() -> void:
 		crosshair.draw_arc(Vector2.ZERO, 9.0, 0, TAU, 24, Color(1, 1, 1, 0.25), 1.5))
 	root.add_child(crosshair)
 
-	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt · X special\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · Esc menu", 15, UIKit.DIM)
+	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt · X special\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · T follow next quest · Esc menu", 15, UIKit.DIM)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	hint.position = Vector2(-600, -70); hint.size = Vector2(1200, 50)
@@ -166,6 +199,8 @@ func _ready() -> void:
 
 func bind_player(p: Player) -> void:
 	player = p
+	if compass:
+		compass.player = p
 	p.interact_target_changed.connect(func(t: String) -> void: _prompt = t)
 
 func set_target(n: Node) -> void:
@@ -210,6 +245,12 @@ func _process(delta: float) -> void:
 	xp_bar.max_value = Game.xp_to_next(); xp_bar.value = Game.xp
 	if quest_box:
 		quest_box.position.x = 104.0 if Game.touch_active else 22.0
+	if compass:
+		var vw := root.size.x
+		compass.position = Vector2(vw - compass.size.x - (6.0 if Game.touch_active else 14.0), 104.0 if Game.touch_active else 8.0)
+		msg_box.position.y = compass.position.y + compass.size.y + 24.0
+	if Input.is_action_just_pressed("track_quest") and get_tree().current_scene.get("state") == "play":
+		Game.track_next()
 	potion_label.text = ("Heal %d   Mana %d" if Game.touch_active else "Heal %d [R]   Mana %d [F]") % [Game.potions, Game.mana_potions]
 	var ab := Game.ability()
 	var ab_state := "ready" if player.special_cd <= 0.0 else "%ds" % ceili(player.special_cd)

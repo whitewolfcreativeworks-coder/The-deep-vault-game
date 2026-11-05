@@ -239,12 +239,35 @@ def whistle_tune():
         out.append(tone * e)
     return np.concatenate(out)
 def kettle():
-    d = 2.6; seg = t(d)
-    f = 1400 + 900 * np.clip(seg / 1.6, 0, 1)
-    ph = 2 * np.pi * np.cumsum(f) / SR
-    tone = np.sin(ph) * np.clip(seg / 1.2, 0, 1) * np.clip((d - seg) / 0.3, 0, 1)
-    hiss = highpass(noise(d), 2500) * np.clip(seg / 0.8, 0, 1) * 0.5
-    return tone * 0.6 + hiss
+    # water rumbling to the boil, then the classic two-note kettle whistle
+    d = 3.2; seg = t(d)
+    boil = lowpass(noise(d), 380) * (0.4 + 0.6 * np.abs(np.sin(2 * np.pi * 7 * seg + 3 * lowpass(noise(d), 4))))
+    boil *= np.clip(seg / 0.6, 0, 1) * 0.8
+    w0 = 0.9                                   # the whistle starts here
+    ws = np.clip((seg - w0) / 0.5, 0, 1)        # swell
+    f = 1900 + 160 * np.clip((seg - w0) / 0.8, 0, 1) + 20 * np.sin(2 * np.pi * 5 * seg)
+    tone = np.sin(2 * np.pi * np.cumsum(f) / SR) + 0.8 * np.sin(2 * np.pi * np.cumsum(f * 1.075) / SR)
+    breath = highpass(noise(d), 3000) * 0.25
+    end = np.clip((d - seg) / 0.25, 0, 1)
+    return (boil + (tone * 0.55 + breath) * ws) * end
+def pour():
+    # water pouring into a cup: the pitch climbs as the cup fills
+    d = 1.3; seg = t(d)
+    f = 500 + 1300 * (seg / d)
+    rush = lowpass(noise(d), 2600)
+    ring = np.sin(2 * np.pi * np.cumsum(f) / SR) * lowpass(np.abs(noise(d)), 40) * 1.5
+    e = np.clip(seg / 0.08, 0, 1) * np.clip((d - seg) / 0.15, 0, 1)
+    return (rush * 0.7 + ring * 0.5) * e
+def stir():
+    # a spoon tinkling round a china cup
+    d = 1.2; x = np.zeros(int(d * SR))
+    for k, at in enumerate([0.05, 0.33, 0.6, 0.88]):
+        seg = t(0.3); f = 2650 + 120 * (k % 2)
+        ping = (np.sin(2 * np.pi * f * seg) + 0.5 * np.sin(2 * np.pi * f * 2.7 * seg)) * np.exp(-seg * 22)
+        sw = lowpass(noise(0.3), 1500) * np.exp(-seg * 8) * 0.2
+        s0 = int(at * SR); n = min(len(seg), len(x) - s0)
+        x[s0:s0 + n] += (ping + sw)[:n]
+    return x
 def brush():
     d = 2.4; x = np.zeros(int(d * SR))
     for k in range(10):
@@ -290,7 +313,7 @@ SOUNDS = {
     "death": death_sting, "victory": victory,
     "loop_cave": cave_drone, "loop_river": river_loop, "loop_fire": fire_loop,
     "music_explore": music_explore, "music_boss": music_boss,
-    "loop_birds": birds_loop, "whistle": whistle_tune, "kettle": kettle, "brush": brush, "sip": sip,
+    "loop_birds": birds_loop, "whistle": whistle_tune, "kettle": kettle, "brush": brush, "sip": sip, "pour": pour, "stir": stir,
     "rumble": rumble, "portal": portal_whoosh, "music_morning": music_morning,
 }
 

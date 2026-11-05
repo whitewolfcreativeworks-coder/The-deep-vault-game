@@ -142,9 +142,7 @@ func _valley() -> void:
 	# the cabin, smoke from the chimney, a well, a little garden
 	_model("building_home_A_green", g(CABIN.x, CABIN.z) - Vector3(0, 0.2, 0), 0.0, 7.0)
 	var smoke := CPUParticles3D.new(); smoke.amount = 30; smoke.lifetime = 5.0; smoke.preprocess = 5.0
-	smoke.mesh = FX.quad(0.9); var smm := StandardMaterial3D.new(); smm.albedo_color = Color(0.92, 0.92, 0.94, 0.35)
-	smm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; smm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	smm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; smoke.material_override = smm
+	smoke.mesh = FX.quad(1.4); smoke.material_override = _puff_mat(Color(0.92, 0.92, 0.94, 0.4))
 	smoke.direction = Vector3(0.3, 1, 0); smoke.spread = 10; smoke.initial_velocity_min = 0.6; smoke.initial_velocity_max = 1.0
 	smoke.gravity = Vector3(0.2, 0.15, 0); smoke.scale_amount_min = 0.8; smoke.scale_amount_max = 2.2
 	add_child(smoke); smoke.position = g(CABIN.x, CABIN.z) + Vector3(1.6, 7.6, -1.0)
@@ -266,81 +264,178 @@ func _cabin_interior() -> void:
 	glow.set_script(load("res://scripts/world/flicker.gd")); add_child(glow); glow.position = ROOM + _stove + Vector3(-0.7, 0.5, 0)
 	_teapot = _make_teapot()
 	_teapot.position = ROOM + _stove + Vector3(-0.2, 1.0, 0)
-	_teapot.rotation.y = PI / 2
-	_kettle_steam = _steam(Vector3.ZERO)
-	_teapot.add_child(_kettle_steam)
-	_kettle_steam.position = Vector3(0, 0.12, 0.33)
+	_teapot.rotation.y = 0.35                      # spout side-on to the camera
+	_kettle_steam = _steam(Vector3.ZERO, 0.14, 40, _teapot)
+	_kettle_steam.position = SPOUT_TIP + Vector3(0, 0.02, 0.01)
+	_kettle_steam.direction = Vector3(0, 1, 0.5)
+	_kettle_steam.initial_velocity_min = 0.6; _kettle_steam.initial_velocity_max = 1.0
 	_kettle_steam.emitting = false
-	# table, stool, cup, tea bag and spoon
-	_box(_table + Vector3(-0.8, 0.74, -0.5), _table + Vector3(0.8, 0.8, 0.5), dark)
-	for p in [Vector3(-0.7, 0, -0.4), Vector3(0.7, 0, -0.4), Vector3(-0.7, 0, 0.4), Vector3(0.7, 0, 0.4)]:
-		_box(_table + p - Vector3(0.05, 0, 0.05), _table + p + Vector3(0.05, 0.74, 0.05), dark)
+	_kit("pan_A", ROOM + _stove + Vector3(0.0, 1.0, -0.38), 90.0, 0.32)
+	# kitchen shelf by the stove: jars, plates and a cutting board (KayKit Restaurant Bits)
+	_box(Vector3(2.3, 1.35, -3.98), Vector3(4.4, 1.41, -3.6), dark)
+	_kit("jar_A_medium", ROOM + Vector3(2.55, 1.41, -3.78), 0.0, 0.42)
+	_kit("jar_C_large", ROOM + Vector3(2.9, 1.41, -3.78), 0.0, 0.38)
+	_kit("jar_B_small", ROOM + Vector3(3.2, 1.41, -3.78), 0.0, 0.45)
+	_kit("jar_D_medium", ROOM + Vector3(3.5, 1.41, -3.78), 0.0, 0.4)
+	_kit("dishrack_plates", ROOM + Vector3(4.0, 1.41, -3.78), 0.0, 0.35)
+	_box(Vector3(4.2, 0, -1.2), Vector3(4.95, 0.9, 0.4), dark)               # counter beside the stove
+	_kit("cuttingboard", ROOM + Vector3(4.55, 0.9, -0.5), 90.0, 0.4)
+	_kit("food_ingredient_bun", ROOM + Vector3(4.55, 0.93, -0.55), 0.0, 0.35)
+	_kit("crate_carrots", ROOM + Vector3(4.4, 0.0, 2.9), 20.0, 0.45)
+	_kit("crate_potatoes", ROOM + Vector3(3.6, 0.0, 3.3), -10.0, 0.45)
+	# a round table set for breakfast
+	_kit("table_round_A_small", ROOM + _table, 0.0, 0.8)
 	Props.place(self, "stool", ROOM + _stool, 0.0, 1.0)
-	Props.place(self, "candle_triple", ROOM + _table + Vector3(-0.55, 0.8, -0.3), 0.0, 0.5)
-	_cup = Node3D.new(); add_child(_cup); _cup.position = ROOM + _table + Vector3(0.05, 0.8, 0.12)
-	var cup_m := _mat(Color(0.95, 0.93, 0.88), 0.35)
-	cup_m.cull_mode = BaseMaterial3D.CULL_DISABLED          # open cup: you can see the tea inside
-	var cupm := MeshInstance3D.new(); var cc := CylinderMesh.new(); cc.top_radius = 0.085; cc.bottom_radius = 0.065; cc.height = 0.14
-	cc.cap_top = false
-	cupm.mesh = cc; cupm.material_override = cup_m; cupm.position.y = 0.07; _cup.add_child(cupm)
-	var ch := MeshInstance3D.new(); var tor := TorusMesh.new(); tor.inner_radius = 0.025; tor.outer_radius = 0.045
-	ch.mesh = tor; ch.material_override = cup_m; ch.position = Vector3(0.095, 0.075, 0); ch.rotation.x = PI / 2; _cup.add_child(ch)
-	_tea = MeshInstance3D.new(); var tc := CylinderMesh.new(); tc.top_radius = 0.079; tc.bottom_radius = 0.07; tc.height = 0.01
-	_tea.mesh = tc; _tea_mat = _mat(Color(0.75, 0.82, 0.85), 0.1); _tea.material_override = _tea_mat
-	_tea.position.y = 0.02; _tea.visible = false; _cup.add_child(_tea)
-	_cup_steam = _steam(Vector3.ZERO); _cup.add_child(_cup_steam); _cup_steam.position.y = 0.15; _cup_steam.emitting = false
+	Props.place(self, "candle_triple", ROOM + _table + Vector3(-0.32, 0.8, -0.32), 0.0, 0.45)
+	_kit("plate", ROOM + _table + Vector3(0.3, 0.8, -0.05), 0.0, 0.28)
+	_kit("food_ingredient_bun", ROOM + _table + Vector3(0.27, 0.83, -0.08), 30.0, 0.3)
+	_kit("food_ingredient_cheese", ROOM + _table + Vector3(0.36, 0.83, 0.0), 0.0, 0.25)
+	# the cup on its saucer
+	_kit("plate_small", ROOM + _table + Vector3(-0.02, 0.8, 0.14), 0.0, 0.3)
+	_cup = Node3D.new(); add_child(_cup); _cup.position = ROOM + _table + Vector3(-0.02, 0.815, 0.14)
+	var china := _mat(Color(0.97, 0.96, 0.93), 0.15)
+	china.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var blue := _mat(Color(0.2, 0.36, 0.72), 0.25)
+	_cup.add_child(_lathe([Vector2(0, 0.012), Vector2(0.038, 0.012), Vector2(0.042, 0), Vector2(0.05, 0.004), Vector2(0.058, 0.03),
+		Vector2(0.068, 0.07), Vector2(0.075, 0.1), Vector2(0.078, 0.112), Vector2(0.074, 0.114), Vector2(0.068, 0.104),
+		Vector2(0.062, 0.07), Vector2(0.052, 0.03), Vector2(0.0, 0.02)], china))
+	_cup.add_child(_lathe([Vector2(0.0768, 0.093), Vector2(0.0775, 0.1), Vector2(0.0768, 0.106)], blue))
+	_cup.add_child(_tube(Vector3(0.062, 0.088, 0), Vector3(0.125, 0.085, 0), Vector3(0.06, 0.035, 0), 0.009, 0.008, china))
+	_tea = MeshInstance3D.new(); var tc := CylinderMesh.new(); tc.top_radius = 0.066; tc.bottom_radius = 0.066; tc.height = 0.004
+	_tea.mesh = tc; _tea_mat = _mat(Color(0.72, 0.8, 0.84), 0.05); _tea.material_override = _tea_mat
+	_tea.position.y = 0.03; _tea.scale = Vector3(0.8, 1, 0.8); _tea.visible = false; _cup.add_child(_tea)
+	_cup_steam = _steam(Vector3.ZERO, 0.05, 14, _cup); _cup_steam.position.y = 0.12; _cup_steam.emitting = false
+	_cup_steam.initial_velocity_min = 0.08; _cup_steam.initial_velocity_max = 0.18
 	_teabag = Node3D.new(); add_child(_teabag)
-	var tb := MeshInstance3D.new(); var tbm := BoxMesh.new(); tbm.size = Vector3(0.06, 0.07, 0.015)
-	tb.mesh = tbm; tb.material_override = _mat(Color(0.95, 0.92, 0.82)); _teabag.add_child(tb)
-	var tag := MeshInstance3D.new(); var tgm := BoxMesh.new(); tgm.size = Vector3(0.035, 0.035, 0.005)
-	tag.mesh = tgm; tag.material_override = _mat(Color(0.85, 0.2, 0.2)); tag.position = Vector3(0.07, 0.12, 0); _teabag.add_child(tag)
-	var string := MeshInstance3D.new(); var sgm := BoxMesh.new(); sgm.size = Vector3(0.003, 0.11, 0.003)
-	string.mesh = sgm; string.material_override = _mat(Color(0.95, 0.95, 0.95)); string.position = Vector3(0.035, 0.08, 0); string.rotation.z = -0.6
+	var tb := MeshInstance3D.new(); var tbm := BoxMesh.new(); tbm.size = Vector3(0.05, 0.06, 0.012)
+	tb.mesh = tbm; tb.material_override = _mat(Color(0.93, 0.88, 0.75)); _teabag.add_child(tb)
+	var tag := MeshInstance3D.new(); var tgm := BoxMesh.new(); tgm.size = Vector3(0.03, 0.03, 0.004)
+	tag.mesh = tgm; tag.material_override = _mat(Color(0.85, 0.2, 0.2)); tag.position = Vector3(0.09, 0.1, 0); _teabag.add_child(tag)
+	var string := MeshInstance3D.new(); var sgm := BoxMesh.new(); sgm.size = Vector3(0.0025, 0.11, 0.0025)
+	string.mesh = sgm; string.material_override = _mat(Color(0.95, 0.95, 0.95)); string.position = Vector3(0.045, 0.065, 0); string.rotation.z = -0.95
 	_teabag.add_child(string)
-	_teabag.position = ROOM + _table + Vector3(0.35, 0.82, 0.25)
-	_teabag.rotation.x = -PI / 2
-	_spoon = MeshInstance3D.new(); var spm := BoxMesh.new(); spm.size = Vector3(0.015, 0.2, 0.01)
-	_spoon.mesh = spm; _spoon.material_override = _mat(Color(0.82, 0.82, 0.85), 0.2, 1.0)
-	add_child(_spoon); _spoon.position = ROOM + _table + Vector3(-0.2, 0.81, 0.25); _spoon.rotation = Vector3(PI / 2, 0, 0.4)
+	_teabag.position = ROOM + _table + Vector3(0.14, 0.81, 0.3)
+	_teabag.rotation = Vector3(-PI / 2, 0, 0.3)
+	_spoon = MeshInstance3D.new()
+	var sp := Node3D.new()
+	var shaft := MeshInstance3D.new(); var shm := CylinderMesh.new(); shm.top_radius = 0.004; shm.bottom_radius = 0.006; shm.height = 0.13
+	shaft.mesh = shm; shaft.material_override = _mat(Color(0.85, 0.85, 0.88), 0.15, 1.0); shaft.position.y = 0.065; sp.add_child(shaft)
+	var bowl2 := MeshInstance3D.new(); var bsm := SphereMesh.new(); bsm.radius = 0.014; bsm.height = 0.012
+	bowl2.mesh = bsm; bowl2.material_override = shaft.material_override; bowl2.scale = Vector3(1, 1, 1.5); sp.add_child(bowl2)
+	_spoon.add_child(sp)
+	add_child(_spoon); _spoon.position = ROOM + _table + Vector3(-0.17, 0.805, 0.22); _spoon.rotation = Vector3(PI / 2, 0, 0.5)
 	# the pouring water
-	_stream = MeshInstance3D.new(); var sc := CylinderMesh.new(); sc.top_radius = 0.012; sc.bottom_radius = 0.016; sc.height = 1.0
+	_stream = MeshInstance3D.new(); var sc := CylinderMesh.new(); sc.top_radius = 0.013; sc.bottom_radius = 0.017; sc.height = 1.0
 	_stream.mesh = sc
-	var wm := StandardMaterial3D.new(); wm.albedo_color = Color(0.8, 0.9, 1.0, 0.65); wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var wm := StandardMaterial3D.new(); wm.albedo_color = Color(0.62, 0.78, 0.95, 0.85); wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	wm.roughness = 0.05
 	_stream.material_override = wm; _stream.visible = false; add_child(_stream)
 	Props.place(self, "shelf_small_candles", ROOM + Vector3(1.8, 1.6, -3.9), 0.0, 1.0)
 	Props.place(self, "barrel_small", ROOM + Vector3(-4.3, 0, -0.1), 0.0, 1.0)
 	Props.place(self, "shelves", ROOM + Vector3(1.6, 0, 3.8), 180.0, 1.0)
 
-## A proper teapot: round body, lid with a knob, spout and a loop handle.
+const SPOUT_TIP := Vector3(0, 0.27, 0.33)      # teapot-local, the spout points along +Z
+
+## A smooth shape turned on a lathe: `profile` is (radius, height) pairs.
+func _lathe(profile: Array, mat: Material, segs := 28) -> MeshInstance3D:
+	var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(0)
+	for i in profile.size() - 1:
+		var p0: Vector2 = profile[i]; var p1: Vector2 = profile[i + 1]
+		for k in segs:
+			var a0 := TAU * k / segs; var a1 := TAU * (k + 1) / segs
+			var v00 := Vector3(cos(a0) * p0.x, p0.y, sin(a0) * p0.x); var v01 := Vector3(cos(a1) * p0.x, p0.y, sin(a1) * p0.x)
+			var v10 := Vector3(cos(a0) * p1.x, p1.y, sin(a0) * p1.x); var v11 := Vector3(cos(a1) * p1.x, p1.y, sin(a1) * p1.x)
+			for v in [v00, v10, v11, v00, v11, v01]:
+				st.add_vertex(v)
+	st.generate_normals()
+	var mi := MeshInstance3D.new(); mi.mesh = st.commit(); mi.material_override = mat
+	return mi
+
+## A tube along a quadratic curve (spouts, handles), radius r0 -> r1.
+func _tube(p0: Vector3, p1: Vector3, p2: Vector3, r0: float, r1: float, mat: Material, steps := 12, segs := 14) -> MeshInstance3D:
+	var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rings := []
+	for i in steps + 1:
+		var t := float(i) / steps
+		var c := p0.lerp(p1, t).lerp(p1.lerp(p2, t), t)
+		var tan := (p1 - p0).lerp(p2 - p1, t).normalized()
+		var side := tan.cross(Vector3.RIGHT if absf(tan.x) < 0.9 else Vector3.UP).normalized()
+		var up := side.cross(tan).normalized()
+		var r := lerpf(r0, r1, t)
+		var ring := []
+		for k in segs:
+			var a := TAU * k / segs
+			ring.append(c + (side * cos(a) + up * sin(a)) * r)
+		rings.append(ring)
+	for i in steps:
+		for k in segs:
+			var a: Vector3 = rings[i][k]; var b2: Vector3 = rings[i][(k + 1) % segs]
+			var c2: Vector3 = rings[i + 1][k]; var d2: Vector3 = rings[i + 1][(k + 1) % segs]
+			for v in [a, c2, d2, a, d2, b2]:
+				st.add_vertex(v)
+	st.generate_normals()
+	var mi := MeshInstance3D.new(); mi.mesh = st.commit(); mi.material_override = mat
+	(mi.material_override as BaseMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
+	return mi
+
+var _lid: Node3D
+
+## A china teapot: round turned body, lid with a knob, curved spout, loop handle.
 func _make_teapot() -> Node3D:
 	var tp := Node3D.new(); add_child(tp)
-	var ceramic := _mat(Color(0.92, 0.94, 0.98), 0.3)
-	var blue := _mat(Color(0.25, 0.42, 0.78), 0.35)
-	var body := MeshInstance3D.new(); var bs := SphereMesh.new(); bs.radius = 0.2; bs.height = 0.3
-	body.mesh = bs; body.material_override = ceramic; body.position.y = 0.15; tp.add_child(body)
-	var band := MeshInstance3D.new(); var bt := TorusMesh.new(); bt.inner_radius = 0.19; bt.outer_radius = 0.205
-	band.mesh = bt; band.material_override = blue; band.position.y = 0.15; tp.add_child(band)
-	var lid := MeshInstance3D.new(); var ls := SphereMesh.new(); ls.radius = 0.11; ls.height = 0.08; ls.is_hemisphere = true
-	lid.mesh = ls; lid.material_override = blue; lid.position.y = 0.285; tp.add_child(lid)
-	var knob := MeshInstance3D.new(); var ks := SphereMesh.new(); ks.radius = 0.03; ks.height = 0.06
-	knob.mesh = ks; knob.material_override = ceramic; knob.position.y = 0.335; tp.add_child(knob)
-	var spout := MeshInstance3D.new(); var sc := CylinderMesh.new(); sc.top_radius = 0.022; sc.bottom_radius = 0.05; sc.height = 0.26
-	spout.mesh = sc; spout.material_override = ceramic; spout.position = Vector3(0, 0.2, 0.24); spout.rotation.x = 0.85
-	tp.add_child(spout)
-	var handle := MeshInstance3D.new(); var ht := TorusMesh.new(); ht.inner_radius = 0.06; ht.outer_radius = 0.085
-	handle.mesh = ht; handle.material_override = blue; handle.position = Vector3(0, 0.17, -0.2); handle.rotation.z = PI / 2
-	tp.add_child(handle)
+	var china := _mat(Color(0.95, 0.95, 0.97), 0.18)
+	var blue := _mat(Color(0.2, 0.36, 0.72), 0.25)
+	tp.add_child(_lathe([Vector2(0, 0), Vector2(0.1, 0), Vector2(0.11, 0.012), Vector2(0.15, 0.04), Vector2(0.178, 0.1),
+		Vector2(0.176, 0.16), Vector2(0.15, 0.215), Vector2(0.105, 0.248), Vector2(0.09, 0.25), Vector2(0.0, 0.25)], china))
+	var band := _lathe([Vector2(0.179, 0.115), Vector2(0.18, 0.13), Vector2(0.179, 0.145)], blue)
+	tp.add_child(band)
+	_lid = Node3D.new(); tp.add_child(_lid); _lid.position.y = 0.245
+	_lid.add_child(_lathe([Vector2(0.098, 0), Vector2(0.096, 0.012), Vector2(0.075, 0.035), Vector2(0.03, 0.048),
+		Vector2(0.018, 0.05), Vector2(0.026, 0.065), Vector2(0.022, 0.08), Vector2(0, 0.084)], blue))
+	tp.add_child(_tube(Vector3(0, 0.085, 0.15), Vector3(0, 0.1, 0.29), SPOUT_TIP, 0.042, 0.017, china))
+	tp.add_child(_tube(Vector3(0, 0.2, -0.13), Vector3(0, 0.22, -0.3), Vector3(0, 0.05, -0.16), 0.02, 0.018, blue))
 	return tp
 
-func _steam(at: Vector3) -> CPUParticles3D:
-	var p := CPUParticles3D.new(); p.amount = 30; p.lifetime = 1.8
-	p.mesh = FX.quad(0.16); var m := StandardMaterial3D.new(); m.albedo_color = Color(1, 1, 1, 0.5)
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; p.material_override = m
-	p.direction = Vector3.UP; p.spread = 12; p.initial_velocity_min = 0.25; p.initial_velocity_max = 0.5
-	p.gravity = Vector3(0, 0.15, 0); p.scale_amount_min = 0.6; p.scale_amount_max = 2.2
-	add_child(p); p.position = at
+## Soft round puff texture for steam and smoke (instead of hard squares).
+var _puff_tex: GradientTexture2D
+func _puff_mat(c: Color) -> StandardMaterial3D:
+	if _puff_tex == null:
+		_puff_tex = GradientTexture2D.new(); _puff_tex.width = 64; _puff_tex.height = 64
+		_puff_tex.fill = GradientTexture2D.FILL_RADIAL
+		_puff_tex.fill_from = Vector2(0.5, 0.5); _puff_tex.fill_to = Vector2(0.5, 0.0)
+		var gr := Gradient.new()
+		gr.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+		gr.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.35), Color(1, 1, 1, 0)])
+		_puff_tex.gradient = gr
+	var m := StandardMaterial3D.new(); m.albedo_texture = _puff_tex; m.albedo_color = c
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; m.vertex_color_use_as_albedo = true
+	m.disable_receive_shadows = true
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD      # steam only ever lightens (no dark fringes)
+	return m
+
+func _kit(name: String, pos: Vector3, yaw_deg := 0.0, scl := 1.0) -> Node3D:
+	var path := "res://assets/kaykit/kitchen/%s.gltf" % name
+	if not _scenes.has(path):
+		_scenes[path] = load(path)
+	var n: Node3D = (_scenes[path] as PackedScene).instantiate()
+	add_child(n)
+	n.position = pos; n.rotation_degrees.y = yaw_deg; n.scale = Vector3.ONE * scl
+	return n
+
+func _steam(at: Vector3, size := 0.16, amount := 30, parent: Node = null) -> CPUParticles3D:
+	var p := CPUParticles3D.new(); p.amount = amount; p.lifetime = 1.8
+	p.mesh = FX.quad(size); p.material_override = _puff_mat(Color(0.75, 0.75, 0.78, 0.6))
+	p.direction = Vector3.UP; p.spread = 10; p.initial_velocity_min = 0.25; p.initial_velocity_max = 0.5
+	p.gravity = Vector3(0.03, 0.12, 0); p.scale_amount_min = 0.6; p.scale_amount_max = 1.2
+	var sc := Curve.new(); sc.add_point(Vector2(0, 0.4)); sc.add_point(Vector2(1, 1.8)); p.scale_amount_curve = sc
+	var cr := Gradient.new()
+	cr.offsets = PackedFloat32Array([0.0, 0.15, 1.0])
+	cr.colors = PackedColorArray([Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.8), Color(1, 1, 1, 0.0)])
+	p.color_ramp = cr
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	(parent if parent else self).add_child(p); p.position = at
 	return p
 
 func _actor() -> void:
@@ -459,8 +554,50 @@ func _yaw_to(p: Vector3) -> float:
 	var d := p - actor.position
 	return atan2(-d.x, -d.z)
 
+## A toothbrush held at the mouth (it follows the head as he brushes), with foam.
+func _toothbrush(foam: Array) -> Node3D:
+	var head: MeshInstance3D = null
+	for m in actor.find_children("*", "MeshInstance3D", true, false):
+		if String(m.name).ends_with("_Head") and (m as MeshInstance3D).visible:
+			head = m
+	var mouth := actor.position + Vector3(-0.32, 1.12, 0)
+	if head:
+		var ab: AABB = head.global_transform * head.get_aabb()
+		mouth = Vector3(ab.position.x + 0.03, ab.position.y + ab.size.y * 0.2, ab.get_center().z)
+	var att := actor._attach("head")
+	var root := Node3D.new()
+	if att:
+		att.add_child(root)
+	else:
+		add_child(root)
+	# handle runs out to his right hand (world -Z while he faces the mirror) and down
+	var along := Vector3(-0.45, -0.7, -0.55).normalized()
+	var up := Vector3(0, 1, 0)
+	var side := along.cross(up).normalized()
+	root.global_transform = Transform3D(Basis(along, side.cross(along), side), mouth)
+	var scrub := Node3D.new(); root.add_child(scrub)
+	var handle := MeshInstance3D.new(); var hb := BoxMesh.new(); hb.size = Vector3(0.26, 0.028, 0.03)
+	handle.mesh = hb; handle.material_override = _mat(Color(0.2, 0.55, 1.0), 0.3); handle.position.x = 0.15; scrub.add_child(handle)
+	var neck := MeshInstance3D.new(); var nb := BoxMesh.new(); nb.size = Vector3(0.05, 0.02, 0.022)
+	neck.mesh = nb; neck.material_override = handle.material_override; neck.position.x = 0.01; scrub.add_child(neck)
+	var bristle := MeshInstance3D.new(); var bb := BoxMesh.new(); bb.size = Vector3(0.05, 0.03, 0.03)
+	bristle.mesh = bb; bristle.material_override = _mat(Color(1, 1, 1), 0.6); bristle.position = Vector3(-0.005, 0.0, 0.0); scrub.add_child(bristle)
+	var tipm := MeshInstance3D.new(); var tb2 := BoxMesh.new(); tb2.size = Vector3(0.05, 0.012, 0.032)
+	tipm.mesh = tb2; tipm.material_override = _mat(Color(0.3, 0.85, 0.9), 0.6); tipm.position = Vector3(-0.005, 0.018, 0.0); scrub.add_child(tipm)
+	# toothpaste foam round the mouth
+	var fm := _mat(Color(1, 1, 1), 0.5)
+	for k in 7:
+		var f := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.016 + (k % 3) * 0.006; sm.height = sm.radius * 2.0
+		f.mesh = sm; f.material_override = fm
+		root.add_child(f)
+		f.global_position = mouth + Vector3(-0.01, -0.015 + (k % 2) * 0.03, -0.07 + k * 0.022)
+		f.scale = Vector3.ONE * 0.01
+		foam.append(f)
+	return root
+
 # ---------------------------------------------------------------------------
 func play() -> void:
+	_t0 = Time.get_ticks_msec()
 	_music = AudioStreamPlayer.new(); _music.stream = Sfx.get_stream("music_morning"); _music.volume_db = -14.0
 	add_child(_music); _music.play()
 	var nm: String = Game.profile.name
@@ -537,109 +674,127 @@ func play() -> void:
 	var mirror_eye := R + _basin + Vector3(-0.4, 1.6, 0.12)
 	_cam(mirror_eye, mirror_eye + Vector3(0.04, -0.03, -0.08), R + _basin + Vector3(1.45, 1.3, 0), R + _basin + Vector3(1.45, 1.28, 0), 3.0, 52.0)
 	_open()
-	var brush := Node3D.new()
-	var handle := MeshInstance3D.new(); var hb := BoxMesh.new(); hb.size = Vector3(0.025, 0.2, 0.025); handle.mesh = hb
-	handle.material_override = _mat(Color(0.3, 0.6, 1.0)); brush.add_child(handle)
-	var bristle := MeshInstance3D.new(); var bb := BoxMesh.new(); bb.size = Vector3(0.03, 0.05, 0.04); bristle.mesh = bb
-	bristle.material_override = _mat(Color(1, 1, 1)); bristle.position = Vector3(0, 0.11, 0.015); brush.add_child(bristle)
-	var hand := actor._attach("handslot.r")
-	if hand:
-		hand.add_child(brush)
-	var bubbles := CPUParticles3D.new(); bubbles.amount = 20; bubbles.lifetime = 0.8
-	bubbles.mesh = FX.quad(0.06); bubbles.material_override = FX.glow_material(Color(1, 1, 1), 1.0)
-	bubbles.direction = Vector3(-1, 0.6, 0); bubbles.spread = 50; bubbles.initial_velocity_min = 0.2; bubbles.initial_velocity_max = 0.6
-	bubbles.gravity = Vector3(0, -0.6, 0)
-	add_child(bubbles); bubbles.position = actor.position + Vector3(-0.3, 1.15, 0)
+	await _wait(0.05)
+	var foam: Array = []
+	var brush := _toothbrush(foam)
+	var scrub: Node3D = brush.get_child(0) if brush else null
+	var bubbles := CPUParticles3D.new(); bubbles.amount = 14; bubbles.lifetime = 0.7
+	bubbles.mesh = FX.quad(0.035); bubbles.material_override = _puff_mat(Color(1, 1, 1, 0.95))
+	bubbles.direction = Vector3(-1, 0.4, 0); bubbles.spread = 60; bubbles.initial_velocity_min = 0.15; bubbles.initial_velocity_max = 0.4
+	bubbles.gravity = Vector3(0, -0.8, 0)
+	add_child(bubbles); bubbles.global_position = brush.global_position if brush else actor.position + Vector3(-0.3, 1.1, 0)
 	_say("Brush, brush, brush...")
 	Sfx.play("brush", -4.0)
-	for k in 3:
-		actor.oneshot("Use_Item", 0.7)
-		await _wait(0.7)
-		if skipped: return
+	actor.oneshot("Use_Item", 2.4)
+	if scrub:
+		var sw := create_tween().set_loops(12)
+		sw.tween_property(scrub, "position:x", 0.03, 0.1)
+		sw.tween_property(scrub, "position:x", -0.03, 0.1)
+	for f in foam:
+		create_tween().tween_property(f, "scale", Vector3.ONE, 1.4).set_delay(randf() * 0.6)
+	await _wait(2.4)
+	if skipped: return
 	bubbles.emitting = false
-	brush.queue_free()
+	if brush:
+		brush.queue_free()
+	FX.burst(actor.position + Vector3(-0.35, 1.18, 0), Color(1, 1, 1), 12, 1.2, 0.04, 0.5, 0.0)
 	actor.oneshot("Cheer", 0.9)
-	_say("Sparkling!")
+	_say("Sparkling clean!")
 	await _wait(0.9)
 	if skipped: return
 
-	# 5. the teapot whistles on the stove
+	# 5. the teapot boils and whistles on the stove
 	shot = "kettle"
 	await _cut()
 	actor.visible = false
-	_cam(R + _stove + Vector3(-1.4, 1.5, 0.9), R + _stove + Vector3(-1.1, 1.4, 0.7), _teapot.position + Vector3(0, 0.2, 0), _teapot.position + Vector3(0, 0.2, 0), 2.2, 35.0)
+	_cam(R + _stove + Vector3(-1.25, 1.45, 0.75), R + _stove + Vector3(-1.0, 1.35, 0.6), _teapot.position + Vector3(0, 0.2, 0.05), _teapot.position + Vector3(0, 0.22, 0.05), 2.8, 34.0)
 	_open()
+	Sfx.play("kettle", -3.0, 0.0)
+	_say("Bubble, bubble...")
 	_kettle_steam.emitting = true
-	_kettle_steam.amount = 40
-	Sfx.play("kettle", -6.0)
-	_say("Tweeeee! The water's ready.")
-	await _wait(2.2)
+	_kettle_steam.amount = 16
+	var rattle := create_tween().set_loops(10)
+	rattle.tween_property(_lid, "position:y", 0.258, 0.07)
+	rattle.tween_property(_lid, "position:y", 0.245, 0.07)
+	await _wait(1.0)
+	_kettle_steam.amount = 60
+	_kettle_steam.initial_velocity_max = 1.6
+	_say("Tweeeeee! The water's ready.")
+	await _wait(1.8)
 	if skipped: return
 
-	# 6. tea at the table: pour, tea bag, steep 3 seconds, stir, sip
+	# 6. tea at the table: pour, tea bag, steep three seconds, stir, sip
 	shot = "tea"
 	await _cut()
 	_kettle_steam.emitting = false
+	_kettle_steam.visible = false
 	actor.visible = true
 	actor.position = R + _stool
 	actor.rotation.y = 0.0                        # facing the table (-z)
 	actor.hold_clip = "Sit_Chair_Idle"
 	_teapot.scale = Vector3.ONE * 0.7
-	_teapot.position = R + _table + Vector3(-0.45, 0.8, -0.1)
+	_teapot.position = R + _table + Vector3(-0.32, 0.8, 0.05)
 	_teapot.rotation = Vector3(0, PI / 2 + 0.3, 0)
-	var front := R + _table + Vector3(0.25, 1.3, -1.7)
-	_cam(front, front + Vector3(0.1, -0.05, 0.1), R + _table + Vector3(0.0, 1.05, 0.4), R + _table + Vector3(0.0, 1.05, 0.45), 1.6, 45.0)
+	var cup_top := _cup.position + Vector3(0, 0.11, 0)
+	# close on the cup: teapot tips, water runs from the spout
+	_cam(cup_top + Vector3(0.12, 0.42, -0.62), cup_top + Vector3(0.08, 0.38, -0.55), cup_top + Vector3(-0.08, 0.04, 0), cup_top + Vector3(-0.03, 0.0, 0), 4.5, 42.0)
 	_open()
 	_say("Time for a nice cup of tea.")
-	await _wait(1.4)
-	if skipped: return
-	# close-up: the pour
-	var cup_top := _cup.position + Vector3(0, 0.15, 0)
-	_cam(cup_top + Vector3(0.12, 0.5, -0.7), cup_top + Vector3(0.08, 0.45, -0.6), cup_top + Vector3(-0.1, 0.06, 0), cup_top + Vector3(-0.04, 0.0, 0), 4.0, 40.0)
 	var pour := create_tween().set_parallel(true)
-	pour.tween_property(_teapot, "position", _cup.position + Vector3(-0.31, 0.33, 0.0), 0.6)
-	pour.tween_property(_teapot, "rotation", Vector3(0.75, PI / 2, 0), 0.6)
+	pour.tween_property(_teapot, "position", _cup.position + Vector3(-0.3, 0.3, 0.0), 0.6)
+	pour.tween_property(_teapot, "rotation", Vector3(0.78, PI / 2, 0), 0.6)
 	await _wait(0.65)
+	if skipped: return
 	_stream.visible = true
-	var tip: Vector3 = _teapot.global_transform * Vector3(0, 0.286, 0.338)
-	var down := cup_top - Vector3(0, 0.05, 0) - tip
+	var tip: Vector3 = _teapot.global_transform * SPOUT_TIP
+	var down := cup_top - Vector3(0, 0.06, 0) - tip
 	var yax := down.normalized()
 	var xax := yax.cross(Vector3.FORWARD).normalized()
 	_stream.global_transform = Transform3D(Basis(xax, yax * down.length(), xax.cross(yax)), tip + down * 0.5)
 	_tea.visible = true
-	Sfx.play("splash", -8.0, 0.0)
-	create_tween().tween_property(_tea, "position:y", 0.115, 1.1)
+	Sfx.play("pour", -4.0, 0.0)
+	var fill := create_tween().set_parallel(true)
+	fill.tween_property(_tea, "position:y", 0.098, 1.2)
+	fill.tween_property(_tea, "scale", Vector3(1.0, 1, 1.0), 1.2)
 	_say("Pour...")
-	await _wait(1.1)
+	await _wait(1.2)
 	_stream.visible = false
 	var back := create_tween().set_parallel(true)
-	back.tween_property(_teapot, "position", R + _table + Vector3(-0.45, 0.8, -0.1), 0.5)
+	back.tween_property(_teapot, "position", R + _table + Vector3(-0.32, 0.8, 0.05), 0.5)
 	back.tween_property(_teapot, "rotation", Vector3(0, PI / 2 + 0.3, 0), 0.5)
 	_cup_steam.emitting = true
-	# the tea bag goes in and the water turns brown
+	# in goes the tea bag: count to three while it turns brown
 	var drop := create_tween()
-	drop.tween_property(_teabag, "position", cup_top + Vector3(0, 0.12, 0), 0.4)
-	drop.tween_property(_teabag, "position", cup_top + Vector3(0, -0.03, 0), 0.25)
-	await _wait(0.7)
+	drop.tween_property(_teabag, "position", cup_top + Vector3(0, 0.1, 0), 0.35)
+	drop.parallel().tween_property(_teabag, "rotation", Vector3(0, 0.4, 0), 0.35)
+	drop.tween_property(_teabag, "position", cup_top + Vector3(0, -0.035, 0), 0.25)
+	await _wait(0.6)
 	if skipped: return
-	_say("1...")
-	create_tween().tween_property(_tea_mat, "albedo_color", Color(0.45, 0.24, 0.1), 3.0)
-	await _wait(1.0)
-	_say("2...")
-	await _wait(1.0)
-	_say("3...")
-	await _wait(1.0)
-	if skipped: return
-	# stir
+	Sfx.play("splash", -16.0, 0.0)
+	create_tween().tween_property(_tea_mat, "albedo_color", Color(0.48, 0.24, 0.08), 3.0)
+	var bob := create_tween().set_loops(3)
+	bob.tween_property(_teabag, "position:y", cup_top.y - 0.02, 0.5)
+	bob.tween_property(_teabag, "position:y", cup_top.y - 0.035, 0.5)
+	for n in ["1...", "2...", "3..."]:
+		_say(n)
+		await _wait(1.0)
+		if skipped: return
+	# out with the bag, then stir
+	create_tween().tween_property(_teabag, "position", _cup.position + Vector3(0.16, 0.0, 0.08), 0.4)
 	_say("Stir, stir...")
-	_spoon.position = cup_top + Vector3(0.02, 0.06, 0)
-	_spoon.rotation = Vector3(0, 0, 0.25)
-	var stir := create_tween().set_loops(3)
-	stir.tween_property(_spoon, "position", cup_top + Vector3(-0.02, 0.06, 0.02), 0.15)
-	stir.tween_property(_spoon, "position", cup_top + Vector3(0.02, 0.06, 0.02), 0.15)
-	await _wait(0.9)
+	_spoon.position = cup_top + Vector3(0.0, 0.0, 0)
+	_spoon.rotation = Vector3(0, 0, 0.3)
+	Sfx.play("stir", -6.0, 0.0)
+	var stir := create_tween().set_loops(4)
+	for k in 4:
+		var ang := TAU * k / 4.0
+		stir.tween_property(_spoon, "position", cup_top + Vector3(cos(ang) * 0.03, -0.01, sin(ang) * 0.03), 0.07)
+	await _wait(1.15)
 	if skipped: return
+	_spoon.position = _cup.position + Vector3(0.0, 0.0, 0.115)
+	_spoon.rotation = Vector3(PI / 2, PI / 2, 0)
 	# sip, seen from across the table
+	var front := R + _table + Vector3(0.25, 1.3, -1.7)
 	_cam(front + Vector3(0.2, 0, 0), front + Vector3(0.1, -0.05, 0.2), R + _stool + Vector3(0, 1.15, 0), R + _stool + Vector3(0, 1.2, 0), 2.4, 40.0)
 	actor.hold_clip = ""
 	actor.oneshot("Use_Item", 0.9)
@@ -698,8 +853,10 @@ func _beam(at: Vector3) -> void:
 	tw.tween_property(actor, "position:y", actor.position.y + 1.2, 1.6).set_ease(Tween.EASE_IN)
 	tw.tween_property(actor, "scale", Vector3(0.3, 1.6, 0.3), 1.6).set_ease(Tween.EASE_IN)
 
+var _t0 := 0
 func _end() -> void:
 	shot = "end"
+	print("INTRO_MOVIE_SECONDS %.1f" % ((Time.get_ticks_msec() - _t0) / 1000.0))
 	if _music:
 		_music.stop()
 	finished.emit()

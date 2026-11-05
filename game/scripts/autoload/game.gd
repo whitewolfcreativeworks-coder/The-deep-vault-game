@@ -212,6 +212,8 @@ func reset_run() -> void:
 	equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
 	flags = {}
 	quests = {}
+	tracked_quest = ""
+	tracked_manual = false
 	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
 	game_over = false
@@ -350,7 +352,7 @@ func _register_inputs() -> void:
 		"interact": [KEY_E], "inventory": [KEY_I], "character": [KEY_TAB],
 		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1], "mana_potion": [KEY_F, KEY_2],
 		"zoom_in_key": [KEY_EQUAL, KEY_KP_ADD], "zoom_out_key": [KEY_MINUS, KEY_KP_SUBTRACT],
-		"toggle_view": [KEY_V], "special": [KEY_X],
+		"toggle_view": [KEY_V], "special": [KEY_X], "track_quest": [KEY_T],
 	}
 	for action in keys:
 		if not InputMap.has_action(action):
@@ -429,7 +431,7 @@ func save_slot(i := -1) -> bool:
 		"checkpoint_pos": checkpoint_pos, "checkpoint_yaw": checkpoint_yaw, "checkpoint_name": checkpoint_name,
 		"objective": objective,
 		"resume_pos": resume_pos, "resume_yaw": resume_yaw,
-		"zone": zone, "quests": quests.duplicate(true),
+		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual,
 	}
 	var f := FileAccess.open(_slot_path(i), FileAccess.WRITE)
 	if f == null:
@@ -479,6 +481,8 @@ func load_slot(i: int) -> bool:
 	resume_yaw = float(d.get("resume_yaw", 0.0))
 	zone = String(d.get("zone", "vault"))
 	quests = d.get("quests", {}).duplicate(true)
+	tracked_quest = String(d.get("tracked_quest", ""))
+	tracked_manual = bool(d.get("tracked_manual", false))
 	hp = clampf(float(d.get("hp", max_hp())), max_hp() * 0.5, max_hp())
 	mana = clampf(float(d.get("mana", max_mana())), 0.0, max_mana())
 	stamina = max_stamina()
@@ -526,6 +530,8 @@ signal quests_changed
 signal quest_event(text: String)
 var zone := "vault"               # "vault" (Level 1) or "forest" (Level 2: the Goblin Forest)
 var quests := {}                  # quest id -> {"state": "active"|"ready"|"done", "n": progress}
+var tracked_quest := ""           # the quest the compass arrow points to ("" = pick one automatically)
+var tracked_manual := false       # true when the player chose it themselves
 
 const ZONE_NAMES := {"vault": "The Deep Vault", "forest": "The Goblin Forest"}
 const GOBLINS := ["goblin", "goblin_archer", "goblin_brute", "goblin_chief"]
@@ -580,6 +586,8 @@ func quest_accept(id: String) -> void:
 	if quests.has(id):
 		return
 	quests[id] = {"state": "active", "n": 0}
+	tracked_quest = id                # a new quest is the one you're on
+	tracked_manual = false
 	set_objective(forest_objective())
 	quest_event.emit("New quest: %s" % QUESTS[id].title)
 	message.emit("New quest: %s" % QUESTS[id].title, Color(1.0, 0.85, 0.35))
@@ -663,6 +671,29 @@ func forest_objective() -> String:
 	if quest_state("goblin_trouble") == "done":
 		return "Help the forest folk, then see Captain Aldric at the Warren gate (north)."
 	return "Help the forest folk: your quests are listed on the left."
+
+## Choose the quest the compass follows (the player picked it).
+func track_quest(id: String) -> void:
+	if not quest_state(id) in ["active", "ready"]:
+		return
+	tracked_quest = id
+	tracked_manual = true
+	message.emit("Following: %s" % QUESTS[id].title, Color(1.0, 0.85, 0.35))
+	quests_changed.emit()
+
+## Step to the next open quest (T key / gamepad).
+func track_next() -> void:
+	var ids := tracked_quests()
+	if ids.is_empty():
+		return
+	var i := ids.find(tracked_quest)
+	track_quest(ids[(i + 1) % ids.size()])
+
+## The quest the compass follows right now; "" if there are none open.
+func current_quest() -> String:
+	if quest_state(tracked_quest) in ["active", "ready"]:
+		return tracked_quest
+	return ""
 
 func tracked_quests() -> Array:
 	var out: Array = []

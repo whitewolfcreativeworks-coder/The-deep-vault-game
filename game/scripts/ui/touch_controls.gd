@@ -238,6 +238,9 @@ func _drop(idx: int) -> void:
 func _on_touch(e: InputEventScreenTouch) -> void:
 	if e.pressed:
 		var b := _button_at(e.position)
+		var hud := get_tree().get_first_node_in_group("hud")
+		if b.is_empty() and hud and hud.has_method("tap_at") and hud.tap_at(e.position):
+			return          # tapped a quest in the list, or the compass
 		if not b.is_empty():
 			_btn_touch[e.index] = b.name
 			_press_info[e.index] = {"name": b.name, "t": 0.0, "pos": e.position}

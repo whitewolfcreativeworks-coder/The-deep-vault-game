@@ -213,6 +213,7 @@ func _run() -> void:
 		else:
 			var seen := {}
 			var t := 0.0
+			var t_start := Time.get_ticks_msec()
 			while main.state == "intro" and t < 150.0:
 				var sh: String = main.intro.shot if main.intro else ""
 				if sh != "" and not seen.has(sh):
@@ -221,10 +222,11 @@ func _run() -> void:
 					await shot("in_" + sh)
 				await wait(0.25)
 				t += 0.25
-				if int(t * 4.0) % 4 == 0 and OS.get_environment("INTRO_FRAMES") != "":
+				if OS.get_environment("INTRO_FRAMES") != "" and int(t * 4.0) % (4 if OS.get_environment("INTRO_FRAMES") == "1" else 2) == 0:
 					await shot("f_%03d" % int(t))
-			print("INTRO_LENGTH ", t)
-			check("intro_short", t < 60.0, str(t))
+			var secs := (Time.get_ticks_msec() - t_start) / 1000.0
+			print("INTRO_LENGTH ", secs)
+			check("intro_short", secs < 60.0, "%.1f s" % secs)
 			for sh2 in ["sunrise", "bed", "dress", "teeth", "kettle", "tea", "portal"]:
 				check("intro_shot_" + sh2, seen.has(sh2))
 			await wait(2.0)
@@ -232,6 +234,9 @@ func _run() -> void:
 			await shot("in_arrival")
 	elif mode == "forest":
 		if await _forest_test():
+			return
+	elif mode == "compass":
+		if await _compass_test():
 			return
 	elif mode == "saves":
 		if await _saves_test():
@@ -1814,3 +1819,81 @@ func _finish() -> void:
 		f.store_string(JSON.stringify(summary, "  "))
 	print("AUTOTEST SUMMARY %d/%d passed in %.0fs" % [passed, results.size(), summary.seconds])
 	get_tree().quit(0 if passed == results.size() else 1)
+
+# --- compass and quest arrow -------------------------------------------------
+func _compass_test() -> bool:
+	var phase: int = Game.get_meta("compass_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("compass_phase", 2)
+		main.go_to_forest()
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var hud: HUD = main.hud
+	var cp: QuestCompass = hud.compass
+	check("compass_shown", cp != null and cp.visible and cp.is_inside_tree())
+	await wait(0.6)
+	check("no_arrow_without_quest", not cp._has_target)
+	# compass turns with the camera
+	player.yaw = 0.0; player.snap_view(); await wait(0.3)
+	var h0 := cp.heading()
+	player.yaw = PI * 0.5; player.snap_view(); await wait(0.3)
+	var h1 := cp.heading()
+	check("compass_turns", absf(wrapf(h1 - h0, -PI, PI)) > 1.2, "%.2f -> %.2f" % [h0, h1])
+	player.yaw = 0.0; player.snap_view()
+	await shot("cp_01_no_quest")
+	Game.quest_accept("stolen_axes")
+	await wait(0.8)
+	check("new_quest_followed", Game.current_quest() == "stolen_axes")
+	check("arrow_shown", cp._has_target)
+	var axe := cp._first("quest_item", func(n: Node) -> bool: return n.get("item") == "axe" and (n as Node3D).visible)
+	check("arrow_to_nearest_axe", axe != null and cp._target.distance_to(axe.global_position) < 0.5)
+	await shot("cp_02_axes")
+	Game.quest_accept("goblin_trouble")
+	Game.quest_accept("strongbox")
+	await wait(0.8)
+	check("strongbox_points_to_warren_door", Game.current_quest() == "strongbox" and cp._below == -1)
+	await shot("cp_03_strongbox")
+	# choose a quest by tapping it in the list
+	await wait(0.3)
+	var row: Control = hud._quest_rows.get("goblin_trouble")
+	var tapped := row != null and hud.tap_at(row.get_global_rect().get_center())
+	await wait(0.6)
+	check("tap_to_follow", tapped and Game.current_quest() == "goblin_trouble" and Game.tracked_manual)
+	var gob := cp._first("enemy", func(n: Node) -> bool: return n.get("type_id") in Game.GOBLINS and not n.get("dead"))
+	check("arrow_to_nearest_goblin", gob != null and cp._target.distance_to(gob.global_position) < 3.0)
+	await shot("cp_04_goblins")
+	Game.track_next()
+	await wait(0.5)
+	check("t_cycles", Game.current_quest() != "goblin_trouble")
+	# walk toward the arrow: it says we get closer
+	Game.track_quest("stolen_axes")
+	await wait(0.6)
+	var d0 := cp._dist
+	var to: Vector3 = cp._target
+	player.global_position = player.global_position.lerp(to, 0.6) + Vector3(0, 1.0, 0)
+	await wait(1.0)
+	check("distance_drops", cp._dist < d0 - 5.0, "%.0f -> %.0f" % [d0, cp._dist])
+	# arrow points the right way: face the target, the arrow is at the top
+	var dv := cp._target - player.global_position
+	player.yaw = atan2(-dv.x, -dv.z); player.snap_view(); await wait(0.4)
+	var rel := wrapf(QuestCompass.bearing(dv) - cp.heading(), -PI, PI)
+	check("arrow_up_when_facing", absf(rel) < 0.35, "%.2f" % rel)
+	await shot("cp_05_facing_axe")
+	# hand-in: arrow goes to the quest giver; done quest -> auto pick another
+	Game.quests["stolen_axes"].state = "ready"
+	Game.quests_changed.emit()
+	await wait(0.6)
+	var bram := cp._first("npc", func(n: Node) -> bool: return n.get("id") == "bram")
+	check("ready_points_to_giver", bram != null and cp._target.distance_to(bram.global_position) < 0.5)
+	Game.quests["stolen_axes"].state = "done"
+	Game.quests_changed.emit()
+	await wait(0.8)
+	check("auto_picks_next", Game.current_quest() in ["goblin_trouble", "strongbox"])
+	Game.save_slot()
+	check("tracked_saved", String(Game.read_slot(Game.active_slot).get("tracked_quest", "")) == Game.tracked_quest)
+	return false

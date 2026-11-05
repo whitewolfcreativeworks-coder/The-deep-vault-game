@@ -378,3 +378,51 @@ It also found two stale tests that still looked buttons up by list position. But
 - In the teeth shot this pointed the camera at the kitchen, so the hero was off-screen.
 - Fix: `_cam()` now kills the previous camera tween.
 - Lesson: frame-by-frame contact sheets (`INTRO_FRAMES=1` env var on the `intro` test) caught this immediately, where the pass/fail checks did not.
+
+## Follow-up 10: compass and quest arrow, morning-routine polish, stock assets (Nov 4)
+
+**Request:**
+- "Go north" meant nothing without a compass, so add a compass whose outer ring carries a quest arrow for the quest you're on.
+- Let the player choose the quest (or have one auto-assigned).
+- Fix the intro's missing toothbrush and foam, make the tea routine look right (steam, a whistle when ready), and keep it short.
+- Look into libraries of ready-made models instead of hand-building cups and plates.
+
+**Compass** (`scripts/ui/compass.gd`, drawn with `_draw()`):
+- The dial turns with the camera's heading. North is world −Z, which matches the forest sign ("road north: the Warren").
+- `quest_target()` resolves the followed quest each 0.4 s:
+  - ready → the giver NPC;
+  - collect → the nearest visible quest item of that kind;
+  - kill → the nearest living goblin on your level;
+  - boss → Gruk.
+- When the target is in the Warren (60 m underground) and you're not, it points to the Warren door instead, and to the climb-out when it's the other way round.
+- **Quest choice:**
+  - `Game.tracked_quest` and `tracked_manual` are saved in the slot.
+  - Accepting a quest follows it. Tapping a quest row, tapping the compass, or pressing T changes it.
+  - With nothing followed, it picks hand-ins first, then the nearest target.
+  - Touch taps reach the HUD through `TouchControls`, which asks `HUD.tap_at()` before treating a touch as move or look.
+- **Test:** a new `compass` test (15 checks):
+  - the dial turns;
+  - the arrow appears only on a quest and goes to the nearest axe, the nearest goblin, and the Warren door for the strongbox;
+  - tap-to-follow and T work;
+  - the distance drops as you walk;
+  - the arrow is at the top when you face the target;
+  - a ready quest points to the giver;
+  - a finished one auto-picks another;
+  - the choice is saved.
+
+**Intro polish:**
+- **Teapot and teacup** are turned on a "lathe": `_lathe()` revolves a profile into a smooth mesh, and `_tube()` sweeps a tapered tube along a curve for spouts and handles. They are glazed china with blue bands. The cup has real wall thickness, so the tea's colour change shows inside it.
+- **Toothbrush:**
+  - It is attached to the head bone at the mouth, which is found from the head mesh's bounds, and scrubs side to side.
+  - Toothpaste foam swells around the mouth, then a sparkle at the end.
+  - Before, it was attached to the hand slot, where the chibi fist swallowed it.
+- **Kettle:** it rumbles ("Bubble, bubble..."), the lid rattles, steam builds from the spout tip, then the whistle.
+- **Sounds:** a new kettle sound (boil rumble rising into a two-tone whistle), a pour sound whose pitch rises as the cup fills, and spoon clinks for the stir.
+- **Bug found:** `_steam()` added the particles to the movie node and the callers then tried to re-parent them under the teapot/cup. Godot refused ("already has a parent"), so all the steam had been emitting at the world origin, out of shot. The error was in the log all along. Lesson: grep test logs for `ERROR: Can't` as well as for test failures.
+- **Bug found:** semi-transparent steam rendered a black blob at the spout on this renderer. Isolated with a 20-line render script (glow on/off, steam on/off), then switched steam to additive blending.
+
+**Stock assets: what's reachable.**
+- From this sandbox, GitHub is reachable but Poly Haven, Kenney, Quaternius, Sketchfab and Poly Pizza are blocked by the network allowlist.
+- KayKit publishes its packs on GitHub, so **KayKit Restaurant Bits** (CC0) was added. Its round table, plates, jars, dish rack, pan, cutting board, bread, cheese and vegetable crates now dress the cabin kitchen.
+- It has no teapot or teacup, hence the lathe-built ones.
+- See the README for the libraries worth using if those sites become reachable (or if files are attached).
