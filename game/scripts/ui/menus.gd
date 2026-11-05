@@ -672,6 +672,11 @@ func _build_pause() -> void:
 	v.add_child(t)
 	v.add_child(_button("Resume", func() -> void: resume_requested.emit(), 360))
 	v.add_child(_button("Inventory & Character", func() -> void: show_panel("inventory"), 360))
+	v.add_child(_button("Look at my hero  [P]", func() -> void:
+		resume_requested.emit()
+		var pl := get_tree().get_first_node_in_group("player")
+		if pl and pl.has_method("start_pose"):
+			pl.start_pose(), 360))
 	_pause_sound_btn = _button(_sound_label(), func() -> void: _toggle_mute(), 360)
 	v.add_child(_pause_sound_btn)
 	var mv := _button("", func() -> void: pass, 360)

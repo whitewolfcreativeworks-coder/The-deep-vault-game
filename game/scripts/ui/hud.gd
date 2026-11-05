@@ -204,7 +204,24 @@ func bind_player(p: Player) -> void:
 	player = p
 	if compass:
 		compass.player = p
+	p.pose_changed.connect(_on_pose)
 	p.interact_target_changed.connect(func(t: String) -> void: _prompt = t)
+
+## "Check yourself out" mode: hide the busy bits of the HUD so you can see your hero.
+var _pose_label: Label
+func _on_pose(on: bool) -> void:
+	for n in [quest_box, compass, msg_box, target_box, hint, crosshair, objective_label]:
+		if n:
+			n.visible = not on
+	if _pose_label == null:
+		_pose_label = UIKit.label("", 20, Color(1.0, 0.92, 0.7), true)
+		_pose_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_pose_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		_pose_label.position = Vector2(-450, 22); _pose_label.size = Vector2(900, 60)
+		root.add_child(_pose_label)
+	_pose_label.visible = on
+	_pose_label.text = ("LOOKING GOOD!  Swipe to spin around · pinch or slide to zoom\nPOSE! to show off · DONE when you're finished" if Game.touch_active
+		else "LOOKING GOOD!  Move the mouse to spin around · wheel to zoom\nClick to strike a pose · Space to hop · P when you're finished")
 
 func set_target(n: Node) -> void:
 	if n == null or n.is_in_group("boss"):

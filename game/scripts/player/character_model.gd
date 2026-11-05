@@ -243,7 +243,7 @@ func setup(cfg: Dictionary) -> void:
 				continue
 			if m in _own_colors:
 				# outfit pieces keep their own colours; only the skin tone changes
-				if skin_c != null:
+				if skin_c != null and String(cfg.get("outfit_fx", "")) == "":
 					_recolor(m, Color.WHITE, 0.0, 1.0, skin_c, null)
 				continue
 			var is_head := nm.contains("_Head")
@@ -252,6 +252,13 @@ func setup(cfg: Dictionary) -> void:
 				_recolor(m, (outfit if has_outfit else Color.WHITE) * armor_t, st, 1.0, skin_c, hair_t if is_head else null)
 			elif armor_t != Color.WHITE and not is_head:
 				_mul(m, armor_t)
+	# dark armour skins: shadowy / ghostly / fiery finish on the outfit pieces
+	var ofx := String(cfg.get("outfit_fx", ""))
+	if DARK_LOOKS.has(ofx) and not _own_colors.is_empty():
+		for m in _own_colors:
+			_skin_mat(m, DARK_LOOKS[ofx], false)
+		if not cfg.has("aura"):
+			_add_aura(DARK_LOOKS[ofx].aura, 2, ofx == "infernal")
 	if SKIN_LOOKS.has(skin):
 		for m in all_meshes:
 			if String(m.name).contains("Eyes"):
@@ -351,6 +358,7 @@ func _wear_outfit(rel: String, _cfg: Dictionary) -> void:
 			all_meshes.erase(m)
 	for m in _borrow_meshes(path, body_part):
 		_own_colors.append(m)
+
 
 ## The cfg for a costume that is one of the game's own characters.
 static func costume_look_cfg(look: String, base: Dictionary) -> Dictionary:

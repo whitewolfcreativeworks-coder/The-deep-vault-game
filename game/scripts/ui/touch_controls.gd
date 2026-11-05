@@ -73,6 +73,8 @@ func _defaults() -> Array:
 		{"name": "dodge", "action": "dodge", "label": "DODGE", "center": Vector2(w - 62, h - 330), "radius": 50.0, "hold": false},
 		{"name": "interact", "action": "interact", "label": "USE", "center": Vector2(w - 572, h - 105), "radius": 52.0, "hold": false},
 		{"name": "mount", "action": "mount", "label": "RIDE", "center": Vector2(w - 560, h - 250), "radius": 46.0, "hold": false},
+		{"name": "pose", "action": "pose", "label": "ME", "center": Vector2(w - 576, 62), "radius": 44.0, "hold": false},
+		{"name": "emote", "action": "attack", "label": "POSE!", "center": Vector2(w - 170, h - 170), "radius": 80.0, "hold": false},
 		{"name": "potion", "action": "potion", "label": "HEAL", "center": Vector2(w - 372, 62), "radius": 44.0, "hold": false},
 		{"name": "mana", "action": "mana_potion", "label": "MANA", "center": Vector2(w - 474, 62), "radius": 44.0, "hold": false},
 		{"name": "view", "action": "toggle_view", "label": "VIEW", "center": Vector2(w - 270, 62), "radius": 44.0, "hold": false},
@@ -350,6 +352,11 @@ func _set_axis(action: String, s: float) -> void:
 ## USE swells and pulses gold whenever there's something you can use, talk to or pick up.
 ## The RIDE button only appears once you've earned the Giant Chicken.
 func _available(b: Dictionary) -> bool:
+	var posing: bool = player != null and player.get("posing") == true
+	if b.name == "emote":
+		return posing and not arrange
+	if posing and not arrange:
+		return b.name in ["pose", "jump"]     # only DONE, POSE! and a hop while you look at yourself
 	if b.name == "mount":
 		return bool(Game.flags.get("mount_chicken", false)) or arrange
 	return true
@@ -510,6 +517,8 @@ func _draw_pad() -> void:
 			label = player.view_name()
 		elif b.name == "mount" and player:
 			label = "WALK" if player.get("mounted") else "RIDE"
+		elif b.name == "pose" and player:
+			label = "DONE" if player.get("posing") else "ME"
 		elif b.name == "special":
 			label = Game.ability().short
 			if player and player.special_cd > 0.0 and not picked:

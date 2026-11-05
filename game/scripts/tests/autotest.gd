@@ -241,6 +241,8 @@ func _run() -> void:
 	elif mode == "daynight":
 		if await _daynight_test():
 			return
+	elif mode == "pose":
+		await _pose_test()
 	elif mode == "costumes":
 		await _costumes_test()
 	elif mode == "sinkhole":
@@ -2158,4 +2160,75 @@ func _costumes_test() -> void:
 		for d in Loot.roll_chest("wild", 4):
 			if d.get("kind", "") == "costume":
 				got += 1
-	check("costumes_drop_from_chests", got >= 6, "%d in 60 wild chests" % got)
+	check("costumes_are_rare", got >= 1 and got <= 15, "%d in 60 wild chests" % got)
+	# armour skins: common, small upgrades, and they change your look
+	var skins := 0
+	for k in 60:
+		for d in Loot.roll_chest("small", 4):
+			if d.get("kind", "") == "item" and Game.item(d.id).has("outfit") and Game.item(d.id).slot == "skin":
+				skins += 1
+	check("armor_skins_common", skins >= 10, "%d in 60 small chests" % skins)
+	Game.clear_costume()
+	await wait(0.5)
+	var s1 := Loot.make_armor_skin(4, 3)
+	while not Game.item(s1).has("fx"):
+		s1 = Loot.make_armor_skin(4, 3)
+	Game.add_item(s1)
+	await wait(0.8)
+	check("armor_skin_worn", Game.equipped.skin == s1 and player.body._own_colors.size() >= 3, Game.item(s1).name)
+	player.start_pose()
+	await wait(1.5)
+	await shot("cos_06_dark_armor_skin_" + String(Game.item(s1).fx))
+	player.end_pose()
+
+# --- "check yourself out" mode ---------------------------------------------------------
+func _pose_test() -> void:
+	await _start()
+	player = main.player
+	god = true
+	Game.wear_costume("demon")
+	await wait(1.0)
+	player.yaw = player.facing; player.snap_view()
+	await wait(0.5)
+	await shot("pose_00_from_behind")
+	await press("pose", 0.07)
+	await wait(1.6)
+	check("pose_on", player.posing)
+	var to_cam: Vector3 = player.camera.global_position - player.global_position
+	var fwd := -Vector3(sin(player.facing), 0, cos(player.facing))
+	check("camera_in_front", Vector2(to_cam.x, to_cam.z).normalized().dot(Vector2(fwd.x, fwd.z)) > 0.7, "%.2f" % Vector2(to_cam.x, to_cam.z).normalized().dot(Vector2(fwd.x, fwd.z)))
+	check("hud_tidy", not main.hud.compass.visible and main.hud._pose_label.visible)
+	await shot("pose_01_front")
+	var y0: float = player.yaw
+	var p0: Vector3 = player.global_position
+	Input.action_press("move_forward")
+	await wait(2.5)
+	Input.action_release("move_forward")
+	check("turntable_spins", absf(wrapf(player.yaw - y0, -PI, PI)) > 0.4, "%.2f" % (player.yaw - y0))
+	check("hero_stays_put", player.global_position.distance_to(p0) < 0.3)
+	await shot("pose_02_side")
+	await press("attack", 0.07)
+	await wait(0.4)
+	await shot("pose_03_strike_a_pose")
+	await press("attack", 0.07)
+	await wait(0.6)
+	player.yaw = player.facing + PI * 0.6; player._look_idle = 0.0
+	await wait(1.0)
+	await shot("pose_04_three_quarter")
+	await press("pose", 0.07)
+	await wait(1.2)
+	check("pose_off", not player.posing and main.hud.compass.visible)
+	var back: Vector3 = player.camera.global_position - player.global_position
+	check("camera_behind_again", Vector2(back.x, back.z).normalized().dot(Vector2(fwd.x, fwd.z)) < -0.5)
+	# the pause-menu button works too
+	main.menus.show_panel("pause")
+	await wait(0.3)
+	var found := false
+	for b in main.menus.find_children("*", "Button", true, false):
+		if (b as Button).text.begins_with("Look at my hero") and b.is_visible_in_tree():
+			(b as Button).pressed.emit()
+			found = true
+			break
+	await wait(1.0)
+	check("pause_menu_button", found and player.posing)
+	player.end_pose()

@@ -300,8 +300,11 @@ func add_item(id: String, auto_equip := true) -> void:
 			better = false   # never swap away the river amulet automatically
 		if it.get("special", "") == "river":
 			better = true
-		if it.slot == "skin":
-			better = cur == ""   # your first skin goes on straight away; later ones wait in the bag
+		if it.slot == "skin" and not it.has("outfit"):
+			better = cur == ""   # your first magic skin goes on straight away; later ones wait in the bag
+		elif it.slot == "skin":
+			# armour skins swap in whenever they're an upgrade (unless you wear a magic skin)
+			better = cur == "" or (item(cur).has("outfit") and score(id) > score(cur))
 		if better:
 			equip(id)
 		elif it.slot != "quest":
@@ -398,7 +401,7 @@ func _register_inputs() -> void:
 		"interact": [KEY_E], "inventory": [KEY_I], "character": [KEY_TAB],
 		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1], "mana_potion": [KEY_F, KEY_2],
 		"zoom_in_key": [KEY_EQUAL, KEY_KP_ADD], "zoom_out_key": [KEY_MINUS, KEY_KP_SUBTRACT],
-		"toggle_view": [KEY_V], "special": [KEY_X], "track_quest": [KEY_T], "mount": [KEY_G],
+		"toggle_view": [KEY_V], "special": [KEY_X], "track_quest": [KEY_T], "mount": [KEY_G], "pose": [KEY_P],
 	}
 	for action in keys:
 		if not InputMap.has_action(action):

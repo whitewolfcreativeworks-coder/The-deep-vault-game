@@ -129,6 +129,10 @@ func rebuild_body() -> void:
 	# armour you can see, and magic costumes on top of everything
 	if armor.has("outfit"):
 		cfg["outfit_model"] = armor.outfit
+	if skin.has("outfit"):
+		cfg["outfit_model"] = skin.outfit      # an armour skin changes the look of your armour
+		if skin.has("fx"):
+			cfg["outfit_fx"] = skin.fx
 	if Game.costume_id() != "":
 		cfg["costume"] = Game.costume_id()
 	body.setup(cfg)
@@ -372,12 +376,17 @@ func _physics_process(delta: float) -> void:
 			yaw -= lk.x * 2.2 * delta
 			pitch = clampf(pitch - lk.y * 1.3 * delta, PITCH_MIN, PITCH_MAX)
 			_look_idle = 0.0
-		_handle_actions()
-		var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-		_move_input = iv
-		dir = Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, view_yaw)
-		if Input.is_action_just_pressed("jump"):
-			_jump_buffer = 0.18
+		if posing:
+			_pose_actions(get_physics_process_delta_time())
+		else:
+			_handle_actions()
+			var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+			_move_input = iv
+			dir = Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, view_yaw)
+			if Input.is_action_just_pressed("jump"):
+				_jump_buffer = 0.18
+		if Input.is_action_just_pressed("pose") and not dead:
+			toggle_pose()
 	else:
 		_move_input = Vector2.ZERO
 	if is_on_floor():
@@ -446,6 +455,8 @@ func _physics_process(delta: float) -> void:
 		want = atan2(-dir.x, -dir.z)
 	if dodging and not strafe:
 		want = atan2(-dodge_dir.x, -dodge_dir.z)
+	if posing:
+		want = facing          # stand still and let the camera go round
 	var turn := 22.0 if strafe else (18.0 if attacking else 12.0)
 	if special_kind == "charge":
 		want = atan2(-_charge_dir.x, -_charge_dir.z)
@@ -772,6 +783,7 @@ func die() -> void:
 	Game.player_died.emit()
 
 func respawn_at(pos: Vector3, yaw_r: float) -> void:
+	end_pose()
 	dismount()
 	dead = false
 	global_position = pos
@@ -885,6 +897,65 @@ func _fade_headgear(hide: bool) -> void:
 				(m as MeshInstance3D).visible = true
 		_headgear_hidden.clear()
 
+# --- "Check yourself out": a turntable camera around your hero ---------------------
+signal pose_changed(on: bool)
+var posing := false
+var _pose_saved := {}
+var _pose_i := 0
+const POSE_CLIPS := ["Cheer", "2H_Melee_Attack_Spin", "Interact", "1H_Melee_Attack_Chop", "Spellcast_Raise", "Unarmed_Pose", "Block", "Throw", "PickUp", "Jump_Full_Short"]
+
+func toggle_pose() -> void:
+	if posing:
+		end_pose()
+	else:
+		start_pose()
+
+func start_pose() -> void:
+	if posing or dead:
+		return
+	posing = true
+	_pose_saved = {"zoom": zoom_target, "pitch": pitch, "first": first_person}
+	if first_person and has_method("toggle_view"):
+		zoom = maxf(zoom, 1.0)
+	attacking = false; blocking = false; casting = false; dodging = false
+	velocity.x = 0.0; velocity.z = 0.0
+	zoom_target = 4.6 if mounted else 3.2
+	yaw = facing + PI            # swing round to the front
+	pitch = -0.12
+	_look_idle = 0.0
+	if not mounted:
+		body.oneshot("Cheer", 1.3)
+	Sfx.play("pickup", -8.0, 0.0)
+	pose_changed.emit(true)
+
+func end_pose() -> void:
+	if not posing:
+		return
+	posing = false
+	zoom_target = float(_pose_saved.get("zoom", 4.2))
+	pitch = float(_pose_saved.get("pitch", -0.2))
+	yaw = facing                 # back behind you
+	pose_changed.emit(false)
+
+func _pose_actions(delta: float) -> void:
+	_move_input = Vector2.ZERO
+	# strike a pose (attack / the POSE! button); jump does a happy hop
+	if Input.is_action_just_pressed("attack") and not mounted:
+		var clip: String = POSE_CLIPS[_pose_i % POSE_CLIPS.size()]
+		_pose_i += 1
+		body.oneshot(clip, -1.0)
+		if clip == "Cheer":
+			FX.burst(global_position + Vector3(0, 1.6, 0), Color(1.0, 0.9, 0.5), 20, 2.0, 0.12, 0.8, 0.5)
+	if Input.is_action_just_pressed("jump") and is_on_floor():
+		velocity.y = JUMP_V
+	if mounted and Input.is_action_just_pressed("attack") and mount:
+		mount.bawk()
+	# the camera slowly circles you until you drag it yourself
+	if _look_idle > 1.5:
+		yaw += 0.45 * delta
+	if Input.is_action_just_pressed("pause") or Input.is_action_just_pressed("inventory"):
+		end_pose()
+
 func snap_view() -> void:
 	reset_physics_interpolation()
 	view_yaw = yaw; view_pitch = pitch
@@ -939,9 +1010,9 @@ func _update_camera(delta: float) -> void:
 	# so the head, hair and hats don't fill the middle of the screen
 	var ramp := clampf((zoom - 0.6) / 0.8, 0.0, 1.0)
 	var near := 1.0 - clampf((zoom - 1.0) / 2.5, 0.0, 1.0)
-	var shoulder := ramp * lerpf(0.38 * clampf(1.0 - (zoom - 4.0) / 5.0, 0.3, 1.0), 0.62, near) * squeeze
+	var shoulder := ramp * lerpf(0.38 * clampf(1.0 - (zoom - 4.0) / 5.0, 0.3, 1.0), 0.62, near) * squeeze * (0.0 if posing else 1.0)
 	var lift := clampf((zoom - 0.5) * 0.12, 0.0, 0.55) + 0.2 * near * ramp
-	_fade_headgear(not fp and cam_len < 1.9)
+	_fade_headgear(not fp and cam_len < 1.9 and not posing)
 	# when a wall behind squeezes the camera in, rise up over the shoulder so you
 	# look down at your hero instead of into the back of their helmet
 	if not fp:

@@ -520,3 +520,14 @@ It also found two stale tests that still looked buttons up by list position. But
 - picking up a costume transforms you, and a new one replaces the old;
 - play-time costumes expire, and real-time ones survive a save;
 - wild chests spawn, and costumes drop from about 1 in 4 wild chests.
+
+**Later the same evening:**
+- **Pose mode.** "You never get to see what you look like."
+  - P, the ME touch button, or the pause menu turns on a turntable camera: it swings to the front, auto-orbits until you drag, removes the shoulder offset, and hides the busy parts of the HUD.
+  - The hero stays put; attack cycles 10 poses, jump hops.
+  - Tested by the `pose` test (8 checks): the camera ends up in front and behind again, the turntable spins, and the pause-menu button works.
+- **Rarity.**
+  - "Full character skins should be rarer, with armour skins as common slight upgrades."
+  - Costume odds dropped to 4–9% per ordinary chest.
+  - New armour skins (22 looks, 7 of them dark with a material finish) drop at 30–50% from chests and 6% from monsters.
+  - They sit in the skin slot, override the armour's look, carry a small defence and health bonus, and auto-equip when they score higher.

@@ -112,6 +112,51 @@ const OUTFITS := {
 	"Warden Plate": ["costumes/Paladin", "adv2/Knight", "adv2/Mage"],
 }
 
+## Armour skins: new outfit looks that drop often. Each is a small upgrade
+## (a little defence and health) and changes how your armour looks; it goes on
+## by itself when it beats the one you're wearing. "fx" gives the dark ones a
+## shadowy, ghostly or fiery finish.
+const ARMOR_SKINS := [
+	{"name": "Ranger's Leathers", "outfit": "adv2/Ranger"},
+	{"name": "Rogue's Garb", "outfit": "adv2/Rogue"},
+	{"name": "Druid's Robes", "outfit": "adv2/Druid"},
+	{"name": "Tinker's Overalls", "outfit": "adv2/Engineer"},
+	{"name": "Barbarian Furs", "outfit": "adv2/Barbarian"},
+	{"name": "Mage Robes", "outfit": "adv2/Mage"},
+	{"name": "Knight's Surcoat", "outfit": "adv2/Knight"},
+	{"name": "Paladin's Tabard", "outfit": "costumes/Paladin"},
+	{"name": "Cleric Vestments", "outfit": "costumes/Cleric"},
+	{"name": "Trailblazer Gear", "outfit": "costumes/Hiker"},
+	{"name": "Survivor's Kit", "outfit": "costumes/Survivalist"},
+	{"name": "Farmhand Overalls", "outfit": "costumes/Farmer_B"},
+	{"name": "Treasure Hunter's Coat", "outfit": "costumes/Hoarder"},
+	{"name": "Parade Uniform", "outfit": "costumes/ToySoldier"},
+	{"name": "Ninja Wrappings", "outfit": "costumes/Ninja"},
+	# the dark side
+	{"name": "Necromancer's Shroud", "outfit": "costumes/Necromancer", "min": 1},
+	{"name": "Shadow Plate", "outfit": "costumes/Paladin", "fx": "shadow", "min": 2},
+	{"name": "Nightstalker Garb", "outfit": "adv2/Rogue", "fx": "shadow", "min": 1},
+	{"name": "Deathly Mail", "outfit": "adv2/Knight", "fx": "deathly", "min": 2},
+	{"name": "Hellfire Robes", "outfit": "adv2/Mage", "fx": "infernal", "min": 2},
+	{"name": "Graveyard Rags", "outfit": "costumes/Farmer_B", "fx": "rot", "min": 1},
+	{"name": "Ember Furs", "outfit": "adv2/Barbarian", "fx": "infernal", "min": 2},
+]
+
+static func make_armor_skin(ilvl: int, rarity: int) -> String:
+	var pool: Array = []
+	for a in ARMOR_SKINS:
+		if int(a.get("min", 0)) <= rarity:
+			pool.append(a)
+	var a: Dictionary = pool[rng.randi() % pool.size()]
+	var it := {"slot": "skin", "rarity": rarity, "base": "Armor Skin", "outfit": a.outfit, "name": a.name,
+		"desc": "A new look for your armour. A small upgrade, too."}
+	if a.has("fx"):
+		it["fx"] = a.fx
+	var k := (1.0 + ilvl * 0.6) * (1.0 + rarity * 0.35) * rng.randf_range(0.9, 1.15)
+	it["defense"] = roundf(k * 1.2)
+	it["hp"] = roundf(k * 3.0)
+	return _register(it)
+
 ## affix: [label, low, high, is_percent]
 const AFFIXES := {
 	"crit": ["crit chance", 3.0, 9.0, true],
@@ -266,9 +311,14 @@ static func _potions(out: Array, n: int, mana_bias := 0.4) -> void:
 static func roll_chest(tier: String, ilvl: int) -> Array:
 	var out: Array = []
 	# any chest might hold a magic costume
-	var cchance: float = {"small": 0.14, "big": 0.22, "wild": 0.3, "boss": 0.5, "skin": 0.6}.get(tier, 0.1)
+	# full-body costumes are rare treats...
+	var cchance: float = {"small": 0.04, "big": 0.07, "wild": 0.09, "boss": 0.25, "skin": 0.3}.get(tier, 0.03)
 	if rng.randf() < cchance:
 		out.append({"kind": "costume", "id": roll_costume()})
+	# ...armour skins (new looks, small upgrades) turn up often
+	var achance: float = {"small": 0.3, "big": 0.45, "wild": 0.5, "boss": 0.8, "skin": 0.8, "supply": 0.15}.get(tier, 0.2)
+	if rng.randf() < achance:
+		out.append({"kind": "item", "id": make_armor_skin(ilvl, roll_rarity(0.4))})
 	match tier:
 		"wild":
 			# the chests that pop up out in the wilds: a bit of everything, and lucky
@@ -318,6 +368,8 @@ static func roll_enemy(type_name: String, ilvl: int) -> Array:
 	if rng.randf() < t[1]:
 		var floor_r := 1 if type_name == "revenant" else 0
 		out.append({"kind": "item", "id": make_random(ilvl, t[2], floor_r)})
+	if rng.randf() < 0.06:
+		out.append({"kind": "item", "id": make_armor_skin(ilvl, roll_rarity(0.2))})
 	return out
 
 ## Gold value when you salvage an item you don't want.

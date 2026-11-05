@@ -67,7 +67,11 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
-- **Costumes (magic disguises).** Chests sometimes hold a glowing little figure. Walk over it and POOF, you turn into it!
+- **Look at your hero.** Press **P**, tap **ME** (iPad), or pick "Look at my hero" in the pause menu. The camera swings round to your front and slowly circles you. Swipe or move the mouse to spin it yourself, zoom in or out, tap **POSE!** (or click) to strike a pose, and **DONE** (or P) to go back.
+- **Armour skins (common).** New outfit looks drop often from chests and now and then from monsters. Each one is a small upgrade (a bit of defence and health) and goes on by itself when it beats the one you're wearing.
+  - They include Ranger's Leathers, Druid's Robes, Knight's Surcoat, Paladin's Tabard, Treasure Hunter's Coat and Parade Uniform.
+  - Dark ones are rarer: Necromancer's Shroud, Shadow Plate, Nightstalker Garb, Deathly Mail, Hellfire Robes, Graveyard Rags and Ember Furs, each with a glowing finish and aura.
+- **Costumes (magic disguises, rare).** Now and then a chest holds a glowing little figure. Walk over it and POOF, you turn into it!
   - There are 40 costumes: a cute green dinosaur, a werewolf, a vampire, a clown, a ninja, robots, a witch, a caveman, a superhero, a space ranger, a toy soldier, a teddy bear, a bird knight, an elf, a mech suit and more.
   - About half of them are on the dark side: Dark Knight, Shadow Ninja, Zombie Farmer, Lich, Demon, Death Knight, Shadow Mage, Dark Witch, Vampire Lord, Bone Lord and a Spooky Bear, most with an eerie glow and a dark aura at your feet.
   - You can also become characters from the game: a skeleton, a goblin, an Ember Goblin, or Chief Gruk himself.
