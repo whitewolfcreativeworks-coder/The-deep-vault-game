@@ -135,6 +135,8 @@ func rebuild_body() -> void:
 			cfg["outfit_fx"] = skin.fx
 	if Game.costume_id() != "":
 		cfg["costume"] = Game.costume_id()
+	elif Game.custom_look_on and not Game.custom_look.is_empty():
+		cfg["custom_look"] = Game.custom_look      # your own design from the Skin Designer
 	body.setup(cfg)
 	body.set_head_visible(not _head_hidden)
 	_equipped_sig = _equip_signature()
@@ -203,7 +205,8 @@ static func _apply_profile_looks(cfg: Dictionary) -> void:
 
 var _equipped_sig := ""
 func _equip_signature() -> String:
-	return "%s|%s|%s|%s" % [Game.equipped.weapon, Game.equipped.armor, Game.equipped.skin, Game.costume_id()]
+	return "%s|%s|%s|%s|%s" % [Game.equipped.weapon, Game.equipped.armor, Game.equipped.skin, Game.costume_id(),
+		str(Game.custom_look).hash() if Game.custom_look_on else 0]
 
 func _on_inventory_changed() -> void:
 	if _equip_signature() == _equipped_sig:

@@ -241,6 +241,8 @@ func _run() -> void:
 	elif mode == "daynight":
 		if await _daynight_test():
 			return
+	elif mode == "designer":
+		await _designer_test()
 	elif mode == "pose":
 		await _pose_test()
 	elif mode == "costumes":
@@ -2235,3 +2237,105 @@ func _pose_test() -> void:
 	await wait(1.0)
 	check("pause_menu_button", found and player.posing)
 	player.end_pose()
+
+# --- the Skin Designer --------------------------------------------------------------
+func _designer_test() -> void:
+	await _start()
+	player = main.player
+	god = true
+	for id in ["dino", "dark_knight", "ninja", "witch"]:
+		Game.unlock_look(id)
+	for o in ["costumes/Paladin", "adv2/Knight", "costumes/Ninja"]:
+		Game.unlock_look(o)
+	Game.unlock_look("goblin")
+	check("look_costumes_not_unlocked", not Game.unlocked_looks.has("goblin"))
+	main._open("pause")
+	await wait(0.4)
+	await shot("des_00_pause_menu")
+	main.menus.show_panel("designer")
+	await wait(0.6)
+	var d: SkinDesigner = main.menus.designer
+	check("designer_open", d.visible and d.sources.size() == 8, str(d.sources))
+	await shot("des_01_empty")
+	d.set_part("head", "dino")
+	d.set_part("body", "costumes/Paladin", Color(0.85, 0.15, 0.15))
+	d.set_part("arms", "adv2/Knight")
+	d.set_part("legs", "costumes/Ninja", null, "shadow")
+	await wait(0.8)
+	await shot("des_02_designed")
+	d.randomize_look()
+	await wait(0.5)
+	await shot("des_03_random")
+	d.set_part("head", "dino")
+	d.set_part("body", "costumes/Paladin", Color(0.85, 0.15, 0.15))
+	d.set_part("arms", "adv2/Knight")
+	d.set_part("legs", "costumes/Ninja", null, "shadow")
+	d.wear()
+	await wait(1.0)
+	check("designer_closed_and_playing", not d.visible and main.state == "play" and not get_tree().paused)
+	check("custom_on", Game.custom_look_on and String(Game.custom_look.head.src) == "dino")
+	var parts := {}
+	for m in player.body._own_colors:
+		parts[CharacterModel.part_of(String(m.name))] = true
+	check("borrowed_all_parts", parts.has("head") and parts.has("body") and parts.has("arms") and parts.has("legs"), str(parts.keys()))
+	var own_head_hidden := false
+	for m in player.body._never_show:
+		if is_instance_valid(m) and String(m.name).contains("_Head") and not m.visible and not (m in player.body._own_colors):
+			own_head_hidden = true
+	check("own_head_hidden", own_head_hidden)
+	player.start_pose()
+	await wait(1.8)
+	player.yaw = player.facing + PI; player._look_idle = 0.0
+	await wait(0.6)
+	await shot("des_04_wearing_front")
+	player.end_pose()
+	# own head kept when the head part is "own"
+	var lk2: Dictionary = Game.custom_look.duplicate(true)
+	lk2.head = {"src": "own", "tint": null, "finish": ""}
+	Game.set_custom_look(lk2, true)
+	await wait(0.6)
+	var own_visible := false
+	for m in player.body.all_meshes:
+		if String(m.name).ends_with("_Head") and m.visible and not (m in player.body._own_colors):
+			own_visible = true
+	check("own_head_kept", own_visible)
+	# saved
+	Game.save_slot()
+	var sd: Dictionary = Game.read_slot(Game.active_slot)
+	check("design_saved", bool(sd.get("custom_look_on", false)) and String(sd.get("custom_look", {}).get("body", {}).get("src", "")) == "costumes/Paladin"
+		and (sd.get("unlocked_looks", []) as Array).has("dino"))
+	# a timed costume goes on top, the design comes back after
+	Game.wear_costume("vampire")
+	await wait(0.6)
+	var costumed := player.body._own_colors.is_empty() or Game.costume_id() == "vampire"
+	check("costume_overrides", Game.costume_id() == "vampire" and costumed)
+	Game.clear_costume()
+	await wait(0.6)
+	var back := false
+	for m in player.body._own_colors:
+		if String(m.name).begins_with("Paladin"):
+			back = true
+	check("design_returns", back)
+	# take it off
+	main.menus.show_panel("designer")
+	await wait(0.3)
+	d.take_off()
+	d.close(false)
+	await wait(0.6)
+	check("take_off", not Game.custom_look_on)
+	# opens from the inventory too
+	main.menus.show_panel("inventory")
+	await wait(0.3)
+	await shot("des_05_inventory")
+	var found := false
+	for b in main.menus.find_children("*", "Button", true, false):
+		if (b as Button).text.contains("Skin Designer") and b.is_visible_in_tree():
+			(b as Button).pressed.emit()
+			found = true
+			break
+	await wait(0.4)
+	check("inventory_button", found and d.visible)
+	d.close(false)
+	await wait(0.3)
+	check("close_returns_to_inventory", main.menus.current == "inventory")
+	main._resume()

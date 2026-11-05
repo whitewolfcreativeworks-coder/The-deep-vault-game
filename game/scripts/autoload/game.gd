@@ -187,10 +187,31 @@ func wear_costume(id: String) -> void:
 	costume = {"id": id, "real": real, "until": (Time.get_unix_time_from_system() if real else play_time) + float(t[1])}
 	var c: Dictionary = Loot.COSTUMES[id]
 	message.emit("%s  (lasts %s)" % [c.line, t[3]], Color(1.0, 0.75, 1.0))
+	unlock_look(id)
 	inventory_changed.emit()
 
 func clear_costume() -> void:
 	costume = {}
+	inventory_changed.emit()
+
+# --- the Skin Designer ---------------------------------------------------------
+# Every costume you've worn and every armour look you've found unlocks its parts
+# (head / body / arms / legs) for the designer. custom_look is the mixed look
+# (see CharacterModel._wear_custom); a timed costume still goes on top of it.
+var unlocked_looks: Array = []
+var custom_look := {}
+var custom_look_on := false
+
+func unlock_look(id: String) -> void:
+	if id == "" or unlocked_looks.has(id):
+		return
+	if Loot.COSTUMES.has(id) and not Loot.COSTUMES[id].has("file"):
+		return   # goblins, skeletons... can't be taken apart
+	unlocked_looks.append(id)
+
+func set_custom_look(look: Dictionary, on := true) -> void:
+	custom_look = look.duplicate(true)
+	custom_look_on = on
 	inventory_changed.emit()
 
 # ---------------------------------------------------------------------------
@@ -260,6 +281,7 @@ func reset_run() -> void:
 	tracked_manual = false
 	day_clock = 150.0
 	costume = {}
+	unlocked_looks = []; custom_look = {}; custom_look_on = false
 	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
 	game_over = false
@@ -293,6 +315,8 @@ func add_item(id: String, auto_equip := true) -> void:
 	var tag := "" if r == 0 else "[%s] " % Loot.RARITY_NAMES[r].to_upper()
 	message.emit("Found: %s%s" % [tag, it.name], it.color)
 	loot_found.emit(id)
+	if it.has("outfit"):
+		unlock_look(String(it.outfit))
 	if auto_equip and it.slot in SLOTS:
 		var cur: String = equipped[it.slot]
 		var better := cur == "" or score(id) > score(cur)
@@ -481,6 +505,7 @@ func save_slot(i := -1) -> bool:
 		"objective": objective,
 		"resume_pos": resume_pos, "resume_yaw": resume_yaw,
 		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual, "day_clock": day_clock, "costume": costume.duplicate(),
+		"unlocked_looks": unlocked_looks.duplicate(), "custom_look": custom_look.duplicate(true), "custom_look_on": custom_look_on,
 	}
 	var f := FileAccess.open(_slot_path(i), FileAccess.WRITE)
 	if f == null:
@@ -534,6 +559,9 @@ func load_slot(i: int) -> bool:
 	tracked_manual = bool(d.get("tracked_manual", false))
 	day_clock = float(d.get("day_clock", 150.0))
 	costume = (d.get("costume", {}) as Dictionary).duplicate()
+	unlocked_looks = (d.get("unlocked_looks", []) as Array).duplicate()
+	custom_look = (d.get("custom_look", {}) as Dictionary).duplicate(true)
+	custom_look_on = bool(d.get("custom_look_on", false))
 	hp = clampf(float(d.get("hp", max_hp())), max_hp() * 0.5, max_hp())
 	mana = clampf(float(d.get("mana", max_mana())), 0.0, max_mana())
 	stamina = max_stamina()

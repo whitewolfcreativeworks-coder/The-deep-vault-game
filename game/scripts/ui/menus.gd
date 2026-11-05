@@ -53,6 +53,7 @@ func _ready() -> void:
 	_build_victory()
 	_build_dialogue()
 	_build_forest_victory()
+	_build_designer()
 	fade = ColorRect.new()
 	fade.color = Color(0, 0, 0, 1)
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -67,6 +68,8 @@ func fade_to(a: float, t := 0.8) -> Tween:
 	return tw
 
 func show_panel(n: String) -> void:
+	if n == "designer" and current != "designer":
+		_designer_back = current
 	current = n
 	for k in _panels:
 		(_panels[k] as Control).visible = k == n
@@ -76,6 +79,8 @@ func show_panel(n: String) -> void:
 		_continue_btn.visible = Game.any_save()
 	if n == "inventory":
 		_refresh_inventory(); _refresh_stats()
+	if n == "designer" and designer:
+		designer.open()
 	if n == "pause" and _arrange_btn:
 		_arrange_btn.visible = Game.touch_active
 		_reset_btn.visible = Game.touch_active
@@ -672,6 +677,7 @@ func _build_pause() -> void:
 	v.add_child(t)
 	v.add_child(_button("Resume", func() -> void: resume_requested.emit(), 360))
 	v.add_child(_button("Inventory & Character", func() -> void: show_panel("inventory"), 360))
+	v.add_child(_button("Skin Designer", func() -> void: show_panel("designer"), 360))
 	v.add_child(_button("Look at my hero  [P]", func() -> void:
 		resume_requested.emit()
 		var pl := get_tree().get_first_node_in_group("player")
@@ -708,6 +714,20 @@ func _build_pause() -> void:
 	v.add_child(_button("Restart adventure", func() -> void: restart_requested.emit(), 360))
 	v.add_child(_button("Quit game", func() -> void: quit_requested.emit(), 360))
 
+# --- the Skin Designer (scripts/ui/designer.gd) ------------------------------------
+var designer: SkinDesigner
+var _designer_back := ""
+
+func _build_designer() -> void:
+	designer = SkinDesigner.new()
+	root.add_child(designer)
+	_panels["designer"] = designer
+	designer.closed.connect(func(wore: bool) -> void:
+		if wore or _designer_back == "":
+			resume_requested.emit()
+		else:
+			show_panel(_designer_back))
+
 func _build_inventory() -> void:
 	var p := _center_panel("inventory", 1220, 760)
 	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 26); p.add_child(h)
@@ -719,6 +739,7 @@ func _build_inventory() -> void:
 	var head := HBoxContainer.new()
 	head.add_child(UIKit.label("Equipped", 26, UIKit.GOLD, true))
 	var spacer := Control.new(); spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL; head.add_child(spacer)
+	head.add_child(_button("✂  Skin Designer", func() -> void: show_panel("designer"), 230))
 	var x := Button.new(); x.text = "✕  Close"; x.custom_minimum_size = Vector2(150, 50)
 	x.pressed.connect(func() -> void: resume_requested.emit())
 	head.add_child(x)
