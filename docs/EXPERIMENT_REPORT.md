@@ -344,5 +344,37 @@ It also found two stale tests that still looked buttons up by list position. But
 - The `flow` test now ends by walking into the portal. A second phase, after the scene reload, checks that you arrive at the forest portal.
 
 **Tests:**
-- `intro` checks that all eight shots play and that you end at the Vault outpost.
+- `intro` checks that all the shots play, that the movie is short, and that you end at the Vault outpost.
 - `introskip` checks the Skip button.
+
+## Follow-up 9: a shorter, better-looking opening movie (Nov 4)
+
+**Request:** make the intro shorter and nicer to look at.
+- Put the portal near the cabin, on a path that makes sense, and make it an ordinary family portal rather than a discovery.
+- Use cameras that show the face, not the back of the head, especially while brushing teeth.
+- Add striped pajamas, a stretch, a proper teapot, and the full tea routine (pour, steam, tea bag, about 3 s wait, stir, turns brown, drink).
+- Beam the hero away in a light effect, and arrive at a portal in a side area of the Vault outpost.
+
+**What changed:**
+- `intro.gd` is rewritten as seven shots, about 40 s.
+- Every indoor camera sits in front of the hero:
+  - the wake-up is filmed from the foot of the bed;
+  - the tooth-brushing is filmed from the mirror's point of view;
+  - the tea is filmed from across the table.
+- The hero is scaled to 0.72 indoors so he fits the furniture.
+- **Stripes:** the recolour shader gained `stripes`/`stripe_color` uniforms, which give striped bands in model space. `CharacterModel` passes them through with a new `outfit_stripes` config key.
+- **Teapot:** built from primitives (body, band, lid, knob, angled spout, loop handle).
+  - The pour tilts it about its own side axis.
+  - A water stream is stretched from the computed spout tip to the cup.
+  - The cup is open-topped, so the tea's colour tween (clear to brown) is visible. Steam rises from the cup.
+- **Portal:** about 13 m from the door, at the end of a worn dirt path painted into the terrain colours. The arch's iron gates are hidden, so it reads as an open archway.
+- **Beam-out:** a light pillar, rising sparkles and a burst. The hero flashes, stretches thin and lifts, then the screen flashes white.
+- **Vault side:**
+  - The arrival portal moved from behind the spawn to the west side area, with a cobbled path through the gap in the ruined wall.
+  - The hero now spawns inside it, facing the gate (`VaultWorld.spawn_yaw`, also used for the checkpoint), and beams in with a matching pillar and flash.
+
+**Bug found by screenshots:**
+- Two overlapping camera tweens fought each other: the previous shot's move was still running when the next shot started.
+- In the teeth shot this pointed the camera at the kitchen, so the hero was off-screen.
+- Fix: `_cam()` now kills the previous camera tween.
+- Lesson: frame-by-frame contact sheets (`INTRO_FRAMES=1` env var on the `intro` test) caught this immediately, where the pass/fail checks did not.

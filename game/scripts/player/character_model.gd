@@ -31,7 +31,8 @@ var weapon_root: BoneAttachment3D
 var offhand_root: BoneAttachment3D
 var weapon_tip: Node3D
 var head_meshes: Array[MeshInstance3D] = []
-var hold_clip := ""      # cutscenes: keep playing this clip instead of walking/idling
+var hold_clip := ""
+var _stripes := Color.BLACK   # cfg "outfit_stripes": striped pajamas in the opening movie      # cutscenes: keep playing this clip instead of walking/idling
 var all_meshes: Array[MeshInstance3D] = []
 var kind := "hero"            # "hero" | "skeleton"
 var anims := {}               # role -> clip name
@@ -87,6 +88,7 @@ func setup(cfg: Dictionary) -> void:
 		c.queue_free()
 	head_meshes.clear(); all_meshes.clear()
 	kind = cfg.get("kind", "hero")
+	_stripes = cfg.get("outfit_stripes", Color.BLACK)
 	var skin: String = cfg.get("skin", "")
 	if skin == "bone":
 		kind = "skeleton"
@@ -253,6 +255,9 @@ func _recolor(m: MeshInstance3D, c: Color, strength: float, skin_protect: float,
 		r.shader = _recolor_shader
 		r.set_shader_parameter("tex", sm.albedo_texture)
 		r.set_shader_parameter("tint", c)
+		if _stripes != Color.BLACK:
+			r.set_shader_parameter("stripes", 1.0)
+			r.set_shader_parameter("stripe_color", _stripes)
 		r.set_shader_parameter("strength", strength)
 		r.set_shader_parameter("skin_protect", skin_protect)
 		r.set_shader_parameter("tex_is_srgb", RenderingServer.get_current_rendering_method() == "gl_compatibility")

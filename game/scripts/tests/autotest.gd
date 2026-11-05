@@ -221,7 +221,11 @@ func _run() -> void:
 					await shot("in_" + sh)
 				await wait(0.25)
 				t += 0.25
-			for sh2 in ["sunrise", "bed", "dress", "teeth", "kettle", "tea", "trail", "portal"]:
+				if int(t * 4.0) % 4 == 0 and OS.get_environment("INTRO_FRAMES") != "":
+					await shot("f_%03d" % int(t))
+			print("INTRO_LENGTH ", t)
+			check("intro_short", t < 60.0, str(t))
+			for sh2 in ["sunrise", "bed", "dress", "teeth", "kettle", "tea", "portal"]:
 				check("intro_shot_" + sh2, seen.has(sh2))
 			await wait(2.0)
 			check("intro_ends_at_vault", main.state == "play" and main.world is VaultWorld and main.player.global_position.distance_to(main.world.spawn_point) < 3.0)

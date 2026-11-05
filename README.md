@@ -69,8 +69,10 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 - **Opening movie (new).** After you create your hero, a short real-time movie plays with your own character. It has a Skip button.
   - The sun rises over the mountains into a quiet valley and Bobek's little cabin.
-  - Your hero wakes up in pajamas, changes into their outfit, brushes their teeth, boils the kettle and sits down for a cup of tea.
-  - Then they walk out whistling down the forest trail, find a forgotten portal that flickers to life, and step through to arrive at the gates of the Deep Vault.
+  - Your hero wakes up in striped pajamas, stretches, changes into their outfit and brushes their teeth (seen from the mirror, so you see their face).
+  - The teapot whistles. At the table they pour from the spout into the cup, drop in a tea bag, count three while it turns brown, stir and sip.
+  - Then it's a few steps across the yard to the family portal. They stand in the middle, and a beam of light carries them away.
+  - They beam in at a portal in the west side of the Vault outpost and walk from there to the gate. About 40 seconds in all.
 - **Portal to Level 2.** After you defeat the Warden and claim the Heart, the wall behind the altar grinds open on an ancient portal. Walk into it and you come out of the portal in the Goblin Forest.
 - **Character creator.** A big **Surprise me!** button gives you a random look, colours and a silly Bobek name. There are 60 names, from *Bobek McBobface* and *Bobekasaurus Rex* to *Bobek the Kettle Master*.
 - **Level 2: The Goblin Forest (new).** Win the Vault and a portal opens behind the altar. Step through to arrive in a sunlit forest valley.

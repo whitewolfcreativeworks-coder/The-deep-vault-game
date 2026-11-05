@@ -30,7 +30,9 @@ var warden: Warden
 var altar: Interactable
 var boss_started := false
 var rivers: Array[GlowRiver] = []
-var spawn_point := Vector3(0, 0.1, 30)
+var spawn_point := Vector3(-22.5, 0.1, 25.0)   # inside the arrival portal (west side area)
+var spawn_yaw := -1.15                          # facing out of the portal toward the vault gate
+const ARRIVAL := Vector3(-24.0, 0, 25.0)
 var hall_woken := false
 
 func build() -> void:
@@ -184,19 +186,29 @@ func _story(z: float) -> void:
 
 # ---------------------------------------------------------------------------
 func _outpost() -> void:
-	# the ancient portal you arrive through (from the opening movie)
+	# the ancient portal you arrive through (from the opening movie), in the west side area
 	var arch: Node3D = (load("res://assets/kaykit/forest/arch_gate.gltf") as PackedScene).instantiate()
 	add_child(arch)
-	arch.position = Vector3(0, -0.05, 36.0)
+	arch.position = ARRIVAL + Vector3(0, -0.05, 0)
+	arch.rotation_degrees.y = 90.0
 	arch.scale = Vector3.ONE * 1.5
+	for side in ["arch_gate_left", "arch_gate_right"]:
+		var gate := arch.find_child(side, true, false)
+		if gate:
+			gate.visible = false
 	var disc := MeshInstance3D.new(); var q := QuadMesh.new(); q.size = Vector2(4.4, 5.2); disc.mesh = q
 	var pm := ShaderMaterial.new(); pm.shader = load("res://shaders/portal.gdshader"); pm.set_shader_parameter("intensity", 1.2)
-	disc.material_override = pm; disc.position = Vector3(0, 3.0, 35.95); add_child(disc)
+	disc.material_override = pm; disc.position = ARRIVAL + Vector3(0, 3.0, 0); disc.rotation_degrees.y = 90.0; add_child(disc)
 	var pl := OmniLight3D.new(); pl.light_color = Color(0.4, 1.0, 0.8); pl.light_energy = 2.0; pl.omni_range = 9.0
-	pl.position = Vector3(0, 3.0, 35.0); add_child(pl)
+	pl.position = ARRIVAL + Vector3(1.5, 3.0, 0); add_child(pl)
+	var ring := MeshInstance3D.new(); var rc := CylinderMesh.new(); rc.top_radius = 2.4; rc.bottom_radius = 2.6; rc.height = 0.12
+	ring.mesh = rc; ring.material_override = b.mats.cobble; ring.position = ARRIVAL + Vector3(1.4, 0.03, 0); add_child(ring)
+	# a short worn path from the portal through the gap in the ruined wall
+	b.box(Vector3(-22, -0.97, 23.5), Vector3(-11, 0.025, 26.5), b.mats.cobble, false)
+	# the stone back wall behind the portal so you can't walk round into nothing
 	var asb := StaticBody3D.new(); add_child(asb)
-	var acs := CollisionShape3D.new(); var abs := BoxShape3D.new(); abs.size = Vector3(6.5, 6.5, 1.2)
-	acs.shape = abs; acs.position = Vector3(0, 3.2, 36.0); asb.add_child(acs)
+	var acs := CollisionShape3D.new(); var abs := BoxShape3D.new(); abs.size = Vector3(1.0, 6.5, 6.5)
+	acs.shape = abs; acs.position = ARRIVAL + Vector3(-0.8, 3.2, 0); asb.add_child(acs)
 	# ground and boundary
 	b.box(Vector3(-40, -1, -2), Vector3(40, 0, 50), b.mats.cliff)
 	b.box(Vector3(-11, -0.98, 4), Vector3(11, 0.02, 32), b.mats.cobble, false)

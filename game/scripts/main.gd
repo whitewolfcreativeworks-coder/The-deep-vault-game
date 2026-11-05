@@ -40,7 +40,7 @@ func _ready() -> void:
 	world.player = player
 	if not continue_pending or Game.checkpoint_pos == Vector3.ZERO:
 		Game.checkpoint_pos = world.spawn_point
-		Game.checkpoint_yaw = 0.0
+		Game.checkpoint_yaw = float(world.get("spawn_yaw")) if world.get("spawn_yaw") != null else 0.0
 		Game.checkpoint_name = "the Portal Glade" if Game.zone == "forest" else "the Outpost"
 	hud = HUD.new()
 	add_child(hud)
@@ -99,7 +99,7 @@ func _start_game() -> void:
 	menus.close_all()
 	state = "play"
 	player.rebuild_body()
-	player.respawn_at(world.spawn_point, 0.0)
+	player.respawn_at(world.spawn_point, float(world.get("spawn_yaw")) if world.get("spawn_yaw") != null else 0.0)
 	player.invuln = 0.0
 	player.camera.current = true
 	player.input_enabled = true
@@ -172,9 +172,13 @@ func _end_intro() -> void:
 	add_child(player)
 	Sfx.music("music_explore", -16.0)
 	_start_game()
+	# beamed in: a column of light at the arrival portal
+	var at: Vector3 = world.spawn_point
 	FX.screen_flash(Color(0.85, 1.0, 0.95), 0.9, 1.4)
+	FX.pillar(at, Color(0.55, 1.0, 0.85), 1.2, 12.0, 1.6)
+	FX.burst(at + Vector3(0, 1.0, 0), Color(0.6, 1.0, 0.9), 70, 3.0, 0.22, 1.2, 0.5)
 	Sfx.play("portal", -4.0, 0.0)
-	Game.say("You tumble out of the old portal... at the gates of the Deep Vault!", UIKit.GOLD)
+	Game.say("Whoosh! You step out of the old portal... the Deep Vault awaits!", UIKit.GOLD)
 
 ## Level 1 -> Level 2: through the portal that opens when the Vault is won.
 func go_to_forest() -> void:
