@@ -53,6 +53,28 @@ const TYPES := {
 		"scale": 2.3, "aggro": 20.0, "poise": 120.0, "gold": [120, 180], "heavy": true, "leash": 50.0, "summon": true, "nova": true,
 		"skin": Color(0.45, 0.6, 0.22),
 		"look": {"hero": "Barbarian", "hair_style": "natural", "hair_color": Color(0.15, 0.1, 0.05), "face": "none", "outfit": Color(0.4, 0.1, 0.08), "build": 1.4, "cyclops": true}},
+	# --- Level 3: Ghost Knight Castle (spectral: see-through and glowing)
+	"ghost_knight": {"name": "Ghost Knight", "hp": 210.0, "dmg": 27.0, "speed": 3.6, "range": 2.0,
+		"windup": 0.45, "cooldown": 1.1, "xp": 120, "weapon": "sword_1handed", "shield": "shield_round", "eye": Color(0.5, 0.9, 1.0),
+		"scale": 0.9, "aggro": 16.0, "poise": 18.0, "gold": [12, 26], "leash": 34.0, "skin": Color(0.8, 0.9, 1.0), "armor_drop": 0.35,
+		"look": {"hero": "Knight", "hat": true, "hair_style": "natural", "hair_color": Color(0.7, 0.8, 0.9), "face": "none", "outfit": Color(0.55, 0.65, 0.8), "skin_look": "spectral"}},
+	"ghost_archer": {"name": "Ghost Archer", "hp": 140.0, "dmg": 25.0, "speed": 3.8, "range": 19.0,
+		"windup": 0.55, "cooldown": 1.5, "xp": 110, "weapon": "", "shield": "", "eye": Color(0.45, 1.0, 0.85),
+		"scale": 0.86, "aggro": 21.0, "poise": 0.0, "gold": [10, 22], "ranged": true, "leash": 34.0, "skin": Color(0.8, 0.95, 1.0),
+		"look": {"hero": "Ranger", "hair_style": "natural", "hair_color": Color(0.7, 0.8, 0.9), "face": "none", "outfit": Color(0.4, 0.6, 0.7), "skin_look": "spectral"}},
+	"wraith": {"name": "Wailing Wraith", "variant": "mage", "hp": 150.0, "dmg": 26.0, "speed": 3.0, "range": 14.0,
+		"windup": 0.6, "cooldown": 1.8, "xp": 115, "weapon": "skel_staff", "shield": "", "eye": Color(0.6, 0.8, 1.0),
+		"scale": 0.9, "aggro": 18.0, "poise": 0.0, "gold": [10, 24], "ranged": true, "leash": 30.0, "skin_look": "spectral"},
+	"gatekeeper": {"name": "The Gatehouse Warden", "hp": 1600.0, "dmg": 36.0, "speed": 3.0, "range": 3.2,
+		"windup": 0.8, "cooldown": 1.4, "xp": 700, "weapon": "sword_2handed_color", "shield": "", "eye": Color(0.45, 0.85, 1.0),
+		"scale": 1.7, "aggro": 18.0, "poise": 90.0, "gold": [80, 140], "heavy": true, "leash": 30.0, "nova": true, "armor_drop": 1.0,
+		"skin": Color(0.8, 0.9, 1.0),
+		"look": {"hero": "Knight", "hat": true, "hair_style": "natural", "hair_color": Color(0.7, 0.8, 0.9), "face": "none", "outfit": Color(0.4, 0.5, 0.75), "build": 1.25, "skin_look": "spectral"}},
+	"ghost_lord": {"name": "Morwen, the Ghost Lord", "hp": 3800.0, "dmg": 44.0, "speed": 3.3, "range": 3.6,
+		"windup": 0.8, "cooldown": 1.3, "xp": 1400, "weapon": "sword_2handed_color", "shield": "", "eye": Color(0.55, 0.75, 1.0),
+		"scale": 2.2, "aggro": 22.0, "poise": 140.0, "gold": [200, 320], "heavy": true, "leash": 40.0, "nova": true, "summon": true, "armor_drop": 1.0,
+		"skin": Color(0.75, 0.85, 1.0),
+		"look": {"hero": "Knight", "hat": true, "hair_style": "natural", "hair_color": Color(0.6, 0.7, 0.9), "face": "none", "outfit": Color(0.25, 0.25, 0.45), "build": 1.35, "skin_look": "spectral"}},
 }
 const GOBLIN_SKIN := Color(0.42, 0.62, 0.24)
 
@@ -108,12 +130,16 @@ func _ready() -> void:
 		body.setup({"kind": "hero", "hero": lk.hero, "show_hat": lk.get("hat", false), "weapon": t.weapon, "shield": t.shield,
 			"scale": t.scale, "skin_color": skin_c, "hair_style": lk.hair_style, "hair_color": lk.hair_color,
 			"hair_tint": skin_c.darkened(0.1) if lk.hair_style in ["bald", "mohawk"] else lk.hair_color,
-			"face": lk.face, "ears": true, "outfit_color": lk.outfit, "cape_color": lk.outfit.darkened(0.2),
+			"face": lk.face, "ears": not lk.has("skin_look"), "outfit_color": lk.outfit, "cape_color": lk.outfit.darkened(0.2),
+			"skin": lk.get("skin_look", ""),
 			"build": lk.get("build", 1.05), "height": 0.95})
 	else:
-		body.setup({"kind": "skeleton", "variant": t.variant, "weapon": t.weapon, "shield": t.shield, "eye": t.eye, "scale": t.scale})
+		body.setup({"kind": "skeleton", "variant": t.variant, "weapon": t.weapon, "shield": t.shield, "eye": t.eye, "scale": t.scale,
+			"skin": t.get("skin_look", "")})
 	if t.has("look") and t.look.get("cyclops", false):
 		_cyclops_eye.call_deferred()
+	if t.get("skin_look", t.get("look", {}).get("skin_look", "")) == "spectral":
+		_spectral.call_deferred()
 	leash = t.get("leash", leash)
 	home = global_position
 	facing = rotation.y
@@ -125,6 +151,44 @@ func _ready() -> void:
 		body.visible = false
 		cs.disabled = true
 		set_physics_process(true)
+
+var _frozen_t := 0.0
+var _blind_t := 0.0
+var _ice: MeshInstance3D
+
+## Frost Nova: frozen solid in a block of ice for a few seconds.
+func freeze(sec: float) -> void:
+	if dead or t.get("heavy", false) and sec > 1.5:
+		sec = 1.5 if not dead else 0.0     # bosses only shiver for a moment
+	if sec <= 0.0:
+		return
+	_frozen_t = maxf(_frozen_t, sec)
+	velocity = Vector3.ZERO
+	if body and body.anim:
+		body.anim.speed_scale = 0.0
+	if _ice == null or not is_instance_valid(_ice):
+		_ice = MeshInstance3D.new()
+		var bm := BoxMesh.new(); bm.size = Vector3(1.1, 2.0, 1.1) * t.scale / 0.84
+		_ice.mesh = bm
+		var m := StandardMaterial3D.new(); m.albedo_color = Color(0.7, 0.9, 1.0, 0.35)
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.emission_enabled = true; m.emission = Color(0.3, 0.6, 0.9)
+		m.roughness = 0.05; m.metallic_specular = 1.0
+		_ice.material_override = m
+		_ice.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_ice.position.y = bm.size.y * 0.5
+		add_child(_ice)
+
+func _thaw() -> void:
+	if body and body.anim:
+		body.anim.speed_scale = 1.0
+	if _ice and is_instance_valid(_ice):
+		FX.burst(_ice.global_position, Color(0.75, 0.92, 1.0), 25, 3.0, 0.12, 0.6, -6.0)
+		_ice.queue_free()
+	_ice = null
+
+## Smoke Bomb: lose sight of the player for a few seconds.
+func lose_target(sec := 3.0) -> void:
+	_blind_t = sec
 
 func _go(s: S) -> void:
 	state = s
@@ -139,6 +203,12 @@ func _physics_process(delta: float) -> void:
 			return
 	state_time += delta
 	cooldown -= delta
+	_blind_t -= delta
+	if _frozen_t > 0.0:
+		_frozen_t -= delta
+		if _frozen_t <= 0.0:
+			_thaw()
+		return
 	if _hurt_t >= 0.0:
 		_hurt_t += delta
 		if _hurt_t > 0.35:
@@ -146,7 +216,7 @@ func _physics_process(delta: float) -> void:
 	var to_p: Vector3 = player.global_position - global_position
 	to_p.y = 0
 	var dist := to_p.length()
-	var pdead: bool = player.get("dead") == true
+	var pdead: bool = player.get("dead") == true or _blind_t > 0.0
 	var move := Vector3.ZERO
 	var spd: float = t.speed
 
@@ -273,12 +343,13 @@ func _fire_nova() -> void:
 	Sfx.play_at("roar_big", at, -2.0, 0.05)
 	body.flash(Color(1.0, 0.4, 0.1), 0.9)
 	var ring := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = radius - 0.25; tm.outer_radius = radius
-	ring.mesh = tm; ring.material_override = FX.glow_material(Color(1.0, 0.25, 0.05), 3.0)
+	var nc: Color = t.eye
+	ring.mesh = tm; ring.material_override = FX.glow_material(nc, 3.0)
 	get_tree().current_scene.add_child(ring)
 	ring.global_position = at + Vector3(0, 0.08, 0)
 	ring.scale = Vector3(1, 0.05, 1)
 	var disc := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = radius; cm.bottom_radius = radius; cm.height = 0.02
-	disc.mesh = cm; var dm := FX.glow_material(Color(1.0, 0.2, 0.0), 0.7); dm.albedo_color.a = 0.35
+	disc.mesh = cm; var dm := FX.glow_material(nc, 0.7); dm.albedo_color.a = 0.35
 	disc.material_override = dm
 	get_tree().current_scene.add_child(disc)
 	disc.global_position = at + Vector3(0, 0.06, 0)
@@ -291,9 +362,9 @@ func _fire_nova() -> void:
 		return
 	Sfx.play_at("fire_burst", at, 0.0)
 	Sfx.play_at("slam", at, 0.0)
-	FX.shockwave(at + Vector3(0, 0.2, 0), Color(1.0, 0.35, 0.05), radius, 0.5)
-	FX.burst(at + Vector3(0, 0.6, 0), Color(1.0, 0.45, 0.1), 90, 9.0, 0.35, 0.9, -2.0)
-	FX.flash_light(at + Vector3(0, 2, 0), Color(1.0, 0.45, 0.1), 8.0, 14.0, 0.5)
+	FX.shockwave(at + Vector3(0, 0.2, 0), nc, radius, 0.5)
+	FX.burst(at + Vector3(0, 0.6, 0), nc.lightened(0.2), 90, 9.0, 0.35, 0.9, -2.0)
+	FX.flash_light(at + Vector3(0, 2, 0), nc, 8.0, 14.0, 0.5)
 	if player and player.has_method("add_trauma"):
 		player.add_trauma(0.5)
 	if player and player.get("dead") != true:
@@ -420,6 +491,8 @@ func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) 
 			_hurt_t = 0.0
 
 func _die(away: Vector3) -> void:
+	_frozen_t = 0.0
+	_thaw()
 	dead = true
 	_go(S.DEAD)
 	remove_from_group("enemy")
@@ -441,10 +514,69 @@ func _die(away: Vector3) -> void:
 	tw.tween_property(body, "position:y", -1.2, 1.5)
 	tw.tween_callback(queue_free)
 
+## Ghosts: see-through, glowing a cold blue, with a misty trail.
+func _spectral() -> void:
+	var glow: Color = t.eye
+	for m in body.all_meshes:
+		if not is_instance_valid(m) or m.mesh == null:
+			continue
+		for i in m.mesh.get_surface_count():
+			var src := m.get_active_material(i) as BaseMaterial3D
+			var g: StandardMaterial3D = (src.duplicate() as StandardMaterial3D) if src is StandardMaterial3D else StandardMaterial3D.new()
+			g.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			g.albedo_color = Color(0.75, 0.88, 1.0, 0.55)
+			g.emission_enabled = true; g.emission = glow * 0.55; g.emission_energy_multiplier = 1.2
+			g.cull_mode = BaseMaterial3D.CULL_BACK
+			m.set_surface_override_material(i, g)
+		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var mist := CPUParticles3D.new()
+	mist.amount = 14; mist.lifetime = 1.6
+	mist.mesh = FX.quad(0.35 * t.scale); mist.material_override = FX.glow_material(glow, 0.6)
+	mist.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; mist.emission_sphere_radius = 0.4 * t.scale
+	mist.direction = Vector3.UP; mist.spread = 30; mist.initial_velocity_min = 0.2; mist.initial_velocity_max = 0.6
+	mist.gravity = Vector3.ZERO; mist.color_ramp = FX._fade_ramp(Color(glow.r, glow.g, glow.b, 0.4))
+	mist.position.y = 0.5 * t.scale
+	add_child(mist)
+	var l := OmniLight3D.new(); l.light_color = glow; l.light_energy = 0.7; l.omni_range = 3.5 * t.scale
+	l.position.y = 1.2 * t.scale
+	add_child(l)
+
+## Ghost knights' armour falls to the ground when they're beaten: helmet and
+## plates clatter down, and often a set of ghostly armour you can wear.
+func _armor_clatter() -> void:
+	var at := global_position
+	var metal := StandardMaterial3D.new(); metal.albedo_color = Color(0.62, 0.68, 0.78); metal.metallic = 0.8; metal.roughness = 0.35
+	metal.emission_enabled = true; metal.emission = Color(0.1, 0.25, 0.4)
+	for k in 4:
+		var piece := MeshInstance3D.new()
+		var m: Mesh
+		if k == 0:
+			var sm := SphereMesh.new(); sm.radius = 0.22 * t.scale; sm.height = 0.36 * t.scale; sm.is_hemisphere = true; m = sm
+		else:
+			var bm := BoxMesh.new(); bm.size = Vector3(0.35, 0.08, 0.28) * t.scale; m = bm
+		piece.mesh = m; piece.material_override = metal
+		get_tree().current_scene.add_child(piece)
+		piece.global_position = at + Vector3(randf_range(-0.3, 0.3), 1.2 * t.scale, randf_range(-0.3, 0.3))
+		var land := at + Vector3(randf_range(-1.0, 1.0), 0.05, randf_range(-1.0, 1.0))
+		var tw := piece.create_tween().set_parallel(true)
+		tw.tween_property(piece, "global_position", land, 0.55).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_BOUNCE)
+		tw.tween_property(piece, "rotation", Vector3(randf_range(-3, 3), randf_range(-3, 3), randf_range(-3, 3)), 0.55)
+		tw.chain().tween_interval(6.0)
+		tw.chain().tween_callback(piece.queue_free)
+	Sfx.play_at("clang", at, -4.0, 0.2)
+	if randf() < float(t.armor_drop):
+		Pickup.spawn(at + Vector3(0, 0.9, 0), "item", 1, Loot.make_ghost_armor(Game.zone_level(), Loot.roll_rarity(0.8, 1)))
+
 func _drop_loot() -> void:
 	var g: Array = t.gold
 	Pickup.spawn(global_position + Vector3(0, 0.6, 0), "gold", randi_range(g[0], g[1]))
 	var table := "summon" if uid == "" else type_id
+	if t.has("armor_drop"):
+		_armor_clatter()
+	# now and then a monster drops a costume of itself
+	var ms: Array = Loot.MONSTER_SKINS.get(type_id, [])
+	if not ms.is_empty() and randf() < float(ms[1]) and Loot.COSTUMES.has(ms[0]):
+		Pickup.spawn(global_position + Vector3(0, 0.9, 0), "costume", 1, String(ms[0]))
 	var k := 0
 	for d in Loot.roll_enemy(table, Loot.area_level(global_position.z)):
 		k += 1

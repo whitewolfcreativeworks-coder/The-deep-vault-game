@@ -48,6 +48,14 @@ func _wild_spot_ok(p: Vector2) -> bool:
 			return false
 	return true
 var boss_started := false
+## Ground colours (the castle's moors use their own, gloomier set)
+var pal := {"grass_a": Color(0.33, 0.52, 0.2), "grass_b": Color(0.45, 0.58, 0.22), "dirt": Color(0.5, 0.39, 0.25),
+	"rock": Color(0.45, 0.43, 0.38), "bed": Color(0.32, 0.34, 0.26)}
+const MOON_PORTAL := Vector2(80.0, 78.0)
+var _moon_area: Area3D
+var _moon_mat: ShaderMaterial
+var _moon_light: OmniLight3D
+var _moon_disc: MeshInstance3D
 
 func build() -> void:
 	_rng.seed = 7
@@ -56,7 +64,7 @@ func build() -> void:
 	b = Builder.new(self)
 	clearings = [[Vector2(0, 92), 16.0], [Vector2(-55, 45), 16.0], [Vector2(55, 8), 13.0], [Vector2(-14, -18), 10.0],
 		[Vector2(-58, -42), 15.0], [Vector2(60, -50), 15.0], [Vector2(36, 62), 10.0], [Vector2(0, -92), 15.0],
-		[SinkholeOfDeath.HOLE, 12.0]]
+		[SinkholeOfDeath.HOLE, 12.0], [MOON_PORTAL, 12.0]]
 	_environment()
 	_terrain()
 	_stream()
@@ -70,6 +78,7 @@ func build() -> void:
 	_goblin_camp(Vector2(60, -50), "e")
 	_goblin_outpost(Vector2(36, 62))
 	_warren_entrance()
+	_moon_portal()
 	_scatter_forest()
 	_horizon()
 	_bounds()
@@ -141,8 +150,8 @@ func _terrain() -> void:
 			hs[j * n + i] = height(-HALF + i * STEP, -HALF + j * STEP)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var grass_a := Color(0.33, 0.52, 0.2); var grass_b := Color(0.45, 0.58, 0.22)
-	var dirt := Color(0.5, 0.39, 0.25); var rock := Color(0.45, 0.43, 0.38); var bed := Color(0.32, 0.34, 0.26)
+	var grass_a: Color = pal.grass_a; var grass_b: Color = pal.grass_b
+	var dirt: Color = pal.dirt; var rock: Color = pal.rock; var bed: Color = pal.bed
 	var verts := []
 	verts.resize(n * n)
 	for j in n:
@@ -637,6 +646,51 @@ func _motes() -> void:
 		p.color_ramp = FX._fade_ramp(Color(1.0, 0.95, 0.6))
 		add_child(p)
 		p.position = c + Vector3(0, height(c.x, c.z), 0)
+
+## The Moonlit Portal (south-east): it wakes when every forest quest is done
+## and leads to Level 3, Ghost Knight Castle.
+func _moon_portal() -> void:
+	var c := ground(MOON_PORTAL.x, MOON_PORTAL.y)
+	var face := atan2(-MOON_PORTAL.x, -MOON_PORTAL.y)     # turned toward the valley
+	var arch := _model("arch_gate", c + Vector3(0, -0.2, 0), rad_to_deg(face), 1.5, false)
+	arch.name = "MoonPortal"
+	var disc := MeshInstance3D.new(); var q := QuadMesh.new(); q.size = Vector2(4.4, 5.2)
+	disc.mesh = q
+	_moon_mat = ShaderMaterial.new(); _moon_mat.shader = load("res://shaders/portal.gdshader")
+	disc.material_override = _moon_mat
+	_moon_disc = disc
+	disc.position = c + Vector3(0, 3.0, 0); disc.rotation.y = face
+	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(disc)
+	_moon_light = OmniLight3D.new(); _moon_light.light_color = Color(0.6, 0.7, 1.0); _moon_light.omni_range = 14.0
+	_moon_light.position = c + Vector3(0, 3.0, 0); add_child(_moon_light)
+	for k in 6:
+		var a := k * TAU / 6.0
+		_instance("rock_single_" + ["C", "E", "B"][k % 3], ground(MOON_PORTAL.x + cos(a) * 9.0, MOON_PORTAL.y + sin(a) * 9.0) - Vector3(0, 0.3, 0), a, 7.0)
+	Interactable.create(self, "inscription", ground(MOON_PORTAL.x - 5.0, MOON_PORTAL.y - 5.0), rad_to_deg(face), "", [], "Moonlit Portal",
+		"THE MOONLIT PORTAL\n\nIt sleeps until the forest is at peace.\nHelp everyone in the Goblin Forest and it will wake,\nand carry you to Castle Morwen: Ghost Knight Castle.")
+	_moon_area = Area3D.new(); _moon_area.collision_layer = 0; _moon_area.collision_mask = 2
+	var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(3.6, 4.0, 1.6)
+	cs.shape = bs; _moon_area.add_child(cs)
+	add_child(_moon_area)
+	_moon_area.position = c + Vector3(0, 2.0, 0); _moon_area.rotation.y = face
+	_moon_area.body_entered.connect(func(bd: Node) -> void:
+		if bd.is_in_group("player") and Game.zone_complete("forest"):
+			_moon_area.set_deferred("monitoring", false)
+			Sfx.play("portal", 0.0, 0.0)
+			FX.screen_flash(Color(0.8, 0.85, 1.0), 1.0, 1.2)
+			var sc := get_tree().current_scene
+			if sc.has_method("go_to_castle"):
+				get_tree().create_timer(0.5).timeout.connect(sc.go_to_castle))
+	Game.quests_changed.connect(_moon_refresh)
+	_moon_refresh()
+
+func _moon_refresh() -> void:
+	var open := Game.zone_complete("forest")
+	_moon_mat.set_shader_parameter("intensity", 2.2 if open else 0.25)
+	_moon_light.light_energy = 4.0 if open else 0.6
+	_moon_area.monitoring = open
+	_moon_disc.visible = open          # asleep: just an empty stone arch
 
 # ---------------------------------------------------------------------------
 # Enemies and quests

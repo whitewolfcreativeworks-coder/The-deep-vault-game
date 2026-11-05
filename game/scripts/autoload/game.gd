@@ -62,6 +62,26 @@ const ABILITIES := {
 func ability() -> Dictionary:
 	return ABILITIES.get(profile.hero, ABILITIES.Knight)
 
+## Second special abilities: every hero gets one on arriving at Ghost Knight Castle.
+const ABILITIES2 := {
+	"Knight": {"name": "Holy Ward", "short": "WARD", "cd": 16.0, "color": Color(1.0, 0.9, 0.45),
+		"desc": "A golden shield of light: you take far less damage for a few seconds, heal, and push foes back."},
+	"Barbarian": {"name": "Earthshatter", "short": "SLAM", "cd": 12.0, "color": Color(0.9, 0.6, 0.3),
+		"desc": "Leap and smash the ground: a huge shockwave stuns everything around you."},
+	"Rogue": {"name": "Smoke Bomb", "short": "SMOKE", "cd": 14.0, "color": Color(0.5, 0.9, 0.5),
+		"desc": "Vanish in poison smoke: enemies lose you and choke, and you dash away faster."},
+	"Ranger": {"name": "Rain of Arrows", "short": "RAIN", "cd": 13.0, "color": Color(0.7, 1.0, 0.6),
+		"desc": "A storm of arrows falls on the ground ahead of you."},
+	"Mage": {"name": "Frost Nova", "short": "FROST", "cd": 12.0, "color": Color(0.6, 0.9, 1.0),
+		"desc": "A blast of ice freezes every enemy around you solid."},
+}
+
+func ability2() -> Dictionary:
+	return ABILITIES2.get(profile.hero, ABILITIES2.Knight)
+
+func has_special2() -> bool:
+	return bool(flags.get("special2", false))
+
 const CAPE_COLORS := [
 	Color(1, 1, 1), Color(0.75, 0.15, 0.12), Color(0.2, 0.45, 0.85), Color(0.25, 0.6, 0.3),
 	Color(0.55, 0.3, 0.75), Color(0.2, 0.2, 0.22), Color(0.95, 0.75, 0.3),
@@ -401,7 +421,7 @@ func _register_inputs() -> void:
 		"interact": [KEY_E], "inventory": [KEY_I], "character": [KEY_TAB],
 		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1], "mana_potion": [KEY_F, KEY_2],
 		"zoom_in_key": [KEY_EQUAL, KEY_KP_ADD], "zoom_out_key": [KEY_MINUS, KEY_KP_SUBTRACT],
-		"toggle_view": [KEY_V], "special": [KEY_X], "track_quest": [KEY_T], "mount": [KEY_G], "pose": [KEY_P],
+		"toggle_view": [KEY_V], "special": [KEY_X], "track_quest": [KEY_T], "mount": [KEY_G], "pose": [KEY_P], "auto_run": [KEY_Z, KEY_NUMLOCK], "special2": [KEY_B, KEY_3],
 	}
 	for action in keys:
 		if not InputMap.has_action(action):
@@ -419,7 +439,7 @@ func _register_inputs() -> void:
 	var pad_buttons := {"jump": JOY_BUTTON_A, "attack": JOY_BUTTON_X, "interact": JOY_BUTTON_Y,
 		"block": JOY_BUTTON_LEFT_SHOULDER, "spell": JOY_BUTTON_RIGHT_SHOULDER,
 		"dodge": JOY_BUTTON_B, "pause": JOY_BUTTON_START, "inventory": JOY_BUTTON_BACK,
-		"potion": JOY_BUTTON_DPAD_UP, "mana_potion": JOY_BUTTON_DPAD_DOWN, "special": JOY_BUTTON_RIGHT_STICK}
+		"potion": JOY_BUTTON_DPAD_UP, "mana_potion": JOY_BUTTON_DPAD_DOWN, "special": JOY_BUTTON_RIGHT_STICK, "special2": JOY_BUTTON_LEFT_STICK}
 	for action in pad_buttons:
 		var jb := InputEventJoypadButton.new()
 		jb.button_index = pad_buttons[action]
@@ -585,7 +605,7 @@ var tracked_quest := ""           # the quest the compass arrow points to ("" = 
 var tracked_manual := false       # true when the player chose it themselves
 var day_clock := 150.0            # seconds into the forest's day/night cycle (see DayNight)
 
-const ZONE_NAMES := {"vault": "The Deep Vault", "forest": "The Goblin Forest"}
+const ZONE_NAMES := {"vault": "The Deep Vault", "forest": "The Goblin Forest", "castle": "Ghost Knight Castle"}
 const GOBLINS := ["goblin", "goblin_archer", "goblin_brute", "goblin_chief", "fire_goblin", "fire_archer", "magma_brute", "cyclops"]
 
 ## Quest givers and their quests (Level 2). Goals: kill (enemy types), collect (quest items), boss (enemy uid).
@@ -628,7 +648,79 @@ const QUESTS := {
 		"busy": "Grimgor's down at the very bottom, past the lava river. Watch for his stomp: when the ground glows red around him, RUN!",
 		"thanks": "You beat Grimgor?! And you came back riding a GIANT CHICKEN! Hah! Best thing I've seen in sixty years of digging. Here, you've earned every coin.",
 		"reward": {"xp": 700, "gold": 260, "potions": 3, "roll": "boss"}},
+	# --- Level 3: Ghost Knight Castle (nine quests)
+	"restless_dead": {"giver": "elowen", "zone": "castle", "title": "The Restless Dead",
+		"goal": {"type": "kill", "types": ["ghost_knight"], "count": 8}, "track": "Ghost knights laid to rest",
+		"offer": "Bless you for coming, traveller. Every night the ghost knights ride out of Castle Morwen and terrify Ashenford.\n\nLay eight of them to rest. When they fall, their armour clatters to the ground: keep whatever fits you.",
+		"busy": "The ghost knights patrol the moors and the castle road. Their armour falls when they do.",
+		"thanks": "Eight souls at peace. The village sleeps a little easier tonight. Take this, with the chapel's thanks.",
+		"reward": {"xp": 520, "gold": 120, "potions": 2, "roll": "armor"}},
+	"lost_lockets": {"giver": "mott", "zone": "castle", "title": "Lockets in the Graveyard",
+		"goal": {"type": "collect", "item": "locket", "count": 5}, "track": "Lockets found",
+		"offer": "Eh? Oh, a living one! Ha. I'm Mott, the gravedigger.\n\nThe ghosts have been digging up the graveyard looking for their old lockets. If you find five of them first, the ghosts might settle down. They glint gold between the graves, west of here.",
+		"busy": "Five lockets. West, in the graveyard. Mind the archers in the trees.",
+		"thanks": "Five lockets, safe and sound. I'll put them back where they belong. You've a good heart.",
+		"reward": {"xp": 480, "gold": 110, "potions": 2, "roll": "skin"}},
+	"light_beacons": {"giver": "brannoc", "zone": "castle", "title": "Light the Beacons",
+		"goal": {"type": "collect", "item": "beacon", "count": 3}, "track": "Beacons lit",
+		"offer": "Captain Brannoc of the King's Guard. We came to take back Castle Morwen, and the ghosts sent us running.\n\nThree old beacons stand on the hills around the castle. Light all three and the ghosts' mist will thin. Then we can talk about that gate.",
+		"busy": "Three beacons on the hills around the castle. Walk up to each one to light it.",
+		"thanks": "Look at that! You can see the castle walls again. Now, about that gate...",
+		"reward": {"xp": 500, "gold": 120, "potions": 2, "roll": "weapon"}},
+	"the_gatehouse": {"giver": "brannoc", "zone": "castle", "title": "The Gatehouse Warden", "requires": "light_beacons",
+		"goal": {"type": "boss", "uid": "gatekeeper", "count": 1}, "track": "Gatehouse Warden defeated",
+		"locked": "Light the beacons first. With the mist this thick we'd never even find the gate.",
+		"offer": "The castle gate is guarded by the Gatehouse Warden: a ghost knight twice the size of the others. While he stands, the gate stays shut.\n\nBeat him and the gate is ours. His stomp freezes the ground, so keep moving!",
+		"busy": "The Warden stands before the castle gate, to the north. Watch for the blue ring when he stomps.",
+		"thanks": "The gate is open! Castle Morwen, here we come. You fight like a whole company of guards.",
+		"reward": {"xp": 750, "gold": 180, "potions": 3, "roll": "big"}},
+	"archers_on_walls": {"giver": "holt", "zone": "castle", "title": "Archers on the Walls",
+		"goal": {"type": "kill", "types": ["ghost_archer"], "count": 8}, "track": "Ghost archers defeated",
+		"offer": "Sergeant Holt. Keep your head down! Ghost archers shoot at anything that moves near the castle.\n\nTake out eight of them and my lads can move in. They hide on the hills and in the graveyard trees.",
+		"busy": "Eight ghost archers. They keep their distance, so close in fast or shoot back.",
+		"thanks": "Eight! My lads can breathe again. Here, you've earned the good stuff.",
+		"reward": {"xp": 520, "gold": 130, "potions": 2, "roll": "weapon"}},
+	"holy_water": {"giver": "ansel", "zone": "castle", "title": "Holy Water",
+		"goal": {"type": "collect", "item": "holywater", "count": 3}, "track": "Holy water found",
+		"offer": "Brother Ansel, of the chapel. The Ghost Lord in the castle can't be beaten by steel alone.\n\nThe old monks hid three flasks of holy water in the crypt under the graveyard. Bring them to me and I'll bless your blade.",
+		"busy": "The crypt is under the graveyard, west. Look for the stone crypt with the stairs going down.",
+		"thanks": "Three flasks of holy water! Hold out your weapon... there. Now the Ghost Lord will feel your blows.",
+		"reward": {"xp": 520, "gold": 120, "mana_potions": 3, "roll": "big"}},
+	"wraith_hunt": {"giver": "pip", "zone": "castle", "title": "Spooked Horses",
+		"goal": {"type": "kill", "types": ["wraith"], "count": 6}, "track": "Wraiths banished",
+		"offer": "M-m-mister! The wraiths keep scaring our horses and they've all run off!\n\nCould you chase away six of those floaty, wailing things? They hang about the old ruined chapel to the east.",
+		"busy": "Six wraiths. East, at the ruined chapel. They throw cold magic, so dodge!",
+		"thanks": "The horses are coming back! Thank you thank you thank you! Here, it's all my savings.",
+		"reward": {"xp": 480, "gold": 90, "potions": 2, "roll": "skin"}},
+	"music_box": {"giver": "wren", "zone": "castle", "title": "Lady Wren's Music Box", "requires": "the_gatehouse",
+		"goal": {"type": "collect", "item": "musicbox", "count": 1}, "track": "Music box found",
+		"locked": "Oh... a visitor. I can't leave the castle gate, and the gate is shut. If only someone could open it...",
+		"offer": "I'm Lady Wren. I lived in Castle Morwen, long ago, before the Ghost Lord came.\n\nMy music box is still in the castle library. If I could hear its song once more, I think I could finally rest. Would you find it for me?",
+		"busy": "The library is on the east side of the great hall. My music box sits on a little table there.",
+		"thanks": "My music box... *its little tune plays* Thank you. I feel so light. Please, take my family's treasure. And beat him for me.",
+		"reward": {"xp": 560, "gold": 150, "roll": "big"}},
+	"ghost_lord": {"giver": "elowen", "zone": "castle", "title": "The Ghost Lord", "requires": "the_gatehouse",
+		"goal": {"type": "boss", "uid": "ghost_lord", "count": 1}, "track": "Ghost Lord defeated",
+		"locked": "Lay the restless dead to rest, and get the castle gate open. Then come back to me.",
+		"offer": "The Ghost Lord sits on Castle Morwen's throne and sends the dead riding every night. It has to end.\n\nHe waits in the throne room at the back of the great hall. Brother Ansel's holy water will help. Go, and may the light go with you.",
+		"busy": "The throne room is at the far end of the great hall. When he raises his sword, a ring of frost spreads out: get away from it!",
+		"thanks": "It's over! The ghosts are going home at last. The whole of Ashenford owes you everything.\n\nAnd... there's something in the old stable you should see. Pip's been fixing it up for you. It goes VROOM.",
+		"reward": {"xp": 1200, "gold": 400, "potions": 3, "roll": "boss"}},
 }
+
+## Quests belonging to a zone (the forest's six have no "zone" key).
+func zone_quests(z: String) -> Array:
+	var out: Array = []
+	for id in QUESTS:
+		if String(QUESTS[id].get("zone", "forest")) == z:
+			out.append(id)
+	return out
+
+func zone_complete(z: String) -> bool:
+	for id in zone_quests(z):
+		if quest_state(id) != "done":
+			return false
+	return not zone_quests(z).is_empty()
 
 func quest_state(id: String) -> String:
 	if quests.has(id):
@@ -672,7 +764,7 @@ func on_enemy_killed(type_id: String, uid: String) -> void:
 		if quests[id].state != "active":
 			continue
 		var g: Dictionary = QUESTS[id].goal
-		if g.type == "kill" and type_id in GOBLINS:
+		if g.type == "kill" and type_id in g.get("types", GOBLINS):
 			_advance(id)
 		elif g.type == "boss" and uid == g.uid:
 			_advance(id)
@@ -698,8 +790,10 @@ func quest_turn_in(id: String) -> Array:
 	mana_potions += int(r.get("mana_potions", 0))
 	var items_got: Array = []
 	if r.has("roll"):
-		for d in Loot.roll_chest(String(r.roll), 5 if r.roll == "boss" else 4):
-			if d.kind == "item":
+		for d in Loot.roll_chest(String(r.roll), zone_level() + (1 if r.roll == "boss" else 0)):
+			if d.kind == "costume":
+				wear_costume(String(d.id))
+			elif d.kind == "item":
 				add_item(d.id)
 				items_got.append(d.id)
 			elif d.kind == "gold":
@@ -715,14 +809,25 @@ func quest_turn_in(id: String) -> Array:
 	save_slot()
 	return items_got
 
-const NPC_NAMES := {"fenn": "Ranger Fenn", "bram": "Bram the Woodcutter", "maera": "Old Maera", "tobble": "Tobble the Merchant", "aldric": "Captain Aldric", "dunstan": "Digger Dunstan"}
+const NPC_NAMES := {"fenn": "Ranger Fenn", "bram": "Bram the Woodcutter", "maera": "Old Maera", "tobble": "Tobble the Merchant", "aldric": "Captain Aldric", "dunstan": "Digger Dunstan",
+	"elowen": "Sister Elowen", "mott": "Old Mott", "brannoc": "Captain Brannoc", "holt": "Sergeant Holt", "ansel": "Brother Ansel", "pip": "Pip the Stablehand", "wren": "Lady Wren"}
 
 ## Quests listed in the tracker: active and ready ones.
+## Item level of the current zone: the Vault starts low, the castle is tougher.
+func zone_level() -> int:
+	return {"vault": 4, "forest": 5, "castle": 8}.get(zone, 4)
+
 func forest_objective() -> String:
+	if zone == "castle":
+		return castle_objective()
 	if zone != "forest":
 		return objective
+	if zone_complete("forest"):
+		return "Every forest quest is done! The Moonlit Portal (south-east) leads to Ghost Knight Castle."
+	if quest_state("warren") == "done" and quest_state("sinkhole") != "done":
+		return "Gruk is beaten! Finish every forest quest (Digger Dunstan, north-west, still needs help) to open the Moonlit Portal."
 	if quest_state("warren") == "done":
-		return "The Goblin Forest is safe. (Level 3 is coming!)"
+		return "Finish every forest quest to open the Moonlit Portal to Level 3."
 	if quest_state("warren") in ["active", "ready"]:
 		return "Defeat Chief Gruk at the bottom of the Goblin Warren." if quest_state("warren") == "active" else "Tell Captain Aldric that Gruk is beaten."
 	if quests.is_empty():
@@ -730,6 +835,18 @@ func forest_objective() -> String:
 	if quest_state("goblin_trouble") == "done":
 		return "Help the forest folk, then see Captain Aldric at the Warren gate (north)."
 	return "Help the forest folk: your quests are listed on the left."
+
+func castle_objective() -> String:
+	if quest_state("ghost_lord") == "done":
+		return "Castle Morwen is free! Ride your moped (G) and enjoy the moonlight."
+	if quest_state("ghost_lord") in ["active", "ready"]:
+		return "Defeat the Ghost Lord in the castle's throne room." if quest_state("ghost_lord") == "active" else "Tell Sister Elowen the Ghost Lord is gone."
+	if quests_in("castle").is_empty():
+		return "Welcome to Ashenford. Talk to the villagers: they need your help against the ghosts of Castle Morwen."
+	return "Help Ashenford: your quests are listed on the left. The beams of light show who needs you."
+
+func quests_in(z: String) -> Array:
+	return zone_quests(z).filter(func(id: String) -> bool: return quests.has(id))
 
 ## Choose the quest the compass follows (the player picked it).
 func track_quest(id: String) -> void:

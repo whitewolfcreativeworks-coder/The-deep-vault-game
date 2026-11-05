@@ -69,10 +69,12 @@ func _defaults() -> Array:
 		{"name": "jump", "action": "jump", "label": "JUMP", "center": Vector2(w - 385, h - 110), "radius": 58.0, "hold": false},
 		{"name": "block", "action": "block", "label": "BLOCK", "center": Vector2(w - 395, h - 262), "radius": 58.0, "hold": true},
 		{"name": "special", "action": "special", "label": "SPECIAL", "center": Vector2(w - 318, h - 400), "radius": 58.0, "hold": false},
+		{"name": "special2", "action": "special2", "label": "POWER", "center": Vector2(w - 300, h - 530), "radius": 50.0, "hold": false},
 		{"name": "spell", "action": "spell", "label": "BOLT", "center": Vector2(w - 178, h - 412), "radius": 54.0, "hold": false},
 		{"name": "dodge", "action": "dodge", "label": "DODGE", "center": Vector2(w - 62, h - 330), "radius": 50.0, "hold": false},
 		{"name": "interact", "action": "interact", "label": "USE", "center": Vector2(w - 572, h - 105), "radius": 52.0, "hold": false},
 		{"name": "mount", "action": "mount", "label": "RIDE", "center": Vector2(w - 560, h - 250), "radius": 46.0, "hold": false},
+		{"name": "auto", "action": "auto_run", "label": "AUTO", "center": Vector2(w - 560, h - 372), "radius": 44.0, "hold": false},
 		{"name": "pose", "action": "pose", "label": "ME", "center": Vector2(w - 576, 62), "radius": 44.0, "hold": false},
 		{"name": "emote", "action": "attack", "label": "POSE!", "center": Vector2(w - 170, h - 170), "radius": 80.0, "hold": false},
 		{"name": "potion", "action": "potion", "label": "HEAL", "center": Vector2(w - 372, 62), "radius": 44.0, "hold": false},
@@ -358,7 +360,9 @@ func _available(b: Dictionary) -> bool:
 	if posing and not arrange:
 		return b.name in ["pose", "jump"]     # only DONE, POSE! and a hop while you look at yourself
 	if b.name == "mount":
-		return bool(Game.flags.get("mount_chicken", false)) or arrange
+		return bool(Game.flags.get("mount_chicken", false)) or bool(Game.flags.get("mount_moped", false)) or arrange
+	if b.name == "special2":
+		return Game.has_special2() or arrange
 	return true
 
 func _use_ready() -> bool:
@@ -486,7 +490,12 @@ func _draw_pad() -> void:
 		elif b.name == "special":
 			var abc: Color = Game.ability().color
 			fill = Color(abc.r * 0.45, abc.g * 0.3, abc.b * 0.55, 0.6 if player == null or player.special_cd <= 0.0 else 0.25)
+		elif b.name == "special2":
+			var abc2: Color = Game.ability2().color
+			fill = Color(abc2.r * 0.4, abc2.g * 0.4, abc2.b * 0.45, 0.6 if player == null or player.special2_cd <= 0.0 else 0.25)
 		var rad: float = b.radius
+		if b.name == "auto" and player and player.get("auto_run"):
+			fill = Color(0.2, 0.55, 0.9, 0.75)
 		if interact_ready and not arrange:
 			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.008)
 			fill = Color(0.85, 0.62, 0.12, 0.75 + 0.15 * pulse)
@@ -519,12 +528,21 @@ func _draw_pad() -> void:
 			label = "WALK" if player.get("mounted") else "RIDE"
 		elif b.name == "pose" and player:
 			label = "DONE" if player.get("posing") else "ME"
+		elif b.name == "auto" and player and player.get("auto_run"):
+			label = "AUTO ON"
+			fs = 14
 		elif b.name == "special":
 			label = Game.ability().short
 			if player and player.special_cd > 0.0 and not picked:
 				var frac: float = player.special_cd / float(Game.ability().cd)
 				pad.draw_arc(b.center, b.radius - 6.0, -PI / 2, -PI / 2 + TAU * frac, 40, Color(1, 1, 1, 0.5), 7.0)
 				label = "%d" % ceili(player.special_cd)
+		elif b.name == "special2":
+			label = Game.ability2().short
+			if player and player.special2_cd > 0.0 and not picked:
+				var frac2: float = player.special2_cd / float(Game.ability2().cd)
+				pad.draw_arc(b.center, b.radius - 6.0, -PI / 2, -PI / 2 + TAU * frac2, 40, Color(1, 1, 1, 0.5), 7.0)
+				label = "%d" % ceili(player.special2_cd)
 		if interact_ready and not arrange:
 			label = "USE!"
 			fs = 24

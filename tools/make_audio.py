@@ -359,6 +359,26 @@ def roar_big():
     e = np.clip(seg / 0.15, 0, 1) * np.clip((d - seg) / 0.6, 0, 1)
     return (tone * 0.8 + grit) * e
 
+def moped_loop():
+    # a little two-stroke putt-putt engine
+    d = 2.0; seg = t(d)
+    f = 38.0
+    ph = 2 * np.pi * f * seg
+    puff = np.clip(np.sin(ph), 0, 1) ** 6
+    buzz = np.sin(2 * np.pi * 152 * seg) * 0.35 + np.sin(2 * np.pi * 304 * seg) * 0.15
+    grit = lowpass(noise(d), 1400) * 0.5
+    x = (buzz + grit) * (0.35 + puff)
+    return loopify(lowpass(x, 2600), 0.2)
+def beep():
+    # a squeaky "meep meep!" horn
+    out = []
+    for k in range(2):
+        seg = t(0.13)
+        tone = np.sign(np.sin(2 * np.pi * 620 * seg)) * 0.5 + np.sin(2 * np.pi * 930 * seg) * 0.5
+        out.append(lowpass(tone, 3000) * env(len(seg), 0.005, 0.12, 2.0))
+        out.append(np.zeros(int(0.06 * SR)))
+    return np.concatenate(out)
+
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
     "pickup": pickup, "coins": coins, "levelup": levelup, "spell": spell, "spell_hit": spell_hit,
@@ -369,6 +389,7 @@ SOUNDS = {
     "music_explore": music_explore, "music_boss": music_boss,
     "loop_birds": birds_loop, "whistle": whistle_tune, "kettle": kettle, "brush": brush, "sip": sip, "pour": pour, "stir": stir, "cluck": cluck, "bawk": bawk, "collapse": collapse, "loop_lava": lava_loop, "roar_big": roar_big,
     "rumble": rumble, "portal": portal_whoosh, "music_morning": music_morning,
+    "loop_moped": moped_loop, "beep": beep,
 }
 
 if __name__ == "__main__":

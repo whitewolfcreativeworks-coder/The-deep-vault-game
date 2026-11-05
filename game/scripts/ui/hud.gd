@@ -178,7 +178,7 @@ func _ready() -> void:
 		crosshair.draw_arc(Vector2.ZERO, 9.0, 0, TAU, 24, Color(1, 1, 1, 0.25), 1.5))
 	root.add_child(crosshair)
 
-	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt · X special\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · T follow next quest · Esc menu", 15, UIKit.DIM)
+	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt · X special · B 2nd special\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · T follow next quest · Esc menu", 15, UIKit.DIM)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	hint.position = Vector2(-600, -70); hint.size = Vector2(1200, 50)
@@ -276,6 +276,10 @@ func _process(delta: float) -> void:
 	var ab_state := "ready" if player.special_cd <= 0.0 else "%ds" % ceili(player.special_cd)
 	special_label.text = ("%s: %s" if Game.touch_active else "%s [X]: %s") % [ab.name, ab_state]
 	special_label.modulate = Color(1, 1, 1) if player.special_cd <= 0.0 else Color(0.6, 0.6, 0.6)
+	if Game.has_special2():
+		var ab2 := Game.ability2()
+		var st2 := "ready" if player.special2_cd <= 0.0 else "%ds" % ceili(player.special2_cd)
+		special_label.text += ("\n%s: %s" if Game.touch_active else "\n%s [B]: %s") % [ab2.name, st2]
 	var cid := Game.costume_id()
 	costume_label.visible = cid != ""
 	if cid != "":

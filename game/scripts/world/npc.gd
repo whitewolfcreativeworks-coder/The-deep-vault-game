@@ -7,12 +7,27 @@ class_name NPC
 
 var id := ""
 var display_name := ""
-var quest := ""
+var quest := ""            # the quest this NPC is on right now (some give several, one after another)
+var quests: Array = []
+
+func _pick_quest() -> void:
+	if quests.is_empty():
+		return
+	quest = quests[quests.size() - 1]
+	for q in quests:
+		if Game.quest_state(q) != "done":
+			quest = q
+			return
 var body: CharacterModel
 var _marker: Label3D
 var _name_tag: Label3D
 var _t := 0.0
 var _home_yaw := 0.0
+var _beam: MeshInstance3D
+var _beam_mat: StandardMaterial3D
+var _beam_core: MeshInstance3D
+var _beam_motes: CPUParticles3D
+var _beam_col := Color.WHITE
 
 static func create(parent: Node, npc_id: String, pos: Vector3, yaw_deg: float, look: Dictionary) -> NPC:
 	var n := NPC.new()
@@ -20,7 +35,8 @@ static func create(parent: Node, npc_id: String, pos: Vector3, yaw_deg: float, l
 	n.display_name = Game.NPC_NAMES.get(npc_id, npc_id)
 	for q in Game.QUESTS:
 		if Game.QUESTS[q].giver == npc_id:
-			n.quest = q
+			n.quests.append(q)
+	n._pick_quest()
 	parent.add_child(n)
 	n.global_position = pos
 	n._home_yaw = deg_to_rad(yaw_deg)
@@ -58,24 +74,79 @@ func _build(look: Dictionary) -> void:
 	_marker.outline_size = 22; _marker.outline_modulate = Color(0.15, 0.08, 0.0)
 	_marker.position.y = 2.75
 	add_child(_marker)
+	_build_beam()
 	Game.quests_changed.connect(_refresh)
 	_refresh()
 
+## A beam of light shooting up into the sky over anyone with a quest for you:
+## white while they have a quest to give, green once you've taken it (that's
+## who you report back to). It glows brightest when the quest is ready to hand in.
+func _build_beam() -> void:
+	_beam = MeshInstance3D.new()
+	var cm := CylinderMesh.new(); cm.top_radius = 0.55; cm.bottom_radius = 0.75; cm.height = 60.0
+	cm.radial_segments = 16; cm.cap_top = false; cm.cap_bottom = false
+	_beam.mesh = cm
+	_beam_mat = StandardMaterial3D.new()
+	_beam_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_beam_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_beam_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_beam_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_beam_mat.disable_receive_shadows = true
+	_beam.material_override = _beam_mat
+	_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_beam.position.y = 32.0
+	add_child(_beam)
+	_beam_core = MeshInstance3D.new()
+	var cc := CylinderMesh.new(); cc.top_radius = 0.12; cc.bottom_radius = 0.18; cc.height = 60.0
+	cc.radial_segments = 8; cc.cap_top = false; cc.cap_bottom = false
+	_beam_core.mesh = cc; _beam_core.material_override = _beam_mat
+	_beam_core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_beam_core.position.y = 32.0
+	add_child(_beam_core)
+	_beam_motes = CPUParticles3D.new(); _beam_motes.amount = 24; _beam_motes.lifetime = 3.0
+	_beam_motes.mesh = FX.quad(0.14); _beam_motes.material_override = FX.glow_material(Color(1, 1, 1), 2.0)
+	_beam_motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; _beam_motes.emission_sphere_radius = 0.6
+	_beam_motes.direction = Vector3.UP; _beam_motes.spread = 5; _beam_motes.initial_velocity_min = 3.0; _beam_motes.initial_velocity_max = 6.0
+	_beam_motes.gravity = Vector3.ZERO; _beam_motes.position.y = 3.2
+	add_child(_beam_motes)
+
+func _set_beam(on: bool, c: Color) -> void:
+	_beam.visible = on; _beam_core.visible = on; _beam_motes.emitting = on
+	_beam_col = c
+	_beam_motes.color = c
+
 func _refresh() -> void:
+	_pick_quest()
 	var st := Game.quest_state(quest)
 	match st:
 		"available":
 			_marker.text = "!"; _marker.modulate = Color(1.0, 0.82, 0.15); _marker.visible = true
+			_set_beam(true, Color(1.0, 1.0, 1.0))
 		"ready":
 			_marker.text = "?"; _marker.modulate = Color(1.0, 0.82, 0.15); _marker.visible = true
-		"active", "locked":
+			_set_beam(true, Color(0.3, 1.0, 0.35))
+		"active":
 			_marker.text = "..."; _marker.modulate = Color(0.75, 0.75, 0.75, 0.8); _marker.visible = true
+			_set_beam(true, Color(0.25, 0.85, 0.3))
+		"locked":
+			_marker.text = "..."; _marker.modulate = Color(0.75, 0.75, 0.75, 0.8); _marker.visible = true
+			_set_beam(false, Color.WHITE)
 		_:
 			_marker.visible = false
+			_set_beam(false, Color.WHITE)
 
 func _process(delta: float) -> void:
 	_t += delta
 	_marker.position.y = 2.75 + sin(_t * 2.5) * 0.08
+	if _beam and _beam.visible:
+		# brighter when the quest is ready; softer when you're standing right next to it
+		var ready := Game.quest_state(quest) == "ready"
+		var pulse := 0.75 + 0.25 * sin(_t * (4.0 if ready else 1.6))
+		var a := (0.32 if ready else 0.2) * pulse
+		var pl := get_tree().get_first_node_in_group("player") as Node3D
+		if pl:
+			a *= clampf(pl.global_position.distance_to(global_position) / 9.0, 0.25, 1.0)
+		_beam_mat.albedo_color = Color(_beam_col.r, _beam_col.g, _beam_col.b, a)
 	# turn to face the player when they come close, back to the post otherwise
 	var p := get_tree().get_first_node_in_group("player") as Node3D
 	var want := _home_yaw

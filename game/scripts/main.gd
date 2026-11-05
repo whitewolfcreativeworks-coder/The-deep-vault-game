@@ -26,7 +26,10 @@ func _ready() -> void:
 		Game.reset_run()
 	if not continue_pending:
 		Game.hp = Game.max_hp(); Game.mana = Game.max_mana(); Game.stamina = Game.max_stamina()
-	world = ForestWorld.new() if Game.zone == "forest" else VaultWorld.new()
+	match Game.zone:
+		"forest": world = ForestWorld.new()
+		"castle": world = CastleWorld.new()
+		_: world = VaultWorld.new()
 	world.name = "World"
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(world)
@@ -41,7 +44,7 @@ func _ready() -> void:
 	if not continue_pending or Game.checkpoint_pos == Vector3.ZERO:
 		Game.checkpoint_pos = world.spawn_point
 		Game.checkpoint_yaw = float(world.get("spawn_yaw")) if world.get("spawn_yaw") != null else 0.0
-		Game.checkpoint_name = "the Portal Glade" if Game.zone == "forest" else "the Outpost"
+		Game.checkpoint_name = {"forest": "the Portal Glade", "castle": "the Moor Portal"}.get(Game.zone, "the Outpost")
 	hud = HUD.new()
 	add_child(hud)
 	hud.bind_player(player)
@@ -136,10 +139,17 @@ func _continue_game() -> void:
 	player.set_mouse_captured(true)
 	hud.visible = true
 	Game.in_game = true
-	if Game.zone == "forest":
+	if Game.zone in ["forest", "castle"]:
 		Game.objective = Game.forest_objective()
 	Game.set_objective(Game.objective if Game.objective != "" else "Enter the Deep Vault beneath the cliffs.")
-	if Game.zone == "forest" and Game.play_time > 0.0 and Game.resume_pos == Vector3.ZERO:
+	if Game.zone == "castle" and Game.resume_pos == Vector3.ZERO:
+		Game.say("You step out under a cold moon. Somewhere a ghost wails... Welcome to Ghost Knight Castle!", Color(0.7, 0.85, 1.0))
+		if not Game.flags.get("special2_told", false):
+			Game.flags["special2_told"] = true
+			var a2: Dictionary = Game.ability2()
+			get_tree().create_timer(3.0).timeout.connect(func() -> void:
+				Game.say("NEW POWER! %s: press %s to use it." % [a2.name, "B / 3" if not Game.touch_active else "the new button"], Color(0.6, 1.0, 0.9)))
+	elif Game.zone == "forest" and Game.play_time > 0.0 and Game.resume_pos == Vector3.ZERO:
 		Game.say("You step out of the portal into the Goblin Forest.", UIKit.GOLD)
 	else:
 		Game.say("Welcome back, %s. Level %d." % [Game.profile.name, Game.level], UIKit.GOLD)
@@ -196,6 +206,23 @@ func go_to_forest() -> void:
 	continue_pending = true
 	get_tree().reload_current_scene()
 
+## Level 2 -> Level 3: through the Moonlit Portal once every forest quest is done.
+## Every class learns its second special power on arrival.
+func go_to_castle() -> void:
+	Game.zone = "castle"
+	Game.flags["special2"] = true
+	Game.checkpoint_pos = Vector3.ZERO
+	Game.resume_pos = Vector3.ZERO
+	Game.objective = ""
+	Game.game_over = false
+	Game.in_game = true
+	if Game.active_slot < 0:
+		Game.active_slot = maxi(Game.first_empty_slot(), 0)
+	Game.save_slot()
+	get_tree().paused = false
+	continue_pending = true
+	get_tree().reload_current_scene()
+
 ## Doors and ladders: fade out, move the player, fade back in.
 func teleport_player(dest: Vector3, yaw: float, label: String) -> void:
 	player.input_enabled = false
@@ -217,13 +244,18 @@ func open_dialogue(npc: NPC) -> void:
 	player.set_mouse_captured(false)
 
 func _check_forest_done() -> void:
-	if Game.zone == "forest" and Game.quest_state("warren") == "done" and not Game.flags.get("forest_won", false):
-		Game.flags["forest_won"] = true
-		Game.set_objective("The Goblin Forest is safe. (Level 3 is coming!)")
+	var won := ""
+	if Game.zone == "forest" and Game.zone_complete("forest") and not Game.flags.get("forest_won", false):
+		won = "forest"
+	elif Game.zone == "castle" and Game.quest_state("ghost_lord") == "done" and not Game.flags.get("castle_won", false):
+		won = "castle"
+	if won != "":
+		Game.flags[won + "_won"] = true
+		Game.set_objective(Game.forest_objective())
 		autosave()
 		get_tree().create_timer(2.5).timeout.connect(func() -> void:
 			if menus.current == "":
-				menus.show_forest_victory()
+				menus.show_forest_victory(won)
 				get_tree().paused = true
 				player.set_mouse_captured(false))
 

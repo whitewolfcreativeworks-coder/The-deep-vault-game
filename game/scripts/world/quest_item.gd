@@ -58,6 +58,35 @@ func _build() -> void:
 			add_child(_vis)
 			_vis.scale = Vector3.ONE * 0.8
 			col = Color(1.0, 0.85, 0.4)
+		"locket":
+			_vis = Node3D.new(); add_child(_vis)
+			var gold := StandardMaterial3D.new(); gold.albedo_color = Color(1.0, 0.8, 0.35); gold.metallic = 0.9; gold.roughness = 0.25
+			gold.emission_enabled = true; gold.emission = Color(0.5, 0.35, 0.1)
+			for sx in [-0.06, 0.06]:
+				var lobe := MeshInstance3D.new(); var lm := SphereMesh.new(); lm.radius = 0.1; lm.height = 0.12
+				lobe.mesh = lm; lobe.material_override = gold; lobe.position = Vector3(sx, 0.04, 0); _vis.add_child(lobe)
+			var tip := MeshInstance3D.new(); var tm := PrismMesh.new(); tm.size = Vector3(0.24, 0.16, 0.1)
+			tip.mesh = tm; tip.material_override = gold; tip.rotation.z = PI; tip.position.y = -0.07; _vis.add_child(tip)
+			var chain := MeshInstance3D.new(); var cm2 := TorusMesh.new(); cm2.inner_radius = 0.17; cm2.outer_radius = 0.19
+			chain.mesh = cm2; chain.material_override = gold; chain.rotation.x = PI * 0.5; chain.position.y = 0.22; _vis.add_child(chain)
+			col = Color(1.0, 0.85, 0.5)
+		"beacon":
+			# an unlit beacon pole with a cold wisp waiting to be lit
+			_vis = Node3D.new(); add_child(_vis)
+			var wisp := MeshInstance3D.new(); var wm := SphereMesh.new(); wm.radius = 0.22; wm.height = 0.44
+			wisp.mesh = wm; wisp.material_override = FX.glow_material(Color(1.0, 0.85, 0.5), 3.0); _vis.add_child(wisp)
+			col = Color(1.0, 0.8, 0.45)
+		"holywater":
+			_vis = Props.make("bottle_A_labeled_brown"); add_child(_vis)
+			for mi in _vis.find_children("*", "MeshInstance3D", true, false):
+				(mi as MeshInstance3D).material_override = FX.glow_material(Color(0.6, 0.85, 1.0), 1.8)
+			col = Color(0.6, 0.85, 1.0)
+		"musicbox":
+			_vis = Props.make("chest_gold"); add_child(_vis)
+			_vis.scale = Vector3.ONE * 0.5
+			col = Color(1.0, 0.7, 0.9)
+		_:
+			_vis = Node3D.new(); add_child(_vis)
 	_vis.position.y = 0.6
 	_light = OmniLight3D.new(); _light.light_color = col; _light.light_energy = 1.4; _light.omni_range = 4.0
 	_light.position.y = 1.0

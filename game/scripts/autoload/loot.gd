@@ -23,6 +23,18 @@ const ARMOR_BASES := [
 	{"base": "Plate Cuirass", "shield": "shield_square_color", "def": 1.25, "tint": Color(0.6, 0.7, 0.9)},
 	{"base": "Warden Plate", "shield": "Skeleton_Shield_Large_A", "def": 1.4, "tint": Color(0.5, 0.65, 0.75)},
 ]
+## Ghost Knight Castle has its own, stronger kinds of gear.
+const CASTLE_WEAPONS := [
+	{"base": "Spectral Blade", "model": "sword_1handed", "dmg": 1.25, "spell": 0},
+	{"base": "Ghostforged Greatsword", "model": "sword_2handed_color", "dmg": 1.5, "spell": 0},
+	{"base": "Wraithbone Axe", "model": "skel_axe", "dmg": 1.4, "spell": 0},
+	{"base": "Moonlit Staff", "model": "skel_staff", "dmg": 0.85, "spell": 40},
+]
+const CASTLE_ARMOR := [
+	{"base": "Ghostforged Plate", "shield": "shield_square_color", "def": 1.55, "tint": Color(0.7, 0.85, 1.0)},
+	{"base": "Moonsilver Mail", "shield": "shield_badge_color", "def": 1.45, "tint": Color(0.8, 0.85, 0.95)},
+	{"base": "Phantom Cuirass", "shield": "Skeleton_Shield_Large_A", "def": 1.6, "tint": Color(0.55, 0.7, 0.9)},
+]
 const TRINKET_BASES := ["Ring", "Charm", "Talisman", "Band", "Pendant"]
 const SKINS := {
 	"lizard": {"name": "Lizardfolk Hide", "desc": "Your skin turns to green scales. You feel... cold-blooded.", "min": 2, "affix": "hp"},
@@ -69,6 +81,8 @@ const COSTUMES := {
 	"zombie": {"name": "Zombie Farmer", "file": "Farmer_B", "fx": "rot", "line": "Braaains... you're a zombie farmer!"},
 	"lich": {"name": "Lich", "file": "Lorekeeper", "fx": "deathly", "line": "A cold, ghostly lich. Your breath freezes the air."},
 	"demon": {"name": "Demon", "file": "Tiefling", "fx": "infernal", "line": "Horns of fire! You're a demon from the Sinkhole!"},
+	"ghost_knight": {"name": "Ghost Knight", "file": "costumes/Paladin", "fx": "deathly", "line": "Whooo! You're a see-through ghost knight!"},
+	"ghost_archer": {"name": "Ghost Archer", "file": "adv2/Ranger", "fx": "deathly", "line": "A ghostly archer. Your arrows whisper."},
 	"death_knight": {"name": "Death Knight", "file": "adv2/Knight", "fx": "deathly", "line": "A Death Knight, glowing with cold blue fire."},
 	"shadow_mage": {"name": "Shadow Mage", "file": "adv2/Mage", "fx": "shadow", "line": "Dark magic crackles around you. Shadow Mage!"},
 	"dark_witch": {"name": "Dark Witch", "file": "Witch", "fx": "shadow", "line": "A wicked witch of the dark woods. Mwahaha!"},
@@ -86,9 +100,42 @@ const COSTUME_TIMES := [
 	[20, 86400.0, true, "a whole day"], [10, 259200.0, true, "3 days"],
 ]
 
-static func roll_costume() -> String:
-	var keys := COSTUMES.keys()
-	return keys[rng.randi() % keys.size()]
+## Which costumes turn up where. Half the time it's one of the zone's own
+## creatures or people, 40% something that fits the world, and 10% something
+## completely out of place (a robot in a dungeon is funny).
+const ZONE_COSTUMES := {
+	"vault": ["skeleton", "necromancer", "bone_lord", "lich", "death_knight", "shadow_mage"],
+	"forest": ["goblin", "ember_goblin", "gruk", "werewolf", "leafy", "birdknight", "zombie", "demon", "dark_witch"],
+	"castle": ["ghost_knight", "ghost_archer", "vampire", "blood_vampire", "lich", "dark_knight", "death_knight", "necromancer"],
+}
+const FITTING_COSTUMES := ["vampire", "ninja", "witch", "caveman", "imp", "sage", "farmer", "dark_knight", "shadow_ninja",
+	"zombie", "demon", "blood_vampire", "dark_witch", "necromancer", "birdknight", "leafy", "werewolf", "death_knight", "lich"]
+const SILLY_COSTUMES := ["dino", "dino_hood", "robot", "robot2", "clown", "superhero", "spaceranger", "toysoldier", "teddy",
+	"zombie_bear", "elf", "magical", "cool", "action", "mech"]
+## Monsters sometimes drop a costume of themselves: [costume, chance]
+const MONSTER_SKINS := {
+	"minion": ["skeleton", 0.015], "warrior": ["skeleton", 0.02], "mage": ["necromancer", 0.02], "revenant": ["death_knight", 0.08],
+	"goblin": ["goblin", 0.02], "goblin_archer": ["goblin", 0.02], "goblin_brute": ["goblin", 0.05], "goblin_chief": ["gruk", 0.5],
+	"fire_goblin": ["ember_goblin", 0.03], "fire_archer": ["ember_goblin", 0.03], "magma_brute": ["demon", 0.06], "cyclops": ["demon", 0.4],
+	"ghost_knight": ["ghost_knight", 0.04], "ghost_archer": ["ghost_archer", 0.04], "ghost_lord": ["death_knight", 0.5],
+}
+
+static func _pick(pool: Array) -> String:
+	var ok: Array = pool.filter(func(c: String) -> bool: return COSTUMES.has(c))
+	if ok.is_empty():
+		var keys := COSTUMES.keys()
+		return keys[rng.randi() % keys.size()]
+	return ok[rng.randi() % ok.size()]
+
+static func roll_costume(zone := "") -> String:
+	if zone == "":
+		zone = Game.zone
+	var x := rng.randf()
+	if x < 0.5:
+		return _pick(ZONE_COSTUMES.get(zone, FITTING_COSTUMES))
+	if x < 0.9:
+		return _pick(FITTING_COSTUMES)
+	return _pick(SILLY_COSTUMES)
 
 static func roll_costume_time() -> Array:
 	var total := 0
@@ -110,6 +157,9 @@ const OUTFITS := {
 	"Bone Mail": ["costumes/Necromancer", "costumes/Ninja", "adv2/Barbarian"],
 	"Plate Cuirass": ["adv2/Knight", "costumes/Paladin", "costumes/ToySoldier"],
 	"Warden Plate": ["costumes/Paladin", "adv2/Knight", "adv2/Mage"],
+	"Ghostforged Plate": ["costumes/Paladin", "adv2/Knight"],
+	"Moonsilver Mail": ["adv2/Knight", "costumes/Cleric"],
+	"Phantom Cuirass": ["costumes/Paladin", "adv2/Barbarian"],
 }
 
 ## Armour skins: new outfit looks that drop often. Each is a small upgrade
@@ -186,6 +236,8 @@ static func rarity_color(r: int) -> Color:
 
 ## Item level from how deep in the dungeon (z) the loot appears.
 static func area_level(z: float) -> int:
+	if Game.zone == "castle":
+		return 8 if z < -40.0 else 7     # inside the castle walls is harder
 	if Game.zone == "forest":
 		return 5 if z < -120.0 else 4    # the Goblin Forest, deeper in the Warren
 	if z > -12.0: return 1
@@ -233,7 +285,8 @@ static func _register(it: Dictionary) -> String:
 	return uid
 
 static func make_weapon(ilvl: int, rarity: int) -> String:
-	var b: Dictionary = WEAPON_BASES[rng.randi() % WEAPON_BASES.size()]
+	var pool: Array = CASTLE_WEAPONS if Game.zone == "castle" else WEAPON_BASES
+	var b: Dictionary = pool[rng.randi() % pool.size()]
 	var it := {"slot": "weapon", "rarity": rarity, "model": b.model, "base": b.base}
 	it["damage"] = roundf((2.0 + ilvl * 2.2) * RARITY_MULT[rarity] * b.dmg * rng.randf_range(0.85, 1.15))
 	if b.spell > 0:
@@ -245,6 +298,15 @@ static func make_weapon(ilvl: int, rarity: int) -> String:
 
 static func make_armor(ilvl: int, rarity: int) -> String:
 	var b: Dictionary = ARMOR_BASES[clampi(int(rng.randf_range(0.0, 2.2)) + int(ilvl / 2.0), 0, ARMOR_BASES.size() - 1)]
+	if Game.zone == "castle":
+		b = CASTLE_ARMOR[rng.randi() % CASTLE_ARMOR.size()]
+	return _armor_from(b, ilvl, rarity)
+
+## The armour a beaten ghost knight leaves behind.
+static func make_ghost_armor(ilvl: int, rarity: int) -> String:
+	return _armor_from(CASTLE_ARMOR[rng.randi() % CASTLE_ARMOR.size()], ilvl, rarity)
+
+static func _armor_from(b: Dictionary, ilvl: int, rarity: int) -> String:
 	var it := {"slot": "armor", "rarity": rarity, "shield": b.shield, "tint": b.tint, "base": b.base}
 	var wardrobe: Array = OUTFITS.get(b.base, [])
 	if not wardrobe.is_empty():
@@ -362,11 +424,13 @@ static func roll_chest(tier: String, ilvl: int) -> Array:
 static func roll_enemy(type_name: String, ilvl: int) -> Array:
 	var out: Array = []
 	var t: Array = {"minion": [0.32, 0.1, 0.0], "warrior": [0.4, 0.18, 0.2], "mage": [0.45, 0.18, 0.2],
-		"revenant": [1.0, 1.0, 1.0], "summon": [0.7, 0.04, 0.0]}.get(type_name, [0.3, 0.1, 0.0])
+		"revenant": [1.0, 1.0, 1.0], "summon": [0.7, 0.04, 0.0],
+		"ghost_knight": [0.4, 0.2, 0.4], "ghost_archer": [0.4, 0.2, 0.4], "wraith": [0.5, 0.22, 0.5],
+		"gatekeeper": [1.0, 1.0, 1.5], "ghost_lord": [1.0, 1.0, 2.5]}.get(type_name, [0.3, 0.1, 0.0])
 	if rng.randf() < t[0]:
 		_potions(out, 2 if type_name == "revenant" else 1, 0.65 if type_name == "mage" else 0.4)
 	if rng.randf() < t[1]:
-		var floor_r := 1 if type_name == "revenant" else 0
+		var floor_r := 1 if type_name in ["revenant", "gatekeeper"] else (2 if type_name == "ghost_lord" else 0)
 		out.append({"kind": "item", "id": make_random(ilvl, t[2], floor_r)})
 	if rng.randf() < 0.06:
 		out.append({"kind": "item", "id": make_armor_skin(ilvl, roll_rarity(0.2))})

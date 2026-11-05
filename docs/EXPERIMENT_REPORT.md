@@ -531,3 +531,43 @@ It also found two stale tests that still looked buttons up by list position. But
   - Costume odds dropped to 4–9% per ordinary chest.
   - New armour skins (22 looks, 7 of them dark with a material finish) drop at 30–50% from chests and 6% from monsters.
   - They sit in the skin slot, override the armour's look, carry a small defence and health bonus, and auto-equip when they score higher.
+
+## Follow-up 13: Level 3, Ghost Knight Castle (Nov 5)
+
+**Request:**
+- quest beams over NPCs;
+- a third zone that opens once every forest quest is done;
+- ghost knights that drop their armour, and ghost archers;
+- nine quests;
+- a second mount (the moped);
+- a second special ability for every class;
+- zone-themed skins (50% zone / 40% fitting / 10% silly);
+- an auto-run button;
+- a skin designer.
+
+**How it was built:**
+- `CastleWorld` extends `ForestWorld`. It reuses the height-field terrain, the multimesh scatter and the model helpers, and overrides the land shape, the night sky, the area logic and the places. That kept the new level to about 600 lines.
+- The KayKit Halloween Bits graves, crypt, coffins and candles were imported for it (all CC0).
+- **Spectral enemies.** These are the KayKit hero and skeleton rigs drawn with see-through, emissive copies of their own materials. Each one also has a misty particle trail and a cold light.
+- **Ghost knights' armour.** Four metal pieces bounce to the ground. There is a 35% chance (100% for the bosses) of a wearable Ghostforged / Moonsilver / Phantom armour drop.
+- **Quest-driven world.**
+  - The beacons light up when touched, and the mist thins when all three are burning.
+  - The Gatehouse Warden only appears once his quest is accepted, so he can't be killed early.
+  - The portcullis rises when he falls.
+  - The Ghost Lord takes the throne once Elowen sends you.
+  - Turning his quest in grants the moped and seats you on it.
+- **Moped.** It is built from simple shapes (wheels, shell, handlebars, mirrors, a headlight spotlight, tail light and exhaust puffs). It has a new synthesized two-stroke engine loop and a "meep meep" horn (tools/make_audio.py). It goes 2.1× running speed. G cycles chicken → moped → off.
+- **Second specials.** Holy Ward (−70% damage for 5 s, heal, knockback), Earthshatter, Smoke Bomb (enemies lose you, you dash), Rain of Arrows, and Frost Nova. Frost Nova freezes enemies in a block of ice; bosses only shiver.
+- **Drops.** The castle has its own weapon and armour bases and item level 7–8. Monsters can drop costumes of themselves.
+- **Delegation.** The skin designer was handed to a fork agent working in its own git worktree, in parallel with the castle work.
+
+**Tests:** a new `castle` test runs the whole level's flow:
+- the Moonlit Portal sleeps, then wakes, then carries you over;
+- the beams go white, then green;
+- auto-run moves you, and pulling back cancels it;
+- ghost armour drops; the crypt passage works;
+- the beacons light; the Warden appears and the gate opens;
+- the music box is found; the Ghost Lord spawns, summons help and is beaten;
+- all five second specials deal damage;
+- the moped is granted, is fast and gets you off on G;
+- the castle zone saves.

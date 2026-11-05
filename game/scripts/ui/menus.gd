@@ -960,12 +960,16 @@ func _refresh_dialogue(extra := "") -> void:
 
 # ---------------------------------------------------------------------------
 var _forest_stats: Label
+var _forest_title: Label
+var _forest_sub: Label
 func _build_forest_victory() -> void:
 	var p := _center_panel("forest_victory", 820, 560)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 16); v.alignment = BoxContainer.ALIGNMENT_CENTER; p.add_child(v)
 	var t := UIKit.label("THE FOREST IS SAFE", 46, UIKit.GOLD, true); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
-	var s2 := UIKit.label("Chief Gruk is beaten and the goblins are scattered.\nLevel 2 complete! The next adventure is on its way.", 20, UIKit.PARCH)
+	_forest_title = t
+	var s2 := UIKit.label("Every quest in the Goblin Forest is done!\nThe Moonlit Portal in the south-east glade has woken up: it leads to Level 3, Ghost Knight Castle.", 20, UIKit.PARCH)
+	_forest_sub = s2
 	s2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(s2)
 	_forest_stats = UIKit.label("", 18, UIKit.PARCH); _forest_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -974,7 +978,13 @@ func _build_forest_victory() -> void:
 	hb.add_child(_button("Keep exploring", func() -> void: _close_dialogue(), 280))
 	hb.add_child(_button("Save & exit to title", func() -> void: exit_to_title_requested.emit(), 300))
 
-func show_forest_victory() -> void:
+func show_forest_victory(which := "forest") -> void:
+	if which == "castle":
+		_forest_title.text = "CASTLE MORWEN IS FREE"
+		_forest_sub.text = "The Ghost Lord is beaten and Ashenford can sleep again.\nLevel 3 complete! Hop on your new moped (G) and enjoy the moonlight."
+	else:
+		_forest_title.text = "THE FOREST IS SAFE"
+		_forest_sub.text = "Every quest in the Goblin Forest is done!\nThe Moonlit Portal in the south-east glade has woken up: it leads to Level 3, Ghost Knight Castle."
 	var done := 0
 	for q in Game.QUESTS:
 		if Game.quest_state(q) == "done":

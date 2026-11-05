@@ -143,23 +143,38 @@ func rebuild_body() -> void:
 
 # --- the Giant Chicken mount --------------------------------------------------------
 const MOUNT_SPEED := 1.75       # riding is this much faster than running on foot
+const MOPED_SPEED := 2.1        # the moped is even faster
 var mounted := false
-var mount: ChickenMount
+var mount = null                 # ChickenMount or MopedMount
+var mount_kind := ""
 
 func has_mount() -> bool:
-	return bool(Game.flags.get("mount_chicken", false))
+	return bool(Game.flags.get("mount_chicken", false)) or has_moped()
 
+func has_moped() -> bool:
+	return bool(Game.flags.get("mount_moped", false))
+
+## G: get on, (with both mounts) swap chicken -> moped, then get off.
 func toggle_mount() -> void:
 	if mounted:
+		var swap := mount_kind == "chicken" and has_moped()
 		dismount()
+		if swap:
+			mount_up("moped")
 	elif has_mount() and not dead:
-		mount_up()
+		mount_up("chicken" if Game.flags.get("mount_chicken", false) else "moped")
 
-func mount_up() -> void:
+func _seat_h() -> float:
+	return MopedMount.SEAT_H if mount_kind == "moped" else ChickenMount.SEAT_H
+
+func mount_up(kind := "chicken") -> void:
 	if mounted or dead:
 		return
+	if kind == "moped" and not has_moped():
+		kind = "chicken"
 	mounted = true
-	mount = ChickenMount.new()
+	mount_kind = kind
+	mount = MopedMount.new() if kind == "moped" else ChickenMount.new()
 	mount.riding = true
 	add_child(mount)
 	mount.rotation.y = facing
@@ -174,7 +189,7 @@ func dismount() -> void:
 	mounted = false
 	if mount and is_instance_valid(mount):
 		FX.burst(mount.global_position + Vector3(0, 1.0, 0), Color(1.0, 0.95, 0.85), 30, 3.0, 0.16, 0.8, -3.0)
-		Sfx.play("cluck", -6.0, 0.1)
+		Sfx.play("cluck" if mount_kind == "chicken" else "beep", -6.0, 0.1)
 		mount.queue_free()
 	mount = null
 	_ride_pose(false)
@@ -183,7 +198,7 @@ func _ride_pose(on: bool) -> void:
 	if body == null:
 		return
 	body.hold_clip = "Sit_Chair_Idle" if on else ""
-	body.position.y = (ChickenMount.SEAT_H - 0.46) if on else 0.0
+	body.position.y = (_seat_h() - 0.46) if on else 0.0
 
 ## Looks chosen in the character creator (shared with the creator preview).
 static func _apply_profile_looks(cfg: Dictionary) -> void:
@@ -381,6 +396,15 @@ func _physics_process(delta: float) -> void:
 		else:
 			_handle_actions()
 			var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+			if Input.is_action_just_pressed("auto_run"):
+				set_auto_run(not auto_run)
+			if auto_run:
+				# keep running forward (the way the camera looks); left/right still steer,
+				# pulling back stops it
+				if iv.y > 0.5:
+					set_auto_run(false)
+				else:
+					iv = Vector2(iv.x * 0.6, -1.0).limit_length(1.0)
 			_move_input = iv
 			dir = Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, view_yaw)
 			if Input.is_action_just_pressed("jump"):
@@ -413,7 +437,9 @@ func _physics_process(delta: float) -> void:
 	var sprinting := input_enabled and Input.is_action_pressed("sprint") and dir.length() > 0.1 and Game.stamina > 1 and not blocking
 	var speed := SPRINT if sprinting else WALK
 	if mounted:
-		speed *= MOUNT_SPEED
+		speed *= MOPED_SPEED if mount_kind == "moped" else MOUNT_SPEED
+	if haste_t > 0.0:
+		speed *= 1.45      # Smoke Bomb dash
 	if blocking:
 		speed *= 0.45
 	if attacking:
@@ -501,6 +527,13 @@ func _update_timers(delta: float) -> void:
 	invuln = maxf(0.0, invuln - delta)
 	potion_cd = maxf(0.0, potion_cd - delta)
 	special_cd = maxf(0.0, special_cd - delta)
+	special2_cd = maxf(0.0, special2_cd - delta)
+	if ward_t > 0.0:
+		ward_t -= delta
+		if ward_t <= 0.0 and _ward_fx and is_instance_valid(_ward_fx):
+			_ward_fx.queue_free()
+	if haste_t > 0.0:
+		haste_t -= delta
 	if blocking:
 		block_time += delta
 	if special_kind != "":
@@ -544,7 +577,7 @@ func _handle_actions() -> void:
 		toggle_mount()
 	# any fighting move hops you off the chicken first
 	if mounted and (Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("block") or Input.is_action_just_pressed("dodge")
-			or Input.is_action_just_pressed("spell") or Input.is_action_just_pressed("special")):
+			or Input.is_action_just_pressed("spell") or Input.is_action_just_pressed("special") or Input.is_action_just_pressed("special2")):
 		dismount()
 	if Input.is_action_just_pressed("attack") and not dodging and not casting:
 		if not attacking:
@@ -582,6 +615,8 @@ func _handle_actions() -> void:
 			Game.say("Not enough mana.", Color(0.6, 0.7, 1.0))
 	if Input.is_action_just_pressed("special"):
 		use_special()
+	if Input.is_action_just_pressed("special2"):
+		use_special2()
 	if Input.is_action_just_pressed("mana_potion"):
 		drink_mana_potion()
 	if Input.is_action_just_pressed("potion"):
@@ -729,6 +764,9 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
 	var blocked := blocking and to_src.length() > 0.01 and fwd.dot(to_src.normalized()) > -0.15
 	var dmg := Game.mitigate(amount)
+	if ward_t > 0.0:
+		dmg *= 0.3        # Holy Ward
+		FX.sparks(global_position + Vector3(0, 1.2, 0), Color(1.0, 0.9, 0.45))
 	if blocked:
 		if block_time < PARRY_WINDOW:
 			_parry(from_pos)
@@ -784,6 +822,7 @@ func die() -> void:
 
 func respawn_at(pos: Vector3, yaw_r: float) -> void:
 	end_pose()
+	auto_run = false
 	dismount()
 	dead = false
 	global_position = pos
@@ -897,6 +936,15 @@ func _fade_headgear(hide: bool) -> void:
 				(m as MeshInstance3D).visible = true
 		_headgear_hidden.clear()
 
+# --- auto-run -----------------------------------------------------------------------
+var auto_run := false
+
+func set_auto_run(on: bool) -> void:
+	if on == auto_run:
+		return
+	auto_run = on
+	Game.say("Auto-run ON (pull back or tap AUTO to stop)" if on else "Auto-run off", Color(0.8, 0.9, 1.0))
+
 # --- "Check yourself out": a turntable camera around your hero ---------------------
 signal pose_changed(on: bool)
 var posing := false
@@ -914,6 +962,7 @@ func start_pose() -> void:
 	if posing or dead:
 		return
 	posing = true
+	auto_run = false
 	_pose_saved = {"zoom": zoom_target, "pitch": pitch, "first": first_person}
 	if first_person and has_method("toggle_view"):
 		zoom = maxf(zoom, 1.0)
@@ -983,7 +1032,7 @@ func _update_camera(delta: float) -> void:
 		pitch = lerpf(pitch, -0.18, 1.0 - exp(-0.9 * delta))
 	# --- follow the interpolated body position
 	var base := get_global_transform_interpolated().origin
-	var head_pos := base + Vector3(0, EYE_H * float(Game.profile.get("height", 1.0)) + ((ChickenMount.SEAT_H - 0.46) if mounted else 0.0), 0)
+	var head_pos := base + Vector3(0, EYE_H * float(Game.profile.get("height", 1.0)) + ((_seat_h() - 0.46) if mounted else 0.0), 0)
 	if body.dead:
 		head_pos = base + Vector3(0, 0.6, 0)
 	if fp:
@@ -1193,6 +1242,150 @@ func use_special() -> void:
 	if ok:
 		special_cd = ab.cd
 		specials_used += 1
+
+# ---------------------------------------------------------------------------
+# Second special abilities (Game.ABILITIES2): every class learns one on
+# arriving at Ghost Knight Castle. B / 3 on a keyboard, its own touch button.
+var special2_cd := 0.0
+var specials2_used := 0
+var ward_t := 0.0
+var haste_t := 0.0
+var _ward_fx: MeshInstance3D
+
+func special2_ready() -> bool:
+	return Game.has_special2() and special2_cd <= 0.0
+
+func use_special2() -> void:
+	if dead or mantling or not input_enabled or not Game.has_special2() or special_kind != "":
+		return
+	var ab := Game.ability2()
+	if special2_cd > 0.0:
+		Game.say("%s ready in %ds." % [ab.name, ceili(special2_cd)], Color(0.75, 0.9, 1.0))
+		return
+	attacking = false; casting = false; dodging = false; combo_queued = false; blocking = false
+	match Game.profile.hero:
+		"Knight": _holy_ward()
+		"Barbarian": _earthshatter()
+		"Rogue": _smoke_bomb()
+		"Ranger": _rain_of_arrows()
+		_: _frost_nova()
+	special2_cd = ab.cd
+	specials2_used += 1
+
+## Knight: a golden dome; 70% less damage for 5 s, heals, knocks foes away.
+func _holy_ward() -> void:
+	var gold := Color(1.0, 0.88, 0.4)
+	ward_t = 5.0
+	heal(Game.max_hp() * 0.25)
+	_aoe(global_position, 4.5, Game.attack_damage() * 1.2, 14.0, true)
+	if _ward_fx and is_instance_valid(_ward_fx):
+		_ward_fx.queue_free()
+	_ward_fx = MeshInstance3D.new()
+	var sm := SphereMesh.new(); sm.radius = 1.25; sm.height = 2.5; sm.radial_segments = 24; sm.rings = 12
+	_ward_fx.mesh = sm
+	_ward_fx.material_override = FX._add_mat(gold, 0.7)
+	(_ward_fx.material_override as StandardMaterial3D).albedo_color.a = 0.35
+	_ward_fx.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_ward_fx)
+	_ward_fx.position = Vector3(0, 1.0, 0)
+	FX.dome(global_position, gold, 4.5, 0.5)
+	FX.pillar(global_position, gold, 1.6, 10.0, 0.8)
+	FX.burst(global_position + Vector3(0, 1.2, 0), gold, 70, 5.0, 0.25, 1.0, 1.0)
+	FX.screen_flash(gold, 0.3, 0.4)
+	Sfx.play("levelup", -4.0, 0.05)
+	add_trauma(0.3)
+
+## Barbarian: hop up and smash down; a shockwave stuns everything nearby.
+func _earthshatter() -> void:
+	velocity.y = JUMP_V * 0.9
+	var col := Color(0.95, 0.6, 0.25)
+	invuln = maxf(invuln, 0.7)
+	await get_tree().create_timer(0.42, false).timeout
+	if dead:
+		return
+	var at := global_position
+	var n := _aoe(at, 6.5, Game.attack_damage() * 2.4, 13.0, true)
+	FX.shockwave(at, col, 7.5, 0.55)
+	FX.shockwave(at, Color(0.6, 0.45, 0.3), 5.0, 0.4)
+	FX.burst(at + Vector3(0, 0.4, 0), Color(0.55, 0.45, 0.35), 90, 8.0, 0.4, 1.0, -9.0)
+	for k in 8:
+		var a := k * TAU / 8.0
+		FX.burst(at + Vector3(cos(a) * 3.5, 0.3, sin(a) * 3.5), col, 12, 4.0, 0.3, 0.6, -6.0)
+	FX.flash_light(at + Vector3(0, 1, 0), col, 9.0, 12.0, 0.4)
+	FX.screen_flash(col, 0.25, 0.3)
+	Sfx.play("slam", 0.0, 0.05)
+	add_trauma(0.75 if n > 0 else 0.5)
+	_hitstop(0.1)
+
+## Rogue: a cloud of poison smoke; you vanish for a moment and dash off fast.
+func _smoke_bomb() -> void:
+	var green := Color(0.45, 0.9, 0.4)
+	var at := global_position
+	_aoe(at, 4.0, Game.attack_damage() * 1.0, 3.0, true)
+	FX.shadow_pool(at, Color(0.35, 0.75, 0.3), 4.0, 4.0, Game.attack_damage() * 0.6)
+	FX.burst(at + Vector3(0, 1.0, 0), Color(0.55, 0.7, 0.5), 110, 3.5, 0.6, 1.6, 0.8)
+	FX.dome(at, green, 4.0, 0.5)
+	invuln = maxf(invuln, 2.0)
+	haste_t = 4.0
+	# enemies lose track of you
+	for e in _live_enemies():
+		if e.global_position.distance_to(at) < 14.0 and e.get("state") != null and e.has_method("lose_target"):
+			e.lose_target()
+	Sfx.play("fire_burst", -4.0, 0.1)
+	fov_kick = 10.0
+
+## Ranger: arrows rain down over a wide spot ahead of you for 1.5 s.
+func _rain_of_arrows() -> void:
+	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
+	var at := global_position + fwd * 9.0
+	var best: Node3D = null
+	var bd := 14.0
+	for e in _live_enemies():
+		var d: float = e.global_position.distance_to(global_position)
+		if d < bd and fwd.dot((e.global_position - global_position).normalized()) > 0.2:
+			bd = d; best = e
+	if best:
+		at = best.global_position
+	var fl = _floor_at(at)
+	if fl != null:
+		at = fl
+	var col := Color(0.75, 1.0, 0.6)
+	FX.shockwave(at, col, 5.0, 0.4)
+	casting = true; cast_time = 0.15
+	Sfx.play("swing", -2.0, 0.1)
+	for wave in 6:
+		await get_tree().create_timer(0.25, false).timeout
+		if dead:
+			return
+		for k in 7:
+			var p := at + Vector3(randf_range(-4.5, 4.5), 0, randf_range(-4.5, 4.5))
+			FX.beam(p + Vector3(randf_range(-1.0, 1.0), 9.0, randf_range(-1.0, 1.0)), p, col, 0.08, 0.18)
+			FX.burst(p + Vector3(0, 0.1, 0), Color(0.75, 0.65, 0.45), 4, 2.0, 0.12, 0.4, -4.0)
+		_aoe(at, 5.0, Game.attack_damage() * 0.75, 1.5, wave == 5)
+		Sfx.play("hit", -10.0, 0.25)
+
+## Mage: a ring of ice bursts out; every foe nearby is frozen solid.
+func _frost_nova() -> void:
+	var ice := Color(0.6, 0.9, 1.0)
+	var at := global_position
+	var dmg := Game.attack_damage() * 1.4 + Game.spell_damage() * 1.0
+	for e in _live_enemies():
+		var to: Vector3 = e.global_position - at
+		if absf(to.y) < 2.8 and Vector2(to.x, to.z).length() < 7.0 + _hit_radius(e):
+			_special_hit_enemy(e, dmg * randf_range(0.92, 1.08), 2.0, false, true)
+			if e.has_method("freeze"):
+				e.freeze(3.0)
+	FX.shockwave(at, ice, 8.0, 0.5)
+	FX.dome(at, ice, 7.0, 0.5)
+	for k in 14:
+		var a := k * TAU / 14.0
+		FX.pillar(at + Vector3(cos(a) * 4.5, 0, sin(a) * 4.5), ice, 0.35, 2.4, 0.9)
+	FX.burst(at + Vector3(0, 0.8, 0), Color(0.85, 0.95, 1.0), 100, 9.0, 0.2, 1.0, -2.0)
+	FX.screen_flash(ice, 0.3, 0.4)
+	Sfx.play("spell_hit", 0.0, 0.05)
+	casting = true; cast_time = 0.2
+	add_trauma(0.4)
+	_slowmo(0.35, 0.15)
 
 func _special_step(delta: float) -> void:
 	_special_t += delta

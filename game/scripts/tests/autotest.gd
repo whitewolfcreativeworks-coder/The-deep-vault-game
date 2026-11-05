@@ -248,6 +248,9 @@ func _run() -> void:
 	elif mode == "sinkhole":
 		if await _sinkhole_test():
 			return
+	elif mode == "castle":
+		if await _castle_test():
+			return
 	elif mode == "saves":
 		if await _saves_test():
 			return   # the scene reloaded: the next phase runs in a fresh test node
@@ -2071,6 +2074,222 @@ func _sinkhole_test() -> bool:
 	check("quest_done", Game.quest_state("sinkhole") == "done")
 	Game.save_slot()
 	check("mount_saved", bool(Game.read_slot(Game.active_slot).get("flags", {}).get("mount_chicken", false)))
+	return false
+
+# --- Level 3: Ghost Knight Castle -------------------------------------------------
+func _dlg_ok() -> void:
+	main.menus._dlg_buttons.get_child(0).pressed.emit()
+	await wait(0.2)
+	main._resume()
+	await wait(0.2)
+
+func _look(at: Vector3, from: Vector3, zoom := 6.0, pitch := -0.2) -> void:
+	var d := at - from
+	await tp(from, atan2(-d.x, -d.z), pitch)
+	player.zoom_target = zoom; player.zoom = zoom; player.pitch = pitch; player.snap_view()
+	await wait(1.0)
+
+func _castle_test() -> bool:
+	var phase: int = Game.get_meta("ck_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("ck_phase", 2)
+		main.go_to_forest()
+		return true
+	if phase == 2:
+		await wait(2.5)
+		player = main.player
+		god = true
+		var fw: ForestWorld = main.world
+		check("moon_portal_sleeps", not fw._moon_area.monitoring)
+		await _look(fw.ground(ForestWorld.MOON_PORTAL.x, ForestWorld.MOON_PORTAL.y) + Vector3(0, 2, 0),
+			fw.ground(ForestWorld.MOON_PORTAL.x - 9, ForestWorld.MOON_PORTAL.y - 9) + Vector3(0, 0.3, 0), 5.0, -0.15)
+		await shot("ck_00_moon_portal_asleep")
+		Game.flags["forest_won"] = true
+		for q in Game.zone_quests("forest"):
+			Game.quests[q] = {"state": "done", "n": 99}
+		Game.quests_changed.emit()
+		await wait(0.5)
+		check("moon_portal_wakes", fw._moon_area.monitoring and Game.zone_complete("forest"))
+		await wait(1.0)
+		await shot("ck_01_moon_portal_open")
+		Game.set_meta("ck_phase", 3)
+		await tp(fw._moon_area.global_position - Vector3(0, 1.8, 0), 0.0)
+		await wait(4.0)
+		check("portal_did_not_fire", false, "still in the forest")   # only reached if the reload never happened
+		return false
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w = main.world
+	check("castle_loaded", w is CastleWorld and Game.zone == "castle" and main.state == "play", Game.zone)
+	check("special2_granted", Game.has_special2())
+	await wait(1.0)
+	await shot("ck_02_arrival")
+	var all_npcs := true
+	for id in ["elowen", "mott", "brannoc", "holt", "ansel", "pip", "wren"]:
+		all_npcs = all_npcs and _npc(id) != null
+	check("seven_villagers", all_npcs)
+	var el := _npc("elowen")
+	check("beam_white_until_accepted", el._beam.visible and el._beam_col.is_equal_approx(Color.WHITE))
+	await _look(el.global_position + Vector3(0, 3, 0), el.global_position + Vector3(6, 0.3, 14), 6.0, -0.05)
+	await shot("ck_03_ashenford_beams")
+	await _talk("elowen")
+	await _dlg_ok()
+	check("restless_accepted", Game.quest_state("restless_dead") == "active")
+	check("beam_green_when_active", el._beam.visible and el._beam_col.g > 0.8 and el._beam_col.r < 0.5)
+	# auto-run: walk forward with no keys held
+	await tp(Vector3(0, w.height(0, 30) + 0.3, 30), 0.0)
+	var p0 := player.global_position
+	player.set_auto_run(true)
+	await wait(1.5)
+	check("auto_run_moves", player.global_position.distance_to(p0) > 5.0, "%.1f m" % player.global_position.distance_to(p0))
+	await press("move_back", 0.15)
+	await wait(0.3)
+	var p1 := player.global_position
+	await wait(0.6)
+	check("auto_run_cancels", not player.auto_run and player.global_position.distance_to(p1) < 1.0)
+	# ghost knights: see-through, and their armour falls when they do
+	var gk: Enemy = null
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e is Enemy and e.type_id == "ghost_knight" and not e.dead:
+			gk = e; break
+	check("ghost_knights_exist", gk != null)
+	await _look(gk.global_position + Vector3(0, 1.2, 0), gk.global_position + Vector3(3.5, 0.3, 3.5), 3.5, -0.1)
+	gk.state = Enemy.S.IDLE
+	await shot("ck_04_ghost_knight")
+	var before := get_tree().get_nodes_in_group("enemy").size()
+	gk.t = gk.t.duplicate(); gk.t["armor_drop"] = 1.0
+	var n_items := Game.items.size()
+	gk.take_damage(99999.0, player.global_position)
+	await wait(1.2)
+	var dropped := false
+	for uid in Game.items:
+		var it: Dictionary = Game.items[uid]
+		if it.get("slot", "") == "armor" and String(it.get("base", "")) in ["Ghostforged Plate", "Moonsilver Mail", "Phantom Cuirass"]:
+			dropped = true
+	check("ghost_armour_drops", dropped and Game.items.size() > n_items)
+	check("restless_progress", int(Game.quests["restless_dead"].n) >= 1)
+	await shot("ck_05_armour_falls")
+	# the graveyard, the crypt, the chapel
+	await _look(w.ground(-62, 12) + Vector3(0, 1, 0), w.ground(-40, 26) + Vector3(0, 0.3, 0), 5.0, -0.2)
+	await shot("ck_06_graveyard")
+	var pas: Passage = null
+	for n in get_tree().get_nodes_in_group("interactable"):
+		if n is Passage and (n as Node3D).global_position.y > CastleWorld.CY + 20.0:
+			pas = n
+	check("crypt_door", pas != null)
+	pas.interact(player)
+	await wait(1.4)
+	check("in_crypt", player.global_position.y < CastleWorld.CY + 5.0 and w.area == "crypt", str(player.global_position))
+	_kill_near(Enemy.TYPES.keys(), 60.0, Vector3(-62, CastleWorld.CY, -10))
+	await _look(Vector3(-62, CastleWorld.CY + 1.0, -22), Vector3(-62, CastleWorld.CY + 0.3, -6), 4.0, -0.1)
+	await shot("ck_07_crypt")
+	await _look(w.ground(62, 10) + Vector3(0, 1, 0), w.ground(62, 34) + Vector3(0, 0.3, 0), 5.0, -0.15)
+	await shot("ck_08_chapel")
+	# beacons -> gatehouse warden -> gate opens
+	Game.quests["light_beacons"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await wait(0.3)
+	for qi in get_tree().get_nodes_in_group("quest_item"):
+		if qi.get("item") == "beacon":
+			await tp((qi as Node3D).global_position + Vector3(0, 0.3, 0), 0.0)
+			await wait(0.4)
+	check("beacons_lit", Game.quest_state("light_beacons") == "ready" and w._beacons_lit())
+	var bp: Vector2 = CastleWorld.BEACONS[0]
+	await _look(w.ground(bp.x, bp.y) + Vector3(0, 3, 0), w.ground(bp.x + 10, bp.y + 10) + Vector3(0, 0.3, 0), 5.0, -0.1)
+	await shot("ck_09_beacon_lit")
+	Game.quests["light_beacons"].state = "done"
+	Game.quests["the_gatehouse"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await wait(0.5)
+	check("warden_appears", w.warden != null and is_instance_valid(w.warden))
+	await _look(Vector3(0, CastleWorld.KY + 4, CastleWorld.GATE_Z), Vector3(4, CastleWorld.KY + 0.3, CastleWorld.GATE_Z + 22), 6.0, -0.05)
+	await shot("ck_10_castle_gate_and_warden")
+	check("gate_shut", not w._gate_open)
+	w.warden.take_damage(99999.0, player.global_position)
+	await wait(5.0)
+	check("gate_opens", w._gate_open and Game.quest_state("the_gatehouse") == "ready" and w.portcullis.position.y > CastleWorld.KY + 5.0)
+	_kill_near(Enemy.TYPES.keys(), 40.0, Vector3(0, CastleWorld.KY, -66))
+	await _look(Vector3(0, CastleWorld.KY + 3, -76), Vector3(0, CastleWorld.KY + 0.3, -46), 5.0, -0.05)
+	await shot("ck_11_courtyard")
+	# the library and the music box
+	Game.quests["the_gatehouse"].state = "done"
+	Game.quests["music_box"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	_kill_near(Enemy.TYPES.keys(), 40.0, Vector3(10, CastleWorld.KY, -90))
+	await _look(Vector3(25.5, CastleWorld.KY + 1.2, -89), Vector3(18, CastleWorld.KY + 0.3, -86), 3.0, -0.2)
+	await shot("ck_12_library")
+	await tp(Vector3(25.5, CastleWorld.KY + 0.3, -88.5), 0.0)
+	await wait(0.5)
+	check("music_box_found", Game.quest_state("music_box") == "ready")
+	# the Ghost Lord
+	Game.quests["ghost_lord"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await wait(0.3)
+	var lord: Enemy = w.lord
+	check("ghost_lord_on_throne", lord != null and is_instance_valid(lord))
+	await tp(Vector3(0, CastleWorld.KY + 0.3, -88), 0.0)
+	await wait(1.0)
+	check("boss_music", w._lord_started)
+	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.08; player.snap_view()
+	await wait(1.0)
+	await shot("ck_13_ghost_lord")
+	# the second special (Knight: Holy Ward), then each other class's on a target
+	var hp_before: float = lord.hp
+	player.special2_cd = 0.0
+	await tp(lord.global_position + Vector3(0, 0.3, 3.0), 0.0)
+	player.use_special2()
+	await wait(0.4)
+	check("holy_ward", player.ward_t > 0.0 and lord.hp < hp_before)
+	await shot("ck_14_holy_ward")
+	var hero0: String = Game.profile.hero
+	for h in ["Barbarian", "Rogue", "Ranger", "Mage"]:
+		Game.profile.hero = h
+		player.special2_cd = 0.0
+		if is_instance_valid(lord) and not lord.dead:
+			await tp(lord.global_position + Vector3(0, 0.3, 3.0), 0.0)
+		var dmg0 := player.special_damage
+		player.use_special2()
+		await wait(1.9)
+		check("special2_" + h.to_lower(), player.special_damage > dmg0, Game.ability2().name)
+		if h == "Mage":
+			await shot("ck_15_frost_nova")
+	Game.profile.hero = hero0
+	lord.take_damage(lord.max_hp * 0.55, player.global_position)
+	await wait(1.0)
+	check("lord_summons", get_tree().get_nodes_in_group("enemy").filter(func(e: Node) -> bool: return e.get("type_id") in ["ghost_knight", "wraith"] and not e.dead \
+		and (e as Node3D).global_position.distance_to(lord.global_position) < 14.0).size() >= 2)
+	lord.take_damage(99999.0, player.global_position)
+	await wait(2.0)
+	check("ghost_lord_beaten", Game.quest_state("ghost_lord") == "ready" and w.get_node_or_null("LordChest") != null)
+	_kill_near(Enemy.TYPES.keys(), 30.0, Vector3(0, CastleWorld.KY, -98))
+	# hand it in to Elowen: the moped!
+	Game.quests["restless_dead"].state = "done"
+	Game.flags["castle_won"] = true      # skip the victory panel for the rest of the test
+	await _talk("elowen")
+	await _dlg_ok()
+	check("ghost_lord_done", Game.quest_state("ghost_lord") == "done")
+	await wait(0.5)
+	check("moped_unlocked", Game.flags.get("mount_moped", false) and player.mounted and player.mount_kind == "moped")
+	_kill_near(Enemy.TYPES.keys(), 30.0, Vector3(0, 0, -20))
+	await tp(Vector3(0, w.height(0, -6) + 0.3, -6), PI)
+	player.yaw = 0.0; player.zoom_target = 4.5; player.zoom = 4.5; player.pitch = -0.2; player.snap_view()
+	await wait(0.3)
+	var m0 := player.global_position
+	await press("move_forward", 1.5)
+	check("moped_is_fast", player.global_position.distance_to(m0) > 11.0, "%.1f m in 1.5 s" % player.global_position.distance_to(m0))
+	player.yaw = PI * 0.8; player.snap_view()
+	await wait(0.6)
+	await shot("ck_16_moped")
+	# G cycles: moped -> off -> chicken (if owned) -> moped
+	await press("mount", 0.07)
+	await wait(0.3)
+	check("g_gets_off_moped", not player.mounted)
+	Game.save_slot()
+	check("castle_saved", Game.read_slot(Game.active_slot).get("zone", "") == "castle")
 	return false
 
 # --- costumes, outfits and wild chests ---------------------------------------------

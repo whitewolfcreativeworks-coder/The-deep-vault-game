@@ -90,6 +90,8 @@ func _find_target() -> void:
 
 ## 0 = the forest floor, 1 = the Warren, 2 = the Sinkhole of Death (far below).
 func _level(p: Vector3) -> int:
+	if Game.zone == "castle":
+		return 1 if p.y < CastleWorld.CY + 20.0 else 0
 	if Game.zone != "forest":
 		return 0
 	if p.y < SinkholeOfDeath.SY + 30.0:
@@ -122,10 +124,11 @@ func quest_target(id: String) -> Variant:
 			"collect":
 				spot = _first("quest_item", func(n: Node) -> bool: return n.get("item") == g.item and (n as Node3D).visible)
 			"kill":
-				spot = _first("enemy", func(n: Node) -> bool: return n.get("type_id") in Game.GOBLINS and not n.get("dead") \
+				var types: Array = g.get("types", Game.GOBLINS)
+				spot = _first("enemy", func(n: Node) -> bool: return n.get("type_id") in types and not n.get("dead") \
 					and _level((n as Node3D).global_position) == _level(player.global_position))
 				if spot == null:
-					spot = _first("enemy", func(n: Node) -> bool: return n.get("type_id") in Game.GOBLINS and not n.get("dead"))
+					spot = _first("enemy", func(n: Node) -> bool: return n.get("type_id") in types and not n.get("dead"))
 			"boss":
 				spot = _first("enemy", func(n: Node) -> bool: return n.get("uid") == g.uid and not n.get("dead"))
 	if spot == null:
@@ -139,7 +142,12 @@ func quest_target(id: String) -> Variant:
 	_where = ""
 	if here == 0 and there != 0:
 		_below = -1
-		if there == 1:
+		if Game.zone == "castle":
+			_where = "down in the crypt"
+			var cd := _first("interactable", func(n: Node) -> bool: return n is Passage and _level((n as Node3D).global_position) == 0)
+			if cd:
+				return cd.global_position
+		elif there == 1:
 			_where = "down in the Warren"
 			var door := _first("interactable", func(n: Node) -> bool: return n is WarrenDoor)
 			if door:
@@ -152,7 +160,7 @@ func quest_target(id: String) -> Variant:
 	elif here != 0 and there != here:
 		_below = 1
 		_where = "climb out"
-		var out := _first("interactable", func(n: Node) -> bool: return n is ClimbOut and _level((n as Node3D).global_position) == here)
+		var out := _first("interactable", func(n: Node) -> bool: return (n is ClimbOut or n is Passage) and _level((n as Node3D).global_position) == here)
 		if out:
 			return out.global_position
 	return at

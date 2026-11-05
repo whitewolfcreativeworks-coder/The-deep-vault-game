@@ -56,6 +56,9 @@ A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without
 | Right mouse (hold) | Raise shield / block. It comes up instantly (even mid-swing) and stops frontal blows completely. Raise it just as an enemy strikes (their eyes flash when they wind up) to **Parry**: no damage, the attacker staggers, +12 mana |
 | Q | Arcane bolt (homing, costs mana) |
 | **X** | **Hero special ability** (on a cooldown; big purple button on touchscreens) |
+| **B** or 3 | **Second special ability** (learned on reaching Ghost Knight Castle; its own button on iPad) |
+| **Z** | **Auto-run** on/off (AUTO button on iPad). Pull back to stop |
+| G | Ride your mount. With both mounts: chicken → moped → off |
 | Space / Shift / C | Jump (tap again in the air to double jump; press against a ledge to climb up) / Sprint / Dodge roll |
 | E | Interact (chests, levers, shrines, inscriptions) |
 | R or 1 | Drink a healing draught |
@@ -102,6 +105,7 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
     - Inside: Ember Goblins, Cinder Slingers and Magma Brutes, a river of lava with a stone bridge and fire geysers, and a den with a treasure chest.
     - At the bottom is **Grimgor the Cyclops Goblin**: huge, one giant glowing eye, and a stomp that rings the floor red before a wave of fire bursts out. Get clear when you see the ring!
     - Rope ladders lead back up, and you can jump into the open pit to go back down.
+  - **The Moonlit Portal (new).** Finish all six forest quests and the sleeping portal in the south-east glade wakes up. It leads to Level 3.
   - **The Giant Chicken mount.** Beat Grimgor and a Giant Chicken waddles out from behind his throne; use it to claim your first mount.
     - Ride any time with **G** (or the **RIDE** button on iPad). It's about 75% faster than running and jumps higher.
     - It has googly eyes, a bobbing head and flapping wings, and it clucks now and then.
@@ -159,6 +163,26 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - caustic light on the stone
   - the river burns you, or heals you if you carry the Amulet of the Deep
 - Dynamic torchlight, firelight, fire-vent traps, and synthesized sound and music.
+
+- **Level 3: Ghost Knight Castle (new).** A misty, moonlit moor with Castle Morwen on its hill.
+  - **Quest beams.** Anyone with a quest for you has a beam of light over their head: white until you accept, green while it's under way and when it's ready to bring back. These beams were added in every zone.
+  - **Ashenford village** has seven quest givers and **nine quests**: lay ghost knights to rest, find lockets in the graveyard, light three hilltop beacons, beat the Gatehouse Warden to open the castle gate, shoot down ghost archers, fetch holy water from the crypt, banish the wraiths at the ruined chapel, find Lady Wren's music box in the castle library, and finally defeat **Morwen, the Ghost Lord**, on his throne.
+  - **New enemies.** All of them are see-through and glowing:
+    - Ghost Knights. Their armour clatters to the ground when they fall, and often leaves a set you can wear.
+    - Ghost Archers.
+    - Wailing Wraiths.
+    - The Gatehouse Warden, who has a freezing stomp.
+    - The Ghost Lord, who calls up more ghosts.
+  - **Places.** The graveyard, a crypt down the stairs beneath it, the ruined chapel, the hilltop beacons (light all three and the mist thins), the castle courtyard, the great hall, the library and the throne room.
+  - **Better gear.** Drops are castle-tier and stronger: Spectral Blades, Ghostforged Greatswords, Moonsilver Mail, Phantom Cuirasses and more.
+  - **Second special abilities.** Every class learns one on arrival:
+    - Knight: Holy Ward (a golden shield that heals you and cuts damage).
+    - Barbarian: Earthshatter (leap and smash).
+    - Rogue: Smoke Bomb (vanish, poison the air and dash away).
+    - Ranger: Rain of Arrows.
+    - Mage: Frost Nova (freezes enemies in ice).
+  - **The Moped**, the second mount and the final reward. It's a little red scooter with a headlight, a putt-putt engine and a "meep meep" horn, and it goes about twice as fast as running.
+  - **Zone skins.** Half of all costume drops are the monsters and people of the zone you're in: skeletons in the Vault, goblins in the forest, ghost knights and vampires at the castle. Monsters sometimes drop a costume of themselves. Most of the rest are themes that fit, and only 1 in 10 is something silly and out of place.
 
 ## Repository layout
 
