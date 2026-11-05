@@ -1086,6 +1086,9 @@ func _feel_test() -> void:
 		if cc.x - bs[i].radius < 0 or cc.y - bs[i].radius < 0 or cc.x + bs[i].radius > r.x or cc.y + bs[i].radius > r.y:
 			off = true
 		for j in range(i + 1, bs.size()):
+			# POSE! only shows in pose mode, where it takes ATTACK's place
+			if "emote" in [bs[i].name, bs[j].name]:
+				continue
 			if cc.distance_to(bs[j].center) < bs[i].radius + bs[j].radius + 6.0:
 				overlap = true
 	check("buttons_layout", not overlap and not off, "attack radius %.0f" % big)
