@@ -8,7 +8,7 @@ Descend from a ruined outpost at dusk into the Vault of Ashkar. Fight risen skel
 
 ## Play it
 
-**On iPad (or any modern browser):** open **https://whitewolfcreativeworks-coder.github.io/The-deep-vault-game/** in Safari. The first load downloads about 66 MB.
+**On iPad (or any modern browser):** open **https://whitewolfcreativeworks-coder.github.io/The-deep-vault-game/** in Safari. The first load downloads about 85 MB (the build checks it stays under a 100 MB mobile budget), then it is cached.
 - **Touch:** the on-screen controls appear as soon as you touch the screen. Use both thumbs at once, move with the left and look with the right:
   - left thumb to move (push all the way to sprint)
   - swipe on the right side to look
