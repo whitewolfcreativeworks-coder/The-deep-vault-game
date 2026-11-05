@@ -1449,6 +1449,8 @@ func _forest_test() -> bool:
 		await wait(0.6)
 		check("strongbox_found", Game.quest_state("strongbox") == "ready")
 		await _talk("tobble"); main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
+		check("no_victory_until_all_six", not Game.zone_complete("forest") or Game.quest_state("sinkhole") == "done")
+		Game.quests["sinkhole"] = {"state": "done", "n": 1}    # the Sinkhole has its own test
 		await _talk("aldric"); main.menus._dlg_buttons.get_child(0).pressed.emit(); await wait(0.2); main._resume()
 		await wait(3.5)
 		check("forest_victory", main.menus.current == "forest_victory", main.menus.current)
