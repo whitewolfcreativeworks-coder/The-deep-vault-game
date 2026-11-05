@@ -145,6 +145,7 @@ const DARK_LOOKS := {
 func setup(cfg: Dictionary) -> void:
 	for c in get_children():
 		c.queue_free()
+	_aura = null
 	head_meshes.clear(); all_meshes.clear(); _never_show.clear(); _own_colors.clear()
 	# a costume made from one of the game's own characters is just a different look
 	var costume_file := ""
@@ -226,6 +227,10 @@ func setup(cfg: Dictionary) -> void:
 		return
 	if cfg.has("outfit_model") and kind == "hero":
 		_wear_outfit(String(cfg.outfit_model), cfg)
+	_custom_head = false
+	_part_styles.clear()
+	if cfg.has("custom_look") and kind == "hero" and cfg.custom_look is Dictionary:
+		_wear_custom(cfg.custom_look)
 	if SKIN_LOOKS.get(skin, {}).is_empty() and skin != "bone":
 		# outfit colour chosen at the start tints body, arms, legs and headgear;
 		# armour found later adds its own lighter tint on top
@@ -243,7 +248,7 @@ func setup(cfg: Dictionary) -> void:
 				continue
 			if m in _own_colors:
 				# outfit pieces keep their own colours; only the skin tone changes
-				if skin_c != null and String(cfg.get("outfit_fx", "")) == "":
+				if skin_c != null and String(cfg.get("outfit_fx", "")) == "" and not _has_finish(m):
 					_recolor(m, Color.WHITE, 0.0, 1.0, skin_c, null)
 				continue
 			var is_head := nm.contains("_Head")
@@ -264,6 +269,7 @@ func setup(cfg: Dictionary) -> void:
 			if String(m.name).contains("Eyes"):
 				continue
 			_skin_mat(m, SKIN_LOOKS[skin], String(m.name).contains("Cape"))
+	_style_custom_parts()
 	var weapon = cfg.get("weapon", "")
 	set_weapon(weapon)
 	set_offhand(cfg.get("shield", ""))
@@ -280,14 +286,137 @@ func setup(cfg: Dictionary) -> void:
 		var hat_on: bool = hero.hat != "" and cfg.get("show_hat", true)
 		var hooded: bool = String(hero.get("path", "")).contains("Hooded")
 		var hs := String(cfg.get("hair_style", ""))
-		if not (hat_on or hooded):
+		if _custom_head:
+			pass   # a designer head replaces the hero's own head, hair and face
+		elif not (hat_on or hooded):
 			if HAIR_HEADS.has(hs):
 				_swap_head(hero, cfg, skin, hs)
 			elif hs in ["buns", "spiky"]:
 				# buns and spikes sit on a modelled head too, so the colour always takes
 				_swap_head(hero, cfg, skin, BUN_SPIKE_BASE.get(String(cfg.get("hero", "Knight")), "short"))
-		_add_head_looks(hero, cfg, hat_on or hooded)
+		if not _custom_head:
+			_add_head_looks(hero, cfg, hat_on or hooded)
 	_play(anims.idle, 0.0)
+
+# --- the Skin Designer: a look mixed from parts of collected skins -------------
+## custom_look = {"head"|"body"|"arms"|"legs": {"src": "own" | costume id | "adv2/Ranger"...,
+##                "tint": Color or null, "finish": "" | "shadow" | "deathly" | "infernal" | "rot"}}
+const DESIGN_PARTS := ["head", "body", "arms", "legs"]
+const _PART_HEAD := ["Head", "Hat", "Helmet", "Mask", "Glasses", "Headband", "Sunglasses", "Hood", "Visor", "Crown", "Cigar", "Skull", "Jaw", "Eyes"]
+var _custom_head := false
+var _part_styles := []          # [[meshes, tint, finish], ...] applied after recolouring
+
+## Which designer part a mesh belongs to, from its name.
+static func part_of(mesh_name: String) -> String:
+	for k in ["ArmLeft", "ArmRight"]:
+		if mesh_name.contains(k):
+			return "arms"
+	for k in ["LegLeft", "LegRight", "LegArmor"]:
+		if mesh_name.contains(k):
+			return "legs"
+	for k in _PART_HEAD:
+		if mesh_name.contains(k):
+			return "head"
+	return "body"
+
+## The model file (and its built-in finish) for a designer source id; "" means own.
+static func design_source(src: String) -> Array:
+	if src == "" or src == "own":
+		return ["", ""]
+	if Loot.COSTUMES.has(src):
+		var c: Dictionary = Loot.COSTUMES[src]
+		if not c.has("file"):
+			return ["", ""]
+		var f := String(c.file)
+		return ["res://assets/kaykit/%s.glb" % (f if f.contains("/") else "costumes/" + f), String(c.get("fx", ""))]
+	if src.contains("/"):
+		var path := "res://assets/kaykit/%s.glb" % src
+		if ResourceLoader.exists(path):
+			return [path, ""]
+	return ["", ""]
+
+func _has_finish(m: MeshInstance3D) -> bool:
+	for st in _part_styles:
+		if m in st[0] and DARK_LOOKS.has(String(st[2])):
+			return true
+	return false
+
+func _wear_custom(look: Dictionary) -> void:
+	for part in DESIGN_PARTS:
+		var d: Dictionary = look.get(part, {}) if look.get(part, {}) is Dictionary else {}
+		var srcinfo := design_source(String(d.get("src", "own")))
+		var path: String = srcinfo[0]
+		var finish := String(d.get("finish", ""))   # only the finish shown in the designer
+		var tint = d.get("tint", null)
+		var meshes: Array[MeshInstance3D] = []
+		if path != "" and ResourceLoader.exists(path):
+			# hide whatever covers this part now (own pieces or an armour outfit)
+			for m in all_meshes.duplicate():
+				if part_of(String(m.name)) == part or (part == "head" and String(m.name) == "Hair_Head"):
+					m.visible = false
+					m.name = String(m.name) + "_off"   # free the name for the borrowed piece
+					_never_show.append(m)
+					all_meshes.erase(m)
+					head_meshes.erase(m)
+					_own_colors.erase(m)
+			meshes = _borrow_meshes(path, func(n: String) -> bool: return part_of(n) == part)
+			for m in meshes:
+				_own_colors.append(m)
+				if part == "head":
+					head_meshes.append(m)
+			if part == "head":
+				_custom_head = true
+		else:
+			for m in all_meshes:
+				if part_of(String(m.name)) == part:
+					meshes.append(m)
+		if tint is Color or DARK_LOOKS.has(finish):
+			_part_styles.append([meshes, tint, finish])
+
+## Tints and finishes chosen in the designer, on top of everything else.
+func _style_custom_parts() -> void:
+	var auras := {}
+	for st in _part_styles:
+		var tint = st[1]
+		var finish := String(st[2])
+		for m in st[0]:
+			if not is_instance_valid(m):
+				continue
+			if DARK_LOOKS.has(finish):
+				_skin_mat(m, DARK_LOOKS[finish], false)
+				auras[finish] = true
+			if tint is Color:
+				_tint_mesh(m, tint)
+	for f in auras:
+		if _aura == null:
+			_add_aura(DARK_LOOKS[f].aura, 2, f == "infernal")
+
+## Recolour a mesh to `c`, keeping its shading (skin stays skin).
+func _tint_mesh(m: MeshInstance3D, c: Color) -> void:
+	for s in m.mesh.get_surface_count():
+		var base := m.get_active_material(s)
+		if base is ShaderMaterial and (base as ShaderMaterial).shader == _recolor_shader:
+			var r := (base as ShaderMaterial).duplicate() as ShaderMaterial
+			r.set_shader_parameter("tint", c)
+			r.set_shader_parameter("strength", 0.7)
+			m.set_surface_override_material(s, r)
+		elif base is StandardMaterial3D:
+			var sm := base as StandardMaterial3D
+			if sm.albedo_texture:
+				var r2 := ShaderMaterial.new()
+				r2.shader = _recolor_shader
+				r2.set_shader_parameter("tex", sm.albedo_texture)
+				r2.set_shader_parameter("tint", c * sm.albedo_color)
+				r2.set_shader_parameter("strength", 0.7)
+				r2.set_shader_parameter("skin_protect", 1.0)
+				r2.set_shader_parameter("tex_is_srgb", RenderingServer.get_current_rendering_method() == "gl_compatibility")
+				r2.set_shader_parameter("roughness_v", sm.roughness)
+				r2.set_shader_parameter("metallic_v", sm.metallic)
+				m.set_surface_override_material(s, r2)
+			else:
+				var d := sm.duplicate() as StandardMaterial3D
+				d.albedo_color = d.albedo_color.lerp(c, 0.7)
+				m.set_surface_override_material(s, d)
 
 # --- costumes and outfits (KayKit characters on the same rig) -----------------
 var _own_colors: Array[MeshInstance3D] = []
