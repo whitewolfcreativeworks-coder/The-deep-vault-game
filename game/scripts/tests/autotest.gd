@@ -1705,14 +1705,15 @@ func _looks_test() -> void:
 	m.current = "looks"   # stop the turntable
 	var cam: Camera3D = m._preview_vp.find_children("*", "Camera3D", true, false)[0]
 	var combos := [
-		{"hair_style": "curly", "face": "beard", "hair_color": 4, "skin": 5},
+		{"hair_style": "short", "face": "beard", "hair_color": 4, "skin": 5},
 		{"hair_style": "long", "face": "blush", "hair_color": 3, "skin": 2},
-		{"hair_style": "ponytail", "face": "eyepatch", "hair_color": 0, "skin": 4},
+		{"hair_style": "shoulder", "face": "eyepatch", "hair_color": 0, "skin": 4},
 		{"hair_style": "buns", "face": "warpaint", "hair_color": 7, "skin": 1},
 		{"hair_style": "spiky", "face": "scar", "hair_color": 6, "skin": 3},
-		{"hair_style": "mohawk", "face": "mustache", "hair_color": 8, "skin": 6},
+		{"hair_style": "swept", "face": "mustache", "hair_color": 8, "skin": 6},
 		{"hair_style": "bald", "face": "beard", "hair_color": 5, "skin": 7},
-		{"hair_style": "natural", "face": "none", "hair_color": 1, "skin": 0},
+		{"hair_style": "wild", "face": "none", "hair_color": 1, "skin": 0},
+		{"hair_style": "curly", "face": "none", "hair_color": 0, "skin": 0},   # old save name -> wild
 	]
 	var heroes: Array = Game.HERO_ORDER if OS.get_environment("LOOKS_ALL") != "" else ["Knight", "Rogue"]
 	for hero in heroes:

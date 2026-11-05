@@ -27,9 +27,11 @@ var profile := {
 const SKIN_COLORS := [Color(0.97, 0.8, 0.67), Color(1.0, 0.86, 0.76), Color(0.93, 0.72, 0.55), Color(0.82, 0.6, 0.42),
 	Color(0.66, 0.45, 0.3), Color(0.47, 0.31, 0.21), Color(0.33, 0.21, 0.15), Color(0.55, 0.8, 0.5), Color(0.6, 0.7, 0.95)]
 const SKIN_NAMES := ["Hero's own", "Pale", "Fair", "Tan", "Olive", "Brown", "Deep", "Goblin green", "Frost blue"]
-const HAIR_STYLES2 := ["natural", "curly", "long", "ponytail", "buns", "spiky", "mohawk", "bald"]
-const HAIR_STYLE_NAMES := {"natural": "Natural", "curly": "Curly", "long": "Long", "ponytail": "Ponytail",
-	"buns": "Buns", "spiky": "Spiky", "mohawk": "Mohawk", "bald": "Bald"}
+## "short".."bald" are modelled heads (KayKit Adventurers 2.0); buns and spiky are built on top
+## of the hero's own hair. Old saves: curly -> wild, ponytail -> shoulder, mohawk -> spiky.
+const HAIR_STYLES2 := ["natural", "short", "long", "swept", "shoulder", "wild", "bald", "buns", "spiky"]
+const HAIR_STYLE_NAMES := {"natural": "Natural", "short": "Short", "long": "Long", "swept": "Swept + goatee",
+	"shoulder": "Shoulder-length", "wild": "Wild + beard", "bald": "Bald + beard", "buns": "Buns", "spiky": "Spiky"}
 const HAIR_COLORS2 := [Color(0.5, 0.3, 0.2), Color(0.12, 0.08, 0.06), Color(0.32, 0.19, 0.1), Color(0.55, 0.3, 0.14), Color(0.85, 0.66, 0.35),
 	Color(0.78, 0.33, 0.12), Color(0.9, 0.9, 0.92), Color(0.25, 0.45, 0.95), Color(0.95, 0.4, 0.7), Color(0.3, 0.75, 0.35)]
 const HAIR_COLOR_NAMES := ["Hero's own", "Black", "Dark brown", "Chestnut", "Blonde", "Ginger", "White", "Blue", "Pink", "Green"]

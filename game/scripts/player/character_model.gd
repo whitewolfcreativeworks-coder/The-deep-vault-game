@@ -59,6 +59,58 @@ const SKELETONS := {
 	"mage": "res://assets/kaykit/skeletons/Skeleton_Mage.glb",
 }
 const HERO_WEAPON_LENGTH := 1.45
+## Hair styles that swap in a modelled head from KayKit Adventurers 2.0 (same
+## rig, same head bone, so it sits exactly where the hero's own head was).
+const HAIR_HEADS := {
+	"short": ["res://assets/kaykit/adv2/Knight.glb", "Knight_Head"],
+	"long": ["res://assets/kaykit/adv2/Mage.glb", "Mage_Head"],
+	"swept": ["res://assets/kaykit/adv2/Ranger.glb", "Ranger_Head"],
+	"shoulder": ["res://assets/kaykit/adv2/Rogue.glb", "Rogue_Head"],
+	"wild": ["res://assets/kaykit/adv2/Engineer.glb", "Engineer_Head"],
+	"bald": ["res://assets/kaykit/adv2/Barbarian.glb", "Barbarian_Head"],
+}
+const HAIR_HEAD_BEARDED := ["wild", "bald"]       # these heads already have a beard
+## The head that buns and spikes are built on, per hero.
+const BUN_SPIKE_BASE := {"Knight": "short", "Barbarian": "short", "Mage": "long", "Rogue": "shoulder"}
+## Old saved styles -> the closest current one.
+const HAIR_ALIASES := {"curly": "wild", "ponytail": "shoulder", "mohawk": "spiky"}
+const MAGE_HAT_CROWN_R := 0.62     # hat-local radius where the brim starts
+const MAGE_HAT_BRIM := 0.32        # brim width kept (0..1)
+const MAGE_HAT_TIP_Y := 0.25       # above this the point is shortened...
+const MAGE_HAT_TIP := 0.7          # ...to this fraction
+static var _small_hat_cache := {}
+
+## The Mage's hat with a much narrower brim and a shorter point; the crown still
+## fits the head (shrinking the whole hat made the head poke through it).
+static func _small_mage_hat(src: Mesh) -> Mesh:
+	if _small_hat_cache.has(src):
+		return _small_hat_cache[src]
+	var out := ArrayMesh.new()
+	for s in src.get_surface_count():
+		var arr := src.surface_get_arrays(s)
+		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		for i in v.size():
+			var p := v[i]
+			var r := Vector2(p.x, p.z).length()
+			if r > MAGE_HAT_CROWN_R:
+				var k := (MAGE_HAT_CROWN_R + (r - MAGE_HAT_CROWN_R) * MAGE_HAT_BRIM) / r
+				p.x *= k; p.z *= k
+			if p.y > MAGE_HAT_TIP_Y:
+				p.y = MAGE_HAT_TIP_Y + (p.y - MAGE_HAT_TIP_Y) * MAGE_HAT_TIP
+			v[i] = p
+		arr[Mesh.ARRAY_VERTEX] = v
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		out.surface_set_material(s, src.surface_get_material(s))
+	_small_hat_cache[src] = out
+	return out
+## The modelled heads' own hair colours (buns/spikes on "hero's own" match them).
+const HEAD_OWN_HAIR := {"short": Color(0.86, 0.72, 0.46), "long": Color(0.13, 0.11, 0.11), "shoulder": Color(0.55, 0.32, 0.2)}
+## Each hero's own hair colour (for face details on "hero's own").
+const HERO_OWN_HAIR := {"Knight": Color(0.86, 0.74, 0.5), "Rogue": Color(0.8, 0.62, 0.36),
+	"Barbarian": Color(0.62, 0.62, 0.66), "Mage": Color(0.13, 0.11, 0.11), "Ranger": Color(0.42, 0.26, 0.15)}
+
+static func hair_style_of(st: String) -> String:
+	return HAIR_ALIASES.get(st, st)
 const KEEP_MESHES := ["Body", "Head", "Arm", "Leg", "Cape", "Cloak", "Eyes", "Jaw", "Helmet", "Hat", "Hood", "Skull"]
 
 const WEAPON_SCENES := {
@@ -100,6 +152,9 @@ func setup(cfg: Dictionary) -> void:
 	if kind == "hero":
 		hero = HEROES.get(cfg.get("hero", "Knight"), HEROES.Knight)
 		path = hero.path
+		if cfg.has("hair_style"):
+			cfg = cfg.duplicate()
+			cfg["hair_style"] = hair_style_of(String(cfg.hair_style))
 	else:
 		path = SKELETONS.get(cfg.get("variant", "minion"), SKELETONS.minion)
 	model = (load(path) as PackedScene).instantiate()
@@ -128,6 +183,10 @@ func setup(cfg: Dictionary) -> void:
 				head_meshes.append(m)
 			if hero.hat != "" and m.name == hero.hat and not cfg.get("show_hat", true):
 				m.visible = false
+				_never_show.append(m)
+			if m.name == "Mage_Hat":
+				# a slimmer hat (narrow brim, shorter point) so you can see past it
+				m.mesh = _small_mage_hat(m.mesh)
 			if m.name == hero.cape and cfg.has("cape_color"):
 				_recolor(m, cfg.cape_color, 1.0, 0.0, null)
 		else:
@@ -180,6 +239,13 @@ func setup(cfg: Dictionary) -> void:
 		model.scale = Vector3(bw, bh, lerpf(1.0, bw, 0.85))
 		var hat_on: bool = hero.hat != "" and cfg.get("show_hat", true)
 		var hooded: bool = String(hero.get("path", "")).contains("Hooded")
+		var hs := String(cfg.get("hair_style", ""))
+		if not (hat_on or hooded):
+			if HAIR_HEADS.has(hs):
+				_swap_head(hero, cfg, skin, hs)
+			elif hs in ["buns", "spiky"]:
+				# buns and spikes sit on a modelled head too, so the colour always takes
+				_swap_head(hero, cfg, skin, BUN_SPIKE_BASE.get(String(cfg.get("hero", "Knight")), "short"))
 		_add_head_looks(hero, cfg, hat_on or hooded)
 	_play(anims.idle, 0.0)
 
@@ -437,10 +503,89 @@ func set_offhand(id: String) -> void:
 	for mi in s.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = flash_mat
 
+var _never_show: Array[MeshInstance3D] = []   # hidden hats and swapped-out heads
+
 func set_head_visible(v: bool) -> void:
 	for m in head_meshes:
 		if is_instance_valid(m):
-			m.visible = v
+			m.visible = v and not _never_show.has(m)
+
+static var _hair_head_cache := {}
+
+## Load (once) a modelled head: its mesh, texture and the UV rect of its hair swatch.
+static func _hair_head(style: String) -> Dictionary:
+	if _hair_head_cache.has(style):
+		return _hair_head_cache[style]
+	var info := {}
+	var spec: Array = HAIR_HEADS.get(style, [])
+	if spec.size() == 2 and ResourceLoader.exists(spec[0]):
+		var inst: Node = (load(spec[0]) as PackedScene).instantiate()
+		var src := inst.find_child(spec[1], true, false) as MeshInstance3D
+		if src and src.mesh:
+			info.mesh = src.mesh
+			var mat := src.get_active_material(0) as StandardMaterial3D
+			info.mat = mat
+			info.tex = mat.albedo_texture if mat else null
+			# the hair swatch: the atlas cell under the top of the head (for the
+			# bald head: under the bottom of the beard)
+			var arr := src.mesh.surface_get_arrays(0)
+			var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+			var uvs: PackedVector2Array = arr[Mesh.ARRAY_TEX_UV]
+			var best := 0
+			for i in verts.size():
+				if (style == "bald" and verts[i].y < verts[best].y) or (style != "bald" and verts[i].y > verts[best].y):
+					best = i
+			var uv: Vector2 = uvs[best]
+			var cw := 1.0 / 8.0
+			var chh := 1.0 / 4.0
+			var cx := floorf(uv.x / cw) * cw
+			var cy := floorf(uv.y / chh) * chh
+			info.rect = Vector4(cx + 0.002, cy + 0.002, cx + cw - 0.002, cy + chh - 0.002)
+		inst.free()
+	_hair_head_cache[style] = info
+	return info
+
+## Swap the hero's head for a modelled one with real hair (see HAIR_HEADS).
+func _swap_head(hero: Dictionary, cfg: Dictionary, skin_look: String, style: String) -> void:
+	var info := _hair_head(style)
+	if info.is_empty() or skel == null or skel.find_bone("head") < 0:
+		return
+	for m in all_meshes:
+		if m.name == hero.head[0]:
+			m.visible = false
+			_never_show.append(m)
+	var ba := _attach("head")
+	var mi := MeshInstance3D.new()
+	mi.name = "Hair_Head"
+	mi.mesh = info.mesh
+	mi.transform = skel.get_bone_global_rest(skel.find_bone("head")).affine_inverse()
+	ba.add_child(mi)
+	mi.material_overlay = flash_mat
+	all_meshes.append(mi)
+	head_meshes.append(mi)
+	if SKIN_LOOKS.has(skin_look):
+		_skin_mat(mi, SKIN_LOOKS[skin_look], false)
+		return
+	if info.tex == null:
+		return
+	var r := ShaderMaterial.new()
+	r.shader = _recolor_shader
+	r.set_shader_parameter("tex", info.tex)
+	r.set_shader_parameter("strength", 0.0)
+	r.set_shader_parameter("tex_is_srgb", RenderingServer.get_current_rendering_method() == "gl_compatibility")
+	var skin_c = cfg.get("skin_color", null)
+	if skin_c != null:
+		r.set_shader_parameter("skin_tone", skin_c)
+		r.set_shader_parameter("skin_on", 1.0)
+	var hc: Color = cfg.get("hair_color", Game.HAIR_COLORS2[0])
+	if hc != Game.HAIR_COLORS2[0]:
+		r.set_shader_parameter("hair_tone", hc)
+		r.set_shader_parameter("hair_rect", info.rect)
+		r.set_shader_parameter("hair_rect_on", 1.0)
+	var sm: StandardMaterial3D = info.mat
+	r.set_shader_parameter("roughness_v", sm.roughness if sm else 0.8)
+	r.set_shader_parameter("metallic_v", sm.metallic if sm else 0.0)
+	mi.material_override = r
 
 func flash(color := Color(1, 1, 1), strength := 0.8) -> void:
 	flash_mat.albedo_color = Color(color.r, color.g, color.b, strength)
@@ -566,6 +711,12 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 	var sz := box.size
 	var rx := sz.x * 0.5; var ry := sz.y * 0.5; var rz := sz.z * 0.5
 	var hair_c: Color = cfg.get("hair_color", Color(0.32, 0.19, 0.1))
+	if hair_c == Game.HAIR_COLORS2[0]:   # "hero's own" colour
+		var hn := String(cfg.get("hero", "Knight"))
+		if style in ["buns", "spiky"] and not covered:
+			hair_c = HEAD_OWN_HAIR.get(BUN_SPIKE_BASE.get(hn, "short"), hair_c)
+		else:
+			hair_c = HERO_OWN_HAIR.get(hn, hair_c)
 	var skin_c: Color = cfg.get("skin_color", Color(0.97, 0.8, 0.67))
 	var hair := _look_mat(hair_c, 0.7)
 	# Hair styles are added on top of the hero's own (recoloured) hair rather
@@ -575,38 +726,6 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 		return c + Vector3(sin(yaw_a) * cos(pitch_a) * rx, sin(pitch_a) * ry, cos(yaw_a) * cos(pitch_a) * rz) * out
 	if not covered:
 		match style:
-			"curly":
-				# a mop of bumpy curls over the top, back and sides
-				var k := 0
-				for row in [[1.35, 1], [0.95, 7], [0.55, 10], [0.15, 9]]:
-					var pa: float = row[0]
-					var cnt: int = row[1]
-					for i in cnt:
-						var ya := TAU * (float(i) + 0.5 * (k % 2)) / cnt
-						if cos(ya) > 0.55 and pa < 0.8:
-							continue   # keep the face clear
-						var pr: Vector3 = surf.call(ya, pa, 0.98)
-						_piece(_sphere(), hair, pr, Vector3.ONE * rx * (0.3 + 0.04 * sin(i * 2.7 + pa * 5.0)))
-					k += 1
-			"long":
-				# strands falling from the crown down the back and past the ears
-				for i in 7:
-					var ya := PI + (float(i) - 3.0) * 0.32
-					var top: Vector3 = surf.call(ya, 0.55, 0.92)
-					var cap := CapsuleMesh.new(); cap.radius = rx * 0.15; cap.height = sz.y * 1.05
-					_piece(cap, hair, top + Vector3(0, -sz.y * 0.42, 0) + Vector3(sin(ya), 0, cos(ya)) * rz * 0.12, Vector3.ONE, Vector3(-cos(ya) * 0.12, 0, sin(ya) * 0.12))
-				for sd in [-1.0, 1.0]:
-					for j in 2:
-						var ya2: float = sd * (PI * 0.5 - 0.05 + 0.32 * j)
-						var top2: Vector3 = surf.call(ya2, 0.35, 1.0)
-						var cap2 := CapsuleMesh.new(); cap2.radius = rx * 0.14; cap2.height = sz.y * 0.9
-						_piece(cap2, hair, top2 + Vector3(0, -sz.y * 0.38, 0), Vector3.ONE, Vector3(0, 0, sd * 0.1))
-			"ponytail":
-				var tie: Vector3 = surf.call(PI, 0.55, 1.0)
-				_piece(_sphere(), _look_mat(Color(0.8, 0.15, 0.2), 0.5), tie, Vector3.ONE * rx * 0.17)
-				var cap3 := CapsuleMesh.new(); cap3.radius = rx * 0.2; cap3.height = sz.y * 0.95
-				_piece(cap3, hair, tie + Vector3(0, -sz.y * 0.36, -rz * 0.28), Vector3.ONE, Vector3(-0.5, 0, 0))
-				_piece(_sphere(), hair, tie + Vector3(0, -sz.y * 0.78, -rz * 0.52), Vector3(rx * 0.17, ry * 0.2, rz * 0.17))
 			"buns":
 				for sd in [-1.0, 1.0]:
 					var bp: Vector3 = surf.call(sd * 0.95, 0.85, 1.0)
@@ -624,16 +743,6 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 						var cone := CylinderMesh.new(); cone.top_radius = 0.0; cone.bottom_radius = rx * 0.2; cone.height = ry * 0.75
 						var pc := _piece(cone, hair, surf.call(ya3, pa2, 0.95) + n * ry * 0.3)
 						pc.basis = Basis(Quaternion(Vector3.UP, n))
-			"mohawk":
-				# shaved head (hair recoloured to skin) with a tall crest front to back
-				for i in 8:
-					var ang := 1.0 + float(i) * 0.27    # from the hairline over the crown to the back
-					var pt := c + Vector3(0, sin(ang) * ry, cos(ang) * rz) * 0.96
-					var n2 := (pt - c).normalized()
-					var cone2 := CylinderMesh.new(); cone2.top_radius = 0.0; cone2.bottom_radius = rx * 0.17
-					cone2.height = ry * (0.5 + 0.45 * sin(float(i) / 7.0 * PI))
-					var pc2 := _piece(cone2, hair, pt + n2 * cone2.height * 0.45, Vector3(0.45, 1.0, 1.0))
-					pc2.basis = Basis(Quaternion(Vector3.UP, n2)) * Basis.from_scale(Vector3(0.45, 1.0, 1.0))
 	if ears:
 		# long pointy goblin ears sticking out sideways
 		var ear_m := _look_mat(cfg.get("skin_color", Color(0.42, 0.62, 0.24)), 0.6)
@@ -648,6 +757,8 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 		return c.z + rz * sqrt(maxf(k, 0.05))
 	var eye_y := c.y - ry * 0.08
 	var eye_x := rx * 0.36
+	if style in HAIR_HEAD_BEARDED and not covered and face in ["beard", "mustache"]:
+		face = "none"          # this head already has a fine beard
 	match face:
 		"beard":
 			_piece(_sphere(), hair, Vector3(0, c.y - ry * 0.62, fz.call(0.0, c.y - ry * 0.62) - rz * 0.25), Vector3(rx * 0.62, ry * 0.4, rz * 0.32))

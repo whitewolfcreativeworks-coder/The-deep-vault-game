@@ -9,6 +9,9 @@ uniform vec3 skin_tone : source_color = vec3(0.97, 0.8, 0.67);
 uniform float skin_on = 0.0;         // 1 = replace the light-peach skin with skin_tone
 uniform vec3 hair_tone : source_color = vec3(0.3, 0.2, 0.1);
 uniform float hair_on = 0.0;
+// Modelled-hair heads (KayKit 2.0): the hair lives in one swatch of the atlas, given as a UV rect.
+uniform vec4 hair_rect = vec4(0.0);  // x0, y0, x1, y1
+uniform float hair_rect_on = 0.0;
 // The web/iPad (Compatibility) renderer hands the texture back in sRGB already.
 uniform bool tex_is_srgb = false;         // head meshes only: recolour the hero's own hair and brows
 // Pajama stripes: alternate the outfit colour with stripe_color in horizontal bands.
@@ -42,6 +45,14 @@ void fragment() {
 	float hair = (1.0 - skin) * smoothstep(0.18, 0.3, s.r) * clamp((s.r - s.b) * 6.0, 0.0, 1.0);
 	vec3 htoned = hair_tone * clamp(ls / 0.45, 0.3, 1.6);
 	c = mix(c, htoned, hair * hair_on);
+	if (hair_rect_on > 0.5) {
+		float inr = step(hair_rect.x, UV.x) * step(UV.x, hair_rect.z) * step(hair_rect.y, UV.y) * step(UV.y, hair_rect.w);
+		vec3 kc = texture(tex, (hair_rect.xy + hair_rect.zw) * 0.5).rgb;
+		vec3 ks = tex_is_srgb ? kc : pow(max(kc, vec3(0.0)), vec3(1.0 / 2.2));
+		float kl = max(dot(ks, vec3(0.299, 0.587, 0.114)), 0.05);
+		vec3 rt = hair_tone * clamp(pow(ls / kl, 1.4), 0.35, 1.7);
+		c = mix(c, rt, inr);
+	}
 	ALBEDO = c;
 	ROUGHNESS = roughness_v;
 	METALLIC = metallic_v;
