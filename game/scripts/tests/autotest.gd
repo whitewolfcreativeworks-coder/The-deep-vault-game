@@ -933,11 +933,13 @@ func _cam_inside() -> bool:
 ## Coplanar, same-facing, overlapping faces between box meshes = z-fighting.
 func _count_zfight() -> int:
 	var boxes := []
+	var names := []
 	for mi in world().find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
-		if m.mesh is BoxMesh and m.visible:
+		if m.mesh is BoxMesh and m.is_visible_in_tree():
 			var a := m.global_transform * m.get_aabb()
 			boxes.append(a)
+			names.append(str(world().get_path_to(m)))
 	var n := 0
 	var buckets := {}
 	for i in boxes.size():
@@ -962,6 +964,7 @@ func _count_zfight() -> int:
 				var ov := minf(a.end[v], b.end[v]) - maxf(a.position[v], b.position[v])
 				if ou > 0.02 and ov > 0.02:
 					n += 1
+					print("ZFIGHT ", names[lst[i]], " ", a, " <-> ", names[lst[j]], " ", b)
 	return n
 
 func _feel_test() -> void:
