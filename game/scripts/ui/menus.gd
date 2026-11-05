@@ -520,7 +520,7 @@ func _refresh_preview(cheer := false) -> void:
 	for i in _hcol_btns.size():
 		_hcol_btns[i].set_pressed_no_signal(i == int(p.hair_color))
 	for k in _hair_btns:
-		(_hair_btns[k] as Button).set_pressed_no_signal(k == p.hair_style)
+		(_hair_btns[k] as Button).set_pressed_no_signal(k == CharacterModel.hair_style_of(String(p.hair_style)))
 	for k in _face_btns:
 		(_face_btns[k] as Button).set_pressed_no_signal(k == p.face)
 	var ab := Game.ability()
