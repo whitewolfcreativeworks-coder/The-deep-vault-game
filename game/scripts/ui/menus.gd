@@ -800,6 +800,16 @@ func _refresh_inventory() -> void:
 			_equipped_box.add_child(UIKit.label("%s: (empty)" % Game.SLOT_NAMES[slot], 16, UIKit.DIM))
 		else:
 			_equipped_box.add_child(_item_row(id, true))
+	# a magic costume you're wearing, with its time left and a way to take it off
+	if Game.costume_id() != "":
+		var c: Dictionary = Loot.COSTUMES.get(Game.costume_id(), {})
+		var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 12)
+		row.add_child(UIKit.label("Costume: %s  (%s left)" % [c.get("name", "?"), Game.costume_time_text()], 17, Color(1.0, 0.7, 1.0), true))
+		row.add_child(_button("Take it off", func() -> void:
+			Game.clear_costume()
+			Game.say("You take off the costume. Back to your old self!", Color(1.0, 0.85, 0.6))
+			_refresh_inventory(), 170))
+		_equipped_box.add_child(row)
 	var bag: Array = []
 	for id in Game.inventory:
 		if not Game.equipped.values().has(id):

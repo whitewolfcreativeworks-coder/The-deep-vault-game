@@ -19,7 +19,7 @@ Descend from a ruined outpost at dusk into the Vault of Ashkar. Fight risen skel
 
 The browser version uses Godot's web renderer, which has no volumetric fog or light shafts. Everything else is the same game.
 
-**Download a build** (`BobeksAdventure-Windows.zip`, `-macOS.zip`, `-Linux.zip`) from the [`builds` branch](https://github.com/whitewolfcreativeworks-coder/The-deep-vault-game/tree/builds): Windows, macOS (Apple Silicon and Intel) and Linux zips, with run instructions in that branch's README. Only the Linux build has actually been launched and tested so far.
+**Download a build** (`BobeksAdventure-Windows.zip`, `-macOS.zip`, `-Linux.zip`) from the [**latest-build Release**](https://github.com/whitewolfcreativeworks-coder/The-deep-vault-game/releases/tag/latest-build). GitHub builds these on its own computers every time the game changes (`.github/workflows/desktop-release.yml`). Releases allow files up to 2 GB, so nothing needs splitting. The older [`builds` branch](https://github.com/whitewolfcreativeworks-coder/The-deep-vault-game/tree/builds) has the last builds made before the game outgrew GitHub's 100 MB file limit. Only the Linux build has actually been launched and tested so far.
 
 **Run from source (any OS):**
 
@@ -67,6 +67,17 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+- **Costumes (magic disguises).** Chests sometimes hold a glowing little figure. Walk over it and POOF, you turn into it!
+  - There are 40 costumes: a cute green dinosaur, a werewolf, a vampire, a clown, a ninja, robots, a witch, a caveman, a superhero, a space ranger, a toy soldier, a teddy bear, a bird knight, an elf, a mech suit and more.
+  - About half of them are on the dark side: Dark Knight, Shadow Ninja, Zombie Farmer, Lich, Demon, Death Knight, Shadow Mage, Dark Witch, Vampire Lord, Bone Lord and a Spooky Bear, most with an eerie glow and a dark aura at your feet.
+  - You can also become characters from the game: a skeleton, a goblin, an Ember Goblin, or Chief Gruk himself.
+  - Some costumes last 3 or 10 minutes of play; others last a whole real day or even 3 days, and they stay on between sessions. A new costume always replaces the old one.
+  - The time left shows under your health. You can take a costume off in the Inventory.
+- **Armour you can see.** Every armour drop now comes with its own outfit (body, arms and legs), and your head and hair stay yours.
+  - Leather Jerkins look like a ranger, rogue, hiker or survivalist; Chain Hauberks like an engineer, druid, cleric or hoarder; Bone Mail like a necromancer, ninja or barbarian; Plate and Warden Plate like a knight, paladin, toy soldier or battle mage.
+- **Wild treasure chests.** Golden chests now turn up in random spots out in the Goblin Forest (7 at a time) and around the Vault's outpost (2), each with a silly scene:
+  - a pumpkin party, a glowing fairy ring, a sleeping goblin (shh!), a gang of pecking chickens guarding their treasure, a skeleton's picnic ("back in 500 years"), a chest on top of a wobbly crate tower (try a double jump), or a "DEFINITELY NOT A TRAP" chest that bites... and then coughs up double loot;
+  - they're in new places every time you load, and a new one pops up every few minutes.
 - **New hair.** Real modelled hairstyles from KayKit's Adventurers 2.0 (CC0): short, long, swept (with a goatee), shoulder-length, wild (with a big beard) and bald-with-beard. The buns and spikes are still there, now on top of the modelled hair, and every style takes any hair colour.
 - **Smaller mage hat, clearer close-up camera.** The mage hat is smaller. When you zoom in close, the camera moves over the right shoulder, and hats and helmets disappear until you zoom back out, so they never block your view.
 - **The USE button lights up.** On iPad, whenever there's something to talk to, open or pick up, USE swells, glows gold and says USE!

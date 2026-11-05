@@ -32,6 +32,86 @@ const SKINS := {
 	"spectral": {"name": "Spectral Shroud", "desc": "You fade into a glowing ghost.", "min": 3, "affix": "regen"},
 	"ember": {"name": "Ember Soul", "desc": "Fire lives under your skin. Sparks trail behind you.", "min": 3, "affix": "spell"},
 }
+## Costumes: magic disguises found in chests. You change the moment you pick one
+## up, and a new one replaces the old. Some last a few minutes of play, some last
+## for real days. "file" is a KayKit character (same rig as the heroes);
+## "look" is one of the game's own characters (a goblin, a skeleton...).
+const COSTUMES := {
+	"dino": {"name": "Dino Suit", "file": "MonsterCostume", "line": "RAWR! You're a little green dinosaur!"},
+	"dino_hood": {"name": "Dino Hoodie", "file": "Monster", "line": "A comfy dino hoodie. Very fierce. Very cosy."},
+	"werewolf": {"name": "Werewolf", "file": "Werewolf_Wolf", "line": "Awoooo! You've turned into a werewolf!"},
+	"vampire": {"name": "Vampire", "file": "Vampire", "line": "Bleh, bleh! You're a vampire now."},
+	"clown": {"name": "Clown", "file": "Clown", "line": "Honk honk! Somebody call the circus."},
+	"ninja": {"name": "Ninja", "file": "Ninja", "line": "You become a silent, sneaky ninja."},
+	"robot": {"name": "Robot", "file": "Robot_One", "line": "BEEP BOOP. YOU ARE NOW A ROBOT."},
+	"robot2": {"name": "Rusty Robot", "file": "Robot_Two", "line": "Clank... clank... a rusty old robot!"},
+	"witch": {"name": "Witch", "file": "Witch", "line": "A pointy hat and a cackle. Hee hee hee!"},
+	"caveman": {"name": "Caveman", "file": "Caveman", "line": "Ugg! You big strong caveman now."},
+	"superhero": {"name": "Superhero", "file": "Superhero", "line": "Cape on. Time to save the day!"},
+	"spaceranger": {"name": "Space Ranger", "file": "SpaceRanger", "line": "To the stars and back again!"},
+	"toysoldier": {"name": "Toy Soldier", "file": "ToySoldier", "line": "Wind-up toy soldier, reporting for duty!"},
+	"teddy": {"name": "Teddy Bear", "file": "Animatronic_Normal", "line": "You're a big cuddly teddy bear."},
+	"zombie_bear": {"name": "Spooky Bear", "file": "Animatronic_Creepy", "line": "A spooky, broken teddy bear. Brrr!"},
+	"birdknight": {"name": "Bird Knight", "file": "AvianSwordsman", "line": "Caw! A brave knight with a beak."},
+	"imp": {"name": "Little Devil", "file": "Tiefling", "line": "Horns, a tail, and a mischievous grin."},
+	"leafy": {"name": "Leaf Spirit", "file": "PlantWarrior", "line": "You're a spirit of the forest. Very leafy."},
+	"necromancer": {"name": "Necromancer", "file": "Necromancer", "line": "Bones bow to you now, dark one."},
+	"elf": {"name": "Holiday Elf", "file": "Helper_A", "line": "A jolly little elf with jingly shoes."},
+	"magical": {"name": "Magical Hero", "file": "MagicalGirl", "line": "Sparkle power! A magical hero appears!"},
+	"sage": {"name": "Old Sage", "file": "Lorekeeper", "line": "A wise old sage with a long white beard."},
+	"cool": {"name": "Cool Dude", "file": "Driver", "line": "Sunglasses on. Too cool for goblins."},
+	"action": {"name": "Action Hero", "file": "ActionFigure", "line": "An action hero with a bandana. Hoo-ah!"},
+	"mech": {"name": "Mech Suit", "file": "CombatMech", "line": "Giant robot armour, online!"},
+	"farmer": {"name": "Farmer", "file": "Farmer_A", "line": "Just a humble farmer. With a sword."},
+	# --- the dark side: evil and spooky costumes
+	"dark_knight": {"name": "Dark Knight", "file": "Paladin", "fx": "shadow", "line": "Your armour turns black as night. Dark Knight rises!"},
+	"shadow_ninja": {"name": "Shadow Ninja", "file": "Ninja", "fx": "shadow", "line": "You melt into the shadows. Shadow Ninja!"},
+	"zombie": {"name": "Zombie Farmer", "file": "Farmer_B", "fx": "rot", "line": "Braaains... you're a zombie farmer!"},
+	"lich": {"name": "Lich", "file": "Lorekeeper", "fx": "deathly", "line": "A cold, ghostly lich. Your breath freezes the air."},
+	"demon": {"name": "Demon", "file": "Tiefling", "fx": "infernal", "line": "Horns of fire! You're a demon from the Sinkhole!"},
+	"death_knight": {"name": "Death Knight", "file": "adv2/Knight", "fx": "deathly", "line": "A Death Knight, glowing with cold blue fire."},
+	"shadow_mage": {"name": "Shadow Mage", "file": "adv2/Mage", "fx": "shadow", "line": "Dark magic crackles around you. Shadow Mage!"},
+	"dark_witch": {"name": "Dark Witch", "file": "Witch", "fx": "shadow", "line": "A wicked witch of the dark woods. Mwahaha!"},
+	"blood_vampire": {"name": "Vampire Lord", "file": "Vampire", "fx": "infernal", "line": "The Vampire Lord awakens, eyes burning red."},
+	"bone_lord": {"name": "Bone Lord", "file": "Necromancer", "fx": "deathly", "line": "Master of the dead! Skeletons kneel to you."},
+	# characters from the game itself
+	"skeleton": {"name": "Skeleton", "look": "bone", "line": "You're a rattly skeleton, like the ones in the Vault!"},
+	"goblin": {"name": "Goblin", "look": "goblin", "line": "You turn into a goblin! The goblins are VERY confused."},
+	"ember_goblin": {"name": "Ember Goblin", "look": "ember_goblin", "line": "A fiery goblin from the Sinkhole of Death!"},
+	"gruk": {"name": "Chief Gruk", "look": "gruk", "line": "You're Chief Gruk! GRUK SMASH!"},
+}
+## How long a costume lasts: [weight, seconds, real_time?, label]
+const COSTUME_TIMES := [
+	[40, 180.0, false, "3 minutes"], [30, 600.0, false, "10 minutes"],
+	[20, 86400.0, true, "a whole day"], [10, 259200.0, true, "3 days"],
+]
+
+static func roll_costume() -> String:
+	var keys := COSTUMES.keys()
+	return keys[rng.randi() % keys.size()]
+
+static func roll_costume_time() -> Array:
+	var total := 0
+	for t in COSTUME_TIMES:
+		total += int(t[0])
+	var x := rng.randi() % total
+	for t in COSTUME_TIMES:
+		x -= int(t[0])
+		if x < 0:
+			return t
+	return COSTUME_TIMES[0]
+
+## Outfits: armour you can see. Each armour type is worn as the body, arms and
+## legs of a KayKit character (the head and hair stay yours). Better armour
+## comes from the fancier wardrobes.
+const OUTFITS := {
+	"Leather Jerkin": ["adv2/Ranger", "adv2/Rogue", "costumes/Hiker", "costumes/Survivalist", "costumes/Farmer_B"],
+	"Chain Hauberk": ["adv2/Engineer", "adv2/Druid", "costumes/Cleric", "costumes/Hoarder"],
+	"Bone Mail": ["costumes/Necromancer", "costumes/Ninja", "adv2/Barbarian"],
+	"Plate Cuirass": ["adv2/Knight", "costumes/Paladin", "costumes/ToySoldier"],
+	"Warden Plate": ["costumes/Paladin", "adv2/Knight", "adv2/Mage"],
+}
+
 ## affix: [label, low, high, is_percent]
 const AFFIXES := {
 	"crit": ["crit chance", 3.0, 9.0, true],
@@ -121,6 +201,9 @@ static func make_weapon(ilvl: int, rarity: int) -> String:
 static func make_armor(ilvl: int, rarity: int) -> String:
 	var b: Dictionary = ARMOR_BASES[clampi(int(rng.randf_range(0.0, 2.2)) + int(ilvl / 2.0), 0, ARMOR_BASES.size() - 1)]
 	var it := {"slot": "armor", "rarity": rarity, "shield": b.shield, "tint": b.tint, "base": b.base}
+	var wardrobe: Array = OUTFITS.get(b.base, [])
+	if not wardrobe.is_empty():
+		it["outfit"] = wardrobe[rng.randi() % wardrobe.size()]
 	it["defense"] = roundf((2.0 + ilvl * 2.2) * RARITY_MULT[rarity] * b.def * rng.randf_range(0.85, 1.15))
 	var first := _add_affixes(it, ["hp", "mana", "regen", "crit", "lifesteal", "defense"], RARITY_AFFIXES[rarity], ilvl)
 	it["name"] = _name(it, b.base, first, "armor")
@@ -182,7 +265,18 @@ static func _potions(out: Array, n: int, mana_bias := 0.4) -> void:
 ## Chest tiers: small, big, supply (before the boss), boss (after it), skin, weapon, armor.
 static func roll_chest(tier: String, ilvl: int) -> Array:
 	var out: Array = []
+	# any chest might hold a magic costume
+	var cchance: float = {"small": 0.14, "big": 0.22, "wild": 0.3, "boss": 0.5, "skin": 0.6}.get(tier, 0.1)
+	if rng.randf() < cchance:
+		out.append({"kind": "costume", "id": roll_costume()})
 	match tier:
+		"wild":
+			# the chests that pop up out in the wilds: a bit of everything, and lucky
+			out.append({"kind": "gold", "amount": rng.randi_range(12, 30) * ilvl})
+			_potions(out, rng.randi_range(1, 2))
+			out.append({"kind": "item", "id": make_random(ilvl, 1.2, 1)})
+			if rng.randf() < 0.35:
+				out.append({"kind": "item", "id": make_random(ilvl, 0.9)})
 		"small":
 			out.append({"kind": "gold", "amount": rng.randi_range(8, 25) * ilvl})
 			_potions(out, rng.randi_range(1, 2))

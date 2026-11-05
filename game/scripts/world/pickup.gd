@@ -46,6 +46,22 @@ func _ready() -> void:
 				m.emission = col; m.emission_energy_multiplier = 1.6
 				m.roughness = 0.2
 				(mi as MeshInstance3D).material_override = m
+		"costume":
+			# a little spinning figure of what you'll turn into, in a rainbow glow
+			col = Color.from_hsv(randf(), 0.6, 1.0)
+			if Loot.COSTUMES.has(item_id):
+				var fig := CharacterModel.new()
+				_vis.add_child(fig)
+				fig.setup({"kind": "hero", "hero": "Knight", "show_hat": false, "costume": item_id, "scale": 0.42})
+				fig.position.y = -0.35
+			_add_beam(col, 4)
+			var sp := CPUParticles3D.new(); sp.amount = 24; sp.lifetime = 1.2
+			sp.mesh = FX.quad(0.08); sp.material_override = FX.glow_material(Color(1, 1, 1), 2.5)
+			sp.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; sp.emission_sphere_radius = 0.6
+			sp.direction = Vector3.UP; sp.spread = 40; sp.initial_velocity_min = 0.3; sp.initial_velocity_max = 0.9
+			sp.gravity = Vector3.ZERO; sp.hue_variation_min = -1.0; sp.hue_variation_max = 1.0
+			sp.color = Color(1.0, 0.5, 0.5)
+			_vis.add_child(sp)
 		_:
 			var it := Game.item(item_id)
 			var r: int = it.get("rarity", 0)
@@ -106,6 +122,11 @@ func _collect() -> void:
 			Game.say("+1 Mana Potion", Color(0.45, 0.6, 1.0))
 			Sfx.play("pickup", -6.0, 0.0)
 			Game.stats_changed.emit()
+		"costume":
+			Game.wear_costume(item_id)
+			Sfx.play("levelup", -2.0, 0.0)
+			FX.burst(global_position, Color(1.0, 0.6, 1.0), 60, 4.0, 0.2, 1.0, 0.5)
+			FX.burst(global_position, Color(0.6, 1.0, 1.0), 40, 3.0, 0.16, 0.9, 0.5)
 		_:
 			var r: int = Game.item(item_id).get("rarity", 0)
 			Game.add_item(item_id)

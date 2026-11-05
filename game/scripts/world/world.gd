@@ -271,6 +271,12 @@ func _outpost() -> void:
 	var dust := _motes(Vector3(0, 3, 18), Vector3(18, 3, 16), Color(0.8, 0.85, 1.0), 120, 0.05)
 	dust.position = Vector3(0, 3, 18)
 
+	# a couple of treasure chests in random spots around the outpost's edges
+	var wc := WildChests.create(self, Rect2(-31, 2, 62, 40), func(x: float, z: float) -> Vector3: return Vector3(x, 0.0, z),
+		func(p: Vector2) -> bool: return absf(p.x) > 16.0 and p.distance_to(Vector2(ARRIVAL.x, ARRIVAL.z)) > 7.0 and p.y < 40.0, 2, 1, false)
+	wc.max_chests = 3
+	wc.respawn_every = 300.0
+
 func _tent(pos: Vector3, yaw: float, col: Color) -> void:
 	var n := Node3D.new(); add_child(n); n.position = pos; n.rotation_degrees.y = yaw
 	var mi := MeshInstance3D.new(); var pm := PrismMesh.new(); pm.size = Vector3(3.0, 2.0, 3.4)

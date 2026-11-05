@@ -1,0 +1,68 @@
+# Builds the Windows, macOS and Linux versions of Bobek's Adventure on GitHub's
+# own computers and attaches them to the "latest-build" Release
+# (https://github.com/whitewolfcreativeworks-coder/The-deep-vault-game/releases/tag/latest-build).
+# Releases allow files up to 2 GB, so the downloads never need splitting.
+# Runs on every push to main that changes the game, or by hand from the Actions tab.
+name: Desktop builds
+
+on:
+  push:
+    branches: [main]
+    paths: ["game/**", "tools/build.sh", ".github/workflows/desktop-release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.5.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Godot and its export templates
+        run: |
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -sSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q godot.zip && mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot && chmod +x godot
+          tdir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$tdir" && unzip -q templates.tpz && mv templates/* "$tdir/"
+
+      - name: Export Windows, macOS and Linux
+        run: GODOT="$PWD/godot" tools/build.sh all
+
+      - name: Zip the downloads
+        run: |
+          mkdir -p dist
+          (cd builds/windows && zip -q -9 ../../dist/BobeksAdventure-Windows.zip BobeksAdventure.exe BobeksAdventure.pck)
+          (cd builds/linux && zip -q -9 ../../dist/BobeksAdventure-Linux.zip BobeksAdventure.x86_64 BobeksAdventure.pck)
+          cp builds/macos/BobeksAdventure.zip dist/BobeksAdventure-macOS.zip
+          (cd dist && sha256sum *.zip > SHA256SUMS.txt)
+          ls -la dist
+
+      - name: Publish to the latest-build Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-build
+          name: "Bobek's Adventure - latest build"
+          make_latest: true
+          body: |
+            Desktop downloads of the latest build (commit ${{ github.sha }}).
+            - Windows: unzip, keep BobeksAdventure.exe and BobeksAdventure.pck together, run the .exe (SmartScreen: More info, then Run anyway).
+            - macOS: unzip, then right-click the app and choose Open the first time (it is unsigned).
+            - Linux: unzip, chmod +x BobeksAdventure.x86_64, run it.
+
+            Play in the browser or on iPad: https://whitewolfcreativeworks-coder.github.io/The-deep-vault-game/
+          files: |
+            dist/BobeksAdventure-Windows.zip
+            dist/BobeksAdventure-macOS.zip
+            dist/BobeksAdventure-Linux.zip
+            dist/SHA256SUMS.txt

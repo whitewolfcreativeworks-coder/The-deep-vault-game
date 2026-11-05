@@ -126,6 +126,11 @@ func rebuild_body() -> void:
 	if best >= 3:
 		cfg["aura"] = Loot.rarity_color(best)
 		cfg["aura_level"] = best
+	# armour you can see, and magic costumes on top of everything
+	if armor.has("outfit"):
+		cfg["outfit_model"] = armor.outfit
+	if Game.costume_id() != "":
+		cfg["costume"] = Game.costume_id()
 	body.setup(cfg)
 	body.set_head_visible(not _head_hidden)
 	_equipped_sig = _equip_signature()
@@ -194,13 +199,22 @@ static func _apply_profile_looks(cfg: Dictionary) -> void:
 
 var _equipped_sig := ""
 func _equip_signature() -> String:
-	return "%s|%s|%s" % [Game.equipped.weapon, Game.equipped.armor, Game.equipped.skin]
+	return "%s|%s|%s|%s" % [Game.equipped.weapon, Game.equipped.armor, Game.equipped.skin, Game.costume_id()]
 
 func _on_inventory_changed() -> void:
 	if _equip_signature() == _equipped_sig:
 		return
 	var first := _equipped_sig == ""
+	var was_costume := _equipped_sig.get_slice("|", 3) if _equipped_sig.count("|") >= 3 else ""
 	rebuild_body()
+	if not first and is_inside_tree() and was_costume != Game.costume_id():
+		# a magic transformation: a swirl of rainbow sparkles
+		for k in 3:
+			FX.burst(global_position + Vector3(0, 0.4 + k * 0.6, 0), Color.from_hsv(k / 3.0, 0.55, 1.0), 40, 3.5, 0.16, 1.0, 0.5)
+		FX.pillar(global_position, Color(1.0, 0.75, 1.0), 1.0, 5.0, 0.6)
+		body.flash(Color(1, 0.8, 1), 0.9)
+		Sfx.play("portal", -6.0, 0.0)
+		return
 	if not first and is_inside_tree():
 		# a little celebration when your look changes
 		FX.burst(global_position + Vector3(0, 1.0, 0), Color(1.0, 0.9, 0.6), 30, 2.5, 0.14, 0.8, 1.0)

@@ -39,7 +39,7 @@ func _build() -> void:
 		"chest":
 			var golden := false
 			for l in loot:
-				if l.get("roll", "") in ["big", "boss", "skin", "supply"] or l.get("id", "") in ["vault_blade", "amulet_deep"]:
+				if l.get("roll", "") in ["big", "boss", "skin", "supply", "wild"] or l.get("id", "") in ["vault_blade", "amulet_deep"]:
 					golden = true
 			_vis = Props.place(self, "chest_gold" if golden else "chest", Vector3.ZERO, 0.0, 1.0, true)
 			for n in _vis.find_children("*", "Node3D", true, false):

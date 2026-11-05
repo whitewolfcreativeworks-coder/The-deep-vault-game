@@ -11,6 +11,7 @@ var xp_bar: ProgressBar
 var gold_label: Label
 var potion_label: Label
 var special_label: Label
+var costume_label: Label
 var objective_label: Label
 var prompt_label: Label
 var msg_box: VBoxContainer
@@ -109,6 +110,8 @@ func _ready() -> void:
 	potion_label = UIKit.label("", 16, Color(1, 0.55, 0.55)); res_row.add_child(potion_label)
 	special_label = UIKit.label("", 16, Color(0.8, 0.65, 1.0))
 	sv.add_child(special_label)
+	costume_label = UIKit.label("", 16, Color(1.0, 0.7, 1.0))
+	sv.add_child(costume_label)
 	gold_label = UIKit.label("", 16, Color(1, 0.82, 0.35)); res_row.add_child(gold_label)
 
 	# --- objective (top-centre)
@@ -256,6 +259,10 @@ func _process(delta: float) -> void:
 	var ab_state := "ready" if player.special_cd <= 0.0 else "%ds" % ceili(player.special_cd)
 	special_label.text = ("%s: %s" if Game.touch_active else "%s [X]: %s") % [ab.name, ab_state]
 	special_label.modulate = Color(1, 1, 1) if player.special_cd <= 0.0 else Color(0.6, 0.6, 0.6)
+	var cid := Game.costume_id()
+	costume_label.visible = cid != ""
+	if cid != "":
+		costume_label.text = "%s: %s" % [Loot.COSTUMES.get(cid, {}).get("name", "Costume"), Game.costume_time_text()]
 	gold_label.text = "Gold: %d" % Game.gold
 	# damage / low-health vignette
 	var vm := vignette.material as ShaderMaterial

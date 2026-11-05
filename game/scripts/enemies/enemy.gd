@@ -350,6 +350,7 @@ func _has_los() -> bool:
 func _awaken() -> void:
 	_go(S.AWAKEN)
 	body.visible = true
+	body.hold_clip = ""
 	for c in get_children():
 		if c is CollisionShape3D:
 			c.disabled = false

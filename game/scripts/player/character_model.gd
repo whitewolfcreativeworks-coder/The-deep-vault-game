@@ -132,13 +132,31 @@ const SKIN_LOOKS := {
 	"ember": {"albedo": Color(1.0, 0.55, 0.4), "rough": 0.6, "emit": Color(0.9, 0.28, 0.05)},
 }
 var _aura: Node3D
+## Dark costume finishes: a colour wash, an eerie glow, and a dark aura at the feet.
+const DARK_LOOKS := {
+	"shadow": {"albedo": Color(0.5, 0.45, 0.6), "rough": 0.45, "emit": Color(0.08, 0.0, 0.14), "aura": Color(0.6, 0.2, 1.0)},
+	"rot": {"albedo": Color(0.6, 0.85, 0.5), "rough": 0.8, "emit": Color(0.03, 0.12, 0.0), "aura": Color(0.45, 1.0, 0.3)},
+	"deathly": {"albedo": Color(0.55, 0.7, 0.85), "rough": 0.4, "metal": 0.2, "emit": Color(0.05, 0.22, 0.45), "aura": Color(0.3, 0.75, 1.0)},
+	"infernal": {"albedo": Color(0.85, 0.38, 0.32), "rough": 0.5, "emit": Color(0.55, 0.08, 0.02), "aura": Color(1.0, 0.3, 0.1)},
+}
 
 ## cfg: {kind:"hero", hero:"Knight", cape_color:Color, outfit_color:Color, show_hat:bool, weapon:id, shield:id|""}
 ##      {kind:"skeleton", variant:"minion", weapon:"skel_blade", shield:"Skeleton_Shield_Small_A", eye:Color}
 func setup(cfg: Dictionary) -> void:
 	for c in get_children():
 		c.queue_free()
-	head_meshes.clear(); all_meshes.clear()
+	head_meshes.clear(); all_meshes.clear(); _never_show.clear(); _own_colors.clear()
+	# a costume made from one of the game's own characters is just a different look
+	var costume_file := ""
+	var costume_fx := ""
+	if cfg.has("costume") and Loot.COSTUMES.has(cfg.costume):
+		var c: Dictionary = Loot.COSTUMES[cfg.costume]
+		if c.has("look"):
+			cfg = costume_look_cfg(String(c.look), cfg)
+		else:
+			var f := String(c.file)
+			costume_file = "res://assets/kaykit/%s.glb" % (f if f.contains("/") else "costumes/" + f)
+			costume_fx = String(c.get("fx", ""))
 	kind = cfg.get("kind", "hero")
 	_stripes = cfg.get("outfit_stripes", Color.BLACK)
 	var skin: String = cfg.get("skin", "")
@@ -198,6 +216,16 @@ func setup(cfg: Dictionary) -> void:
 				em.emission_enabled = true; em.emission = cfg.eye; em.emission_energy_multiplier = 6.0
 				m.material_override = em
 	_setup_anims()
+	if costume_file != "":
+		_wear_costume(costume_file, cfg)
+		if DARK_LOOKS.has(costume_fx):
+			var dl: Dictionary = DARK_LOOKS[costume_fx]
+			for m in all_meshes:
+				_skin_mat(m, dl, false)
+			_add_aura(dl.aura, 2, costume_fx == "infernal")
+		return
+	if cfg.has("outfit_model") and kind == "hero":
+		_wear_outfit(String(cfg.outfit_model), cfg)
 	if SKIN_LOOKS.get(skin, {}).is_empty() and skin != "bone":
 		# outfit colour chosen at the start tints body, arms, legs and headgear;
 		# armour found later adds its own lighter tint on top
@@ -212,6 +240,11 @@ func setup(cfg: Dictionary) -> void:
 		for m in all_meshes:
 			var nm := String(m.name)
 			if nm.contains("Cape") or nm.contains("Eyes"):
+				continue
+			if m in _own_colors:
+				# outfit pieces keep their own colours; only the skin tone changes
+				if skin_c != null:
+					_recolor(m, Color.WHITE, 0.0, 1.0, skin_c, null)
 				continue
 			var is_head := nm.contains("_Head")
 			if skin_c != null or has_outfit or (is_head and hair_t != null):
@@ -248,6 +281,101 @@ func setup(cfg: Dictionary) -> void:
 				_swap_head(hero, cfg, skin, BUN_SPIKE_BASE.get(String(cfg.get("hero", "Knight")), "short"))
 		_add_head_looks(hero, cfg, hat_on or hooded)
 	_play(anims.idle, 0.0)
+
+# --- costumes and outfits (KayKit characters on the same rig) -----------------
+var _own_colors: Array[MeshInstance3D] = []
+static var _costume_scenes := {}
+
+## Skinned meshes from another KayKit character, bound to this rig's skeleton
+## (the bones share names and rest poses, so our animations drive them).
+func _borrow_meshes(path: String, accept: Callable) -> Array[MeshInstance3D]:
+	var out: Array[MeshInstance3D] = []
+	if skel == null or not ResourceLoader.exists(path):
+		return out
+	if not _costume_scenes.has(path):
+		_costume_scenes[path] = load(path)
+	var src: Node = (_costume_scenes[path] as PackedScene).instantiate()
+	for mi in src.find_children("*", "MeshInstance3D", true, false):
+		var o := mi as MeshInstance3D
+		if not accept.call(String(o.name)):
+			continue
+		var m := MeshInstance3D.new()
+		m.name = o.name; m.mesh = o.mesh; m.skin = o.skin; m.transform = o.transform
+		for i in o.get_surface_override_material_count():
+			if o.get_surface_override_material(i):
+				m.set_surface_override_material(i, o.get_surface_override_material(i))
+		skel.add_child(m)
+		m.skeleton = NodePath("..")
+		m.material_overlay = flash_mat
+		all_meshes.append(m)
+		out.append(m)
+	src.free()
+	return out
+
+const _HEADGEAR := ["Head", "Hat", "Helmet", "Mask", "Glasses", "Headband", "Sunglasses", "Cigar", "Hood", "Visor"]
+
+## Become someone else entirely (the whole body is swapped; weapons stay).
+func _wear_costume(path: String, cfg: Dictionary) -> void:
+	for m in all_meshes:
+		m.visible = false
+		_never_show.append(m)
+	all_meshes.clear(); head_meshes.clear()
+	for m in _borrow_meshes(path, func(_n: String) -> bool: return true):
+		for k in _HEADGEAR:
+			if String(m.name).contains(k):
+				head_meshes.append(m)
+				break
+	set_weapon(cfg.get("weapon", ""))
+	set_offhand(cfg.get("shield", ""))
+	if cfg.has("aura"):
+		_add_aura(cfg.aura, int(cfg.get("aura_level", 3)))
+	_base_scale = float(cfg.get("scale", 0.84))
+	scale = Vector3.ONE * _base_scale
+	_play(anims.idle, 0.0)
+
+## Visible armour: swap the body, arms and legs (and cape) for an outfit,
+## keeping your own head and hair.
+func _wear_outfit(rel: String, _cfg: Dictionary) -> void:
+	var path := "res://assets/kaykit/%s.glb" % rel
+	if not ResourceLoader.exists(path):
+		return
+	var body_part := func(n: String) -> bool:
+		for k in ["Body", "ArmLeft", "ArmRight", "LegLeft", "LegRight", "Cape", "Cloak", "Chest", "Shoulder", "LegArmor"]:
+			if n.contains(k) and not n.contains("Head"):
+				return true
+		return false
+	for m in all_meshes.duplicate():
+		if body_part.call(String(m.name)):
+			m.visible = false
+			_never_show.append(m)
+			all_meshes.erase(m)
+	for m in _borrow_meshes(path, body_part):
+		_own_colors.append(m)
+
+## The cfg for a costume that is one of the game's own characters.
+static func costume_look_cfg(look: String, base: Dictionary) -> Dictionary:
+	var cfg := base.duplicate()
+	cfg.erase("costume")
+	if look == "bone":
+		cfg["skin"] = "bone"
+		return cfg
+	var t: Dictionary = Enemy.TYPES.get({"goblin": "goblin", "ember_goblin": "fire_goblin", "gruk": "goblin_chief"}.get(look, "goblin"), {})
+	var lk: Dictionary = t.get("look", {})
+	var skin_c: Color = t.get("skin", Enemy.GOBLIN_SKIN)
+	cfg["hero"] = lk.get("hero", "Rogue")
+	cfg["show_hat"] = lk.get("hat", false)
+	cfg["skin_color"] = skin_c
+	cfg["hair_style"] = lk.get("hair_style", "spiky")
+	cfg["hair_color"] = lk.get("hair_color", Color(0.1, 0.1, 0.1))
+	cfg["hair_tint"] = lk.get("hair_color", Color(0.1, 0.1, 0.1))
+	cfg["face"] = lk.get("face", "none")
+	cfg["ears"] = true
+	cfg["outfit_color"] = lk.get("outfit", Color(0.4, 0.3, 0.2))
+	cfg["cape_color"] = (lk.get("outfit", Color(0.4, 0.3, 0.2)) as Color).darkened(0.2)
+	cfg["build"] = lk.get("build", 1.05)
+	cfg["height"] = 0.95
+	cfg.erase("outfit_model"); cfg.erase("tint"); cfg.erase("skin")
+	return cfg
 
 ## Multiply a mesh's colours (keeps its texture).
 func _mul(m: MeshInstance3D, c: Color) -> void:

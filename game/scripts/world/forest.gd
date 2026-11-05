@@ -33,6 +33,20 @@ var door: Node3D
 var gruk: Enemy
 var day_night: DayNight
 var sinkhole: SinkholeOfDeath
+var wild_chests: WildChests
+
+func _wild_spot_ok(p: Vector2) -> bool:
+	if road_dist(p) < 8.0 or stream_dist(p) < 7.0 or p.distance_to(SinkholeOfDeath.HOLE) < 12.0:
+		return false
+	for c in clearings:
+		if p.distance_to(c[0]) < c[1] + 4.0:
+			return false
+	# not on a steep slope
+	var h := height(p.x, p.y)
+	for d in [Vector2(3, 0), Vector2(-3, 0), Vector2(0, 3), Vector2(0, -3)]:
+		if absf(height(p.x + d.x, p.y + d.y) - h) > 1.2:
+			return false
+	return true
 var boss_started := false
 
 func build() -> void:
@@ -64,6 +78,8 @@ func build() -> void:
 	_warren()
 	_quest_items()
 	sinkhole = SinkholeOfDeath.build_in(self)
+	# treasure chests in random spots out in the woods (new ones keep popping up)
+	wild_chests = WildChests.create(self, Rect2(-PLAY + 8, -86, (PLAY - 8) * 2, 86 + PLAY - 8), ground, _wild_spot_ok, 7, 5)
 	if Game.is_compat():
 		for l in find_children("*", "Light3D", true, false):
 			if l is OmniLight3D or l is SpotLight3D:

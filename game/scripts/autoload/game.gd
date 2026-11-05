@@ -150,6 +150,48 @@ func _init() -> void:
 func _process(delta: float) -> void:
 	if in_game and not get_tree().paused:
 		play_time += delta
+		if not costume.is_empty() and costume_left() <= 0.0:
+			var nm: String = Loot.COSTUMES.get(costume.get("id", ""), {}).get("name", "costume")
+			clear_costume()
+			message.emit("POOF! Your %s magic wears off." % nm, Color(1.0, 0.85, 0.5))
+
+# ---------------------------------------------------------------------------
+# Costumes (see Loot.COSTUMES): {"id", "until", "real"}. "real" costumes count
+# down in real time (they can last for days), the others only while you play.
+var costume := {}
+
+func costume_id() -> String:
+	return String(costume.get("id", "")) if not costume.is_empty() else ""
+
+func costume_left() -> float:
+	if costume.is_empty():
+		return 0.0
+	if costume.get("real", false):
+		return float(costume.until) - Time.get_unix_time_from_system()
+	return float(costume.until) - play_time
+
+func costume_time_text() -> String:
+	var s := maxf(costume_left(), 0.0)
+	if s >= 86400.0:
+		return "%dd %dh" % [int(s / 86400.0), int(fmod(s, 86400.0) / 3600.0)]
+	if s >= 3600.0:
+		return "%dh %dm" % [int(s / 3600.0), int(fmod(s, 3600.0) / 60.0)]
+	return "%d:%02d" % [int(s / 60.0), int(fmod(s, 60.0))]
+
+## Put on a costume straight away (a new one always replaces the old one).
+func wear_costume(id: String) -> void:
+	if not Loot.COSTUMES.has(id):
+		return
+	var t: Array = Loot.roll_costume_time()
+	var real: bool = t[2]
+	costume = {"id": id, "real": real, "until": (Time.get_unix_time_from_system() if real else play_time) + float(t[1])}
+	var c: Dictionary = Loot.COSTUMES[id]
+	message.emit("%s  (lasts %s)" % [c.line, t[3]], Color(1.0, 0.75, 1.0))
+	inventory_changed.emit()
+
+func clear_costume() -> void:
+	costume = {}
+	inventory_changed.emit()
 
 # ---------------------------------------------------------------------------
 ## True on the WebGL / OpenGL "Compatibility" renderer (browser builds, old GPUs).
@@ -217,6 +259,7 @@ func reset_run() -> void:
 	tracked_quest = ""
 	tracked_manual = false
 	day_clock = 150.0
+	costume = {}
 	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
 	game_over = false
@@ -434,7 +477,7 @@ func save_slot(i := -1) -> bool:
 		"checkpoint_pos": checkpoint_pos, "checkpoint_yaw": checkpoint_yaw, "checkpoint_name": checkpoint_name,
 		"objective": objective,
 		"resume_pos": resume_pos, "resume_yaw": resume_yaw,
-		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual, "day_clock": day_clock,
+		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual, "day_clock": day_clock, "costume": costume.duplicate(),
 	}
 	var f := FileAccess.open(_slot_path(i), FileAccess.WRITE)
 	if f == null:
@@ -487,6 +530,7 @@ func load_slot(i: int) -> bool:
 	tracked_quest = String(d.get("tracked_quest", ""))
 	tracked_manual = bool(d.get("tracked_manual", false))
 	day_clock = float(d.get("day_clock", 150.0))
+	costume = (d.get("costume", {}) as Dictionary).duplicate()
 	hp = clampf(float(d.get("hp", max_hp())), max_hp() * 0.5, max_hp())
 	mana = clampf(float(d.get("mana", max_mana())), 0.0, max_mana())
 	stamina = max_stamina()

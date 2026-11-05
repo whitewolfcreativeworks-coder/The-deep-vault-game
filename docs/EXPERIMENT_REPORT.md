@@ -477,3 +477,46 @@ It also found two stale tests that still looked buttons up by list position. But
 - New `daynight` test (7 checks) and `sinkhole` test (20 checks). The sinkhole test plays through: locked → unlocked → accept → fall → lava burns → boss stomp and summons → defeat → claim the chicken → ride (11.8 m in 1.5 s) → G off and on → ladder → hand in → mount saved.
 - Both run in Forward+ and gl_compatibility.
 - **Bug found:** the first lava damage formula killed the hero in about 1.5 s. The damage divisor amplifies at low defence, so the lava rate was halved and the bounce-out added.
+
+## Follow-up 12: costumes, visible armour, wild chests, desktop downloads via GitHub Actions (Nov 4)
+
+**Request:**
+- Random skins from chests: some for a short time, some for days, and a new one overrides the old.
+- Become a cute dinosaur, a skeleton, or NPCs from the game, with plenty of evil and dark ones.
+- Loot that changes how your outfit and armour look, ideally using an existing library.
+- Chests in random places with funny things around them.
+- Also: was it a problem that the downloads were being split?
+
+**The asset library:**
+- A public GitHub mirror of the KayKit collection (CC0) has about 50 more chibi characters.
+- Every one shares bone names with the original heroes. Rest poses were compared bone by bone in Godot: 40 match exactly; 8 "large" characters are 2 m different, so they were left out.
+- **Technique:** take the character's skinned meshes and bind them to the hero's own `Skeleton3D`. Godot's glTF importer gives each Skin named binds, so they resolve by bone name. The hero's existing animations then drive any costume, with no retargeting.
+- Verified by rendering all 40 costumes on the hero rig in a single line-up.
+
+**Costumes** (`Loot.COSTUMES`, `Game.costume`):
+- A chest can drop a `costume` pickup (14–60% depending on the chest). It shows as a tiny spinning figure in a rainbow beam.
+- Picking it up transforms you at once. Duration is rolled: 3 or 10 minutes of play time, or 1 or 3 days of real time (compared against the Unix clock, so they keep counting while the game is closed).
+- The costume is saved in the slot, expires on its own, and can be taken off in the Inventory.
+- 40 costumes, 17 of them dark. The dark ones use a material finish (shadow, rot, deathly, infernal) plus a coloured aura.
+- 4 costumes reuse the game's own characters (skeleton, goblin, Ember Goblin, Gruk) by building their look config.
+
+**Outfits:**
+- Every new armour item gets an `outfit` from a wardrobe for its armour type.
+- The hero's body, arm, leg and cape meshes are swapped for the outfit's. The head and hair stay yours, and the outfit keeps its own colours (only your skin tone is applied).
+
+**Wild chests** (`scripts/world/wild_chests.gd`):
+- Random valid spots: off the road and stream, out of clearings, not on steep slopes, 22 m apart.
+- 7 scenes, including a sleeping goblin (a dormant enemy lying down that wakes when you come close), pecking mini chickens, and a biting mimic that gives double loot.
+- 7 in the forest and 2 at the outpost, with a new one every 4–5 minutes.
+
+**Downloads:**
+- The macOS zip reached about 98 MB, against GitHub's 100 MB limit for a file in a repository.
+- This session isn't allowed to create GitHub Releases directly. So with the user's OK, a GitHub Actions workflow now builds the three desktop versions on GitHub's runners and attaches them to a `latest-build` Release, where files can be up to 2 GB.
+- The web/iPad build was never affected; it's split into many files and served by GitHub Pages.
+
+**Tests:** a new `costumes` test (10 checks):
+- all 40 costumes build;
+- the outfit files exist and armour carries an outfit, which gets worn;
+- picking up a costume transforms you, and a new one replaces the old;
+- play-time costumes expire, and real-time ones survive a save;
+- wild chests spawn, and costumes drop from about 1 in 4 wild chests.

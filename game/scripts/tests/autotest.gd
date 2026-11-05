@@ -241,6 +241,8 @@ func _run() -> void:
 	elif mode == "daynight":
 		if await _daynight_test():
 			return
+	elif mode == "costumes":
+		await _costumes_test()
 	elif mode == "sinkhole":
 		if await _sinkhole_test():
 			return
@@ -2065,3 +2067,95 @@ func _sinkhole_test() -> bool:
 	Game.save_slot()
 	check("mount_saved", bool(Game.read_slot(Game.active_slot).get("flags", {}).get("mount_chicken", false)))
 	return false
+
+# --- costumes, outfits and wild chests ---------------------------------------------
+func _costumes_test() -> void:
+	await _start()
+	player = main.player
+	god = true
+	# a line-up of every costume, far above the world with its own camera and light
+	var stage := Node3D.new(); main.add_child(stage); stage.position = Vector3(0, 400, 0)
+	var ids: Array = Loot.COSTUMES.keys()
+	var cols := 10
+	for i in ids.size():
+		var cm := CharacterModel.new(); stage.add_child(cm)
+		cm.setup({"kind": "hero", "hero": "Knight", "show_hat": false, "costume": ids[i], "scale": 1.0, "weapon": "rusty_sword"})
+		cm.position = Vector3((i % cols - (cols - 1) * 0.5) * 1.7, -(i / cols) * 2.9, 0)
+		cm.rotation.y = PI + 0.35
+		var lb := Label3D.new(); lb.text = ids[i]; lb.pixel_size = 0.0045; lb.font_size = 44; lb.outline_size = 8
+		lb.position = cm.position + Vector3(0, -0.3, 0.6); stage.add_child(lb)
+	var li := DirectionalLight3D.new(); stage.add_child(li); li.rotation_degrees = Vector3(-30, 20, 0); li.light_energy = 1.2
+	var cam := Camera3D.new(); stage.add_child(cam)
+	cam.position = Vector3(0, -3.6, 17.0); cam.fov = 55; cam.current = true
+	cam.look_at(stage.global_position + Vector3(0, -3.7, 0))
+	await wait(1.5)
+	await shot("cos_00_lineup")
+	check("all_costumes_build", stage.get_child_count() >= ids.size() * 2)
+	stage.queue_free()
+	player.camera.current = true
+	# outfits: armour you can see
+	var kinds := {}
+	for base in Loot.OUTFITS:
+		for rel in Loot.OUTFITS[base]:
+			kinds[rel] = true
+	var missing := []
+	for rel in kinds:
+		if not ResourceLoader.exists("res://assets/kaykit/%s.glb" % rel):
+			missing.append(rel)
+	check("outfit_files_exist", missing.is_empty(), str(missing))
+	var aid := Loot.make_armor(4, 3)
+	check("armor_has_outfit", Game.item(aid).has("outfit"), str(Game.item(aid)))
+	Game.add_item(aid)
+	Game.equip(aid)
+	await wait(0.6)
+	player.zoom_target = 3.2; player.zoom = 3.2; player.yaw = PI; player.pitch = -0.1; player.snap_view()
+	await wait(0.6)
+	var outfit_meshes := player.body._own_colors.size()
+	check("outfit_worn", outfit_meshes >= 3, "%d outfit meshes (%s)" % [outfit_meshes, Game.item(aid).outfit])
+	await shot("cos_01_outfit")
+	# a costume from a chest: drop one, walk over it, transform
+	Pickup.spawn(player.global_position + Vector3(0, 1.0, -2.0), "costume", 1, "dino")
+	await wait(1.0)
+	await shot("cos_02_costume_pickup")
+	await tp(player.global_position + Vector3(0, 0.2, -2.0), PI)
+	await wait(1.2)
+	check("became_dino", Game.costume_id() == "dino" and player.body._never_show.size() > 0)
+	player.yaw = PI; player.snap_view()
+	await wait(0.6)
+	await shot("cos_03_dino")
+	# a new costume replaces the old one
+	Game.wear_costume("dark_knight")
+	await wait(0.8)
+	check("new_costume_replaces", Game.costume_id() == "dark_knight")
+	await shot("cos_04_dark_knight")
+	# play-time costumes run out
+	Game.costume = {"id": "vampire", "real": false, "until": Game.play_time + 1.0}
+	Game.inventory_changed.emit()
+	await wait(2.2)
+	check("costume_expires", Game.costume_id() == "")
+	# real-time ones survive a save
+	Game.wear_costume("werewolf")
+	Game.costume.real = true; Game.costume.until = Time.get_unix_time_from_system() + 86400.0
+	Game.save_slot()
+	check("costume_saved", String(Game.read_slot(Game.active_slot).get("costume", {}).get("id", "")) == "werewolf")
+	# wild chests out by the outpost
+	var wc: Array = main.world.find_children("*", "WildChests", true, false)
+	var chests := 0
+	for w in wc:
+		for c in w.get_children():
+			if c.has_meta("chest"):
+				chests += 1
+	check("wild_chests_spawned", chests >= 2, str(chests))
+	if chests > 0:
+		var c0: Node3D = wc[0].get_child(0)
+		await tp(c0.global_position + Vector3(0, 0.5, 3.5), 0.0)
+		player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = -0.3; player.snap_view()
+		await wait(1.0)
+		await shot("cos_05_wild_chest_" + String(c0.get_meta("scene")))
+	# lots of chests: costumes do drop
+	var got := 0
+	for k in 60:
+		for d in Loot.roll_chest("wild", 4):
+			if d.get("kind", "") == "costume":
+				got += 1
+	check("costumes_drop_from_chests", got >= 6, "%d in 60 wild chests" % got)
