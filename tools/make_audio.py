@@ -305,6 +305,60 @@ def music_morning():
                 end = min(len(x), s + len(seg)); x[s:end] += (tone * e)[: end - s]
     return loopify(lowpass(x, 2200), 0.5)
 
+def cluck():
+    # two quick throaty "buk-buk" clucks
+    x = np.zeros(int(0.45 * SR))
+    for at, f in [(0.0, 520), (0.17, 470)]:
+        seg = t(0.12)
+        g = np.sin(2 * np.pi * np.cumsum(f * (1 - 0.35 * seg / 0.12)) / SR)
+        g = np.sign(g) * np.abs(g) ** 0.6 + 0.3 * lowpass(noise(0.12), 2500)
+        e = np.clip(seg / 0.01, 0, 1) * np.exp(-seg * 22)
+        s0 = int(at * SR); x[s0:s0 + len(seg)] += g * e
+    return lowpass(x, 3200)
+def bawk():
+    # the big "BA-GAWK!": a short buk then a long rising-falling squawk
+    d = 0.95; x = np.zeros(int(d * SR))
+    seg = t(0.1); f = 480
+    x[:len(seg)] += np.sign(np.sin(2 * np.pi * f * seg)) * np.exp(-seg * 30) * 0.6
+    seg = t(0.7)
+    f = 700 + 500 * np.sin(np.pi * seg / 0.7) ** 0.7 - 250 * (seg / 0.7) ** 2
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    tone = np.sin(ph) + 0.6 * np.sin(2 * ph) + 0.35 * np.sin(3 * ph)
+    tone = np.tanh(tone * 1.8) + 0.15 * lowpass(noise(0.7), 4000)
+    e = np.clip(seg / 0.03, 0, 1) * np.clip((0.7 - seg) / 0.12, 0, 1)
+    s0 = int(0.16 * SR); x[s0:s0 + len(seg)] += tone * e
+    return lowpass(x, 4200)
+def collapse():
+    # the ground giving way: a deep crack, rumble and tumbling rocks
+    d = 3.0; seg = t(d)
+    crack = highpass(noise(d), 800) * np.exp(-seg * 9) * 1.4
+    rumble = lowpass(noise(d), 160) * np.clip(seg / 0.2, 0, 1) * np.clip((d - seg) / 1.2, 0, 1) * 2.4
+    sub = np.sin(2 * np.pi * 34 * seg) * np.clip((d - seg) / 1.5, 0, 1) * 0.7
+    x = crack + rumble + sub
+    for k in range(14):
+        at = rng.uniform(0.2, 2.6); n = int(0.15 * SR); s0 = int(at * SR)
+        tap = lowpass(noise(0.15), 900) * np.exp(-np.arange(n) / SR * 30) * rng.uniform(0.4, 1.0)
+        x[s0:s0 + n] += tap[: len(x) - s0]
+    return x
+def lava_loop():
+    # bubbling, popping lava
+    d = 4.0; x = lowpass(noise(d), 220) * 0.8
+    for k in range(26):
+        at = rng.uniform(0, d - 0.2); n = int(0.18 * SR); s0 = int(at * SR)
+        sg = np.arange(n) / SR
+        pop = np.sin(2 * np.pi * (90 + 160 * np.exp(-sg * 18)) * sg) * np.exp(-sg * 16)
+        x[s0:s0 + n] += pop[: len(x) - s0] * rng.uniform(0.3, 0.9)
+    return loopify(x, 0.4)
+def roar_big():
+    # the Cyclops: a huge, gravelly bellow
+    d = 2.2; seg = t(d)
+    f = 70 + 40 * np.sin(np.pi * seg / d)
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    tone = np.tanh(2.5 * (np.sin(ph) + 0.5 * np.sin(2.01 * ph) + 0.3 * np.sin(3.02 * ph)))
+    grit = lowpass(noise(d), 700) * (0.6 + 0.4 * np.sin(2 * np.pi * 23 * seg))
+    e = np.clip(seg / 0.15, 0, 1) * np.clip((d - seg) / 0.6, 0, 1)
+    return (tone * 0.8 + grit) * e
+
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
     "pickup": pickup, "coins": coins, "levelup": levelup, "spell": spell, "spell_hit": spell_hit,
@@ -313,7 +367,7 @@ SOUNDS = {
     "death": death_sting, "victory": victory,
     "loop_cave": cave_drone, "loop_river": river_loop, "loop_fire": fire_loop,
     "music_explore": music_explore, "music_boss": music_boss,
-    "loop_birds": birds_loop, "whistle": whistle_tune, "kettle": kettle, "brush": brush, "sip": sip, "pour": pour, "stir": stir,
+    "loop_birds": birds_loop, "whistle": whistle_tune, "kettle": kettle, "brush": brush, "sip": sip, "pour": pour, "stir": stir, "cluck": cluck, "bawk": bawk, "collapse": collapse, "loop_lava": lava_loop, "roar_big": roar_big,
     "rumble": rumble, "portal": portal_whoosh, "music_morning": music_morning,
 }
 

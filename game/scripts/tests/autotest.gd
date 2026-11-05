@@ -238,6 +238,12 @@ func _run() -> void:
 	elif mode == "compass":
 		if await _compass_test():
 			return
+	elif mode == "daynight":
+		if await _daynight_test():
+			return
+	elif mode == "sinkhole":
+		if await _sinkhole_test():
+			return
 	elif mode == "saves":
 		if await _saves_test():
 			return   # the scene reloaded: the next phase runs in a fresh test node
@@ -1363,10 +1369,10 @@ func _forest_test() -> bool:
 		await shot("fo_04_quest_tracker")
 		check("warren_locked_before", not w.door.is_open())
 		var killed := 0
-		for c in [Vector3(0, 0, 40), Vector3(0, 0, -30), Vector3(-58, 0, -42)]:
+		for c in [Vector3(0, 0, 40), Vector3(0, 0, -30), Vector3(-58, 0, -42), Vector3(60, 0, -50)]:
 			killed += _kill_near(Enemy.TYPES.keys(), 30.0, w.ground(c.x, c.z))
 			await wait(0.6)
-		check("goblin_hunt_ready", Game.quest_state("goblin_trouble") == "ready", "%d killed, %d/6" % [killed, Game.quest_progress("goblin_trouble")])
+		check("goblin_hunt_ready", Game.quest_state("goblin_trouble") == "ready", "%d killed, %d/10" % [killed, Game.quest_progress("goblin_trouble")])
 		var lvl0 := Game.level; var g0 := Game.gold; var inv0 := Game.inventory.size()
 		await _talk("fenn")
 		main.menus._dlg_buttons.get_child(0).pressed.emit()
@@ -1896,4 +1902,165 @@ func _compass_test() -> bool:
 	check("auto_picks_next", Game.current_quest() in ["goblin_trouble", "strongbox"])
 	Game.save_slot()
 	check("tracked_saved", String(Game.read_slot(Game.active_slot).get("tracked_quest", "")) == Game.tracked_quest)
+	return false
+
+# --- day and night in the forest ----------------------------------------------
+func _daynight_test() -> bool:
+	var phase: int = Game.get_meta("dn_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("dn_phase", 2)
+		main.go_to_forest()
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: ForestWorld = main.world
+	check("daynight_exists", w.day_night != null)
+	check("cycle_maths", DayNight.phase_name(30.0) == "sunrise" and DayNight.phase_name(200.0) == "day"
+		and DayNight.phase_name(430.0) == "sunset" and DayNight.phase_name(600.0) == "night" and DayNight.phase_name(845.0) == "sunrise")
+	check("seven_minute_blocks", is_equal_approx(DayNight.daylight(400.0), 1.0) and is_equal_approx(DayNight.daylight(420.0 + 90.0), 0.0)
+		and DayNight.daylight(420.0 + 45.0) > 0.3 and DayNight.daylight(420.0 + 45.0) < 0.7)
+	player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = -0.05; player.yaw = 0.0; player.snap_view()
+	var energies := {}
+	for t in [[200.0, "day"], [420.0 + 50.0, "sunset"], [420.0 + 250.0, "night"], [840.0 + 40.0, "sunrise"]]:
+		Game.day_clock = t[0]
+		await wait(1.2)
+		energies[t[1]] = w.sun.light_energy if w.sun.visible else 0.0
+		await shot("dn_" + t[1])
+	check("night_is_dark", energies.night < 0.05 and w.day_night.moon.light_energy > 0.2)
+	check("day_is_bright", energies.day > 1.0)
+	var c0 := Game.day_clock
+	await wait(2.0)
+	check("clock_runs", Game.day_clock > c0 + 1.0)
+	Game.save_slot()
+	check("clock_saved", absf(float(Game.read_slot(Game.active_slot).get("day_clock", -1.0)) - Game.day_clock) < 5.0)
+	return false
+
+# --- the Sinkhole of Death, Grimgor and the Giant Chicken ------------------------
+func _sinkhole_test() -> bool:
+	var phase: int = Game.get_meta("sk_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("sk_phase", 2)
+		main.go_to_forest()
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: ForestWorld = main.world
+	var sk: SinkholeOfDeath = w.sinkhole
+	check("sinkhole_built", sk != null and _npc("dunstan") != null)
+	check("locked_at_first", Game.quest_state("sinkhole") == "locked")
+	Game.quests["goblin_trouble"] = {"state": "done", "n": 10}
+	Game.quests_changed.emit()
+	check("unlocked_after_fenn", Game.quest_state("sinkhole") == "available")
+	await _talk("dunstan")
+	player.yaw = PI * 0.5; player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.35; player.snap_view()
+	await shot("sk_01_dunstan_dialogue")
+	main.menus._dlg_buttons.get_child(0).pressed.emit()
+	await wait(0.2)
+	main._resume()
+	check("quest_accepted", Game.quest_state("sinkhole") == "active")
+	await wait(1.0)
+	await shot("sk_02_ground_shakes")
+	var t := 0.0
+	while player.global_position.y > SinkholeOfDeath.SY + 5.0 and t < 10.0:
+		await wait(0.25); t += 0.25
+	await wait(1.6)
+	check("fell_into_sinkhole", player.global_position.y < SinkholeOfDeath.SY + 3.0 and Game.flags.get("sinkhole_open", false), str(player.global_position))
+	check("red_caverns", w.area == "sinkhole")
+	player.yaw = 0.0; player.pitch = -0.1; player.snap_view()
+	await wait(1.0)
+	await shot("sk_03_landing")
+	# the compass now points the way to Grimgor (same level) - not the surface
+	var cp: QuestCompass = main.hud.compass
+	await wait(0.6)
+	check("compass_points_to_grimgor", cp._has_target and cp._below == 0 and cp._target.distance_to(sk.cyclops.global_position) < 2.0)
+	# the lava river cavern
+	_kill_near(Enemy.TYPES.keys(), 26.0, Vector3(-32, SinkholeOfDeath.SY, -64))
+	await tp(Vector3(-32, SinkholeOfDeath.SY + 0.3, -96), 0.0)
+	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.25; player.snap_view()
+	await wait(1.5)
+	await shot("sk_04_lava_river")
+	var hp0 := Game.hp
+	god = false
+	await tp(Vector3(-46, SinkholeOfDeath.SY - 0.6, -110), 0.0)
+	await wait(1.4)
+	check("lava_burns", Game.hp < hp0, "%.0f -> %.0f" % [hp0, Game.hp])
+	god = true
+	Game.hp = Game.max_hp()
+	_kill_near(Enemy.TYPES.keys(), 40.0, Vector3(-32, SinkholeOfDeath.SY, -110))
+	await tp(Vector3(-32, SinkholeOfDeath.SY + 0.3, -146), 0.0)
+	await wait(1.0)
+	await shot("sk_05_ember_den")
+	_kill_near(Enemy.TYPES.keys(), 30.0, Vector3(-32, SinkholeOfDeath.SY, -155))
+	# Grimgor
+	await tp(Vector3(-32, SinkholeOfDeath.SY + 0.3, -190), 0.0)
+	player.yaw = 0.0; player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.08; player.snap_view()
+	await wait(2.5)
+	check("boss_awake", sk._boss_started)
+	await shot("sk_06_grimgor")
+	var cy: Enemy = sk.cyclops
+	await tp(cy.global_position + Vector3(0, 0.3, 6.0), 0.0)
+	player.yaw = 0.0; player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.15; player.snap_view()
+	cy._nova_cd = 0.0
+	await wait(0.6)
+	await shot("sk_07_stomp_warning")
+	await wait(1.0)
+	cy.take_damage(cy.max_hp * 0.6, player.global_position)
+	await wait(1.0)
+	check("grimgor_summons", get_tree().get_nodes_in_group("enemy").filter(func(e: Node) -> bool: return e.get("type_id") in ["fire_goblin", "fire_archer"] and not e.dead).size() >= 2)
+	cy.take_damage(99999.0, player.global_position)
+	await wait(3.0)
+	check("grimgor_defeated", Game.quest_state("sinkhole") == "ready" and Game.flags.get("cyclops", false))
+	check("chicken_waiting", sk._chicken != null and is_instance_valid(sk._chicken))
+	await tp(sk._chicken.global_position + Vector3(0, 0.3, 2.0), PI)
+	player.zoom_target = 4.5; player.zoom = 4.5; player.pitch = -0.2; player.yaw = 0.0; player.snap_view()
+	await wait(1.0)
+	await shot("sk_08_giant_chicken")
+	var claim: Node = sk._chicken.get_child(sk._chicken.get_child_count() - 1)
+	claim.interact(player)
+	await wait(1.0)
+	check("mount_unlocked", Game.flags.get("mount_chicken", false) and player.mounted)
+	# riding is faster than running
+	await tp(Vector3(-32, SinkholeOfDeath.SY + 0.3, -196), 0.0)
+	player.yaw = PI; player.snap_view()
+	await wait(0.4)
+	var p0 := player.global_position
+	await press("move_forward", 1.5)
+	var ride_d := player.global_position.distance_to(p0)
+	check("riding_is_fast", ride_d > 9.0, "%.1f m in 1.5 s" % ride_d)
+	await shot("sk_09_riding")
+	# dismount and mount with the key
+	await press("mount", 0.07)
+	await wait(0.3)
+	check("g_dismounts", not player.mounted)
+	await press("mount", 0.07)
+	await wait(0.3)
+	check("g_mounts", player.mounted)
+	# up the ladder and hand the quest in
+	var lad: Node = null
+	for n in get_tree().get_nodes_in_group("sinkhole_exit"):
+		lad = n
+	check("exit_ladder", lad != null)
+	lad.interact(player)
+	await wait(1.6)
+	check("back_on_surface", player.global_position.y > -20.0 and w.area == "forest", str(player.global_position))
+	await tp(sk.pit_center() + Vector3(7, 0.5, 6), PI * 0.75)
+	player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = -0.3; player.snap_view()
+	await wait(1.2)
+	await shot("sk_10_riding_by_the_pit")
+	player.dismount()
+	await _talk("dunstan")
+	main.menus._dlg_buttons.get_child(0).pressed.emit()
+	await wait(0.3)
+	main._resume()
+	check("quest_done", Game.quest_state("sinkhole") == "done")
+	Game.save_slot()
+	check("mount_saved", bool(Game.read_slot(Game.active_slot).get("flags", {}).get("mount_chicken", false)))
 	return false

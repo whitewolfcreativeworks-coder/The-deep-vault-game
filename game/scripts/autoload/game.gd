@@ -214,6 +214,7 @@ func reset_run() -> void:
 	quests = {}
 	tracked_quest = ""
 	tracked_manual = false
+	day_clock = 150.0
 	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
 	game_over = false
@@ -352,7 +353,7 @@ func _register_inputs() -> void:
 		"interact": [KEY_E], "inventory": [KEY_I], "character": [KEY_TAB],
 		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1], "mana_potion": [KEY_F, KEY_2],
 		"zoom_in_key": [KEY_EQUAL, KEY_KP_ADD], "zoom_out_key": [KEY_MINUS, KEY_KP_SUBTRACT],
-		"toggle_view": [KEY_V], "special": [KEY_X], "track_quest": [KEY_T],
+		"toggle_view": [KEY_V], "special": [KEY_X], "track_quest": [KEY_T], "mount": [KEY_G],
 	}
 	for action in keys:
 		if not InputMap.has_action(action):
@@ -431,7 +432,7 @@ func save_slot(i := -1) -> bool:
 		"checkpoint_pos": checkpoint_pos, "checkpoint_yaw": checkpoint_yaw, "checkpoint_name": checkpoint_name,
 		"objective": objective,
 		"resume_pos": resume_pos, "resume_yaw": resume_yaw,
-		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual,
+		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual, "day_clock": day_clock,
 	}
 	var f := FileAccess.open(_slot_path(i), FileAccess.WRITE)
 	if f == null:
@@ -483,6 +484,7 @@ func load_slot(i: int) -> bool:
 	quests = d.get("quests", {}).duplicate(true)
 	tracked_quest = String(d.get("tracked_quest", ""))
 	tracked_manual = bool(d.get("tracked_manual", false))
+	day_clock = float(d.get("day_clock", 150.0))
 	hp = clampf(float(d.get("hp", max_hp())), max_hp() * 0.5, max_hp())
 	mana = clampf(float(d.get("mana", max_mana())), 0.0, max_mana())
 	stamina = max_stamina()
@@ -532,17 +534,18 @@ var zone := "vault"               # "vault" (Level 1) or "forest" (Level 2: the 
 var quests := {}                  # quest id -> {"state": "active"|"ready"|"done", "n": progress}
 var tracked_quest := ""           # the quest the compass arrow points to ("" = pick one automatically)
 var tracked_manual := false       # true when the player chose it themselves
+var day_clock := 150.0            # seconds into the forest's day/night cycle (see DayNight)
 
 const ZONE_NAMES := {"vault": "The Deep Vault", "forest": "The Goblin Forest"}
-const GOBLINS := ["goblin", "goblin_archer", "goblin_brute", "goblin_chief"]
+const GOBLINS := ["goblin", "goblin_archer", "goblin_brute", "goblin_chief", "fire_goblin", "fire_archer", "magma_brute", "cyclops"]
 
 ## Quest givers and their quests (Level 2). Goals: kill (enemy types), collect (quest items), boss (enemy uid).
 const QUESTS := {
 	"goblin_trouble": {"giver": "fenn", "title": "Goblin Trouble",
-		"goal": {"type": "kill", "count": 6}, "track": "Goblins defeated",
-		"offer": "Well met, traveller! You came through the old portal? Then you're just in time.\n\nGoblins have been pouring out of the Warren and raiding the road. Thin their numbers: defeat six of them and come back to me.",
-		"busy": "Six goblins. They roam the road and the woods. Watch for the archers: they hang back and shoot.",
-		"thanks": "Six! You fight like three rangers. Take this, and go and talk to the others in the forest: they need help too. Captain Aldric guards the Warren to the north.",
+		"goal": {"type": "kill", "count": 10}, "track": "Goblins defeated",
+		"offer": "Well met, traveller! You came through the old portal? Then you're just in time.\n\nGoblins have been pouring out of the Warren and raiding the road. Thin their numbers: defeat ten of them and come back to me.",
+		"busy": "Ten goblins. They roam the road and the woods. Watch for the archers: they hang back and shoot.",
+		"thanks": "Ten! You fight like three rangers. Take this, and go and talk to the others in the forest: they need help too. Captain Aldric guards the Warren to the north.",
 		"reward": {"xp": 160, "gold": 40, "potions": 2, "roll": "weapon"}},
 	"stolen_axes": {"giver": "bram", "title": "Bram's Stolen Axes",
 		"goal": {"type": "collect", "item": "axe", "count": 3}, "track": "Axes found",
@@ -551,10 +554,10 @@ const QUESTS := {
 		"thanks": "My axes! Back where they belong. Here, this armour was my father's. It'll serve you better than it serves my wall.",
 		"reward": {"xp": 180, "gold": 50, "roll": "armor"}},
 	"moonpetals": {"giver": "maera", "title": "Moonpetals",
-		"goal": {"type": "collect", "item": "moonpetal", "count": 5}, "track": "Moonpetals gathered",
-		"offer": "Ah, a visitor. Hush now, the forest is listening.\n\nI brew my potions from moonpetals, little glowing flowers that grow in the quiet places of this forest. My knees aren't what they were. Could you gather five for me?",
+		"goal": {"type": "collect", "item": "moonpetal", "count": 7}, "track": "Moonpetals gathered",
+		"offer": "Ah, a visitor. Hush now, the forest is listening.\n\nI brew my potions from moonpetals, little glowing flowers that grow in the quiet places of this forest. My knees aren't what they were. Could you gather seven for me? Mind the goblins: they've taken to camping in my favourite spots.",
 		"busy": "Moonpetals glow blue in the shade. Look near the stream and under the big trees.",
-		"thanks": "Five perfect moonpetals. Here, take some of my brews, and a little something I've been saving.",
+		"thanks": "Seven perfect moonpetals. Here, take some of my brews, and a little something I've been saving.",
 		"reward": {"xp": 160, "gold": 30, "potions": 2, "mana_potions": 3, "roll": "skin"}},
 	"strongbox": {"giver": "tobble", "title": "The Stolen Strongbox",
 		"goal": {"type": "collect", "item": "strongbox", "count": 1}, "track": "Strongbox recovered",
@@ -569,6 +572,13 @@ const QUESTS := {
 		"busy": "Gruk is at the bottom of the Warren. He calls for help when he's hurt, so be ready.",
 		"thanks": "Gruk is beaten? The whole forest will sing about this. You have my thanks and the thanks of the realm. Here, from the garrison vault.",
 		"reward": {"xp": 450, "gold": 200, "roll": "boss"}},
+	"sinkhole": {"giver": "dunstan", "title": "The Sinkhole of Death", "requires": "goblin_trouble",
+		"goal": {"type": "boss", "uid": "cyclops", "count": 1}, "track": "Grimgor defeated",
+		"locked": "Eh? You want to help? Hah! You look like you'd faint at a goblin.\n\nGo and help Ranger Fenn by the portal first. Then come back and we'll talk about what lives under this ground.",
+		"offer": "Shh! Listen... hear that rumbling? There's a hollow under these woods, deep as a mountain is tall. My granddad called it the Sinkhole of Death.\n\nSomething's living down there. A great goblin with ONE BIG EYE: Grimgor. His fire goblins are digging up under the forest.\n\nSomebody has to go down and stop him. Are you brave enough?",
+		"busy": "Grimgor's down at the very bottom, past the lava river. Watch for his stomp: when the ground glows red around him, RUN!",
+		"thanks": "You beat Grimgor?! And you came back riding a GIANT CHICKEN! Hah! Best thing I've seen in sixty years of digging. Here, you've earned every coin.",
+		"reward": {"xp": 700, "gold": 260, "potions": 3, "roll": "boss"}},
 }
 
 func quest_state(id: String) -> String:
@@ -656,7 +666,7 @@ func quest_turn_in(id: String) -> Array:
 	save_slot()
 	return items_got
 
-const NPC_NAMES := {"fenn": "Ranger Fenn", "bram": "Bram the Woodcutter", "maera": "Old Maera", "tobble": "Tobble the Merchant", "aldric": "Captain Aldric"}
+const NPC_NAMES := {"fenn": "Ranger Fenn", "bram": "Bram the Woodcutter", "maera": "Old Maera", "tobble": "Tobble the Merchant", "aldric": "Captain Aldric", "dunstan": "Digger Dunstan"}
 
 ## Quests listed in the tracker: active and ready ones.
 func forest_objective() -> String:

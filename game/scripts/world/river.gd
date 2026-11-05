@@ -19,11 +19,16 @@ var glow := Color(0.15, 0.85, 1.0)
 var deep := Color(0.0, 0.12, 0.22)
 var damage_per_sec := 7.0
 var is_pool := false
+var lava := false              # the Sinkhole of Death: always burns, the amulet can't help
 var _pulse := 0.0
 
-static func create(parent: Node, r: Rect2, y: float, flow_dir: Vector2, glow_c := Color(0.15, 0.85, 1.0), pool := false) -> GlowRiver:
+static func create(parent: Node, r: Rect2, y: float, flow_dir: Vector2, glow_c := Color(0.15, 0.85, 1.0), pool := false, is_lava := false) -> GlowRiver:
 	var g := GlowRiver.new()
 	g.rect = r; g.surface_y = y; g.flow = flow_dir; g.glow = glow_c; g.is_pool = pool
+	if is_lava:
+		g.lava = true
+		g.deep = Color(0.35, 0.03, 0.0)
+		g.damage_per_sec = 46.0
 	parent.add_child(g)
 	g._build()
 	return g
@@ -41,6 +46,10 @@ func _build() -> void:
 	mat.shader = load("res://shaders/river.gdshader")
 	mat.set_shader_parameter("flow_dir", flow)
 	mat.set_shader_parameter("glow_color", glow)
+	if lava:
+		mat.set_shader_parameter("foam_color", Color(1.0, 0.85, 0.35))
+		mat.set_shader_parameter("flow_speed", 0.22)
+		mat.set_shader_parameter("glow_strength", 2.8 if not Game.is_compat() else 1.1)
 	mat.set_shader_parameter("deep_color", deep)
 	if is_pool:
 		mat.set_shader_parameter("flow_speed", 0.12)
@@ -125,7 +134,9 @@ func _build() -> void:
 	fog.material = fm
 	fog.position = Vector3(rect.get_center().x, surface_y + 1.0, rect.get_center().y)
 	add_child(fog)
-	if not is_pool:
+	if lava:
+		Sfx.loop_on(self, "loop_lava", -2.0, 6.0, 34.0).position = mi.position
+	elif not is_pool:
 		Sfx.loop_on(self, "loop_river", -4.0, 8.0, 40.0).position = mi.position
 
 func contains(p: Vector3) -> bool:
@@ -137,7 +148,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_splash_cd -= delta
 	var inside: bool = contains(_player.global_position) and _player.get("dead") != true
-	var protected: bool = Game.has_special("river")
+	var protected: bool = Game.has_special("river") and not lava
 	var hspeed: float = Vector2(_player.velocity.x, _player.velocity.z).length() if "velocity" in _player else 0.0
 	_ripple = lerpf(_ripple, (1.0 if inside else 0.0) * clampf(0.35 + hspeed / 5.0, 0.0, 1.2), 1.0 - exp(-4.0 * delta))
 	_corrupt = lerpf(_corrupt, 1.0 if (inside and protected) else 0.0, 1.0 - exp(-1.5 * delta))
@@ -169,4 +180,4 @@ func _physics_process(delta: float) -> void:
 		_pulse = 0.8
 		if not _warned:
 			_warned = true
-			Game.say("The glowing water burns with arcane fire!", Color(0.5, 0.85, 1.0))
+			Game.say("The lava burns! Get out!" if lava else "The glowing water burns with arcane fire!", Color(1.0, 0.5, 0.2) if lava else Color(0.5, 0.85, 1.0))

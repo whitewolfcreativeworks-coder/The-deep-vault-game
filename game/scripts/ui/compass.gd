@@ -17,6 +17,7 @@ var player: Node3D
 var _target := Vector3.ZERO
 var _has_target := false
 var _below := 0                         # -1 target is below you, 1 above, 0 same level
+var _where := ""
 var _dist := 0.0
 var _retarget := 0.0
 var _pulse := 0.0
@@ -87,8 +88,15 @@ func _find_target() -> void:
 		_target = t
 		_has_target = true
 
-func _in_warren(p: Vector3) -> bool:
-	return Game.zone == "forest" and p.y < ForestWorld.WY + 20.0
+## 0 = the forest floor, 1 = the Warren, 2 = the Sinkhole of Death (far below).
+func _level(p: Vector3) -> int:
+	if Game.zone != "forest":
+		return 0
+	if p.y < SinkholeOfDeath.SY + 30.0:
+		return 2
+	if p.y < ForestWorld.WY + 20.0:
+		return 1
+	return 0
 
 func _first(group: String, test: Callable) -> Node3D:
 	var best: Node3D = null
@@ -115,7 +123,7 @@ func quest_target(id: String) -> Variant:
 				spot = _first("quest_item", func(n: Node) -> bool: return n.get("item") == g.item and (n as Node3D).visible)
 			"kill":
 				spot = _first("enemy", func(n: Node) -> bool: return n.get("type_id") in Game.GOBLINS and not n.get("dead") \
-					and _in_warren((n as Node3D).global_position) == _in_warren(player.global_position))
+					and _level((n as Node3D).global_position) == _level(player.global_position))
 				if spot == null:
 					spot = _first("enemy", func(n: Node) -> bool: return n.get("type_id") in Game.GOBLINS and not n.get("dead"))
 			"boss":
@@ -123,18 +131,28 @@ func quest_target(id: String) -> Variant:
 	if spot == null:
 		return null
 	var at := spot.global_position
-	# different level (the Warren is dug far beneath the forest): go via the door
-	var here := _in_warren(player.global_position)
-	var there := _in_warren(at)
+	# a different level (the Warren and the Sinkhole are far beneath the forest):
+	# point the way in (the Warren door / the sinkhole pit) or the way back up
+	var here := _level(player.global_position)
+	var there := _level(at)
 	_below = 0
-	if there and not here:
+	_where = ""
+	if here == 0 and there != 0:
 		_below = -1
-		var door := _first("interactable", func(n: Node) -> bool: return n is WarrenDoor)
-		if door:
-			return door.global_position
-	elif here and not there:
+		if there == 1:
+			_where = "down in the Warren"
+			var door := _first("interactable", func(n: Node) -> bool: return n is WarrenDoor)
+			if door:
+				return door.global_position
+		else:
+			_where = "down the Sinkhole"
+			var pit := _first("sinkhole_pit", func(n: Node) -> bool: return true)
+			if pit:
+				return pit.global_position
+	elif here != 0 and there != here:
 		_below = 1
-		var out := _first("interactable", func(n: Node) -> bool: return n is ClimbOut)
+		_where = "climb out"
+		var out := _first("interactable", func(n: Node) -> bool: return n is ClimbOut and _level((n as Node3D).global_position) == here)
 		if out:
 			return out.global_position
 	return at
@@ -190,10 +208,8 @@ func _draw() -> void:
 		draw_polyline(pts, Color(0.25, 0.12, 0.0, 0.95), 2.0, true)
 		# the quest name and how far
 		var dist_txt := "here!" if near else "%d m" % int(_dist)
-		if _below == -1:
-			dist_txt += "  (down in the Warren)"
-		elif _below == 1:
-			dist_txt += "  (climb out)"
+		if _where != "":
+			dist_txt += "  (%s)" % _where
 		var line := "%s  ·  %s" % [_title, dist_txt]
 		var fs2 := 15
 		var w2 := _font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, fs2).x

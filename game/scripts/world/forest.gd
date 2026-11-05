@@ -31,6 +31,8 @@ var _multi := {}              # model name -> Array[Transform3D]
 var _trunks: StaticBody3D
 var door: Node3D
 var gruk: Enemy
+var day_night: DayNight
+var sinkhole: SinkholeOfDeath
 var boss_started := false
 
 func build() -> void:
@@ -39,7 +41,8 @@ func build() -> void:
 	detail_noise.seed = 5; detail_noise.frequency = 0.08
 	b = Builder.new(self)
 	clearings = [[Vector2(0, 92), 16.0], [Vector2(-55, 45), 16.0], [Vector2(55, 8), 13.0], [Vector2(-14, -18), 10.0],
-		[Vector2(-58, -42), 15.0], [Vector2(60, -50), 15.0], [Vector2(36, 62), 10.0], [Vector2(0, -92), 15.0]]
+		[Vector2(-58, -42), 15.0], [Vector2(60, -50), 15.0], [Vector2(36, 62), 10.0], [Vector2(0, -92), 15.0],
+		[SinkholeOfDeath.HOLE, 12.0]]
 	_environment()
 	_terrain()
 	_stream()
@@ -60,6 +63,7 @@ func build() -> void:
 	_motes()
 	_warren()
 	_quest_items()
+	sinkhole = SinkholeOfDeath.build_in(self)
 	if Game.is_compat():
 		for l in find_children("*", "Light3D", true, false):
 			if l is OmniLight3D or l is SpotLight3D:
@@ -303,13 +307,18 @@ func _environment() -> void:
 	sun.directional_shadow_max_distance = 70.0
 	sun.light_volumetric_fog_energy = 1.2
 	add_child(sun)
+	day_night = DayNight.new()
+	add_child(day_night)
+	day_night.setup(env, sun, psm, self)
 
 func _set_area(a: String) -> void:
 	if a == area:
 		return
 	area = a
 	area_changed.emit(a)
-	var under := a == "warren"
+	var under := a != "forest"
+	if day_night:
+		day_night.active = not under
 	sun.visible = not under
 	env.background_mode = Environment.BG_COLOR if under else Environment.BG_SKY
 	env.background_color = Color(0.01, 0.01, 0.015)
@@ -321,14 +330,17 @@ func _set_area(a: String) -> void:
 	env.fog_depth_end = 70.0 if under else 420.0
 	env.volumetric_fog_density = 0.025 if under else 0.004
 	env.volumetric_fog_albedo = Color(0.7, 0.65, 0.5) if under else Color(0.95, 0.95, 0.85)
+	if a == "sinkhole":
+		SinkholeOfDeath.apply_env(env)
 	if a == "forest":
 		Sfx.music("music_explore", -15.0)
 
 func _process(_delta: float) -> void:
 	if player == null:
 		return
-	player.kill_y = WY - 30.0
-	_set_area("warren" if player.global_position.y < WY + 20.0 else "forest")
+	player.kill_y = SinkholeOfDeath.SY - 30.0
+	var py := player.global_position.y
+	_set_area("sinkhole" if py < SinkholeOfDeath.SY + 30.0 else ("warren" if py < WY + 20.0 else "forest"))
 	if not boss_started and gruk and is_instance_valid(gruk) and not gruk.dead and player.global_position.y < WY + 20.0 \
 			and player.global_position.z < -168.0:
 		boss_started = true
@@ -483,7 +495,7 @@ func _goblin_camp(c: Vector2, tag: String) -> void:
 		_model(nm, ground(c.x + _rng.randf_range(-6, 6), c.y + _rng.randf_range(-6, 6)), _rng.randf() * 360.0,
 			0.6 if k < 3 else 6.0)
 	_model("tree_dead_large", ground(c.x + 10, c.y - 9), 30.0, 1.4)
-	var foes := ["goblin", "goblin", "goblin_archer", "goblin", "goblin_brute" if tag == "w" else "goblin_archer"]
+	var foes := ["goblin", "goblin", "goblin_archer", "goblin", "goblin_brute" if tag == "w" else "goblin_archer", "goblin", "goblin_archer"]
 	for k in foes.size():
 		var a3 := k * TAU / foes.size()
 		_enemy(foes[k], ground(c.x + cos(a3) * 4.0, c.y + sin(a3) * 4.0), "f_camp%s_%d" % [tag, k], a3)
@@ -624,6 +636,16 @@ func _enemy(type_name: String, pos: Vector3, uid: String, yaw: float) -> Enemy:
 
 ## Chief Gruk calls two goblins to his side when badly hurt.
 func summon_for(e: Enemy) -> void:
+	if e.type_id == "cyclops":
+		Game.say("Grimgor: \"EMBER BOYS! BURN TINY HERO!\"", Color(1.0, 0.45, 0.2))
+		for k in 3:
+			var sp := e.global_position + Vector3(-7.0 + k * 7.0, 0.2, 5.0)
+			FX.burst(sp + Vector3(0, 1, 0), Color(1.0, 0.45, 0.1), 30, 3.0, 0.3, 0.8, 0.5)
+			var fg := Enemy.new()
+			fg.configure("fire_goblin" if k != 1 else "fire_archer", "", 0.0)
+			fg.position = sp
+			add_child(fg)
+		return
 	Game.say("Gruk: \"BOYS! Get 'em!\"", Color(1.0, 0.5, 0.3))
 	for k in 2:
 		var p := e.global_position + Vector3(-5.0 + k * 10.0, 0.2, 4.0)
@@ -640,9 +662,20 @@ func _quest_items() -> void:
 	QuestItem.create(self, "axe", "qi_axe_o", ground(39, 65))
 	# Maera's moonpetals: shady spots near the stream and under big trees
 	var k := 0
-	for p in [Vector2(30, 22), Vector2(78, 18), Vector2(70, -14), Vector2(-28, 10), Vector2(-80, 26), Vector2(20, -6)]:
+	for p in [Vector2(30, 22), Vector2(78, 18), Vector2(70, -14), Vector2(-28, 10), Vector2(-80, 26), Vector2(20, -6),
+			Vector2(-44, -18), Vector2(86, -30), Vector2(-70, 60)]:
 		QuestItem.create(self, "moonpetal", "qi_petal_%d" % k, ground(p.x, p.y))
 		k += 1
+	# goblins have made camp by some of Maera's favourite spots
+	var gk := 0
+	for g in [[Vector2(78, 18), ["goblin", "goblin_archer"]], [Vector2(-80, 26), ["goblin", "goblin"]],
+			[Vector2(-44, -18), ["goblin_archer", "goblin", "goblin"]], [Vector2(86, -30), ["goblin_brute"]], [Vector2(-70, 60), ["goblin", "goblin_archer"]]]:
+		var at: Vector2 = g[0]
+		var foes: Array = g[1]
+		for i in foes.size():
+			var a := TAU * i / foes.size()
+			_enemy(foes[i], ground(at.x + cos(a) * 3.5, at.y + sin(a) * 3.5), "f_petalguard_%d" % gk, a)
+			gk += 1
 
 # ---------------------------------------------------------------------------
 # The Goblin Warren: a dungeon dug beneath the northern ridge.

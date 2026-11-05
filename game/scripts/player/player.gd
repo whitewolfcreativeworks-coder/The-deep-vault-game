@@ -105,6 +105,7 @@ func _ready() -> void:
 	cam_yaw.global_position = global_position + Vector3(0, EYE_H, 0)
 
 func rebuild_body() -> void:
+	_headgear_hidden.clear()
 	var p := Game.profile
 	var weapon := Game.item(Game.equipped.weapon)
 	var armor := Game.item(Game.equipped.armor)
@@ -128,6 +129,52 @@ func rebuild_body() -> void:
 	body.setup(cfg)
 	body.set_head_visible(not _head_hidden)
 	_equipped_sig = _equip_signature()
+	if mounted:
+		_ride_pose(true)
+
+# --- the Giant Chicken mount --------------------------------------------------------
+const MOUNT_SPEED := 1.75       # riding is this much faster than running on foot
+var mounted := false
+var mount: ChickenMount
+
+func has_mount() -> bool:
+	return bool(Game.flags.get("mount_chicken", false))
+
+func toggle_mount() -> void:
+	if mounted:
+		dismount()
+	elif has_mount() and not dead:
+		mount_up()
+
+func mount_up() -> void:
+	if mounted or dead:
+		return
+	mounted = true
+	mount = ChickenMount.new()
+	mount.riding = true
+	add_child(mount)
+	mount.rotation.y = facing
+	mount.bawk()
+	FX.burst(global_position + Vector3(0, 0.8, 0), Color(1.0, 0.95, 0.85), 40, 4.0, 0.2, 0.9, -2.0)
+	attacking = false; blocking = false; casting = false
+	_ride_pose(true)
+
+func dismount() -> void:
+	if not mounted:
+		return
+	mounted = false
+	if mount and is_instance_valid(mount):
+		FX.burst(mount.global_position + Vector3(0, 1.0, 0), Color(1.0, 0.95, 0.85), 30, 3.0, 0.16, 0.8, -3.0)
+		Sfx.play("cluck", -6.0, 0.1)
+		mount.queue_free()
+	mount = null
+	_ride_pose(false)
+
+func _ride_pose(on: bool) -> void:
+	if body == null:
+		return
+	body.hold_clip = "Sit_Chair_Idle" if on else ""
+	body.position.y = (ChickenMount.SEAT_H - 0.46) if on else 0.0
 
 ## Looks chosen in the character creator (shared with the creator preview).
 static func _apply_profile_looks(cfg: Dictionary) -> void:
@@ -333,7 +380,7 @@ func _physics_process(delta: float) -> void:
 				_jump_buffer = 0.0
 				return
 			if _coyote > 0.0:
-				velocity.y = JUMP_V   # jumping never needs stamina: it must always get you out of trouble
+				velocity.y = JUMP_V * (1.25 if mounted else 1.0)   # jumping never needs stamina: it must always get you out of trouble
 				Game.stamina = maxf(0.0, Game.stamina - 6.0)
 				_coyote = 0.0
 				_jump_buffer = 0.0
@@ -342,6 +389,8 @@ func _physics_process(delta: float) -> void:
 				_double_jump()
 	var sprinting := input_enabled and Input.is_action_pressed("sprint") and dir.length() > 0.1 and Game.stamina > 1 and not blocking
 	var speed := SPRINT if sprinting else WALK
+	if mounted:
+		speed *= MOUNT_SPEED
 	if blocking:
 		speed *= 0.45
 	if attacking:
@@ -390,6 +439,10 @@ func _physics_process(delta: float) -> void:
 	body.rotation.y = facing
 	if special_kind == "whirl":
 		body.rotation.y = facing + _special_t / 0.75 * TAU * 2.0
+	if mounted and mount:
+		mount.rotation.y = facing
+		mount.speed = hspeed
+		mount.airborne = not is_on_floor()
 
 	# animation inputs
 	body.move_speed = hspeed
@@ -462,6 +515,12 @@ func _handle_actions() -> void:
 	if not mouse_captured:
 		blocking = false
 		return
+	if Input.is_action_just_pressed("mount"):
+		toggle_mount()
+	# any fighting move hops you off the chicken first
+	if mounted and (Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("block") or Input.is_action_just_pressed("dodge")
+			or Input.is_action_just_pressed("spell") or Input.is_action_just_pressed("special")):
+		dismount()
 	if Input.is_action_just_pressed("attack") and not dodging and not casting:
 		if not attacking:
 			if Game.stamina >= 6:
@@ -699,6 +758,7 @@ func die() -> void:
 	Game.player_died.emit()
 
 func respawn_at(pos: Vector3, yaw_r: float) -> void:
+	dismount()
 	dead = false
 	global_position = pos
 	velocity = Vector3.ZERO
@@ -793,6 +853,24 @@ func _mantle_step(delta: float) -> void:
 		velocity = Vector3.ZERO
 
 ## Jump the camera to where it should be (after teleports / respawn).
+## Hats and helmets vanish while the camera is right behind the head, so they
+## never block the view (they come back as soon as you zoom out).
+var _headgear_hidden: Array = []
+func _fade_headgear(hide: bool) -> void:
+	if hide == (not _headgear_hidden.is_empty()):
+		return
+	if hide:
+		for m in body.find_children("*", "MeshInstance3D", true, false):
+			var nm := String(m.name)
+			if (nm.contains("Hat") or nm.contains("Helmet")) and (m as MeshInstance3D).visible:
+				(m as MeshInstance3D).visible = false
+				_headgear_hidden.append(m)
+	else:
+		for m in _headgear_hidden:
+			if is_instance_valid(m):
+				(m as MeshInstance3D).visible = true
+		_headgear_hidden.clear()
+
 func snap_view() -> void:
 	reset_physics_interpolation()
 	view_yaw = yaw; view_pitch = pitch
@@ -820,7 +898,7 @@ func _update_camera(delta: float) -> void:
 		pitch = lerpf(pitch, -0.18, 1.0 - exp(-0.9 * delta))
 	# --- follow the interpolated body position
 	var base := get_global_transform_interpolated().origin
-	var head_pos := base + Vector3(0, EYE_H * float(Game.profile.get("height", 1.0)), 0)
+	var head_pos := base + Vector3(0, EYE_H * float(Game.profile.get("height", 1.0)) + ((ChickenMount.SEAT_H - 0.46) if mounted else 0.0), 0)
 	if body.dead:
 		head_pos = base + Vector3(0, 0.6, 0)
 	if fp:
@@ -843,8 +921,13 @@ func _update_camera(delta: float) -> void:
 	cam_pitch.rotation = Vector3(clampf(view_pitch - high_t() * 0.55 - (_crane if zoom > FP_THRESHOLD else 0.0), -1.3, PITCH_MAX), 0, 0)
 	# --- shoulder offset shrinks when the camera is squeezed by walls
 	var squeeze := clampf(cam_len / maxf(zoom, 0.01), 0.0, 1.0)
-	var shoulder := clampf((zoom - 0.6) / 3.0, 0.0, 1.0) * 0.38 * clampf(1.0 - (zoom - 4.0) / 5.0, 0.3, 1.0) * squeeze
-	var lift := clampf((zoom - 0.5) * 0.12, 0.0, 0.55)
+	# close in, the camera moves further over the right shoulder (and a little up)
+	# so the head, hair and hats don't fill the middle of the screen
+	var ramp := clampf((zoom - 0.6) / 0.8, 0.0, 1.0)
+	var near := 1.0 - clampf((zoom - 1.0) / 2.5, 0.0, 1.0)
+	var shoulder := ramp * lerpf(0.38 * clampf(1.0 - (zoom - 4.0) / 5.0, 0.3, 1.0), 0.62, near) * squeeze
+	var lift := clampf((zoom - 0.5) * 0.12, 0.0, 0.55) + 0.2 * near * ramp
+	_fade_headgear(not fp and cam_len < 1.9)
 	# when a wall behind squeezes the camera in, rise up over the shoulder so you
 	# look down at your hero instead of into the back of their helmet
 	if not fp:
