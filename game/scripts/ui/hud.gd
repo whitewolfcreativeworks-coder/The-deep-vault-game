@@ -16,6 +16,7 @@ var objective_label: Label
 var prompt_label: Label
 var msg_box: VBoxContainer
 var quest_box: VBoxContainer
+var status: PanelContainer
 var compass: QuestCompass
 var _quest_rows := {}            # quest id -> the row Control (for taps)
 
@@ -92,7 +93,7 @@ func _ready() -> void:
 	root.add_child(vignette)
 
 	# --- status block (top-left)
-	var status := PanelContainer.new()
+	status = PanelContainer.new()
 	status.add_theme_stylebox_override("panel", UIKit.panel_style(0.62))
 	status.position = Vector2(20, 18)
 	root.add_child(status)
@@ -265,6 +266,8 @@ func _process(delta: float) -> void:
 	xp_bar.max_value = Game.xp_to_next(); xp_bar.value = Game.xp
 	if quest_box:
 		quest_box.position.x = 104.0 if Game.touch_active else 22.0
+		status.reset_size()
+		quest_box.position.y = maxf(198.0, status.position.y + status.size.y + 14.0)
 	if compass:
 		var vw := root.size.x
 		compass.position = Vector2(vw - compass.size.x - (6.0 if Game.touch_active else 14.0), 104.0 if Game.touch_active else 8.0)

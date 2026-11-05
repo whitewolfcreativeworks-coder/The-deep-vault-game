@@ -306,7 +306,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state == "title":
 		return
 	if event.is_action_pressed("pause"):
-		if menus.current in ["pause", "inventory", "lore"]:
+		if menus.current == "designer":
+			menus.designer.close(false)      # Esc steps back out of the Skin Designer
+		elif menus.current in ["pause", "inventory", "lore"]:
 			_resume()
 		elif menus.current == "" and state == "play":
 			_open("pause")
