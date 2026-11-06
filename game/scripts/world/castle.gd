@@ -492,7 +492,7 @@ func _castle() -> void:
 		var bar := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(0.18, 8.5, 0.18)
 		bar.mesh = bm; bar.material_override = iron; bar.position = Vector3(-3.6 + k * 0.9, 4.25, 0); portcullis.add_child(bar)
 	for k in 4:
-		var bar2 := MeshInstance3D.new(); var bm2 := BoxMesh.new(); bm2.size = Vector3(8.0, 0.18, 0.18)
+		var bar2 := MeshInstance3D.new(); var bm2 := BoxMesh.new(); bm2.size = Vector3(7.7, 0.16, 0.24)
 		bar2.mesh = bm2; bar2.material_override = iron; bar2.position = Vector3(0, 1.0 + k * 2.2, 0); portcullis.add_child(bar2)
 	var psb := StaticBody3D.new(); psb.collision_layer = 1
 	var pcs := CollisionShape3D.new(); var pbs := BoxShape3D.new(); pbs.size = Vector3(8.0, 8.5, 1.0)
