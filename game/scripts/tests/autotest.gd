@@ -2194,6 +2194,23 @@ func _castle_test() -> bool:
 	_kill_near(Enemy.TYPES.keys(), 60.0, Vector3(-62, CastleWorld.CY, -10))
 	await _look(Vector3(-62, CastleWorld.CY + 1.0, -22), Vector3(-62, CastleWorld.CY + 0.3, -6), 4.0, -0.1)
 	await shot("ck_07_crypt")
+	# the way back up: the crypt stairs (not the graveyard door right above)
+	for z in [21.0, 12.0]:
+		await tp(Vector3(-62, CastleWorld.CY + 0.3, z), PI)
+		await wait(0.4)
+		var it = player.interact_target
+		check("crypt_exit_target_z%d" % int(z), it is Passage and (it as Passage).dest.y > CastleWorld.CY + 20.0 or (z == 12.0 and it == null),
+			str(it.get_prompt()) if it else "none")
+	await tp(Vector3(-62, CastleWorld.CY + 0.3, 21.5), PI)
+	await wait(0.4)
+	player.interact_target.interact(player)
+	await wait(1.6)
+	check("climbed_out_of_crypt", player.global_position.y > CastleWorld.CY + 40.0 and w.area == "castle", str(player.global_position))
+	await wait(1.0)
+	check("stays_out", player.global_position.y > CastleWorld.CY + 40.0)
+	var el2 := _npc("elowen")
+	await _look(el2.global_position + Vector3(0, 4, 0), el2.global_position + Vector3(10, 0.3, 22), 6.0, 0.0)
+	await shot("ck_07b_thin_beams")
 	await _look(w.ground(62, 10) + Vector3(0, 1, 0), w.ground(62, 34) + Vector3(0, 0.3, 0), 5.0, -0.15)
 	await shot("ck_08_chapel")
 	# beacons -> gatehouse warden -> gate opens

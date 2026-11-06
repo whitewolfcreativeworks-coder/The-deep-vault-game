@@ -345,12 +345,12 @@ func _graveyard() -> void:
 		_lamp(ground(p.x, p.y), Color(0.55, 0.85, 0.7))
 	# the crypt: stairs down below the graveyard
 	var cd := ground(CRYPT_DOOR.x, CRYPT_DOOR.y)
-	_hw("crypt", cd, 0.0, 2.2, true)
-	for sx in [-2.6, 2.6]:
-		_hw("candle_triple", cd + Vector3(sx, 0, 3.4), 0.0, 1.5)
+	_hw("crypt", cd, 0.0, 1.0, true)          # 6 x 8 m, its door faces the village side (+z)
+	for sx in [-2.2, 2.2]:
+		_hw("candle_triple", cd + Vector3(sx, 0, 5.0), 0.0, 1.5)
 	var cl := OmniLight3D.new(); cl.light_color = Color(0.5, 0.75, 1.0); cl.light_energy = 2.0; cl.omni_range = 8.0
-	cl.position = cd + Vector3(0, 2.0, 3.5); add_child(cl)
-	Passage.make(self, cd + Vector3(0, 0, 3.6), Vector3(-62, CY + 0.1, 18), 0.0, "Go down into the crypt", "The Crypt")
+	cl.position = cd + Vector3(0, 2.0, 5.0); add_child(cl)
+	Passage.make(self, cd + Vector3(0, 0, 4.9), Vector3(-62, CY + 0.1, 18), 0.0, "Go down into the crypt", "The Crypt")
 	# lockets glinting between the graves
 	var k2 := 0
 	for p in [Vector2(-70, 12), Vector2(-54, 18), Vector2(-66, 30), Vector2(-50, 32), Vector2(-74, 24)]:
@@ -533,7 +533,7 @@ func _crypt() -> void:
 	var gl := OmniLight3D.new(); gl.light_color = Color(0.45, 0.65, 1.0); gl.light_energy = 2.0; gl.omni_range = 22.0
 	gl.position = Vector3(-62, Y + 6.0, -21); add_child(gl)
 	Interactable.create(self, "shrine", Vector3(-66, Y, 21), 0.0, "", [], "the Crypt Stairs")
-	Passage.make(self, Vector3(-62, Y, 22.5), ground(CRYPT_DOOR.x, CRYPT_DOOR.y + 6.0) + Vector3(0, 0.2, 0), 0.0,
+	Passage.make(self, Vector3(-62, Y, 22.5), ground(CRYPT_DOOR.x, CRYPT_DOOR.y + 7.5) + Vector3(0, 0.3, 0), PI,
 		"Climb the stairs back to the graveyard", "The Graveyard")
 	# holy water: one in the coffin hall, one by the far pillars, one in the side vault
 	QuestItem.create(self, "holywater", "qi_holy_0", Vector3(-62, Y, -12))

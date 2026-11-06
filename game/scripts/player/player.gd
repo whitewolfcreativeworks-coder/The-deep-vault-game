@@ -852,6 +852,8 @@ func _update_interact() -> void:
 		if n.has_method("can_interact") and not n.can_interact():
 			continue
 		var to: Vector3 = n.global_position - global_position
+		if absf(to.y) > 3.5:
+			continue      # on another floor (e.g. the graveyard door right above the crypt)
 		to.y = 0
 		var d := to.length()
 		var bonus := 0.0 if d < 0.01 else fwd.dot(to / d) * 0.6

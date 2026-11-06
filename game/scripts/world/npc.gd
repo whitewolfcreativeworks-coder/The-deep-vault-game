@@ -83,8 +83,8 @@ func _build(look: Dictionary) -> void:
 ## who you report back to). It glows brightest when the quest is ready to hand in.
 func _build_beam() -> void:
 	_beam = MeshInstance3D.new()
-	var cm := CylinderMesh.new(); cm.top_radius = 0.55; cm.bottom_radius = 0.75; cm.height = 60.0
-	cm.radial_segments = 16; cm.cap_top = false; cm.cap_bottom = false
+	var cm := CylinderMesh.new(); cm.top_radius = 0.07; cm.bottom_radius = 0.1; cm.height = 14.0
+	cm.radial_segments = 8; cm.cap_top = false; cm.cap_bottom = false
 	_beam.mesh = cm
 	_beam_mat = StandardMaterial3D.new()
 	_beam_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -94,19 +94,19 @@ func _build_beam() -> void:
 	_beam_mat.disable_receive_shadows = true
 	_beam.material_override = _beam_mat
 	_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_beam.position.y = 32.0
+	_beam.position.y = 3.2 + 7.0
 	add_child(_beam)
 	_beam_core = MeshInstance3D.new()
-	var cc := CylinderMesh.new(); cc.top_radius = 0.12; cc.bottom_radius = 0.18; cc.height = 60.0
+	var cc := CylinderMesh.new(); cc.top_radius = 0.025; cc.bottom_radius = 0.035; cc.height = 14.0
 	cc.radial_segments = 8; cc.cap_top = false; cc.cap_bottom = false
 	_beam_core.mesh = cc; _beam_core.material_override = _beam_mat
 	_beam_core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_beam_core.position.y = 32.0
+	_beam_core.position.y = 3.2 + 7.0
 	add_child(_beam_core)
-	_beam_motes = CPUParticles3D.new(); _beam_motes.amount = 24; _beam_motes.lifetime = 3.0
-	_beam_motes.mesh = FX.quad(0.14); _beam_motes.material_override = FX.glow_material(Color(1, 1, 1), 2.0)
-	_beam_motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; _beam_motes.emission_sphere_radius = 0.6
-	_beam_motes.direction = Vector3.UP; _beam_motes.spread = 5; _beam_motes.initial_velocity_min = 3.0; _beam_motes.initial_velocity_max = 6.0
+	_beam_motes = CPUParticles3D.new(); _beam_motes.amount = 10; _beam_motes.lifetime = 2.0
+	_beam_motes.mesh = FX.quad(0.08); _beam_motes.material_override = FX.glow_material(Color(1, 1, 1), 2.0)
+	_beam_motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; _beam_motes.emission_sphere_radius = 0.12
+	_beam_motes.direction = Vector3.UP; _beam_motes.spread = 5; _beam_motes.initial_velocity_min = 2.0; _beam_motes.initial_velocity_max = 4.0
 	_beam_motes.gravity = Vector3.ZERO; _beam_motes.position.y = 3.2
 	add_child(_beam_motes)
 
@@ -142,10 +142,12 @@ func _process(delta: float) -> void:
 		# brighter when the quest is ready; softer when you're standing right next to it
 		var ready := Game.quest_state(quest) == "ready"
 		var pulse := 0.75 + 0.25 * sin(_t * (4.0 if ready else 1.6))
-		var a := (0.32 if ready else 0.2) * pulse
+		var a := (0.75 if ready else 0.6) * pulse
 		var pl := get_tree().get_first_node_in_group("player") as Node3D
 		if pl:
-			a *= clampf(pl.global_position.distance_to(global_position) / 9.0, 0.25, 1.0)
+			# softer right next to them; fades out far away (the compass covers that)
+			var d := pl.global_position.distance_to(global_position)
+			a *= clampf(d / 6.0, 0.35, 1.0) * clampf((90.0 - d) / 30.0, 0.0, 1.0)
 		_beam_mat.albedo_color = Color(_beam_col.r, _beam_col.g, _beam_col.b, a)
 	# turn to face the player when they come close, back to the post otherwise
 	var p := get_tree().get_first_node_in_group("player") as Node3D
