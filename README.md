@@ -1,5 +1,7 @@
 # Bobek's Adventure
 
+*Started by Jason Whitewolf as a test of what open-source tools and an AI developer can build together, and named after an old gaming buddy, Bobek. Since Nov 4 the design decisions are made by Jason's son, with his dad's help.*
+
 *(Project 001, "The Deep Vault")*
 
 A small, atmospheric 3D fantasy dungeon crawler built with **Godot 4.5** during an overnight autonomous-development experiment (Project 001).
@@ -100,7 +102,7 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - **The valley:** hills, a road with lantern posts, a stream with a stone bridge, about 650 trees (green and autumn), and mountains all around.
   - **The Warren:** its beacon fire burns on the northern ridge, in view straight up the road from the portal.
   - **Compass with a quest arrow.** The compass in the top-right corner turns as you look around (N is red; north is the road to the Warren). While you're on a quest, a gold arrow on its outer ring points the way, with the quest name and distance underneath. It points to the nearest goblin, axe or moonpetal, to Chief Gruk, to the Warren door when your target is underground, and to the quest giver once the quest is ready to hand in. Tap a quest in the list (or the compass, or press **T**) to choose which one to follow. A new quest is followed straight away, and when one is finished the compass picks the next sensible one by itself.
-  - **The Sinkhole of Death (new, designed by Bobek).** Digger Dunstan waits by a patch of cracked, smoking ground in the north-west woods (unlocks after Ranger Fenn's quest).
+  - **The Sinkhole of Death (new, designed by Jason's son).** Digger Dunstan waits by a patch of cracked, smoking ground in the north-west woods (unlocks after Ranger Fenn's quest).
     - Accept his quest and the ground caves in under you. You fall into red, fiery caverns far below the forest.
     - Inside: Ember Goblins, Cinder Slingers and Magma Brutes, a river of lava with a stone bridge and fire geysers, and a den with a treasure chest.
     - At the bottom is **Grimgor the Cyclops Goblin**: huge, one giant glowing eye, and a stomp that rings the floor red before a wave of fire bursts out. Get clear when you see the ring!

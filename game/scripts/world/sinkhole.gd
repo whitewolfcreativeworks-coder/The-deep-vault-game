@@ -1,6 +1,6 @@
 extends Node3D
 class_name SinkholeOfDeath
-## THE SINKHOLE OF DEATH (Bobek's design): the Goblin Forest's second dungeon.
+## THE SINKHOLE OF DEATH (designed by Jason's son): the Goblin Forest's second dungeon.
 ## Digger Dunstan stands by a patch of cracked, smoking ground in the north-west
 ## woods. Accept his quest and the ground gives way under your feet: you fall
 ## into red, fiery caverns far below. Fight through the Ember Goblins, cross the

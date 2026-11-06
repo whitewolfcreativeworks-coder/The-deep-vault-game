@@ -1,6 +1,6 @@
 extends Node3D
 class_name ChickenMount
-## The Giant Chicken: Bobek's first mount (the reward for beating the Cyclops
+## The Giant Chicken: the first mount (the reward for beating the Cyclops
 ## Goblin in the Sinkhole of Death). Built from simple shapes so it can be as
 ## silly as it likes: googly eyes, a wobbly red comb, a bobbing head, scurrying
 ## legs and flapping wings. Faces -Z like every character.

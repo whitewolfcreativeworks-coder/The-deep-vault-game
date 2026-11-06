@@ -427,7 +427,7 @@ It also found two stale tests that still looked buttons up by list position. But
 - It has no teapot or teacup, hence the lathe-built ones.
 - See the README for the libraries worth using if those sites become reachable (or if files are attached).
 
-## Follow-up 11: playtest notes from Bobek (age 11) (Nov 4)
+## Follow-up 11: playtest notes from the designer's son (Nov 4)
 
 **Notes:**
 - The quests and goblins were too easy.

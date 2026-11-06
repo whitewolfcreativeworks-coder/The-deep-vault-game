@@ -1,6 +1,6 @@
 extends Node3D
 class_name MopedMount
-## The Moped: Bobek's second mount, the reward for beating the Ghost Lord of
+## The Moped: the second mount, the reward for beating the Ghost Lord of
 ## Castle Morwen. A little cherry-red scooter built from simple shapes, with a
 ## headlight that lights up the moors, spinning wheels, puffs of exhaust and a
 ## putt-putt engine. Faster than the Giant Chicken. Faces -Z like everything.
