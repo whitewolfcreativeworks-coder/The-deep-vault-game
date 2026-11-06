@@ -75,6 +75,27 @@ const TYPES := {
 		"scale": 2.2, "aggro": 22.0, "poise": 140.0, "gold": [200, 320], "heavy": true, "leash": 40.0, "nova": true, "summon": true, "armor_drop": 1.0,
 		"skin": Color(0.75, 0.85, 1.0),
 		"look": {"hero": "Knight", "hat": true, "hair_style": "natural", "hair_color": Color(0.6, 0.7, 0.9), "face": "none", "outfit": Color(0.25, 0.25, 0.45), "build": 1.35, "skin_look": "spectral"}},
+	# --- Level 4: Cloud Island. "creature" = a shape-built look (CreatureLook);
+	# "fly" = hovers this high above the ground / the player.
+	"thunder_bird": {"name": "Thunder Bird", "variant": "minion", "creature": "bird", "hp": 340.0, "dmg": 40.0, "speed": 5.4, "range": 2.4,
+		"windup": 0.5, "cooldown": 1.3, "xp": 230, "weapon": "", "shield": "", "eye": Color(1.0, 0.9, 0.3),
+		"scale": 0.9, "aggro": 20.0, "poise": 20.0, "gold": [18, 34], "leash": 36.0, "fly": 2.6},
+	"storm_sprite": {"name": "Storm Sprite", "variant": "minion", "creature": "sprite", "hp": 260.0, "dmg": 36.0, "speed": 3.6, "range": 16.0,
+		"windup": 0.55, "cooldown": 1.6, "xp": 210, "weapon": "", "shield": "", "eye": Color(1.0, 0.95, 0.35),
+		"scale": 0.85, "aggro": 19.0, "poise": 0.0, "gold": [16, 30], "ranged": true, "leash": 30.0, "fly": 1.8},
+	"storm_bat": {"name": "Storm Bat", "variant": "minion", "creature": "bat", "hp": 290.0, "dmg": 38.0, "speed": 6.2, "range": 2.2,
+		"windup": 0.4, "cooldown": 1.1, "xp": 220, "weapon": "", "shield": "", "eye": Color(0.9, 0.3, 0.9),
+		"scale": 0.85, "aggro": 18.0, "poise": 10.0, "gold": [16, 30], "leash": 32.0, "fly": 1.6},
+	"bubble_mimic": {"name": "Bubble Mimic", "variant": "minion", "creature": "mimic", "hp": 430.0, "dmg": 46.0, "speed": 3.2, "range": 2.2,
+		"windup": 0.6, "cooldown": 1.4, "xp": 240, "weapon": "", "shield": "", "eye": Color(0.8, 0.5, 1.0),
+		"scale": 0.9, "aggro": 9.0, "poise": 30.0, "gold": [20, 40], "leash": 20.0},
+	"hail_golem": {"name": "The Hail Golem", "variant": "warrior", "creature": "golem", "hp": 5200.0, "dmg": 58.0, "speed": 2.8, "range": 3.6,
+		"windup": 0.85, "cooldown": 1.5, "xp": 1600, "weapon": "", "shield": "", "eye": Color(0.6, 0.85, 1.0),
+		"scale": 2.0, "aggro": 20.0, "poise": 160.0, "gold": [200, 300], "heavy": true, "leash": 30.0, "nova": true},
+	"mr_bubbles": {"name": "Mr. Bubbles", "variant": "warrior", "creature": "bear", "hp": 9000.0, "dmg": 62.0, "speed": 3.8, "range": 3.6,
+		"windup": 0.8, "cooldown": 1.3, "xp": 3000, "weapon": "", "shield": "", "eye": Color(1.0, 0.92, 0.3),
+		"scale": 2.0, "aggro": 26.0, "poise": 220.0, "gold": [400, 600], "heavy": true, "leash": 40.0, "nova": true, "summon": true,
+		"fly": 0.4, "dive": true},
 }
 const GOBLIN_SKIN := Color(0.42, 0.62, 0.24)
 
@@ -138,6 +159,8 @@ func _ready() -> void:
 			"skin": t.get("skin_look", "")})
 	if t.has("look") and t.look.get("cyclops", false):
 		_cyclops_eye.call_deferred()
+	if t.has("creature"):
+		_creature.call_deferred()
 	if t.get("skin_look", t.get("look", {}).get("skin_look", "")) == "spectral":
 		_spectral.call_deferred()
 	leash = t.get("leash", leash)
@@ -151,6 +174,74 @@ func _ready() -> void:
 		body.visible = false
 		cs.disabled = true
 		set_physics_process(true)
+
+## Flyers hover above the ground (or the player, when chasing) and swoop down
+## to strike. Mr. Bubbles also does a storm dive: up into the clouds, a shadow
+## marks the spot, then CRASH.
+var _dive_t := 0.0
+var _dive_phase := 0
+var _dive_at := Vector3.ZERO
+var _dive_mark: Node3D
+func _fly(delta: float, pdead: bool) -> void:
+	var h: float = t.fly
+	var base_y := home.y
+	var engaged := state in [S.CHASE, S.WINDUP, S.STRIKE, S.RECOVER] and not pdead
+	if engaged:
+		base_y = player.global_position.y
+	var want_y := base_y + h
+	if state == S.STRIKE or (state == S.WINDUP and state_time > t.windup * 0.5):
+		want_y = base_y + 0.6           # swoop
+	if t.get("dive", false) and engaged:
+		_dive_t += delta
+		match _dive_phase:
+			0:
+				if _dive_t > 11.0:
+					_dive_phase = 1; _dive_t = 0.0
+					Game.say("Mr. Bubbles flies up into the storm...", Color(1.0, 0.9, 0.4))
+			1:
+				want_y = base_y + 15.0
+				velocity.x *= 0.9; velocity.z *= 0.9
+				if _dive_t > 1.8:
+					_dive_phase = 2; _dive_t = 0.0
+					_dive_at = player.global_position
+					_dive_mark = MeshInstance3D.new()
+					var cm := CylinderMesh.new(); cm.top_radius = 5.0; cm.bottom_radius = 5.0; cm.height = 0.03
+					(_dive_mark as MeshInstance3D).mesh = cm
+					var dm := FX.glow_material(Color(1.0, 0.85, 0.2), 0.8); dm.albedo_color.a = 0.4
+					(_dive_mark as MeshInstance3D).material_override = dm
+					get_tree().current_scene.add_child(_dive_mark)
+					_dive_mark.global_position = _dive_at + Vector3(0, 0.08, 0)
+			2:
+				want_y = base_y + 15.0
+				global_position.x = lerpf(global_position.x, _dive_at.x, 1.0 - exp(-3.0 * delta))
+				global_position.z = lerpf(global_position.z, _dive_at.z, 1.0 - exp(-3.0 * delta))
+				velocity.x = 0; velocity.z = 0
+				if _dive_t > 1.3:
+					_dive_phase = 3; _dive_t = 0.0
+			3:
+				velocity = Vector3(0, -34.0, 0)
+				if is_on_floor() or global_position.y < _dive_at.y + 0.6 or _dive_t > 1.5:
+					_dive_phase = 0; _dive_t = 0.0
+					if _dive_mark and is_instance_valid(_dive_mark):
+						_dive_mark.queue_free()
+					FX.shockwave(global_position + Vector3(0, 0.2, 0), Color(1.0, 0.9, 0.35), 6.0, 0.5)
+					FX.burst(global_position + Vector3(0, 0.5, 0), Color(1.0, 0.95, 0.5), 80, 8.0, 0.3, 0.8, -4.0)
+					Sfx.play_at("slam", global_position, 0.0, 0.05)
+					if player.has_method("add_trauma"):
+						player.add_trauma(0.6)
+					var d := Vector2(player.global_position.x - global_position.x, player.global_position.z - global_position.z).length()
+					if d < 5.0 and absf(player.global_position.y - global_position.y) < 3.0:
+						player.take_damage(t.dmg * 1.2, global_position, 9.0)
+				return
+	var ground := _ground_below()
+	want_y = maxf(want_y, ground + 0.4)
+	velocity.y = clampf((want_y - global_position.y) * 3.0, -9.0, 9.0)
+
+func _ground_below() -> float:
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 0.5, 0), global_position + Vector3(0, -30, 0), 1)
+	q.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	return hit.position.y if hit else global_position.y - 30.0
 
 var _frozen_t := 0.0
 var _blind_t := 0.0
@@ -196,6 +287,10 @@ func _go(s: S) -> void:
 
 func _physics_process(delta: float) -> void:
 	if dead:
+		if t.has("fly") and not is_on_floor():
+			velocity.y -= 22.0 * delta      # flyers tumble down when beaten
+			velocity.x *= 0.95; velocity.z *= 0.95
+			move_and_slide()
 		return
 	if player == null or not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("player")
@@ -313,7 +408,9 @@ func _physics_process(delta: float) -> void:
 	var target_v := move * spd
 	velocity.x = lerpf(velocity.x, target_v.x, 1.0 - exp(-8.0 * delta))
 	velocity.z = lerpf(velocity.z, target_v.z, 1.0 - exp(-8.0 * delta))
-	if not is_on_floor():
+	if t.has("fly"):
+		_fly(delta, pdead)
+	elif not is_on_floor():
 		velocity.y -= 22.0 * delta
 	else:
 		velocity.y = -0.5
@@ -493,6 +590,10 @@ func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) 
 func _die(away: Vector3) -> void:
 	_frozen_t = 0.0
 	_thaw()
+	if _dive_mark and is_instance_valid(_dive_mark):
+		_dive_mark.queue_free()
+	if look:
+		look.create_tween().tween_property(look, "rotation:z", PI * 0.5, 0.5).set_trans(Tween.TRANS_BOUNCE)
 	dead = true
 	_go(S.DEAD)
 	remove_from_group("enemy")
@@ -513,6 +614,18 @@ func _die(away: Vector3) -> void:
 	tw.tween_interval(3.0)
 	tw.tween_property(body, "position:y", -1.2, 1.5)
 	tw.tween_callback(queue_free)
+
+## Cloud Island creatures: hide the stand-in skeleton and show the shape-built look.
+var look: CreatureLook
+func _creature() -> void:
+	for m in body.all_meshes:
+		if is_instance_valid(m):
+			m.visible = false
+	for n in body.find_children("*", "MeshInstance3D", true, false):
+		(n as MeshInstance3D).visible = false
+	look = CreatureLook.make(String(t.creature), body.flash_mat)
+	body.add_child(look)
+	look.scale = Vector3.ONE * (t.scale / 0.9)
 
 ## Ghosts: see-through, glowing a cold blue, with a misty trail.
 func _spectral() -> void:

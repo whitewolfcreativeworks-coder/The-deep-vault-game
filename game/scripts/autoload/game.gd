@@ -633,7 +633,7 @@ var tracked_quest := ""           # the quest the compass arrow points to ("" = 
 var tracked_manual := false       # true when the player chose it themselves
 var day_clock := 150.0            # seconds into the forest's day/night cycle (see DayNight)
 
-const ZONE_NAMES := {"vault": "The Deep Vault", "forest": "The Goblin Forest", "castle": "Ghost Knight Castle"}
+const ZONE_NAMES := {"vault": "The Deep Vault", "forest": "The Goblin Forest", "castle": "Ghost Knight Castle", "cloud": "Cloud Island"}
 const GOBLINS := ["goblin", "goblin_archer", "goblin_brute", "goblin_chief", "fire_goblin", "fire_archer", "magma_brute", "cyclops"]
 
 ## Quest givers and their quests (Level 2). Goals: kill (enemy types), collect (quest items), boss (enemy uid).
@@ -734,6 +734,65 @@ const QUESTS := {
 		"busy": "The throne room is at the far end of the great hall. When he raises his sword, a ring of frost spreads out: get away from it!",
 		"thanks": "It's over! The ghosts are going home at last. The whole of Ashenford owes you everything.\n\nAnd... there's something in the old stable you should see. Pip's been fixing it up for you. It goes VROOM.",
 		"reward": {"xp": 1200, "gold": 400, "potions": 3, "roll": "boss"}},
+	# --- Level 4: Cloud Island (designed by Orion). The angels need help with
+	# Mr. Bubbles the flying bear and the flying animals his storms stir up.
+	"lost_feathers": {"giver": "ninlil", "zone": "cloud", "title": "Lost Feathers",
+		"goal": {"type": "collect", "item": "feather", "count": 6}, "track": "Feathers found",
+		"offer": "Oh! A visitor from below! I'm Ninlil, keeper of the winds.\n\nMr. Bubbles' storm tore six feathers out of my wings and blew them all over the islands. Could you find them? They glow gold on the cloud edges.",
+		"busy": "Six golden feathers, scattered over the islands. Ride the bubbles up to the higher clouds!",
+		"thanks": "My feathers! Now I can fly straight again. Here, a gift from the sky.",
+		"reward": {"xp": 900, "gold": 200, "potions": 2, "roll": "skin"}},
+	"thunder_birds": {"giver": "ninlil", "zone": "cloud", "title": "Calm the Thunder Birds",
+		"goal": {"type": "kill", "types": ["thunder_bird"], "count": 8}, "track": "Thunder birds calmed",
+		"offer": "The thunder birds used to be gentle. Mr. Bubbles' lightning has made them wild and they swoop at everyone.\n\nCalm eight of them for me. Watch out: they dive!",
+		"busy": "Eight thunder birds. When one pulls up high, it's about to dive: block or roll!",
+		"thanks": "The sky is so much quieter. Thank you, brave one.",
+		"reward": {"xp": 950, "gold": 220, "potions": 2, "roll": "weapon"}},
+	"sky_whale": {"giver": "nanshe", "zone": "cloud", "title": "Rescue the Baby Sky Whale",
+		"goal": {"type": "kill", "types": ["storm_sprite"], "count": 6}, "track": "Storm sprites cleared",
+		"offer": "I'm Nanshe. I look after the sky creatures.\n\nA baby sky whale is stuck in a storm cloud on the east island, and zappy storm sprites won't let it out. Clear six of them away!",
+		"busy": "The baby whale is on the east island. Clear the storm sprites around it.",
+		"thanks": "Listen... it's singing! The baby whale is free and swimming home. You have a kind heart.",
+		"reward": {"xp": 950, "gold": 220, "potions": 2, "roll": "big"}},
+	"storm_bubbles": {"giver": "nanshe", "zone": "cloud", "title": "Pop the Storm Bubbles",
+		"goal": {"type": "collect", "item": "stormbubble", "count": 6}, "track": "Storm bubbles popped",
+		"offer": "Mr. Bubbles blows lightning bubbles down onto our temple island. If they burst on their own they'll zap the gardens!\n\nPop six of them before they do. Run into them: it tickles a little.",
+		"busy": "Crackling yellow bubbles drift around the temple island. Run into them to pop them.",
+		"thanks": "Pop pop pop! Not a single zap on the gardens. Well done!",
+		"reward": {"xp": 900, "gold": 200, "mana_potions": 3, "roll": "armor"}},
+	"why_clouds": {"giver": "enki", "zone": "cloud", "title": "Why Don't Clouds Fall?",
+		"goal": {"type": "collect", "item": "updraft", "count": 3}, "track": "Updraft crystals found",
+		"offer": "I am Enki, the rainmaker. Tell me, little one: a big cloud weighs as much as a hundred elephants. So why doesn't it fall out of the sky?\n\nFind three updraft crystals and I'll show you the answer. They sit where the warm air rises.",
+		"busy": "Three updraft crystals. Look for the shimmering columns of rising warm air.",
+		"thanks": "Feel that? Warm air rises and pushes up. A cloud's water is split into trillions of droplets, each too tiny to fall through that rising air, so the whole cloud floats! Remember it.",
+		"reward": {"xp": 900, "gold": 200, "potions": 2, "roll": "big"}},
+	"make_it_rain": {"giver": "enki", "zone": "cloud", "title": "Make It Rain", "requires": "why_clouds",
+		"goal": {"type": "collect", "item": "raingarden", "count": 1}, "track": "Cloud garden watered",
+		"locked": "First, learn why clouds float. Then we'll talk about rain.",
+		"offer": "Now: rain! When droplets bump together they grow. When they get too heavy for the rising air to hold, they fall. That's rain!\n\nCollect raindrops until you're heavy, then stand still over my dry cloud garden and rain on it.",
+		"busy": "Collect raindrops until your weight bar is past the middle, then stand still in the cloud garden.",
+		"thanks": "Look at it grow! You made it rain, just like a real cloud. You're a natural rainmaker.",
+		"reward": {"xp": 950, "gold": 230, "potions": 2, "roll": "skin"}},
+	"bubble_lifts": {"giver": "utu", "zone": "cloud", "title": "The Bubble Lifts",
+		"goal": {"type": "collect", "item": "ventstone", "count": 3}, "track": "Bubble vents fixed",
+		"offer": "Utu, gate-warden of the sky. Mr. Bubbles clogged the bubble vents that lift us up to the storm layer.\n\nThree vent stones are jammed: one here on the temple island, one on each of the middle islands. Touch them to start them bubbling again.",
+		"busy": "Three vent stones: one on the temple island and one on each middle island.",
+		"thanks": "Listen to them bubble! The way up to the storm layer is open.",
+		"reward": {"xp": 950, "gold": 230, "potions": 2, "roll": "weapon"}},
+	"storm_gate": {"giver": "utu", "zone": "cloud", "title": "The Storm Gate", "requires": "bubble_lifts",
+		"goal": {"type": "boss", "uid": "hail_golem", "count": 1}, "track": "Hail Golem defeated",
+		"locked": "The vents are still clogged. Fix the bubble lifts first.",
+		"offer": "A Hail Golem guards the last bubble vent, the one up to Mr. Bubbles' thunderhead. It throws hailstones the size of pumpkins.\n\nBreak it, and the way to the top is open.",
+		"busy": "The Hail Golem is on the storm layer, by the last bubble vent. Heavy hits: block!",
+		"thanks": "Crunch! The golem is just slush now. The vent to the thunderhead is bubbling.",
+		"reward": {"xp": 1100, "gold": 280, "potions": 3, "roll": "big"}},
+	"mr_bubbles": {"giver": "anu", "zone": "cloud", "title": "Mr. Bubbles", "requires": "storm_gate",
+		"goal": {"type": "boss", "uid": "mr_bubbles", "count": 1}, "track": "Mr. Bubbles defeated",
+		"locked": "I am Anu, eldest of the sky. When the storm gate is open, come to me.",
+		"offer": "Mr. Bubbles was once a gentle cloud bear who blew rainbow bubbles for the sky children. Then he found the storm's lightning and it went to his head.\n\nHe waits on the thunderhead at the very top. Watch for his strike rings, pop his lightning bubbles, and if he traps you in a bubble, wriggle free! Calm him, and the sky is yours to fly.",
+		"busy": "Mr. Bubbles is on the thunderhead at the top. Rings on the ground mean lightning: get out of them!",
+		"thanks": "He's... crying? He says he's sorry, and he only wanted friends. The storm is gone.\n\nAnd look who's come to thank you: a dragonfly! It has chosen you. It will carry you anywhere, in every land below.",
+		"reward": {"xp": 2000, "gold": 600, "potions": 4, "roll": "boss"}},
 }
 
 ## Quests belonging to a zone (the forest's six have no "zone" key).
@@ -838,16 +897,19 @@ func quest_turn_in(id: String) -> Array:
 	return items_got
 
 const NPC_NAMES := {"fenn": "Ranger Fenn", "bram": "Bram the Woodcutter", "maera": "Old Maera", "tobble": "Tobble the Merchant", "aldric": "Captain Aldric", "dunstan": "Digger Dunstan",
-	"elowen": "Sister Elowen", "mott": "Old Mott", "brannoc": "Captain Brannoc", "holt": "Sergeant Holt", "ansel": "Brother Ansel", "pip": "Pip the Stablehand", "wren": "Lady Wren"}
+	"elowen": "Sister Elowen", "mott": "Old Mott", "brannoc": "Captain Brannoc", "holt": "Sergeant Holt", "ansel": "Brother Ansel", "pip": "Pip the Stablehand", "wren": "Lady Wren",
+	"ninlil": "Ninlil of the Winds", "nanshe": "Nanshe the Keeper", "enki": "Enki the Rainmaker", "utu": "Utu the Gate-Warden", "anu": "Anu, Eldest of the Sky"}
 
 ## Quests listed in the tracker: active and ready ones.
 ## Item level of the current zone: the Vault starts low, the castle is tougher.
 func zone_level() -> int:
-	return {"vault": 4, "forest": 5, "castle": 8}.get(zone, 4)
+	return {"vault": 4, "forest": 5, "castle": 8, "cloud": 11}.get(zone, 4)
 
 func forest_objective() -> String:
 	if zone == "castle":
 		return castle_objective()
+	if zone == "cloud":
+		return cloud_objective()
 	if zone != "forest":
 		return objective
 	if zone_complete("forest"):
@@ -864,9 +926,20 @@ func forest_objective() -> String:
 		return "Help the forest folk, then see Captain Aldric at the Warren gate (north)."
 	return "Help the forest folk: your quests are listed on the left."
 
+func cloud_objective() -> String:
+	if quest_state("mr_bubbles") == "done":
+		return "Cloud Island is calm! Fly your dragonfly (G) anywhere you like."
+	if quest_state("mr_bubbles") == "active":
+		return "Ride the bubbles to the thunderhead at the very top and calm Mr. Bubbles."
+	if quest_state("mr_bubbles") == "ready":
+		return "Tell Anu, Eldest of the Sky, that Mr. Bubbles is calm."
+	if quests_in("cloud").is_empty():
+		return "Welcome to Cloud Island! The angels at the sky temple need your help."
+	return "Help the angels: your quests are on the left. Bubbles lift you higher."
+
 func castle_objective() -> String:
 	if quest_state("ghost_lord") == "done":
-		return "Castle Morwen is free! Ride your moped (G) and enjoy the moonlight."
+		return "Castle Morwen is free! Talk to Sister Elowen to ride the cloud up to Cloud Island."
 	if quest_state("ghost_lord") in ["active", "ready"]:
 		return "Defeat the Ghost Lord in the castle's throne room." if quest_state("ghost_lord") == "active" else "Tell Sister Elowen the Ghost Lord is gone."
 	if quests_in("castle").is_empty():

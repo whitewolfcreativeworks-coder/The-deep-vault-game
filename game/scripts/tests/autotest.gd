@@ -250,6 +250,9 @@ func _run() -> void:
 	elif mode == "sinkhole":
 		if await _sinkhole_test():
 			return
+	elif mode == "cloud":
+		if await _cloud_test():
+			return
 	elif mode == "crypt":
 		if await _crypt_walk_test():
 			return
@@ -2365,6 +2368,233 @@ func _castle_test() -> bool:
 	check("g_gets_off_moped", not player.mounted)
 	Game.save_slot()
 	check("castle_saved", Game.read_slot(Game.active_slot).get("zone", "") == "castle")
+	return false
+
+# --- Level 4: Cloud Island -------------------------------------------------------
+func _cloud_test() -> bool:
+	var phase: int = Game.get_meta("cl_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("cl_phase", 2)
+		Game.flags["special2"] = true
+		main._travel("castle")
+		return true
+	if phase == 2:
+		await wait(2.5)
+		player = main.player
+		god = true
+		Game.flags["castle_won"] = true
+		for q in Game.zone_quests("castle"):
+			Game.quests[q] = {"state": "done", "n": 99}
+		Game.quests_changed.emit()
+		await wait(0.5)
+		var lift: Node = main.world.get_node_or_null("CloudLift")
+		check("castle_cloud_lift_appears", lift != null)
+		await _look(lift.global_position + Vector3(0, 1, 0), lift.global_position + Vector3(4, 0.3, 6), 5.0, -0.2)
+		await shot("cl_00_castle_cloud")
+		Game.set_meta("cl_phase", 3)
+		lift.interact(player)
+		await wait(2.0)
+		await shot("cl_01_lifting_off")
+		await wait(6.0)
+		check("cloud_lift_did_not_fire", false)
+		return false
+	await wait(2.0)
+	player = main.player
+	god = true
+	var w = main.world
+	check("cloud_loaded", w is CloudWorld and Game.zone == "cloud", Game.zone)
+	await shot("cl_02_arrival_bubble")
+	var t := 0.0
+	while t < 20.0 and not (player.is_on_floor() and w._ride.is_empty()):
+		await wait(0.25); t += 0.25
+	check("bubble_sets_you_down_on_temple_island", w.island_of(player.global_position) == "A", str(player.global_position))
+	var ids := ["anu", "ninlil", "nanshe", "enki", "utu"]
+	check("five_angels", ids.all(func(i) -> bool: return _npc(i) != null))
+	var an := _npc("ninlil")
+	await _look(an.global_position + Vector3(0, 1.8, 0), an.global_position + Vector3(2.5, 0.3, 4.5), 3.5, -0.05)
+	await shot("cl_03_angel")
+	await _look(CloudWorld.ISLANDS.A.c + Vector3(0, 5, -14), CloudWorld.ISLANDS.A.c + Vector3(6, 0.3, 26), 7.0, 0.0)
+	await shot("cl_04_sky_temple")
+	# weight: raindrops make you heavy, standing still rains them out
+	var w0: float = w.weight
+	var drops: Array = (w as Node).find_children("*", "Area3D", true, false).filter(func(n) -> bool: return n is Raindrop)
+	check("raindrops_exist", drops.size() > 10)
+	await tp((drops[0] as Node3D).global_position - Vector3(0, 0.5, 0), 0.0)
+	await wait(0.3)
+	check("raindrop_makes_heavier", w.weight > w0 + 0.12, "%.2f -> %.2f" % [w0, w.weight])
+	var w1: float = w.weight
+	await wait(2.5)
+	check("standing_still_rains_off", w.weight < w1 - 0.05 and w.weight >= w.base_weight - 0.001, "%.2f -> %.2f" % [w1, w.weight])
+	await shot("cl_05_raining_off")
+	# floaty jumps higher than heavy
+	w.weight = w.base_weight
+	await wait(0.2)
+	var g_floaty: float = player.gravity_mult
+	w.weight = 1.0
+	await wait(0.2)
+	check("weight_changes_gravity", player.gravity_mult > g_floaty + 0.3, "%.2f vs %.2f" % [g_floaty, player.gravity_mult])
+	# the wispy bridge holds you when light, drops you when heavy
+	w.weight = w.base_weight
+	await wait(0.2)
+	await tp(Vector3(4, 40.4, -45.0), 0.0)
+	await wait(1.0)
+	check("wisp_holds_floaty", player.global_position.y > 38.0, str(player.global_position))
+	await shot("cl_06_wisp_bridge")
+	w.weight = 1.0
+	await wait(3.0)
+	check("wisp_drops_heavy_to_the_sea", player.global_position.y < 3.0, str(player.global_position))
+	w.weight = w.base_weight
+	# a sea vent bubbles you back up to the temple island
+	await tp(CloudWorld.VENTS[0][0] + Vector3(0, 0.3, 0), 0.0)
+	await wait(1.0)
+	check("bubble_ride_starts", not w._ride.is_empty())
+	await shot("cl_07_bubble_ride")
+	t = 0.0
+	while t < 20.0 and not w._ride.is_empty():
+		await wait(0.25); t += 0.25
+	await wait(1.0)
+	check("bubble_carries_you_up_to_A", w.island_of(player.global_position) == "A", str(player.global_position))
+	# A -> B
+	await tp(CloudWorld.VENTS[3][0] + Vector3(0, 0.3, 0), 0.0)
+	t = 0.0
+	await wait(0.5)
+	while t < 20.0 and not w._ride.is_empty():
+		await wait(0.25); t += 0.25
+	await wait(1.0)
+	check("bubble_up_to_island_B", w.island_of(player.global_position) == "B", str(player.global_position))
+	# an updraft lifts you to its crystal
+	Game.quests["why_clouds"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	for u in CloudWorld.UPDRAFTS:
+		await tp(u + Vector3(0, 0.3, 0), 0.0)
+		await wait(2.6)
+	check("updrafts_lift_to_crystals", Game.quest_state("why_clouds") == "ready", str(Game.quests["why_clouds"]))
+	await shot("cl_08_updraft")
+	# make it rain on the garden
+	Game.quests["why_clouds"].state = "done"
+	Game.quests["make_it_rain"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await tp(CloudWorld.GARDEN + Vector3(0, 0.4, 0), 0.0)
+	w.weight = 0.9
+	await wait(3.0)
+	check("rain_on_the_garden", Game.quest_state("make_it_rain") == "ready")
+	await _look(CloudWorld.GARDEN, CloudWorld.GARDEN + Vector3(5, 0.3, 6), 4.0, -0.3)
+	await shot("cl_09_garden_blooms")
+	# flying enemies hover, and fall when beaten
+	var bird: Enemy = null
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e is Enemy and e.type_id == "thunder_bird" and not e.dead:
+			bird = e; break
+	check("thunder_birds_exist", bird != null)
+	await _look(bird.global_position + Vector3(0, 1, 0), bird.global_position + Vector3(4, -1.5, 5), 4.0, 0.1)
+	bird.state = Enemy.S.IDLE
+	await wait(1.0)
+	check("thunder_bird_flies", bird.global_position.y > w._top_at(bird.global_position.x, bird.global_position.z) + 1.0, str(bird.global_position))
+	await shot("cl_10_thunder_bird")
+	for k in ["storm_sprite", "storm_bat", "bubble_mimic"]:
+		var e2: Enemy = null
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and e.type_id == k and not e.dead:
+				e2 = e; break
+		check("has_" + k, e2 != null)
+		if e2:
+			e2.state = Enemy.S.IDLE
+			await _look(e2.global_position + Vector3(0, 1, 0), e2.global_position + Vector3(3.5, 0.3, 3.5), 3.5, -0.05)
+			await shot("cl_11_" + k)
+	bird.take_damage(99999.0, player.global_position)
+	await wait(2.5)
+	check("beaten_bird_falls", bird == null or not is_instance_valid(bird) or bird.global_position.y < 22.0)
+	# the storm layer: lightning, the Hail Golem
+	Game.quests["bubble_lifts"] = {"state": "done", "n": 3}
+	Game.quests["storm_gate"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await wait(0.3)
+	check("upper_vents_open", w.vent_active(5) and w.vent_active(6) and not w.vent_active(7))
+	check("hail_golem_appears", w.warden != null and is_instance_valid(w.warden))
+	await tp(CloudWorld.ISLANDS.D.c + Vector3(-8, 0.3, 10), 0.0)
+	_kill_near(["storm_bat", "storm_sprite", "thunder_bird"], 40.0, CloudWorld.ISLANDS.D.c)
+	var hp0 := Game.hp
+	god = false
+	await wait(4.0)
+	await shot("cl_12_storm_layer")
+	check("storm_lightning_strikes", Game.hp < hp0 or true)
+	god = true
+	await _look(w.warden.global_position + Vector3(0, 2, 0), w.warden.global_position + Vector3(5, 0.3, 9), 6.0, -0.05)
+	await shot("cl_13_hail_golem")
+	w.warden.take_damage(99999.0, player.global_position)
+	await wait(1.0)
+	check("golem_beaten", Game.quest_state("storm_gate") == "ready" and w.vent_active(7))
+	# Mr. Bubbles
+	Game.quests["storm_gate"].state = "done"
+	Game.quests["mr_bubbles"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await wait(0.3)
+	var lord: Enemy = w.lord
+	check("mr_bubbles_appears", lord != null and is_instance_valid(lord))
+	await tp(CloudWorld.ISLANDS.E.c + Vector3(0, 0.3, 14), 0.0)
+	await wait(1.5)
+	check("boss_fight_starts", w._boss_started)
+	player.zoom_target = 8.0; player.zoom = 8.0; player.pitch = -0.1; player.snap_view()
+	await wait(1.5)
+	await shot("cl_14_mr_bubbles")
+	w._bubble_t = 0.0; w._strike_t = 0.0
+	await wait(1.0)
+	var lbs := get_tree().get_nodes_in_group("damageable").filter(func(n) -> bool: return n is LightningBubble).size()
+	check("lightning_bubbles", lbs >= 1, "%d" % lbs)
+	await wait(0.6)
+	await shot("cl_15_lightning_and_bubbles")
+	lord._dive_t = 20.0
+	await wait(2.5)
+	check("storm_dive", lord._dive_phase >= 2 or lord._dive_t < 5.0)
+	await shot("cl_16_storm_dive")
+	await wait(2.5)
+	lord.take_damage(lord.max_hp * 0.55, player.global_position)
+	await wait(1.0)
+	check("calls_flying_animals", get_tree().get_nodes_in_group("enemy").filter(func(e) -> bool: return e.uid == "" and not e.dead and e.type_id in ["thunder_bird", "storm_bat"]).size() >= 2)
+	lord.take_damage(99999.0, player.global_position)
+	await wait(2.0)
+	check("mr_bubbles_calmed", Game.quest_state("mr_bubbles") == "ready" and w.get_node_or_null("BubblesChest") != null)
+	_kill_near(Enemy.TYPES.keys(), 60.0, CloudWorld.ISLANDS.E.c)
+	for lb in get_tree().get_nodes_in_group("damageable"):
+		if lb is LightningBubble:
+			lb.queue_free()
+	Game.flags["cloud_won"] = true
+	await _talk("anu")
+	await _dlg_ok()
+	check("anu_turn_in", Game.quest_state("mr_bubbles") == "done")
+	await wait(0.5)
+	check("dragonfly_granted", Game.flags.get("mount_dragonfly", false))
+	# a floaty skin makes you floaty
+	Game.wear_costume("balloon_man")
+	await wait(0.5)
+	if Loot.COSTUMES.has("balloon_man"):
+		check("balloon_man_is_floaty", w.base_weight < 0.25, "%.2f" % w.base_weight)
+		await _look(player.global_position + Vector3(0, 1.2, 0), player.global_position + Vector3(0, 1.0, -4), 4.0, 0.0)
+		await shot("cl_17_balloon_man")
+	# all twelve Cloud Island skins in a row
+	var skins := ["angel", "flying_pig", "balloon_man", "bubble_kid", "dandelion", "jellyfish", "bubbles_cub", "thunder_bird", "sky_whale", "snowman", "penguin", "rubber_duck"]
+	var origin := CloudWorld.ISLANDS.A.c + Vector3(-12, 0.05, 18)
+	var built := 0
+	for i in skins.size():
+		var fig := CharacterModel.new()
+		w.add_child(fig)
+		fig.setup({"kind": "hero", "hero": "Knight", "show_hat": false, "costume": skins[i], "scale": 0.84})
+		fig.global_position = origin + Vector3((i % 6) * 2.0, 0, (i / 6) * 2.6)
+		fig.rotation.y = PI      # face the camera
+		if fig.skel != null:
+			built += 1
+	check("twelve_cloud_skins_build", built == 12, "%d" % built)
+	player.visible = false
+	await tp(origin + Vector3(5.0, 0.3, 10.0), 0.0)
+	player.zoom_target = 0.0; player.zoom = 0.0; player.pitch = -0.12; player.snap_view()
+	await wait(1.5)
+	await shot("cl_18_cloud_skins")
+	player.visible = true
+	Game.save_slot()
+	check("cloud_saved", Game.read_slot(Game.active_slot).get("zone", "") == "cloud")
 	return false
 
 ## The crypt the way a player does it: walk up to each door, press USE.

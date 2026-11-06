@@ -694,6 +694,8 @@ func _on_quests() -> void:
 				Game.say("Morwen fades with a long, sad sigh. Castle Morwen is free!", Color(0.7, 0.9, 1.0)))
 	if Game.flags.get("ghost_lord", false):
 		_lord_chest()
+	if Game.quest_state("ghost_lord") == "done":
+		_cloud_lift()
 	# Elowen's reward for beating the Ghost Lord: the moped!
 	if Game.quest_state("ghost_lord") == "done" and not Game.flags.get("mount_moped", false):
 		Game.flags["mount_moped"] = true
@@ -704,6 +706,13 @@ func _on_quests() -> void:
 			if player.mounted:
 				player.dismount()
 			player.mount_up("moped")
+
+## After the Ghost Lord: a cloud gathers by Sister Elowen to lift you to Cloud Island.
+func _cloud_lift() -> void:
+	if get_node_or_null("CloudLift") != null:
+		return
+	var sl := SkyLift.make(self, ground(-1, 61) + Vector3(0, 0.1, 0), "Step onto the cloud: up to Cloud Island!", "go_to_cloud")
+	sl.name = "CloudLift"
 
 func _lord_chest() -> void:
 	if Game.flags.get("c_chest_lord", false) or get_node_or_null("LordChest") != null:

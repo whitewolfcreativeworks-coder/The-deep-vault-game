@@ -146,13 +146,17 @@ func setup(cfg: Dictionary) -> void:
 	for c in get_children():
 		c.queue_free()
 	_aura = null
+	_cloud_kind = ""
 	head_meshes.clear(); all_meshes.clear(); _never_show.clear(); _own_colors.clear()
 	# a costume made from one of the game's own characters is just a different look
 	var costume_file := ""
 	var costume_fx := ""
 	if cfg.has("costume") and Loot.COSTUMES.has(cfg.costume):
 		var c: Dictionary = Loot.COSTUMES[cfg.costume]
-		if c.has("look"):
+		if c.has("cloud"):
+			_cloud_kind = String(c.cloud)
+			cfg = cloud_skin_cfg(_cloud_kind, cfg)
+		elif c.has("look"):
 			cfg = costume_look_cfg(String(c.look), cfg)
 		else:
 			var f := String(c.file)
@@ -296,7 +300,171 @@ func setup(cfg: Dictionary) -> void:
 				_swap_head(hero, cfg, skin, BUN_SPIKE_BASE.get(String(cfg.get("hero", "Knight")), "short"))
 		if not _custom_head:
 			_add_head_looks(hero, cfg, hat_on or hooded)
+		if _cloud_kind != "":
+			_cloud_extras(_cloud_kind, hero)
 	_play(anims.idle, 0.0)
+
+# --- Cloud Island skins (designed by Orion): the hero, recoloured, plus pieces
+# made from shapes (wings, snouts, balloons, a bubble...). Each one also sets
+# how floaty you are on Cloud Island (Loot.COSTUMES[...].float).
+var _cloud_kind := ""
+
+static func cloud_skin_cfg(kind: String, base: Dictionary) -> Dictionary:
+	var cfg := base.duplicate()
+	cfg.erase("costume"); cfg.erase("outfit_model"); cfg.erase("outfit_fx"); cfg.erase("tint")
+	var looks := {
+		"angel": [Color(0.95, 0.78, 0.62), Color(0.97, 0.95, 0.88), "long", Color(1.0, 0.85, 0.45)],
+		"flying_pig": [Color(1.0, 0.72, 0.76), Color(1.0, 0.62, 0.7), "bald", Color(1.0, 0.7, 0.75)],
+		"balloon_man": [Color(0.97, 0.82, 0.7), Color(0.95, 0.25, 0.3), "curly", Color(0.2, 0.55, 1.0)],
+		"bubble_kid": [Color(0.97, 0.82, 0.7), Color(0.6, 0.85, 1.0), "natural", Color(0.5, 0.75, 1.0)],
+		"dandelion": [Color(0.7, 0.88, 0.5), Color(0.35, 0.65, 0.3), "bald", Color(1, 1, 1)],
+		"jellyfish": [Color(0.95, 0.7, 0.95), Color(0.75, 0.5, 0.95), "bald", Color(0.9, 0.6, 1.0)],
+		"bubbles_cub": [Color(0.62, 0.44, 0.3), Color(0.6, 0.42, 0.28), "bald", Color(0.55, 0.38, 0.25)],
+		"thunder_bird": [Color(1.0, 0.85, 0.35), Color(0.25, 0.45, 0.95), "spiky", Color(1.0, 0.85, 0.3)],
+		"sky_whale": [Color(0.6, 0.75, 1.0), Color(0.35, 0.55, 0.92), "bald", Color(0.5, 0.65, 1.0)],
+		"snowman": [Color(0.97, 0.98, 1.0), Color(0.95, 0.97, 1.0), "bald", Color(1, 1, 1)],
+		"penguin": [Color(0.12, 0.12, 0.15), Color(0.1, 0.1, 0.14), "bald", Color(0.1, 0.1, 0.12)],
+		"rubber_duck": [Color(1.0, 0.86, 0.2), Color(1.0, 0.86, 0.2), "bald", Color(1.0, 0.85, 0.2)],
+	}
+	var l: Array = looks.get(kind, looks.angel)
+	cfg["skin_color"] = l[0]
+	cfg["outfit_color"] = l[1]
+	cfg["cape_color"] = (l[1] as Color).darkened(0.15)
+	cfg["hair_style"] = l[2]
+	cfg["hair_color"] = l[3]; cfg["hair_tint"] = l[3]
+	cfg["show_hat"] = false
+	cfg["face"] = "blush" if kind in ["angel", "bubble_kid", "flying_pig", "balloon_man"] else "none"
+	return cfg
+
+## A node on a bone, authored in skeleton space (positions below are in metres
+## on the hero rig: front is +Z, back is -Z, the head's centre is about y 1.6).
+func _on_bone(bone: String) -> Node3D:
+	var ba := _attach(bone)
+	if ba == null:
+		return null
+	var n := Node3D.new()
+	n.transform = skel.get_bone_global_rest(skel.find_bone(bone)).affine_inverse()
+	ba.add_child(n)
+	return n
+
+func _cp(parent: Node3D, mesh: Mesh, mat: Material, pos: Vector3, scl := Vector3.ONE, rot := Vector3.ZERO, head := false) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh; mi.material_override = mat; mi.material_overlay = flash_mat
+	mi.position = pos; mi.scale = scl; mi.rotation = rot
+	parent.add_child(mi)
+	if head:
+		head_meshes.append(mi)
+	return mi
+
+func _cone_m(r: float, h: float) -> CylinderMesh:
+	var c := CylinderMesh.new(); c.top_radius = 0.0; c.bottom_radius = r; c.height = h; c.radial_segments = 12
+	return c
+
+func _cyl_m(r: float, h: float) -> CylinderMesh:
+	var c := CylinderMesh.new(); c.top_radius = r; c.bottom_radius = r; c.height = h; c.radial_segments = 14
+	return c
+
+func _glassy(c: Color, a := 0.3) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new(); m.albedo_color = Color(c.r, c.g, c.b, a)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.emission_enabled = true; m.emission = c; m.emission_energy_multiplier = 0.4; m.roughness = 0.05
+	return m
+
+func _cloud_extras(kind: String, hero: Dictionary) -> void:
+	var head := _on_bone("head")
+	var chest := _on_bone("chest")
+	if head == null or chest == null:
+		return
+	var hb := _head_bounds(hero)
+	var hc := hb.get_center()
+	var hr := hb.size.x * 0.5
+	var front := hc + Vector3(0, -0.05, hb.size.z * 0.5)
+	var top := hc + Vector3(0, hb.size.y * 0.5, 0)
+	var back := Vector3(0, 1.05, -0.18)
+	match kind:
+		"angel":
+			var w := AngelWings.make(Color(1, 1, 1), 1.0)
+			w.position = Vector3(0, -0.3, -0.05); w.rotation.y = PI
+			chest.add_child(w)
+			var halo := _cp(head, TorusMesh.new(), FX.glow_material(Color(1.0, 0.88, 0.4), 2.0), top + Vector3(0, 0.18, 0), Vector3(0.55, 0.3, 0.55) * hr * 2.0, Vector3.ZERO, true)
+			(halo.mesh as TorusMesh).inner_radius = 0.8; (halo.mesh as TorusMesh).outer_radius = 1.0
+		"flying_pig":
+			var pink := _look_mat(Color(1.0, 0.65, 0.72), 0.6)
+			var dark := _look_mat(Color(0.6, 0.25, 0.3), 0.5)
+			var sn := _cp(head, _cyl_m(hr * 0.32, hr * 0.3), pink, front + Vector3(0, -0.05, 0.02), Vector3.ONE, Vector3(PI * 0.5, 0, 0), true)
+			for sx in [-1.0, 1.0]:
+				_cp(head, _sphere(), dark, front + Vector3(sx * hr * 0.12, -0.05, hr * 0.16), Vector3.ONE * hr * 0.06, Vector3.ZERO, true)
+				_cp(head, _cone_m(hr * 0.22, hr * 0.4), pink, top + Vector3(sx * hr * 0.62, -0.05, 0), Vector3.ONE, Vector3(0, 0, -sx * 0.5), true)
+				var wg := _cp(chest, _boxm(0.38, 0.03, 0.22), _look_mat(Color(1, 1, 1), 0.6), back + Vector3(sx * 0.24, 0.05, -0.04), Vector3.ONE, Vector3(0, sx * 0.3, sx * 0.4))
+			var tail := _cp(chest, TorusMesh.new(), pink, Vector3(0, 0.55, -0.24), Vector3.ONE * 0.09, Vector3(PI * 0.5, 0, 0))
+		"balloon_man":
+			var cols := [Color(0.95, 0.2, 0.25), Color(0.2, 0.55, 1.0), Color(1.0, 0.85, 0.2), Color(0.3, 0.85, 0.4), Color(0.85, 0.4, 0.95)]
+			for k in 5:
+				var a := k * TAU / 5.0
+				var bp := Vector3(cos(a) * 0.32, 2.35 + (k % 2) * 0.2, sin(a) * 0.32 - 0.25)
+				var bm := _look_mat(cols[k], 0.15); bm.metallic_specular = 1.0
+				_cp(chest, _sphere(), bm, bp, Vector3(0.24, 0.3, 0.24))
+				var string_len := bp.distance_to(back)
+				var st := _cp(chest, _cyl_m(0.006, string_len), _look_mat(Color(0.95, 0.95, 0.95)), (bp + back) * 0.5)
+				st.basis = Basis(Quaternion(Vector3.UP, (bp - back).normalized()))
+			_cp(head, _sphere(), _look_mat(Color(0.95, 0.15, 0.2), 0.2), front + Vector3(0, -0.02, 0.03), Vector3.ONE * hr * 0.16, Vector3.ZERO, true)
+		"bubble_kid":
+			_cp(chest, _sphere(), _glassy(Color(0.7, 0.9, 1.0), 0.18), Vector3(0, 0.95, 0), Vector3(0.75, 1.0, 0.75))
+		"dandelion":
+			var seedm := _look_mat(Color(1, 1, 1), 0.9)
+			for k in 34:
+				var u := randf() * TAU; var v := acos(randf_range(-0.6, 1.0))
+				var dirv := Vector3(sin(v) * cos(u), cos(v), sin(v) * sin(u))
+				var sp := _cp(head, _cyl_m(0.006, hr * 0.9), seedm, top + Vector3(0, 0.05, 0) + dirv * hr * 0.45, Vector3.ONE, Vector3.ZERO, true)
+				sp.basis = Basis(Quaternion(Vector3.UP, dirv))
+				_cp(head, _sphere(), seedm, top + Vector3(0, 0.05, 0) + dirv * hr * 0.9, Vector3.ONE * hr * 0.07, Vector3.ZERO, true)
+		"jellyfish":
+			var bell := _glassy(Color(0.95, 0.55, 0.95), 0.45)
+			_cp(head, _sphere(true), bell, top + Vector3(0, -0.12, 0), Vector3(hr * 1.25, hr * 1.1, hr * 1.25), Vector3.ZERO, true)
+			for k in 8:
+				var a := k * TAU / 8.0
+				var tt := _cp(chest, _cyl_m(0.015, 0.7), bell, Vector3(cos(a) * 0.28, 0.95, sin(a) * 0.22), Vector3.ONE, Vector3(sin(a) * 0.15, 0, cos(a) * 0.15))
+		"bubbles_cub":
+			var fur := _look_mat(Color(0.6, 0.42, 0.28), 0.9)
+			var lite := _look_mat(Color(0.9, 0.75, 0.6), 0.9)
+			for sx in [-1.0, 1.0]:
+				_cp(head, _sphere(), fur, top + Vector3(sx * hr * 0.7, -0.05, 0), Vector3.ONE * hr * 0.28, Vector3.ZERO, true)
+				_cp(head, _sphere(), lite, top + Vector3(sx * hr * 0.7, -0.05, hr * 0.12), Vector3.ONE * hr * 0.15, Vector3.ZERO, true)
+				_cp(chest, _sphere(), _look_mat(Color(0.75, 0.78, 0.88), 0.9), back + Vector3(sx * 0.25, 0.08, -0.05), Vector3(0.22, 0.12, 0.15))
+			_cp(head, _sphere(), lite, front + Vector3(0, -0.12, 0), Vector3(hr * 0.35, hr * 0.25, hr * 0.2), Vector3.ZERO, true)
+			_cp(head, _sphere(), _look_mat(Color(0.1, 0.07, 0.05), 0.3), front + Vector3(0, -0.08, hr * 0.15), Vector3.ONE * hr * 0.08, Vector3.ZERO, true)
+		"thunder_bird":
+			_cp(head, _cone_m(hr * 0.2, hr * 0.55), _look_mat(Color(1.0, 0.55, 0.1)), front + Vector3(0, -0.06, hr * 0.2), Vector3.ONE, Vector3(PI * 0.5, 0, 0), true)
+			for k in 3:
+				_cp(head, _cone_m(hr * 0.08, hr * 0.6), FX.glow_material(Color(1.0, 0.95, 0.3), 2.0), top + Vector3((k - 1) * hr * 0.25, 0.08, -0.03 * k), Vector3.ONE, Vector3(0, 0, (k - 1) * 0.35), true)
+			for sx in [-1.0, 1.0]:
+				_cp(chest, _boxm(0.6, 0.04, 0.35), _look_mat(Color(0.25, 0.45, 0.95), 0.6), back + Vector3(sx * 0.38, 0.0, -0.05), Vector3.ONE, Vector3(0, 0, sx * 0.35))
+		"sky_whale":
+			var blue := _look_mat(Color(0.4, 0.6, 0.95), 0.5)
+			_cp(chest, _boxm(0.55, 0.06, 0.25), blue, Vector3(0, 0.6, -0.4), Vector3.ONE, Vector3(0.3, 0, 0))
+			for sx in [-1.0, 1.0]:
+				_cp(chest, _boxm(0.3, 0.05, 0.16), blue, Vector3(sx * 0.32, 0.95, 0), Vector3.ONE, Vector3(0, 0, sx * 0.5))
+			var spout := CPUParticles3D.new(); spout.amount = 24; spout.lifetime = 0.9
+			spout.mesh = FX.quad(0.06); spout.material_override = FX.glow_material(Color(0.7, 0.85, 1.0), 1.0)
+			spout.direction = Vector3.UP; spout.spread = 12; spout.initial_velocity_min = 2.0; spout.initial_velocity_max = 3.0
+			spout.gravity = Vector3(0, -6, 0); spout.position = top + Vector3(0, 0.05, 0)
+			head.add_child(spout)
+		"snowman":
+			var coal := _look_mat(Color(0.08, 0.08, 0.08), 0.8)
+			_cp(head, _cone_m(hr * 0.1, hr * 0.6), _look_mat(Color(1.0, 0.5, 0.1)), front + Vector3(0, -0.02, hr * 0.25), Vector3.ONE, Vector3(PI * 0.5, 0, 0), true)
+			_cp(head, _cyl_m(hr * 0.55, hr * 0.15), coal, top + Vector3(0, 0.02, 0), Vector3.ONE, Vector3.ZERO, true)
+			_cp(head, _cyl_m(hr * 0.38, hr * 0.7), coal, top + Vector3(0, 0.38 * hr, 0), Vector3.ONE, Vector3.ZERO, true)
+			_cp(chest, _cyl_m(0.25, 0.1), _look_mat(Color(0.85, 0.15, 0.2), 0.8), Vector3(0, 1.18, 0))
+			for k in 3:
+				_cp(chest, _sphere(), coal, Vector3(0, 0.95 - k * 0.15, 0.22), Vector3.ONE * 0.035)
+		"penguin":
+			_cp(chest, _sphere(), _look_mat(Color(0.97, 0.97, 0.97), 0.7), Vector3(0, 0.8, 0.14), Vector3(0.24, 0.38, 0.12))
+			_cp(head, _cone_m(hr * 0.18, hr * 0.4), _look_mat(Color(1.0, 0.6, 0.1)), front + Vector3(0, -0.06, hr * 0.15), Vector3.ONE, Vector3(PI * 0.5, 0, 0), true)
+			_cp(head, _sphere(), _look_mat(Color(0.97, 0.97, 0.97), 0.7), front + Vector3(0, 0.02, -hr * 0.05), Vector3(hr * 0.55, hr * 0.4, hr * 0.15), Vector3.ZERO, true)
+		"rubber_duck":
+			var orange := _look_mat(Color(1.0, 0.55, 0.1), 0.3)
+			_cp(head, _sphere(), orange, front + Vector3(0, -0.1, hr * 0.12), Vector3(hr * 0.42, hr * 0.12, hr * 0.32), Vector3.ZERO, true)
+			_cp(chest, _cone_m(0.12, 0.25), _look_mat(Color(1.0, 0.86, 0.2), 0.2), Vector3(0, 0.6, -0.25), Vector3.ONE, Vector3(-1.0, 0, 0))
 
 # --- the Skin Designer: a look mixed from parts of collected skins -------------
 ## custom_look = {"head"|"body"|"arms"|"legs": {"src": "own" | costume id | "adv2/Ranger"...,

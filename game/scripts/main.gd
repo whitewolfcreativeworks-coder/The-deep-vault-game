@@ -29,6 +29,7 @@ func _ready() -> void:
 	match Game.zone:
 		"forest": world = ForestWorld.new()
 		"castle": world = CastleWorld.new()
+		"cloud": world = CloudWorld.new()
 		_: world = VaultWorld.new()
 	world.name = "World"
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -44,7 +45,7 @@ func _ready() -> void:
 	if not continue_pending or Game.checkpoint_pos == Vector3.ZERO:
 		Game.checkpoint_pos = world.spawn_point
 		Game.checkpoint_yaw = float(world.get("spawn_yaw")) if world.get("spawn_yaw") != null else 0.0
-		Game.checkpoint_name = {"forest": "the Portal Glade", "castle": "the Moor Portal"}.get(Game.zone, "the Outpost")
+		Game.checkpoint_name = {"forest": "the Portal Glade", "castle": "the Moor Portal", "cloud": "the Sky Temple"}.get(Game.zone, "the Outpost")
 	hud = HUD.new()
 	add_child(hud)
 	hud.bind_player(player)
@@ -139,10 +140,12 @@ func _continue_game() -> void:
 	player.set_mouse_captured(true)
 	hud.visible = true
 	Game.in_game = true
-	if Game.zone in ["forest", "castle"]:
+	if Game.zone in ["forest", "castle", "cloud"]:
 		Game.objective = Game.forest_objective()
 	Game.set_objective(Game.objective if Game.objective != "" else "Enter the Deep Vault beneath the cliffs.")
-	if Game.zone == "castle" and Game.resume_pos == Vector3.ZERO:
+	if Game.zone == "cloud" and Game.resume_pos == Vector3.ZERO:
+		Game.say("Up, up, up through the clouds... Welcome to Cloud Island!", Color(0.85, 0.95, 1.0))
+	elif Game.zone == "castle" and Game.resume_pos == Vector3.ZERO:
 		Game.say("You step out under a cold moon. Somewhere a ghost wails... Welcome to Ghost Knight Castle!", Color(0.7, 0.85, 1.0))
 		if not Game.flags.get("special2_told", false):
 			Game.flags["special2_told"] = true
@@ -223,6 +226,54 @@ func go_to_castle() -> void:
 	continue_pending = true
 	get_tree().reload_current_scene()
 
+## Level 3 -> Level 4: a cloud forms around you and lifts you into the sky.
+func go_to_cloud() -> void:
+	if state != "play" or player.dead:
+		return
+	player.input_enabled = false
+	if player.mounted:
+		player.dismount()
+	var puff := CPUParticles3D.new(); puff.amount = 80; puff.lifetime = 2.0
+	var sm := SphereMesh.new(); sm.radius = 0.6; sm.height = 1.2; puff.mesh = sm
+	puff.material_override = FX.glow_material(Color(1, 1, 1), 0.6)
+	puff.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING; puff.emission_ring_radius = 2.0; puff.emission_ring_inner_radius = 1.2
+	puff.emission_ring_height = 0.6; puff.emission_ring_axis = Vector3.UP
+	puff.direction = Vector3.UP; puff.spread = 30; puff.initial_velocity_min = 0.5; puff.initial_velocity_max = 1.5
+	puff.gravity = Vector3.ZERO; puff.scale_amount_min = 0.8; puff.scale_amount_max = 2.0
+	player.add_child(puff)
+	Sfx.play("portal", -4.0, 0.0)
+	Game.say("A cloud swirls around you and lifts you up into the sky!", Color(0.85, 0.95, 1.0))
+	player.lift = 6.0
+	player.zoom_target = 7.0
+	await get_tree().create_timer(3.2).timeout
+	FX.screen_flash(Color(1, 1, 1), 1.0, 1.4)
+	await menus.fade_to(1.0, 0.6).finished
+	player.lift = -999.0
+	_travel("cloud")
+
+## Back down from Cloud Island on a rain cloud.
+func go_back_to_castle() -> void:
+	if state != "play":
+		return
+	player.input_enabled = false
+	Sfx.play("splash", -6.0, 0.0)
+	await menus.fade_to(1.0, 0.8).finished
+	_travel("castle")
+
+func _travel(z: String) -> void:
+	Game.zone = z
+	Game.checkpoint_pos = Vector3.ZERO
+	Game.resume_pos = Vector3.ZERO
+	Game.objective = ""
+	Game.game_over = false
+	Game.in_game = true
+	if Game.active_slot < 0:
+		Game.active_slot = maxi(Game.first_empty_slot(), 0)
+	Game.save_slot()
+	get_tree().paused = false
+	continue_pending = true
+	get_tree().reload_current_scene()
+
 ## Doors and ladders: fade out, move the player, fade back in.
 func teleport_player(dest: Vector3, yaw: float, label: String) -> void:
 	player.input_enabled = false
@@ -249,6 +300,8 @@ func _check_forest_done() -> void:
 		won = "forest"
 	elif Game.zone == "castle" and Game.quest_state("ghost_lord") == "done" and not Game.flags.get("castle_won", false):
 		won = "castle"
+	elif Game.zone == "cloud" and Game.quest_state("mr_bubbles") == "done" and not Game.flags.get("cloud_won", false):
+		won = "cloud"
 	if won != "":
 		Game.flags[won + "_won"] = true
 		Game.set_objective(Game.forest_objective())

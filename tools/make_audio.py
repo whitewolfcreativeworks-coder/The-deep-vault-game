@@ -379,6 +379,19 @@ def beep():
         out.append(np.zeros(int(0.06 * SR)))
     return np.concatenate(out)
 
+def pop():
+    # a bright bubble pop
+    seg = t(0.12)
+    f = 900 + 1400 * np.exp(-seg * 40)
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    return np.sin(ph) * np.exp(-seg * 45) + highpass(noise(0.12), 2500) * np.exp(-seg * 90) * 0.4
+def thunder():
+    # a crack of lightning, then a long rolling rumble
+    d = 2.6; seg = t(d)
+    crack = highpass(noise(d), 1800) * np.exp(-seg * 22)
+    roll = lowpass(noise(d), 160) * (np.exp(-seg * 1.2)) * (0.6 + 0.4 * np.sin(2 * np.pi * 3.1 * seg))
+    return crack * 0.9 + roll * 1.6
+
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
     "pickup": pickup, "coins": coins, "levelup": levelup, "spell": spell, "spell_hit": spell_hit,
@@ -390,6 +403,7 @@ SOUNDS = {
     "loop_birds": birds_loop, "whistle": whistle_tune, "kettle": kettle, "brush": brush, "sip": sip, "pour": pour, "stir": stir, "cluck": cluck, "bawk": bawk, "collapse": collapse, "loop_lava": lava_loop, "roar_big": roar_big,
     "rumble": rumble, "portal": portal_whoosh, "music_morning": music_morning,
     "loop_moped": moped_loop, "beep": beep,
+    "pop": pop, "thunder": thunder,
 }
 
 if __name__ == "__main__":

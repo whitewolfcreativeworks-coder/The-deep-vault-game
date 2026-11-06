@@ -35,6 +35,18 @@ const CASTLE_ARMOR := [
 	{"base": "Moonsilver Mail", "shield": "shield_badge_color", "def": 1.45, "tint": Color(0.8, 0.85, 0.95)},
 	{"base": "Phantom Cuirass", "shield": "Skeleton_Shield_Large_A", "def": 1.6, "tint": Color(0.55, 0.7, 0.9)},
 ]
+## Cloud Island's own (next-tier) gear.
+const CLOUD_WEAPONS := [
+	{"base": "Skyforged Blade", "model": "sword_1handed", "dmg": 1.35, "spell": 0},
+	{"base": "Thunderclap Greatsword", "model": "sword_2handed_color", "dmg": 1.6, "spell": 0},
+	{"base": "Galecutter Axe", "model": "skel_axe", "dmg": 1.5, "spell": 0},
+	{"base": "Rainmaker Staff", "model": "skel_staff", "dmg": 0.95, "spell": 55},
+]
+const CLOUD_ARMOR := [
+	{"base": "Skyplate", "shield": "shield_square_color", "def": 1.7, "tint": Color(0.95, 0.95, 1.0)},
+	{"base": "Cloudweave Robes", "shield": "shield_badge_color", "def": 1.6, "tint": Color(0.85, 0.9, 1.0)},
+	{"base": "Stormguard Mail", "shield": "Skeleton_Shield_Large_A", "def": 1.75, "tint": Color(0.6, 0.65, 0.85)},
+]
 const TRINKET_BASES := ["Ring", "Charm", "Talisman", "Band", "Pendant"]
 const SKINS := {
 	"lizard": {"name": "Lizardfolk Hide", "desc": "Your skin turns to green scales. You feel... cold-blooded.", "min": 2, "affix": "hp"},
@@ -81,6 +93,19 @@ const COSTUMES := {
 	"zombie": {"name": "Zombie Farmer", "file": "Farmer_B", "fx": "rot", "line": "Braaains... you're a zombie farmer!"},
 	"lich": {"name": "Lich", "file": "Lorekeeper", "fx": "deathly", "line": "A cold, ghostly lich. Your breath freezes the air."},
 	"demon": {"name": "Demon", "file": "Tiefling", "fx": "infernal", "line": "Horns of fire! You're a demon from the Sinkhole!"},
+	# Cloud Island (designed by Orion): "float" is your starting weight up there (0 floaty .. 1 heavy)
+	"angel": {"name": "Angel", "cloud": "angel", "float": 0.2, "line": "Wings and a halo! You float down as gently as a feather."},
+	"flying_pig": {"name": "Flying Pig", "cloud": "flying_pig", "float": 0.25, "line": "Oink oink! Pigs CAN fly. You're floaty now!"},
+	"balloon_man": {"name": "Balloon Man", "cloud": "balloon_man", "float": 0.08, "line": "Squeak squeak! So floaty, the wind blows you around."},
+	"bubble_kid": {"name": "Bubble Kid", "cloud": "bubble_kid", "float": 0.1, "line": "Inside a bubble! You float, and the bubbles lift you fast."},
+	"dandelion": {"name": "Dandelion Seed", "cloud": "dandelion", "float": 0.05, "line": "Make a wish! You drift on every breeze."},
+	"jellyfish": {"name": "Jellyfish", "cloud": "jellyfish", "float": 0.25, "line": "Bloop bloop. A floaty sky jellyfish!"},
+	"bubbles_cub": {"name": "Mr. Bubbles Cub", "cloud": "bubbles_cub", "float": 0.45, "line": "A tiny cloud bear with tiny wings. Rawr (but cute)."},
+	"thunder_bird": {"name": "Thunder Bird", "cloud": "thunder_bird", "float": 0.3, "line": "Feathers and a lightning crest! Floaty and fierce."},
+	"sky_whale": {"name": "Baby Sky Whale", "cloud": "sky_whale", "float": 0.3, "line": "You swim through the sky! Pfffsh goes your spout."},
+	"snowman": {"name": "Snowman", "cloud": "snowman", "float": 0.8, "line": "A heavy snowman: the wind can't push you, and you sink through thin clouds."},
+	"penguin": {"name": "Penguin", "cloud": "penguin", "float": 0.9, "line": "A penguin? Up HERE? You can't fly at all. Very heavy!"},
+	"rubber_duck": {"name": "Rubber Duck", "cloud": "rubber_duck", "float": 0.2, "line": "Squeak! Rubber ducks float, of course."},
 	"ghost_knight": {"name": "Ghost Knight", "file": "costumes/Paladin", "fx": "deathly", "line": "Whooo! You're a see-through ghost knight!"},
 	"ghost_archer": {"name": "Ghost Archer", "file": "adv2/Ranger", "fx": "deathly", "line": "A ghostly archer. Your arrows whisper."},
 	"death_knight": {"name": "Death Knight", "file": "adv2/Knight", "fx": "deathly", "line": "A Death Knight, glowing with cold blue fire."},
@@ -107,6 +132,7 @@ const ZONE_COSTUMES := {
 	"vault": ["skeleton", "necromancer", "bone_lord", "lich", "death_knight", "shadow_mage"],
 	"forest": ["goblin", "ember_goblin", "gruk", "werewolf", "leafy", "birdknight", "zombie", "demon", "dark_witch"],
 	"castle": ["ghost_knight", "ghost_archer", "vampire", "blood_vampire", "lich", "dark_knight", "death_knight", "necromancer"],
+	"cloud": ["angel", "bubbles_cub", "thunder_bird", "sky_whale", "jellyfish", "bubble_kid"],
 }
 const FITTING_COSTUMES := ["vampire", "ninja", "witch", "caveman", "imp", "sage", "farmer", "dark_knight", "shadow_ninja",
 	"zombie", "demon", "blood_vampire", "dark_witch", "necromancer", "birdknight", "leafy", "werewolf", "death_knight", "lich"]
@@ -118,6 +144,8 @@ const MONSTER_SKINS := {
 	"goblin": ["goblin", 0.02], "goblin_archer": ["goblin", 0.02], "goblin_brute": ["goblin", 0.05], "goblin_chief": ["gruk", 0.5],
 	"fire_goblin": ["ember_goblin", 0.03], "fire_archer": ["ember_goblin", 0.03], "magma_brute": ["demon", 0.06], "cyclops": ["demon", 0.4],
 	"ghost_knight": ["ghost_knight", 0.04], "ghost_archer": ["ghost_archer", 0.04], "ghost_lord": ["death_knight", 0.5],
+	"thunder_bird": ["thunder_bird", 0.04], "storm_sprite": ["bubble_kid", 0.03], "storm_bat": ["jellyfish", 0.02],
+	"bubble_mimic": ["bubble_kid", 0.05], "hail_golem": ["snowman", 0.5], "mr_bubbles": ["bubbles_cub", 0.6],
 }
 
 static func _pick(pool: Array) -> String:
@@ -127,6 +155,10 @@ static func _pick(pool: Array) -> String:
 		return keys[rng.randi() % keys.size()]
 	return ok[rng.randi() % ok.size()]
 
+## Cloud Island has its own "fits the theme" and "silly" picks.
+const CLOUD_FITTING := ["flying_pig", "balloon_man", "dandelion", "snowman"]
+const CLOUD_SILLY := ["penguin", "rubber_duck"]
+
 static func roll_costume(zone := "") -> String:
 	if zone == "":
 		zone = Game.zone
@@ -134,8 +166,8 @@ static func roll_costume(zone := "") -> String:
 	if x < 0.5:
 		return _pick(ZONE_COSTUMES.get(zone, FITTING_COSTUMES))
 	if x < 0.9:
-		return _pick(FITTING_COSTUMES)
-	return _pick(SILLY_COSTUMES)
+		return _pick(CLOUD_FITTING if zone == "cloud" else FITTING_COSTUMES)
+	return _pick(CLOUD_SILLY if zone == "cloud" else SILLY_COSTUMES)
 
 static func roll_costume_time() -> Array:
 	var total := 0
@@ -160,6 +192,9 @@ const OUTFITS := {
 	"Ghostforged Plate": ["costumes/Paladin", "adv2/Knight"],
 	"Moonsilver Mail": ["adv2/Knight", "costumes/Cleric"],
 	"Phantom Cuirass": ["costumes/Paladin", "adv2/Barbarian"],
+	"Skyplate": ["costumes/Paladin", "adv2/Knight"],
+	"Cloudweave Robes": ["adv2/Mage", "costumes/Cleric"],
+	"Stormguard Mail": ["adv2/Knight", "adv2/Engineer"],
 }
 
 ## Armour skins: new outfit looks that drop often. Each is a small upgrade
@@ -236,6 +271,8 @@ static func rarity_color(r: int) -> Color:
 
 ## Item level from how deep in the dungeon (z) the loot appears.
 static func area_level(z: float) -> int:
+	if Game.zone == "cloud":
+		return 12 if z < -80.0 else 11   # the storm layer and thunderhead are harder
 	if Game.zone == "castle":
 		return 8 if z < -40.0 else 7     # inside the castle walls is harder
 	if Game.zone == "forest":
@@ -285,7 +322,7 @@ static func _register(it: Dictionary) -> String:
 	return uid
 
 static func make_weapon(ilvl: int, rarity: int) -> String:
-	var pool: Array = CASTLE_WEAPONS if Game.zone == "castle" else WEAPON_BASES
+	var pool: Array = CASTLE_WEAPONS if Game.zone == "castle" else (CLOUD_WEAPONS if Game.zone == "cloud" else WEAPON_BASES)
 	var b: Dictionary = pool[rng.randi() % pool.size()]
 	var it := {"slot": "weapon", "rarity": rarity, "model": b.model, "base": b.base}
 	it["damage"] = roundf((2.0 + ilvl * 2.2) * RARITY_MULT[rarity] * b.dmg * rng.randf_range(0.85, 1.15))
@@ -300,6 +337,8 @@ static func make_armor(ilvl: int, rarity: int) -> String:
 	var b: Dictionary = ARMOR_BASES[clampi(int(rng.randf_range(0.0, 2.2)) + int(ilvl / 2.0), 0, ARMOR_BASES.size() - 1)]
 	if Game.zone == "castle":
 		b = CASTLE_ARMOR[rng.randi() % CASTLE_ARMOR.size()]
+	elif Game.zone == "cloud":
+		b = CLOUD_ARMOR[rng.randi() % CLOUD_ARMOR.size()]
 	return _armor_from(b, ilvl, rarity)
 
 ## The armour a beaten ghost knight leaves behind.
@@ -426,11 +465,13 @@ static func roll_enemy(type_name: String, ilvl: int) -> Array:
 	var t: Array = {"minion": [0.32, 0.1, 0.0], "warrior": [0.4, 0.18, 0.2], "mage": [0.45, 0.18, 0.2],
 		"revenant": [1.0, 1.0, 1.0], "summon": [0.7, 0.04, 0.0],
 		"ghost_knight": [0.4, 0.2, 0.4], "ghost_archer": [0.4, 0.2, 0.4], "wraith": [0.5, 0.22, 0.5],
-		"gatekeeper": [1.0, 1.0, 1.5], "ghost_lord": [1.0, 1.0, 2.5]}.get(type_name, [0.3, 0.1, 0.0])
+		"gatekeeper": [1.0, 1.0, 1.5], "ghost_lord": [1.0, 1.0, 2.5],
+		"thunder_bird": [0.45, 0.22, 0.6], "storm_sprite": [0.45, 0.22, 0.6], "storm_bat": [0.45, 0.22, 0.6],
+		"bubble_mimic": [0.6, 0.35, 0.8], "hail_golem": [1.0, 1.0, 2.0], "mr_bubbles": [1.0, 1.0, 3.0]}.get(type_name, [0.3, 0.1, 0.0])
 	if rng.randf() < t[0]:
 		_potions(out, 2 if type_name == "revenant" else 1, 0.65 if type_name == "mage" else 0.4)
 	if rng.randf() < t[1]:
-		var floor_r := 1 if type_name in ["revenant", "gatekeeper"] else (2 if type_name == "ghost_lord" else 0)
+		var floor_r := 1 if type_name in ["revenant", "gatekeeper", "hail_golem"] else (2 if type_name in ["ghost_lord", "mr_bubbles"] else 0)
 		out.append({"kind": "item", "id": make_random(ilvl, t[2], floor_r)})
 	if rng.randf() < 0.06:
 		out.append({"kind": "item", "id": make_armor_skin(ilvl, roll_rarity(0.2))})

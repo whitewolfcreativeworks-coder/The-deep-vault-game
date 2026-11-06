@@ -85,6 +85,41 @@ func _build() -> void:
 			_vis = Props.make("chest_gold"); add_child(_vis)
 			_vis.scale = Vector3.ONE * 0.5
 			col = Color(1.0, 0.7, 0.9)
+		"feather":
+			_vis = Node3D.new(); add_child(_vis)
+			var fm := FX.glow_material(Color(1.0, 0.85, 0.4), 1.6)
+			var quill := MeshInstance3D.new(); var qm := BoxMesh.new(); qm.size = Vector3(0.18, 0.7, 0.03)
+			quill.mesh = qm; quill.material_override = fm; quill.rotation.z = 0.3; _vis.add_child(quill)
+			for k in 5:
+				var vane := MeshInstance3D.new(); var vm := BoxMesh.new(); vm.size = Vector3(0.28 - k * 0.03, 0.09, 0.02)
+				vane.mesh = vm; vane.material_override = fm; vane.position = Vector3(0.1 - k * 0.03, 0.25 - k * 0.12, 0); vane.rotation.z = 0.5
+				_vis.add_child(vane)
+			col = Color(1.0, 0.85, 0.4)
+		"updraft":
+			_vis = Node3D.new(); add_child(_vis)
+			var cr := MeshInstance3D.new(); var pm := PrismMesh.new(); pm.size = Vector3(0.35, 0.6, 0.35)
+			cr.mesh = pm; cr.material_override = FX.glow_material(Color(1.0, 0.7, 0.4), 2.5); _vis.add_child(cr)
+			var cr2 := MeshInstance3D.new(); cr2.mesh = pm; cr2.material_override = cr.material_override
+			cr2.rotation.z = PI; cr2.position.y = -0.55; _vis.add_child(cr2)
+			col = Color(1.0, 0.7, 0.4)
+		"ventstone":
+			_vis = Node3D.new(); add_child(_vis)
+			var st := MeshInstance3D.new(); var cm2 := CylinderMesh.new(); cm2.top_radius = 0.35; cm2.bottom_radius = 0.45; cm2.height = 0.5
+			st.mesh = cm2; var sm2 := StandardMaterial3D.new(); sm2.albedo_color = Color(0.85, 0.75, 0.5); sm2.metallic = 0.5
+			st.material_override = sm2; _vis.add_child(st)
+			var gem := MeshInstance3D.new(); var gs := SphereMesh.new(); gs.radius = 0.18; gs.height = 0.36
+			gem.mesh = gs; gem.material_override = FX.glow_material(Color(0.5, 0.85, 1.0), 2.5); gem.position.y = 0.35
+			_vis.add_child(gem)
+			col = Color(0.5, 0.85, 1.0)
+		"stormbubble":
+			_vis = Node3D.new(); add_child(_vis)
+			var bb := MeshInstance3D.new(); var bs := SphereMesh.new(); bs.radius = 0.55; bs.height = 1.1
+			bb.mesh = bs
+			var bmat := StandardMaterial3D.new(); bmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			bmat.albedo_color = Color(1.0, 0.92, 0.4, 0.3); bmat.emission_enabled = true; bmat.emission = Color(1.0, 0.9, 0.3)
+			bmat.emission_energy_multiplier = 1.0; bmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+			bb.material_override = bmat; _vis.add_child(bb)
+			col = Color(1.0, 0.9, 0.35)
 		_:
 			_vis = Node3D.new(); add_child(_vis)
 	_vis.position.y = 0.6
@@ -127,6 +162,10 @@ func _on_body(b: Node) -> void:
 		return
 	_taken = true
 	Game.flags[uid] = true
+	if item == "stormbubble":
+		Sfx.play("pop", -2.0, 0.1)
+		if b.has_method("add_trauma"):
+			b.add_trauma(0.15)
 	Sfx.play("pickup", -2.0)
 	FX.burst(global_position + Vector3(0, 0.8, 0), _light.light_color, 30, 3.0, 0.15, 0.8, 0.5)
 	Game.on_quest_item(item)

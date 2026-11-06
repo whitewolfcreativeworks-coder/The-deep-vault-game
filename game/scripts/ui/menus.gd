@@ -989,6 +989,7 @@ func _refresh_dialogue(extra := "") -> void:
 # ---------------------------------------------------------------------------
 var _forest_stats: Label
 var _forest_title: Label
+var _cloud_btn: Button
 var _forest_sub: Label
 func _build_forest_victory() -> void:
 	var p := _center_panel("forest_victory", 820, 560)
@@ -1005,11 +1006,22 @@ func _build_forest_victory() -> void:
 	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 16); v.add_child(hb)
 	hb.add_child(_button("Keep exploring", func() -> void: _close_dialogue(), 280))
 	hb.add_child(_button("Save & exit to title", func() -> void: exit_to_title_requested.emit(), 300))
+	_cloud_btn = _button("Ride the cloud up  →  Level 4: Cloud Island", func() -> void:
+		_close_dialogue()
+		var sc := get_tree().current_scene
+		if sc.has_method("go_to_cloud"):
+			sc.go_to_cloud(), 640)
+	_cloud_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(_cloud_btn)
 
 func show_forest_victory(which := "forest") -> void:
-	if which == "castle":
+	_cloud_btn.visible = which == "castle"
+	if which == "cloud":
+		_forest_title.text = "CLOUD ISLAND IS CALM"
+		_forest_sub.text = "Mr. Bubbles is friendly again and the storm has blown away.\nLevel 4 complete! Fly your dragonfly (G) anywhere you like."
+	elif which == "castle":
 		_forest_title.text = "CASTLE MORWEN IS FREE"
-		_forest_sub.text = "The Ghost Lord is beaten and Ashenford can sleep again.\nLevel 3 complete! Hop on your new moped (G) and enjoy the moonlight."
+		_forest_sub.text = "The Ghost Lord is beaten and Ashenford can sleep again.\nLevel 3 complete! A cloud is gathering by Sister Elowen..."
 	else:
 		_forest_title.text = "THE FOREST IS SAFE"
 		_forest_sub.text = "Every quest in the Goblin Forest is done!\nThe Moonlit Portal in the south-east glade has woken up: it leads to Level 3, Ghost Knight Castle."

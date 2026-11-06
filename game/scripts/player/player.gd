@@ -12,6 +12,12 @@ const AIR_ACCEL := 4.0
 const GRAVITY := 22.0
 const JUMP_V := 7.0          # a tap: a modest hop
 const DOUBLE_JUMP_V := 11.0  # tap again in the air: a big boosted jump
+# Cloud Island physics (set by the world every frame; 1 / 0 / none elsewhere)
+var gravity_mult := 1.0      # floaty < 1 < heavy
+var jump_mult := 1.0
+var fall_cap := 60.0         # fastest you can fall (floaty skins drift down)
+var lift := -999.0           # a bubble carrying you: target vertical speed (none below -100)
+var wind := Vector3.ZERO     # a push from the wind (m/s), already scaled by your weight
 const EYE_H := 1.62
 const FP_THRESHOLD := 0.45
 const MAX_ZOOM := 11.0
@@ -430,7 +436,7 @@ func _physics_process(delta: float) -> void:
 				_jump_buffer = 0.0
 				return
 			if _coyote > 0.0:
-				velocity.y = JUMP_V * (1.25 if mounted else 1.0)   # jumping never needs stamina: it must always get you out of trouble
+				velocity.y = JUMP_V * (1.25 if mounted else 1.0) * jump_mult   # jumping never needs stamina: it must always get you out of trouble
 				Game.stamina = maxf(0.0, Game.stamina - 6.0)
 				_coyote = 0.0
 				_jump_buffer = 0.0
@@ -467,10 +473,13 @@ func _physics_process(delta: float) -> void:
 	if dodging:
 		target_v = dodge_dir * 10.5 * (1.0 - dodge_time / 0.42 * 0.5)
 	var a := ACCEL if is_on_floor() else AIR_ACCEL
-	velocity.x = lerpf(velocity.x, target_v.x, 1.0 - exp(-a * delta))
-	velocity.z = lerpf(velocity.z, target_v.z, 1.0 - exp(-a * delta))
-	if not is_on_floor():
-		velocity.y -= GRAVITY * delta
+	velocity.x = lerpf(velocity.x, target_v.x + wind.x, 1.0 - exp(-a * delta))
+	velocity.z = lerpf(velocity.z, target_v.z + wind.z, 1.0 - exp(-a * delta))
+	if lift > -100.0:
+		velocity.y = lerpf(velocity.y, lift, 1.0 - exp(-4.0 * delta))    # riding a bubble
+	elif not is_on_floor():
+		velocity.y -= GRAVITY * gravity_mult * delta
+		velocity.y = maxf(velocity.y, -fall_cap)
 	move_and_slide()
 	if global_position.y < kill_y:
 		take_damage(9999.0, global_position, 0.0)
@@ -1667,7 +1676,7 @@ var double_jumps := 0
 func _double_jump() -> void:
 	_air_jumps = 2
 	_jump_buffer = 0.0
-	velocity.y = DOUBLE_JUMP_V
+	velocity.y = DOUBLE_JUMP_V * jump_mult
 	var hv := Vector2(velocity.x, velocity.z)
 	var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	if iv.length() > 0.2:
