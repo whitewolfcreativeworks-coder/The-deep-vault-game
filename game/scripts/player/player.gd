@@ -579,14 +579,14 @@ func _physics_process(delta: float) -> void:
 	var hspeed := Vector2(velocity.x, velocity.z).length()
 	if strafe or attacking or blocking or casting:
 		want = view_yaw    # face where the camera looks; movement is independent
+	elif dir.length() > 0.1:
+		want = atan2(-dir.x, -dir.z)
 	if blocking:
 		# raise the shield toward whoever is about to hit you, wherever the camera points
 		var gt := _guard_target()
 		if gt:
 			var tg := gt.global_position - global_position
 			want = atan2(-tg.x, -tg.z)
-	elif dir.length() > 0.1:
-		want = atan2(-dir.x, -dir.z)
 	if dodging and not strafe:
 		want = atan2(-dodge_dir.x, -dodge_dir.z)
 	if posing:
