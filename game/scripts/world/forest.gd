@@ -85,6 +85,7 @@ func build() -> void:
 	_flush_multimeshes()
 	_motes()
 	_warren()
+	b.fix_coplanar()
 	_quest_items()
 	sinkhole = SinkholeOfDeath.build_in(self)
 	# treasure chests in random spots out in the woods (new ones keep popping up)

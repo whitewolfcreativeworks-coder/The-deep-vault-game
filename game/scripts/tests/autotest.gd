@@ -937,12 +937,13 @@ func _cam_inside() -> bool:
 func _count_zfight() -> int:
 	var boxes := []
 	var names := []
-	for mi in world().find_children("*", "MeshInstance3D", true, false):
+	var wn: Node3D = main.world
+	for mi in wn.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
-		if m.mesh is BoxMesh and m.is_visible_in_tree():
+		if m.mesh is BoxMesh and m.is_visible_in_tree() and not str(wn.get_path_to(m)).contains("Skeleton3D"):
 			var a := m.global_transform * m.get_aabb()
 			boxes.append(a)
-			names.append(str(world().get_path_to(m)))
+			names.append(str(wn.get_path_to(m)))
 	var n := 0
 	var buckets := {}
 	for i in boxes.size():
@@ -1580,6 +1581,29 @@ func _combat2_test() -> void:
 	await shot("c_blocking")
 	Input.action_release("block")
 	check("block_stops_damage", player.blocks + player.parries - b0 >= 3 and Game.hp >= hp0 - 0.5, "%d blocked, hp %.0f -> %.0f" % [player.blocks + player.parries - b0, hp0, Game.hp])
+	# 1b. the camera looks away and the enemy hits from the side: the shield turns to meet it
+	await wait(0.6)
+	await tp(e.global_position + Vector3(2.2, 0.1, 0), PI * 0.5)    # enemy on the left, camera faces right-ish
+	player.yaw = 0.0; player.facing = 0.0; player.snap_view()
+	Game.hp = Game.max_hp(); hp0 = Game.hp
+	b0 = player.blocks + player.parries
+	Input.action_press("block")
+	t = 0.0
+	var shot_done := false
+	while t < 8.0 and player.blocks + player.parries - b0 < 2:
+		player.yaw = 0.0       # the player never turns the camera toward the enemy
+		Game.stamina = Game.max_stamina()
+		await wait(0.1)
+		t += 0.1
+		if not shot_done and t > 0.6:
+			shot_done = true
+			await shot("c_blocking_side_glow")
+	Input.action_release("block")
+	check("block_from_the_side", player.blocks + player.parries - b0 >= 2 and Game.hp >= hp0 - 0.5, "%d blocked, hp %.0f -> %.0f" % [player.blocks + player.parries - b0, hp0, Game.hp])
+	check("guard_glow_shows", player._guard_fx != null)
+	await tp(at, 0.0)
+	player.facing = 0.0; player.yaw = 0.0; player.snap_view()
+	await wait(0.6)
 	# 2. raising the shield as the blow comes is a parry (and it cancels a swing)
 	var p0 := player.parries
 	t = 0.0
@@ -2216,6 +2240,16 @@ func _castle_test() -> bool:
 	await shot("ck_07b_thin_beams")
 	await _look(w.ground(62, 10) + Vector3(0, 1, 0), w.ground(62, 34) + Vector3(0, 0.3, 0), 5.0, -0.15)
 	await shot("ck_08_chapel")
+	# wraiths come back while Pip's quest is on
+	_kill_near(["wraith"], 300.0, Vector3(62, 0, 18))
+	Game.quests["wraith_hunt"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await tp(w.ground(0, 52) + Vector3(0, 0.3, 0), 0.0)
+	await wait(14.0)
+	var wr := get_tree().get_nodes_in_group("enemy").filter(func(e) -> bool: return e.type_id == "wraith" and not e.dead and e.global_position.y > 0.0 - 20.0).size()
+	check("wraiths_respawn", wr >= 2, "%d wraiths" % wr)
+	Game.quests.erase("wraith_hunt")
+	Game.quests_changed.emit()
 	# beacons -> gatehouse warden -> gate opens
 	Game.quests["light_beacons"] = {"state": "active", "n": 0}
 	Game.quests_changed.emit()
@@ -2242,6 +2276,20 @@ func _castle_test() -> bool:
 	_kill_near(Enemy.TYPES.keys(), 40.0, Vector3(0, CastleWorld.KY, -66))
 	await _look(Vector3(0, CastleWorld.KY + 3, -76), Vector3(0, CastleWorld.KY + 0.3, -46), 5.0, -0.05)
 	await shot("ck_11_courtyard")
+	# no flickering floors: the ground stays under the stone floors, and no stone boxes share a face
+	check("castle_ground_below_floors", w.height(0, -90) < CastleWorld.KY - 0.05 and w.height(20, -70) < CastleWorld.KY - 0.05)
+	var zf := _count_zfight()
+	check("castle_no_zfighting", zf == 0, "%d overlapping face pairs" % zf)
+	# the glowing shield, seen from the side
+	var g2 := Enemy.new(); g2.configure("ghost_knight", "", 0.0); g2.position = Vector3(-3, CastleWorld.KY + 0.3, -62)
+	w.add_child(g2)
+	await tp(Vector3(0, CastleWorld.KY + 0.3, -62), 0.0)
+	player.yaw = PI * 0.25; player.zoom_target = 3.6; player.zoom = 3.6; player.pitch = -0.2; player.snap_view()
+	Input.action_press("block")
+	await wait(1.2)
+	await shot("ck_11b_shield_glow")
+	Input.action_release("block")
+	g2.take_damage(99999.0, player.global_position)
 	# the library and the music box
 	Game.quests["the_gatehouse"].state = "done"
 	Game.quests["music_box"] = {"state": "active", "n": 0}

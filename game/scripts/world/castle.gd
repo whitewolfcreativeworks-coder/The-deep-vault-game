@@ -74,6 +74,7 @@ func build() -> void:
 	_beacons()
 	_castle()
 	_crypt()
+	b.fix_coplanar()      # stone boxes that share a face would flicker: nudge them apart
 	_moors()
 	_scatter()
 	_horizon()
@@ -111,7 +112,8 @@ func height(x: float, z: float) -> float:
 		h += pow(edge - 100.0, 1.6) * 0.18
 	# the castle's flat hilltop
 	var k := smoothstep(WALL_X + 14.0, WALL_X + 6.0, absf(x)) * smoothstep(GATE_Z + 16.0, GATE_Z + 6.0, z)
-	return lerpf(h, KY, k)
+	# a hair below the castle's stone floors, so ground and floor never flicker against each other
+	return lerpf(h, KY - 0.12, k)
 
 func _hw(name: String, pos: Vector3, yaw_deg := 0.0, scl := 1.0, collide := false) -> Node3D:
 	var path := HW_DIR % name
@@ -201,9 +203,49 @@ func _set_area(a: String) -> void:
 	if a == "castle" and not _lord_started:
 		Sfx.music("music_explore", -15.0)
 
-func _process(_delta: float) -> void:
+## Ghosts keep coming back while a quest needs them: wraiths at the chapel and
+## in the crypt, ghost knights on the moors, archers on the hills. [quest, type,
+## spots, how many to keep around at once].
+const HAUNTS := [
+	["wraith_hunt", "wraith", [Vector2(62, 12), Vector2(56, 22), Vector2(68, 24), Vector2(62, 32), Vector2(74, 10)], 4],
+	["restless_dead", "ghost_knight", [Vector2(-6, 20), Vector2(28, -12), Vector2(-30, -8), Vector2(42, 48), Vector2(-40, 70)], 4],
+	["archers_on_walls", "ghost_archer", [Vector2(-86, -18), Vector2(86, -22), Vector2(-66, 30), Vector2(-74, 76), Vector2(60, -40)], 4],
+]
+var _haunt_t := 0.0
+var _haunted: Array = []
+
+func _haunt(delta: float) -> void:
+	_haunt_t -= delta
+	if _haunt_t > 0.0:
+		return
+	_haunt_t = 6.0
+	_haunted = _haunted.filter(func(e) -> bool: return is_instance_valid(e) and not e.dead)
+	for h in HAUNTS:
+		if Game.quest_state(h[0]) != "active":
+			continue
+		var alive := 0
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and not e.dead and e.type_id == h[1] and e.global_position.y > CY + 20.0:
+				alive += 1
+		if alive >= int(h[3]):
+			continue
+		# rise at a spot out of the player's sight-line (not right on top of them)
+		var spots: Array = (h[2] as Array).filter(func(p: Vector2) -> bool:
+			return Vector2(player.global_position.x, player.global_position.z).distance_to(p) > 14.0)
+		if spots.is_empty():
+			continue
+		var at: Vector2 = spots[randi() % spots.size()]
+		var g := Enemy.new()
+		g.configure(h[1], "", 0.0)
+		g.position = ground(at.x + randf_range(-3, 3), at.y + randf_range(-3, 3)) + Vector3(0, 0.3, 0)
+		add_child(g)
+		_haunted.append(g)
+		FX.burst(g.position + Vector3(0, 1, 0), Color(0.55, 0.8, 1.0), 30, 3.0, 0.3, 0.9, 0.5)
+
+func _process(delta: float) -> void:
 	if player == null:
 		return
+	_haunt(delta)
 	player.kill_y = CY - 30.0
 	var pp := player.global_position
 	_set_area("crypt" if pp.y < CY + 20.0 else "castle")

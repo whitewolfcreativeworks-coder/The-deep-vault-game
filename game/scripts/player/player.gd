@@ -480,6 +480,12 @@ func _physics_process(delta: float) -> void:
 	var hspeed := Vector2(velocity.x, velocity.z).length()
 	if strafe or attacking or blocking or casting:
 		want = view_yaw    # face where the camera looks; movement is independent
+	if blocking:
+		# raise the shield toward whoever is about to hit you, wherever the camera points
+		var gt := _guard_target()
+		if gt:
+			var tg := gt.global_position - global_position
+			want = atan2(-tg.x, -tg.z)
 	elif dir.length() > 0.1:
 		want = atan2(-dir.x, -dir.z)
 	if dodging and not strafe:
@@ -487,10 +493,13 @@ func _physics_process(delta: float) -> void:
 	if posing:
 		want = facing          # stand still and let the camera go round
 	var turn := 22.0 if strafe else (18.0 if attacking else 12.0)
+	if blocking:
+		turn = 30.0
 	if special_kind == "charge":
 		want = atan2(-_charge_dir.x, -_charge_dir.z)
 	facing = lerp_angle(facing, want, 1.0 - exp(-turn * delta))
 	body.rotation.y = facing
+	_update_guard_fx(delta)
 	if special_kind == "whirl":
 		body.rotation.y = facing + _special_t / 0.75 * TAU * 2.0
 	if mounted and mount:
@@ -591,6 +600,8 @@ func _handle_actions() -> void:
 	# Block raises instantly, even mid-swing (the swing is cancelled), so it can
 	# be used on reaction. The first PARRY_WINDOW seconds count as a parry.
 	var want_block := Input.is_action_pressed("block") and not dodging and special_kind == "" and Game.stamina > 2.0
+	if Input.is_action_just_pressed("block") and Game.stamina <= 2.0:
+		Game.say("Too tired to block! Wait for your yellow bar.", Color(1.0, 0.8, 0.4))
 	if want_block and attacking:
 		attacking = false; combo = 0; combo_queued = false
 	if want_block and not blocking:
@@ -765,7 +776,8 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 	var to_src := from_pos - global_position
 	to_src.y = 0
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
-	var blocked := blocking and to_src.length() > 0.01 and fwd.dot(to_src.normalized()) > -0.15
+	# the shield covers everything but your back (about 240 degrees)
+	var blocked := blocking and (to_src.length() < 0.01 or fwd.dot(to_src.normalized()) > -0.5)
 	var dmg := Game.mitigate(amount)
 	if ward_t > 0.0:
 		dmg *= 0.3        # Holy Ward
@@ -774,12 +786,13 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 		if block_time < PARRY_WINDOW:
 			_parry(from_pos)
 			return
-		var cost := maxf(4.0, dmg * 0.8)
+		var cost := maxf(3.0, dmg * 0.5)
 		if Game.stamina >= cost:
 			Game.stamina -= cost
 			dmg = 0.0 if amount < 40.0 else dmg * 0.15   # only the Warden's biggest blows get through a little
 			blocks += 1
 			Sfx.play("clang", -3.0)
+			_guard_hit = 1.0
 			FX.sparks(global_position + Vector3(0, 1.2, 0) + fwd * 0.6, Color(1.0, 0.85, 0.5))
 			FX.flash_light(global_position + Vector3(0, 1.2, 0) + fwd * 0.6, Color(1.0, 0.8, 0.4), 3.0, 4.0, 0.15)
 			knock *= 0.3
@@ -792,6 +805,7 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 			dmg *= 0.5
 			blocking = false
 			Game.say("Guard broken!", Color(1, 0.5, 0.3))
+			FX.burst(global_position + Vector3(0, 1.2, 0) + fwd * 0.7, Color(0.55, 0.8, 1.0), 40, 5.0, 0.12, 0.5, -6.0)
 	if not blocked or dmg > 3.0:
 		hurt_time = 0.0
 		body.flash(Color(1, 0.2, 0.2), 0.6)
@@ -1671,13 +1685,78 @@ func _double_jump() -> void:
 # ---------------------------------------------------------------------------
 # Parry: raising the shield just as a blow lands stops it completely, staggers
 # the attacker and gives back some mana.
-const PARRY_WINDOW := 0.35
+const PARRY_WINDOW := 0.4
 var block_time := 0.0
 var blocks := 0
 var parries := 0
 
+## The enemy the shield turns toward: whoever is winding up a blow, else the nearest.
+func _guard_target() -> Node3D:
+	var best: Node3D = null
+	var bs := INF
+	for e in _live_enemies():
+		var to: Vector3 = e.global_position - global_position
+		if absf(to.y) > 3.0:
+			continue
+		var d := Vector2(to.x, to.z).length()
+		var reach := 22.0 if e.get("t") is Dictionary and (e.get("t") as Dictionary).get("ranged", false) else 9.0
+		if d > reach:
+			continue
+		var sc := d
+		if e.get("state") == Enemy.S.WINDUP:
+			sc -= 6.0
+		if sc < bs:
+			bs = sc; best = e
+	return best
+
+## A see-through glowing shield in front of you while you block: blue when up,
+## gold during the parry moment, flashing white when it stops a blow.
+var _guard_fx: Node3D
+var _guard_mat: StandardMaterial3D
+var _guard_a := 0.0
+var _guard_hit := 0.0
+
+func _update_guard_fx(delta: float) -> void:
+	if _guard_fx == null:
+		_guard_fx = Node3D.new()
+		add_child(_guard_fx)
+		var mi := MeshInstance3D.new()
+		var sm := SphereMesh.new(); sm.radius = 0.75; sm.height = 0.75; sm.is_hemisphere = true
+		sm.radial_segments = 24; sm.rings = 8
+		mi.mesh = sm
+		_guard_mat = StandardMaterial3D.new()
+		_guard_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_guard_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_guard_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_guard_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mi.material_override = _guard_mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.rotation.x = -PI * 0.5            # the dome bulges forward (-Z)
+		mi.scale = Vector3(1.0, 0.45, 1.25)
+		_guard_fx.add_child(mi)
+		var rim := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 0.72; tm.outer_radius = 0.78
+		rim.mesh = tm; rim.material_override = _guard_mat; rim.rotation.x = PI * 0.5; rim.scale = Vector3(1.0, 1.0, 1.25)
+		rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_guard_fx.add_child(rim)
+	var up := blocking and not dead
+	_guard_a = move_toward(_guard_a, 1.0 if up else 0.0, delta * (12.0 if up else 6.0))
+	_guard_hit = maxf(0.0, _guard_hit - delta * 4.0)
+	_guard_fx.visible = _guard_a > 0.01
+	if not _guard_fx.visible:
+		return
+	var fwd := -Vector3(sin(facing), 0, cos(facing))
+	_guard_fx.position = Vector3(0, 1.05 + ((_seat_h() - 0.46) if mounted else 0.0), 0) + fwd * 0.62
+	_guard_fx.rotation = Vector3(0, facing, 0)
+	var parry_now := blocking and block_time < PARRY_WINDOW
+	var c := Color(1.0, 0.85, 0.35) if parry_now else Color(0.45, 0.75, 1.0)
+	c = c.lerp(Color(1, 1, 1), _guard_hit)
+	var shimmer := 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.012)
+	_guard_mat.albedo_color = Color(c.r, c.g, c.b, (0.32 + 0.5 * _guard_hit) * _guard_a * shimmer)
+	_guard_fx.scale = Vector3.ONE * (0.85 + 0.15 * _guard_a + 0.12 * _guard_hit)
+
 func _parry(from_pos: Vector3) -> void:
 	parries += 1
+	_guard_hit = 1.0
 	invuln = maxf(invuln, 0.2)
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
 	var at := global_position + Vector3(0, 1.2, 0) + fwd * 0.7
