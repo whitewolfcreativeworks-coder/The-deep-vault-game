@@ -250,6 +250,9 @@ func _run() -> void:
 	elif mode == "sinkhole":
 		if await _sinkhole_test():
 			return
+	elif mode == "crypt":
+		if await _crypt_walk_test():
+			return
 	elif mode == "castle":
 		if await _castle_test():
 			return
@@ -2314,6 +2317,57 @@ func _castle_test() -> bool:
 	check("g_gets_off_moped", not player.mounted)
 	Game.save_slot()
 	check("castle_saved", Game.read_slot(Game.active_slot).get("zone", "") == "castle")
+	return false
+
+## The crypt the way a player does it: walk up to each door, press USE.
+func _crypt_walk_test() -> bool:
+	if Game.get_meta("cw_phase", 1) == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("cw_phase", 2)
+		main.go_to_castle()
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w = main.world
+	var door: Passage = null
+	var up: Passage = null
+	for n in get_tree().get_nodes_in_group("interactable"):
+		if n is Passage:
+			if (n as Passage).dest.y < CastleWorld.CY + 5.0: door = n
+			else: up = n
+	print("CRYPT door at ", door.global_position, " -> ", door.dest, "   up at ", up.global_position, " -> ", up.dest)
+	await tp(door.global_position + Vector3(0, 0.3, 3.0), 0.0)
+	await wait(0.5)
+	print("CRYPT surface target: ", player.interact_target, " ", player._last_prompt)
+	await press("interact", 0.1)
+	await wait(1.8)
+	print("CRYPT after going down: ", player.global_position, " area=", w.area)
+	check("went_down", player.global_position.y < CastleWorld.CY + 5.0)
+	_kill_near(Enemy.TYPES.keys(), 80.0, player.global_position)
+	await shot("cw_01_arrived")
+	# walk back (south) toward the sparkles, pressing USE when it shows
+	var t := 0.0
+	player.yaw = PI; player.facing = PI
+	Input.action_press("move_forward")
+	while t < 6.0 and player.interact_target != up:
+		player.yaw = PI
+		await wait(0.1); t += 0.1
+	Input.action_release("move_forward")
+	print("CRYPT walked to ", player.global_position, " target=", player.interact_target, " prompt=", player._last_prompt, " t=", t)
+	await shot("cw_02_at_stairs")
+	check("stairs_targeted", player.interact_target == up, str(player.interact_target))
+	await press("interact", 0.1)
+	await wait(0.6)
+	print("CRYPT mid ", player.global_position)
+	await wait(1.4)
+	print("CRYPT after USE ", player.global_position, " area=", w.area)
+	await wait(2.0)
+	print("CRYPT 2s later ", player.global_position)
+	check("climbed_out", player.global_position.y > CastleWorld.CY + 40.0, str(player.global_position))
+	await shot("cw_03_outside")
 	return false
 
 # --- costumes, outfits and wild chests ---------------------------------------------

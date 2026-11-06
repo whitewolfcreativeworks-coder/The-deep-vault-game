@@ -6,6 +6,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 GODOT="${GODOT:-godot}"
 TARGET="${1:-all}"
+# Stamp the build number shown on the title screen and pause menu
+STAMP="$(date -u +%Y-%m-%d) · $(git rev-parse --short HEAD 2>/dev/null || echo local)"
+printf 'class_name BuildInfo\n## Stamped by tools/build.sh at export time (restored to "dev" afterwards), so\n## the title screen and pause menu show which build you'"'"'re playing.\nconst BUILD := "%s"\n' "$STAMP" > game/scripts/build_info.gd
+trap 'git checkout -q -- game/scripts/build_info.gd 2>/dev/null || true' EXIT
 "$GODOT" --headless --path game --import
 build() {
   local preset="$1" out="$2"

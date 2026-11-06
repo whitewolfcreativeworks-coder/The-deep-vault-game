@@ -127,6 +127,11 @@ func _build_title() -> void:
 	var gm := ShaderMaterial.new(); gm.shader = gs
 	grad.material = gm
 	c.add_child(grad)
+	var ver := UIKit.label("Build " + BuildInfo.BUILD, 14, UIKit.DIM)
+	ver.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	ver.position = Vector2(16, -30); ver.anchor_top = 1.0; ver.anchor_bottom = 1.0
+	ver.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(ver)
 	var v := VBoxContainer.new()
 	v.position = Vector2(110, 180)
 	v.add_theme_constant_override("separation", 14)
@@ -675,6 +680,8 @@ func _build_pause() -> void:
 	p.add_child(v)
 	var t := UIKit.label("Paused", 40, UIKit.GOLD, true); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
+	var bl := UIKit.label("Build " + BuildInfo.BUILD, 14, UIKit.DIM); bl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(bl)
 	v.add_child(_button("Resume", func() -> void: resume_requested.emit(), 360))
 	v.add_child(_button("Inventory & Character", func() -> void: show_panel("inventory"), 360))
 	v.add_child(_button("Skin Designer", func() -> void: show_panel("designer"), 360))
