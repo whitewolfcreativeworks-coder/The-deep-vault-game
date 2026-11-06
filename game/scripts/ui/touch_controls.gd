@@ -360,7 +360,7 @@ func _available(b: Dictionary) -> bool:
 	if posing and not arrange:
 		return b.name in ["pose", "jump"]     # only DONE, POSE! and a hop while you look at yourself
 	if b.name == "mount":
-		return bool(Game.flags.get("mount_chicken", false)) or bool(Game.flags.get("mount_moped", false)) or arrange
+		return (player != null and player.has_mount()) or arrange
 	if b.name == "special2":
 		return Game.has_special2() or arrange
 	return true
@@ -401,18 +401,22 @@ func _press_button(b: Dictionary) -> void:
 				player.toggle_view()
 		_:
 			Input.action_press(b.action)
-			if not b.hold:
+			if not b.hold and not (b.name == "jump" and _flying()):
 				get_tree().create_timer(0.08, true, true).timeout.connect(func() -> void: Input.action_release(b.action))
+
+## On the dragonfly, JUMP is held down to climb (and is labelled FLY).
+func _flying() -> bool:
+	return player != null and player.get("mounted") == true and player.get("mount_kind") == "dragonfly"
 
 func _release_button(n: String) -> void:
 	_held.erase(n)
 	for b in _buttons:
-		if b.name == n and b.hold:
+		if b.name == n and (b.hold or b.name == "jump"):
 			Input.action_release(b.action)
 
 func _release_all() -> void:
 	for b in _buttons:
-		if b.hold:
+		if b.hold or b.name == "jump":
 			Input.action_release(b.action)
 	_held.clear(); _btn_touch.clear(); _look.clear(); _press_info.clear(); _moving.clear()
 	_stick_id = -1; _stick_vec = Vector2.ZERO; _zoom_id = -1
@@ -430,7 +434,7 @@ func _process(d: float) -> void:
 	for idx in _press_info.keys():
 		var info: Dictionary = _press_info[idx]
 		info.t += d
-		if info.t >= LONG_PRESS and not (info.name in ["attack", "block"]):
+		if info.t >= LONG_PRESS and not (info.name in ["attack", "block"]) and not (info.name == "jump" and _flying()):
 			_press_info.erase(idx)
 			_btn_touch.erase(idx)
 			_held.erase(info.name)
@@ -525,7 +529,9 @@ func _draw_pad() -> void:
 		elif b.name == "view" and player:
 			label = player.view_name()
 		elif b.name == "mount" and player:
-			label = "WALK" if player.get("mounted") else "RIDE"
+			label = ("NEXT" if player.has_next_mount() else "WALK") if player.get("mounted") else "RIDE"
+		elif b.name == "jump" and _flying():
+			label = "FLY"
 		elif b.name == "pose" and player:
 			label = "DONE" if player.get("posing") else "ME"
 		elif b.name == "auto" and player and player.get("auto_run"):

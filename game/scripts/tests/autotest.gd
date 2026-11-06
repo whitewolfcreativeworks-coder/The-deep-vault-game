@@ -253,6 +253,8 @@ func _run() -> void:
 	elif mode == "crypt":
 		if await _crypt_walk_test():
 			return
+	elif mode == "dragonfly":
+		await _dragonfly_test()
 	elif mode == "castle":
 		if await _castle_test():
 			return
@@ -2417,6 +2419,102 @@ func _crypt_walk_test() -> bool:
 	check("climbed_out", player.global_position.y > CastleWorld.CY + 40.0, str(player.global_position))
 	await shot("cw_03_outside")
 	return false
+
+# --- the Dragonfly, the first flying mount -------------------------------------------
+func _dragonfly_test() -> void:
+	await _start()
+	player = main.player
+	god = true
+	await wait(0.5)
+	# G does nothing before you own a mount; then cycles chicken -> moped -> dragonfly -> off
+	await press("mount", 0.07); await wait(0.2)
+	check("no_mount_yet", not player.mounted)
+	Game.flags["mount_chicken"] = true
+	Game.flags["mount_moped"] = true
+	Game.grant_dragonfly()
+	check("dragonfly_granted", Game.flags.get("mount_dragonfly", false) and player.has_mount())
+	var order := []
+	for k in 4:
+		await press("mount", 0.07); await wait(0.25)
+		order.append(player.mount_kind if player.mounted else "off")
+	check("g_cycles_all_mounts", order == ["chicken", "moped", "dragonfly", "off"], str(order))
+	Game.flags.erase("mount_moped")
+	await press("mount", 0.07); await wait(0.25)
+	await press("mount", 0.07); await wait(0.25)
+	check("g_skips_unowned", player.mount_kind == "dragonfly", player.mount_kind)
+	check("dragonfly_model", player.mount is DragonflyMount)
+	player.yaw = PI * 0.85; player.zoom_target = 4.5; player.zoom = 4.5; player.pitch = -0.15; player.snap_view()
+	await wait(1.0)
+	await shot("df_01_riding")
+	# hold jump to climb
+	var y0 := player.global_position.y
+	player.wing_stamina = 1.0
+	Input.action_press("jump")
+	Input.action_press("move_forward")
+	await wait(3.0)
+	Input.action_release("move_forward")
+	var y1 := player.global_position.y
+	check("climbs_when_holding_jump", y1 > y0 + 10.0 and player.flying, "%.1f -> %.1f" % [y0, y1])
+	# fly far out past the edge of the outpost: the dragonfly won't leave the ground behind
+	var y_edge := player.global_position.y
+	player.yaw = 0.0; player.facing = 0.0
+	for k in 40:
+		Input.action_press("move_forward")
+		player.yaw = atan2(player.global_position.x - 0.0, player.global_position.z - 0.0)   # head away from the middle
+		await wait(0.1)
+	Input.action_release("move_forward")
+	var below := player._blocked(player.global_position + Vector3(0, 0.5, 0), player.global_position + Vector3(0, -80, 0))
+	check("edge_turns_back", not below.is_empty() or player.global_position.distance_to(player._fly_safe) < 8.0, str(player.global_position))
+	check("wing_stamina_drains", player.wing_stamina < 1.0 and player.wing_stamina > 0.8, "%.3f" % player.wing_stamina)
+	await wait(2.0)
+	player.yaw = PI * 0.9; player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = -0.35; player.snap_view()
+	await wait(0.6)
+	await shot("df_02_flying_high")
+	# altitude is capped (about 60 m over the ground below)
+	player.global_position.y = player._fly_ground_y + 70.0
+	await wait(1.0)
+	check("altitude_capped", player.velocity.y <= 0.5, "vy %.2f" % player.velocity.y)
+	player.global_position.y = player._fly_ground_y + 20.0
+	Input.action_release("jump")
+	await wait(1.5)
+	# let go: a slow glide down, not a fall
+	var vy: float = player.velocity.y
+	check("slow_glide", vy < 0.0 and vy > -2.6, "vy %.2f" % vy)
+	check("still_mounted_in_air", player.mounted and player.flying)
+	# attack mid-air doesn't throw you off
+	await press("attack", 0.07); await wait(0.2)
+	check("attack_keeps_you_flying", player.mounted)
+	# tired wings: can't climb, glide down, rest on the ground
+	player.wing_stamina = 0.004
+	var yt0 := player.global_position.y
+	Input.action_press("jump")
+	await wait(1.2)
+	check("tired_wings", player.wings_tired and player.global_position.y < yt0, "y %.1f -> %.1f" % [yt0, player.global_position.y])
+	player.yaw = PI * 0.8; player.zoom_target = 4.5; player.zoom = 4.5; player.pitch = -0.2; player.snap_view()
+	await shot("df_03_tired")
+	var t := 0.0
+	while not player.is_on_floor() and t < 25.0:
+		await wait(0.25); t += 0.25
+
+	Input.action_release("jump")
+	check("lands_when_tired", player.is_on_floor() and player.mounted, "t %.1f" % t)
+	var w0: float = player.wing_stamina
+	await wait(3.5)
+	check("wings_refill_on_ground", player.wing_stamina > w0 + 0.3, "%.2f -> %.2f" % [w0, player.wing_stamina])
+	player.wing_stamina = 0.4
+	await wait(0.3)
+	check("rested_and_ready", not player.wings_tired)
+	# take off again from the ground
+	var yg := player.global_position.y
+	Input.action_press("jump"); await wait(1.0); Input.action_release("jump")
+	check("takes_off_again", player.global_position.y > yg + 3.0)
+	# the HUD shows the wing bar only while on the dragonfly
+	check("wing_bar_visible", main.hud.wing_row.visible)
+	await press("mount", 0.07); await wait(0.3)
+	check("off_after_last_mount", not player.mounted and not main.hud.wing_row.visible)
+	# saved with the slot
+	Game.save_slot()
+	check("dragonfly_saved", bool(Game.read_slot(Game.active_slot).get("flags", {}).get("mount_dragonfly", false)))
 
 # --- costumes, outfits and wild chests ---------------------------------------------
 func _costumes_test() -> void:

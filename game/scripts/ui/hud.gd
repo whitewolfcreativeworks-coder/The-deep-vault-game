@@ -7,6 +7,9 @@ var name_label: Label
 var hp_bar: ProgressBar; var hp_text: Label
 var mp_bar: ProgressBar
 var st_bar: ProgressBar
+var wing_row: HBoxContainer
+var wing_bar: ProgressBar
+var wing_label: Label
 var xp_bar: ProgressBar
 var gold_label: Label
 var potion_label: Label
@@ -106,6 +109,11 @@ func _ready() -> void:
 	hp_text = UIKit.label("", 15); hp_text.custom_minimum_size.x = 90; hp_row.add_child(hp_text)
 	mp_bar = UIKit.bar(Color(0.2, 0.42, 0.9), 280, 12); sv.add_child(mp_bar)
 	st_bar = UIKit.bar(Color(0.78, 0.66, 0.22), 280, 9); sv.add_child(st_bar)
+	# the dragonfly's wing stamina (only while flying it)
+	wing_row = HBoxContainer.new(); wing_row.add_theme_constant_override("separation", 8); sv.add_child(wing_row)
+	wing_bar = UIKit.bar(Color(0.25, 0.85, 0.8), 230, 9); wing_row.add_child(wing_bar)
+	wing_label = UIKit.label("WINGS", 13, Color(0.5, 1.0, 0.9)); wing_row.add_child(wing_label)
+	wing_bar.max_value = 1.0; wing_row.visible = false
 	xp_bar = UIKit.bar(Color(0.55, 0.35, 0.85), 280, 6); sv.add_child(xp_bar)
 	var res_row := HBoxContainer.new(); res_row.add_theme_constant_override("separation", 22); sv.add_child(res_row)
 	potion_label = UIKit.label("", 16, Color(1, 0.55, 0.55)); res_row.add_child(potion_label)
@@ -263,6 +271,12 @@ func _process(delta: float) -> void:
 	hp_text.text = " %d / %d" % [int(ceil(maxf(Game.hp, 0.0))), int(Game.max_hp())]
 	mp_bar.max_value = Game.max_mana(); mp_bar.value = Game.mana
 	st_bar.max_value = Game.max_stamina(); st_bar.value = Game.stamina
+	var on_fly: bool = player.mounted and player.mount_kind == "dragonfly"
+	wing_row.visible = on_fly
+	if on_fly:
+		wing_bar.value = player.wing_stamina
+		wing_label.text = "TIRED" if player.wings_tired else "WINGS"
+		wing_bar.modulate = Color(1.0, 0.6, 0.4) if player.wings_tired else Color.WHITE
 	xp_bar.max_value = Game.xp_to_next(); xp_bar.value = Game.xp
 	if quest_box:
 		quest_box.position.x = 104.0 if Game.touch_active else 22.0

@@ -143,40 +143,133 @@ func rebuild_body() -> void:
 	if mounted:
 		_ride_pose(true)
 
+# --- the Dragonfly: the first flying mount ------------------------------------------
+## Hold jump to climb, let go to glide gently down, steer with the stick.
+## Its wings tire: wing_stamina (0..1) drains while climbing (about a minute)
+## and barely at all while gliding; it refills on the ground. When it's empty
+## the wings droop and you can only glide down until you land and rest.
+const FLY_CLIMB_V := 6.5
+const FLY_GLIDE_V := -1.8
+const FLY_TIRED_V := -3.2
+const FLY_CEILING := 60.0       # metres above the last ground you flew over
+var wing_stamina := 1.0
+var wings_tired := false
+var flying := false
+var _fly_ground_y := 0.0
+var _fly_safe := Vector3.ZERO     # the last spot with ground underneath
+var _fly_warned := false
+
+func _dragonfly_move(delta: float, target_v: Vector3) -> void:
+	# snappy steering in the air (the normal air control is for jumps)
+	velocity.x = lerpf(velocity.x, target_v.x, 1.0 - exp(-ACCEL * 0.7 * delta))
+	velocity.z = lerpf(velocity.z, target_v.z, 1.0 - exp(-ACCEL * 0.7 * delta))
+	var below := _blocked(global_position + Vector3(0, 0.5, 0), global_position + Vector3(0, -80.0, 0))
+	if not below.is_empty():
+		_fly_ground_y = (below.position as Vector3).y
+		_fly_safe = global_position
+		_fly_warned = false
+	elif flying:
+		# nothing underneath (off the edge of the map): the dragonfly turns back
+		var back := _fly_safe - global_position
+		back.y = 0.0
+		if back.length() > 0.1:
+			var push := back.normalized() * WALK * DRAGONFLY_SPEED * 0.8
+			velocity.x = push.x; velocity.z = push.z
+		if not _fly_warned:
+			_fly_warned = true
+			Game.say("Whoa, there's nothing down there! Your dragonfly turns back.", Color(0.5, 1.0, 0.85))
+	var climb := input_enabled and Input.is_action_pressed("jump") and not wings_tired
+	var under_ceiling := global_position.y < _fly_ground_y + FLY_CEILING
+	if mount:
+		mount.climbing = climb
+		mount.tired = wings_tired
+	if is_on_floor() and not climb:
+		flying = false
+		_fly_safe = global_position
+		wing_stamina = minf(1.0, wing_stamina + delta / 8.0)
+		if wings_tired and wing_stamina >= 0.35:
+			wings_tired = false
+			Game.say("Your dragonfly has rested. Ready to fly!", Color(0.5, 1.0, 0.85))
+		velocity.y = -1.0
+		return
+	flying = true
+	if climb:
+		velocity.y = lerpf(velocity.y, FLY_CLIMB_V if under_ceiling else 0.0, 1.0 - exp(-6.0 * delta))
+		wing_stamina = maxf(0.0, wing_stamina - delta / 60.0)
+	else:
+		velocity.y = lerpf(velocity.y, FLY_TIRED_V if wings_tired else FLY_GLIDE_V, 1.0 - exp(-3.0 * delta))
+		wing_stamina = maxf(0.0, wing_stamina - delta / 600.0)
+	if wing_stamina <= 0.0 and not wings_tired:
+		wings_tired = true
+		Game.say("Your dragonfly is tired! Glide down and land so it can rest.", Color(1.0, 0.8, 0.4))
+
 # --- the Giant Chicken mount --------------------------------------------------------
 const MOUNT_SPEED := 1.75       # riding is this much faster than running on foot
 const MOPED_SPEED := 2.1        # the moped is even faster
+const DRAGONFLY_SPEED := 2.4    # and the dragonfly flies faster still
+const MOUNT_ORDER := ["chicken", "moped", "dragonfly"]
 var mounted := false
-var mount = null                 # ChickenMount or MopedMount
+var mount = null                 # ChickenMount, MopedMount or DragonflyMount
 var mount_kind := ""
 
+func owns_mount(kind: String) -> bool:
+	return bool(Game.flags.get("mount_" + kind, false))
+
 func has_mount() -> bool:
-	return bool(Game.flags.get("mount_chicken", false)) or has_moped()
+	for k in MOUNT_ORDER:
+		if owns_mount(k):
+			return true
+	return false
 
 func has_moped() -> bool:
-	return bool(Game.flags.get("mount_moped", false))
+	return owns_mount("moped")
 
-## G: get on, (with both mounts) swap chicken -> moped, then get off.
+## G: get on the first mount you own; press again for the next one
+## (chicken -> moped -> dragonfly), and after the last one you get off.
 func toggle_mount() -> void:
+	if dead:
+		return
+	var start := 0
 	if mounted:
-		var swap := mount_kind == "chicken" and has_moped()
+		start = MOUNT_ORDER.find(mount_kind) + 1
 		dismount()
-		if swap:
-			mount_up("moped")
-	elif has_mount() and not dead:
-		mount_up("chicken" if Game.flags.get("mount_chicken", false) else "moped")
+	for i in range(start, MOUNT_ORDER.size()):
+		if owns_mount(MOUNT_ORDER[i]):
+			mount_up(MOUNT_ORDER[i])
+			return
+
+## True when G (RIDE) would switch to another mount instead of getting off.
+func has_next_mount() -> bool:
+	if not mounted:
+		return false
+	for i in range(MOUNT_ORDER.find(mount_kind) + 1, MOUNT_ORDER.size()):
+		if owns_mount(MOUNT_ORDER[i]):
+			return true
+	return false
 
 func _seat_h() -> float:
-	return MopedMount.SEAT_H if mount_kind == "moped" else ChickenMount.SEAT_H
+	match mount_kind:
+		"moped": return MopedMount.SEAT_H
+		"dragonfly": return DragonflyMount.SEAT_H
+	return ChickenMount.SEAT_H
+
+func _mount_speed() -> float:
+	match mount_kind:
+		"moped": return MOPED_SPEED
+		"dragonfly": return DRAGONFLY_SPEED
+	return MOUNT_SPEED
 
 func mount_up(kind := "chicken") -> void:
 	if mounted or dead:
 		return
-	if kind == "moped" and not has_moped():
+	if not owns_mount(kind) and kind != "chicken":
 		kind = "chicken"
 	mounted = true
 	mount_kind = kind
-	mount = MopedMount.new() if kind == "moped" else ChickenMount.new()
+	match kind:
+		"moped": mount = MopedMount.new()
+		"dragonfly": mount = DragonflyMount.new()
+		_: mount = ChickenMount.new()
 	mount.riding = true
 	add_child(mount)
 	mount.rotation.y = facing
@@ -191,9 +284,11 @@ func dismount() -> void:
 	mounted = false
 	if mount and is_instance_valid(mount):
 		FX.burst(mount.global_position + Vector3(0, 1.0, 0), Color(1.0, 0.95, 0.85), 30, 3.0, 0.16, 0.8, -3.0)
-		Sfx.play("cluck" if mount_kind == "chicken" else "beep", -6.0, 0.1)
+		Sfx.play({"chicken": "cluck", "moped": "beep"}.get(mount_kind, "chirp"), -6.0, 0.1)
 		mount.queue_free()
 	mount = null
+	mount_kind = ""
+	flying = false
 	_ride_pose(false)
 
 func _ride_pose(on: bool) -> void:
@@ -416,6 +511,8 @@ func _physics_process(delta: float) -> void:
 			toggle_pose()
 	else:
 		_move_input = Vector2.ZERO
+	if mounted and mount_kind == "dragonfly":
+		_jump_buffer = 0.0      # on the dragonfly, jump means climb (see _dragonfly_move)
 	if is_on_floor():
 		_coyote = 0.14
 		if velocity.y <= 0.0:
@@ -440,7 +537,7 @@ func _physics_process(delta: float) -> void:
 	var sprinting := input_enabled and Input.is_action_pressed("sprint") and dir.length() > 0.1 and Game.stamina > 1 and not blocking
 	var speed := SPRINT if sprinting else WALK
 	if mounted:
-		speed *= MOPED_SPEED if mount_kind == "moped" else MOUNT_SPEED
+		speed *= _mount_speed()
 	if haste_t > 0.0:
 		speed *= 1.45      # Smoke Bomb dash
 	if blocking:
@@ -469,7 +566,9 @@ func _physics_process(delta: float) -> void:
 	var a := ACCEL if is_on_floor() else AIR_ACCEL
 	velocity.x = lerpf(velocity.x, target_v.x, 1.0 - exp(-a * delta))
 	velocity.z = lerpf(velocity.z, target_v.z, 1.0 - exp(-a * delta))
-	if not is_on_floor():
+	if mounted and mount_kind == "dragonfly":
+		_dragonfly_move(delta, target_v)
+	elif not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	move_and_slide()
 	if global_position.y < kill_y:
@@ -587,8 +686,8 @@ func _handle_actions() -> void:
 		return
 	if Input.is_action_just_pressed("mount"):
 		toggle_mount()
-	# any fighting move hops you off the chicken first
-	if mounted and (Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("block") or Input.is_action_just_pressed("dodge")
+	# any fighting move hops you off the chicken first (but not off a flying dragonfly!)
+	if mounted and not (mount_kind == "dragonfly" and flying) and (Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("block") or Input.is_action_just_pressed("dodge")
 			or Input.is_action_just_pressed("spell") or Input.is_action_just_pressed("special") or Input.is_action_just_pressed("special2")):
 		dismount()
 	if Input.is_action_just_pressed("attack") and not dodging and not casting:

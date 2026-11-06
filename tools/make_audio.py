@@ -379,6 +379,24 @@ def beep():
         out.append(np.zeros(int(0.06 * SR)))
     return np.concatenate(out)
 
+def wings_loop():
+    # a dragonfly's papery wing buzz: fast flutter with a soft hum
+    d = 1.5; seg = t(d)
+    flutter = 0.55 + 0.45 * np.sin(2 * np.pi * 34 * seg) ** 2
+    hum = np.sin(2 * np.pi * 118 * seg) * 0.25 + np.sin(2 * np.pi * 236 * seg) * 0.1
+    air = highpass(lowpass(noise(d), 2400), 300) * 0.8
+    return loopify((air + hum) * flutter, 0.2)
+def chirp():
+    # a cheerful little two-note chirp
+    out = []
+    for f0, f1 in [(1400, 2100), (1800, 2600)]:
+        seg = t(0.09)
+        f = np.linspace(f0, f1, len(seg))
+        ph = 2 * np.pi * np.cumsum(f) / SR
+        out.append(np.sin(ph) * env(len(seg), 0.004, 0.08, 2.5))
+        out.append(np.zeros(int(0.04 * SR)))
+    return np.concatenate(out)
+
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
     "pickup": pickup, "coins": coins, "levelup": levelup, "spell": spell, "spell_hit": spell_hit,
@@ -390,6 +408,7 @@ SOUNDS = {
     "loop_birds": birds_loop, "whistle": whistle_tune, "kettle": kettle, "brush": brush, "sip": sip, "pour": pour, "stir": stir, "cluck": cluck, "bawk": bawk, "collapse": collapse, "loop_lava": lava_loop, "roar_big": roar_big,
     "rumble": rumble, "portal": portal_whoosh, "music_morning": music_morning,
     "loop_moped": moped_loop, "beep": beep,
+    "loop_wings": wings_loop, "chirp": chirp,
 }
 
 if __name__ == "__main__":

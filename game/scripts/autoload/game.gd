@@ -199,6 +199,13 @@ func costume_time_text() -> String:
 	return "%d:%02d" % [int(s / 60.0), int(fmod(s, 60.0))]
 
 ## Put on a costume straight away (a new one always replaces the old one).
+## The Dragonfly, the first flying mount (Mr. Bubbles' reward on Cloud Island).
+## You keep it for the rest of the game.
+func grant_dragonfly() -> void:
+	flags["mount_dragonfly"] = true
+	Sfx.play("chirp", 0.0, 0.0)
+	say("You got the DRAGONFLY! Press G (or RIDE) to fly.", Color(0.5, 1.0, 0.85))
+
 func wear_costume(id: String) -> void:
 	if not Loot.COSTUMES.has(id):
 		return
