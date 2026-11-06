@@ -571,3 +571,35 @@ It also found two stale tests that still looked buttons up by list position. But
 - all five second specials deal damage;
 - the moped is granted, is fast and gets you off on G;
 - the castle zone saves.
+
+## Follow-up 14: Level 4, Cloud Island (Nov 6)
+
+**Designer:** the designer's son, deciding over a few messages:
+- the theme: cloud science;
+- a weight meter that rains off when you stand still;
+- bubbles everywhere;
+- angels inspired by the Anunnaki;
+- Mr. Bubbles the flying bear with lightning;
+- the Dragonfly, a flying mount with stamina;
+- twelve skins he cut down from a list of eighteen.
+
+The plan was written into a project doc first and approved with "go".
+
+**Parallel work:** a second agent built the Dragonfly in its own git worktree while the main thread built the zone. Because the session's working folder isn't a git repo, the harness's automatic worktree option failed, so the worktree was created by hand and the agent was pointed at it.
+
+**How it's built:**
+- **Islands:** flat-topped cylinder colliders dressed in puffs, all drawn as one MultiMesh of spheres with a new cloud shader. The shader has soft wrap lighting, a sunlit rim and a slow wobble; storm clouds get a darker per-instance colour.
+- **New creatures:** thunder birds, storm sprites, bats, mimics, the golem, Mr. Bubbles and the sky whale are built from shapes (`CreatureLook`). Each rides on a hidden skeleton CharacterModel, so the existing enemy AI, hit flashes and animation timing still work. A new `fly` behaviour hovers, swoops to strike, and tumbles down when beaten.
+- **Weight and bubbles:** the world sets a few new player fields every frame (`gravity_mult`, `jump_mult`, `fall_cap`, `lift`, `wind`). The weight meter, bubbles, updrafts and wind need nothing else from the player code.
+- **Skins:** the 12 float skins are the hero recoloured, plus shape-built pieces on the head and chest bones: wings, a halo, a snout, balloons, a bubble, a jellyfish bell, a whale spout, a top hat. No new downloads.
+
+**Tests:** a new `cloud` mode (35 checks) runs:
+- the castle cloud lift and the arrival bubble;
+- raindrops and raining off;
+- weight changing gravity;
+- the wisp bridge holding a floaty player and dropping a heavy one;
+- sea-to-island and island-to-island bubble rides, updrafts and the garden;
+- each new enemy; flyers hovering and falling;
+- the storm layer, the Hail Golem and the vents opening;
+- Mr. Bubbles: lightning bubbles, the storm dive, summons, the chest, the turn-in and the Dragonfly;
+- a floaty skin, all twelve skins building, and the save.

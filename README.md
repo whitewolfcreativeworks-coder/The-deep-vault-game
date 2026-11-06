@@ -186,6 +186,45 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - **The Moped**, the second mount and the final reward. It's a little red scooter with a headlight, a putt-putt engine and a "meep meep" horn, and it goes about twice as fast as running.
   - **Zone skins.** Half of all costume drops are the monsters and people of the zone you're in: skeletons in the Vault, goblins in the forest, ghost knights and vampires at the castle. Monsters sometimes drop a costume of themselves. Most of the rest are themes that fit, and only 1 in 10 is something silly and out of place.
 
+- **Level 4: Cloud Island (new).** Designed by Jason's son, from his sixth-grade weather unit.
+  - **Getting there:** finish the castle's last quest and a cloud gathers by Sister Elowen. Step on and it lifts you into the sky, and a giant bubble sets you down on Cloud Island.
+  - **The islands:** sunny cloud islands over a sea of clouds.
+    - The angels' temple island, with a stepped-pyramid temple.
+    - Two middle islands joined by a thin wispy bridge.
+    - The storm layer, with rain clouds and lightning.
+    - Mr. Bubbles' thunderhead at the top.
+    - Fall off an island and the sea of clouds catches you.
+  - **The weight meter (FLOATY to HEAVY):**
+    - Raindrops make you heavier. Stand still and they rain back out of you.
+    - Floaty: you jump higher, fall slowly and get pushed by wind, and the wispy bridge holds you.
+    - Heavy: you sink through thin clouds, and land with a ground-pound.
+  - **Getting higher:**
+    - Bubble vents blow bubbles that carry you up to the next island.
+    - Columns of warm rising air lift you too. That's why clouds float!
+  - **The angels:** five quest givers inspired by the winged Anunnaki of ancient Mesopotamia, with nine quests:
+    - lost feathers;
+    - calm the thunder birds;
+    - rescue the baby sky whale;
+    - pop the storm bubbles;
+    - why don't clouds fall?;
+    - make it rain on the cloud garden;
+    - fix the bubble lifts;
+    - the Hail Golem;
+    - **Mr. Bubbles**.
+  - **New enemies:** thunder birds and storm bats that fly, zappy storm sprites, and bubble mimics.
+  - **Mr. Bubbles,** the flying bear boss:
+    - lightning strike rings;
+    - lightning bubbles you can pop;
+    - a bubble trap (tap ATTACK to escape);
+    - a storm dive from the clouds;
+    - he calls flying friends for help.
+  - **The reward:** the **Dragonfly**, your first flying mount.
+  - **Twelve float skins** that change how floaty you are:
+    - Angel, Flying Pig, Balloon Man, Bubble Kid, Dandelion Seed and Jellyfish;
+    - Mr. Bubbles Cub, Thunder Bird and Baby Sky Whale;
+    - Snowman and Penguin (heavy), and Rubber Duck.
+  - **New gear:** Skyforged and Thunderclap gear.
+
 ## Repository layout
 
 ```
