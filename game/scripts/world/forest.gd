@@ -887,6 +887,10 @@ func _warren_wings() -> void:
 		_model(["crate_A_big", "barrel", "sack", "resource_lumber"][k % 4], Vector3(_rng.randf_range(28, 35), Y, _rng.randf_range(-174, -130)), _rng.randf() * 360.0, 5.0, true)
 	for p in [Vector3(21.6, Y + 3.0, -140.0), Vector3(21.6, Y + 3.0, -166.0), Vector3(53.4, Y + 3.0, -140.0), Vector3(53.4, Y + 3.0, -166.0)]:
 		Props.torch(self, p, 90.0 if p.x < 30.0 else -90.0, true)
+	for lp in [Vector3(28, Y + 6.0, -140), Vector3(28, Y + 6.0, -164), Vector3(45, Y + 6.0, -140), Vector3(45, Y + 6.0, -164)]:
+		var ml := OmniLight3D.new(); ml.light_color = Color(1.0, 0.75, 0.45); ml.light_energy = 2.2; ml.omni_range = 16.0
+		ml.position = lp; add_child(ml)
+		_model("lantern_standing", lp - Vector3(0, 0.9, 0), 0.0, 1.2)
 	# the barred mine gate and its lever
 	_mine_gate = Node3D.new(); add_child(_mine_gate); _mine_gate.position = Vector3(37.0, Y, -153.0)
 	for k in 7:
