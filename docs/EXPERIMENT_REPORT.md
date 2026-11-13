@@ -627,3 +627,19 @@ Now a 0.4 s input buffer, hold-to-repeat, and swinging without stamina fix all f
 **The bolt.** It now tiers up by level: 1, 2 or 3 bolts, bigger, recoloured, with a splash, a crackle and finally chain lightning. Each level-up announces it.
 
 **Warren layout.** Two side caves and a totem-locked gate make the second dungeon play differently from the first. It's tested end to end: the gate blocks you, the compass points to the totems, you jump the bridge gap and fall into the pit and climb out, the mine lever works, and the gate opens.
+
+## Follow-up 16: Mr. Bubbles could not be reached (Nov 13)
+
+The designer reported an "invisible shield" around the boss island. The cause was the map's north boundary wall at z = −125: the thunderhead is centred at z = −145, outside the play area. Every earlier boss test **teleported** the hero onto the island, so none of them could catch it.
+
+Lesson: an end-to-end test must travel the way a player does. The new `bubblesfight` test does that, with no teleports:
+- rides the real vent bubble up;
+- walks over to the boss and fights with real attack input;
+- wins, sees the banner and slide, rides the slide down and lands by Anu;
+- collects the dragonfly.
+
+The same playtest found two more problems:
+- Boss size was applied twice (body scale times look scale), so Mr. Bubbles was drawn about 13 m tall over a 4 m wide collision body, and the camera ended up inside his fur.
+- There was no exit after the win.
+
+Both are fixed: a `look_size` and `radius` per boss, camera framing near a giant boss, and a rainbow slide home.

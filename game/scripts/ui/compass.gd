@@ -118,6 +118,11 @@ func quest_target(id: String) -> Variant:
 	var spot: Node3D = null
 	if Game.quest_state(id) == "ready":
 		spot = _first("npc", func(n: Node) -> bool: return n.get("id") == q.giver)
+		# still up on Mr. Bubbles' thunderhead: the rainbow slide is the way down
+		if id == "mr_bubbles" and Game.zone == "cloud" and player.global_position.y > 80.0:
+			var sl := get_tree().current_scene.find_child("RainbowSlide", true, false) as Node3D
+			if sl:
+				spot = sl
 	else:
 		var g: Dictionary = q.goal
 		match String(g.type):

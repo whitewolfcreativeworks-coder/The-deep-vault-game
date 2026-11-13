@@ -243,6 +243,11 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
     - **The Mushroom Grotto (west):** cross a deep chasm on a rope bridge, jumping the missing planks. If you fall, a rope leads back up.
     - **The Goblin Mines (east):** pull the lever to raise the barred gate, free the caged chickens and smash the second totem.
     - The compass leads to the totems until the gate opens.
+- **Update (Nov 13, later): Mr. Bubbles' thunderhead.**
+  - **You can reach the boss now.** The map's invisible north wall stood right at the edge of the thunderhead, so the bubble, walking and the dragonfly all stopped there. It now sits well past the island.
+  - **You can see the whole boss.** Cloud Island creature bosses had their size applied twice, which made Mr. Bubbles about 13 m tall and the Hail Golem just as big. Both now have the intended size and a body as wide as they look. Near a giant boss the camera pulls back to 7.5 m and rises a little.
+  - **A way home.** Calming Mr. Bubbles shows a VICTORY banner, drops the golden reward chest and opens a **rainbow slide** that carries you all the way down to Anu, who gives you the dragonfly. The compass points to the slide.
+  - **A tougher fight:** 12,500 health (was 9,000), harder hits, faster attacks, and a second wave of flying friends at 20% health.
 
 ## Repository layout
 

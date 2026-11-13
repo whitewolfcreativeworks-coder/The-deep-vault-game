@@ -91,11 +91,12 @@ const TYPES := {
 		"scale": 0.9, "aggro": 9.0, "poise": 30.0, "gold": [20, 40], "leash": 20.0},
 	"hail_golem": {"name": "The Hail Golem", "variant": "warrior", "creature": "golem", "hp": 5200.0, "dmg": 58.0, "speed": 2.8, "range": 3.6,
 		"windup": 0.85, "cooldown": 1.5, "xp": 1600, "weapon": "", "shield": "", "eye": Color(0.6, 0.85, 1.0),
-		"scale": 2.0, "aggro": 20.0, "poise": 160.0, "gold": [200, 300], "heavy": true, "leash": 30.0, "nova": true},
-	"mr_bubbles": {"name": "Mr. Bubbles", "variant": "warrior", "creature": "bear", "hp": 9000.0, "dmg": 62.0, "speed": 3.8, "range": 3.6,
-		"windup": 0.8, "cooldown": 1.3, "xp": 3000, "weapon": "", "shield": "", "eye": Color(1.0, 0.92, 0.3),
+		"scale": 2.0, "aggro": 20.0, "poise": 160.0, "gold": [200, 300], "heavy": true, "leash": 30.0, "nova": true,
+		"look_size": 2.0, "radius": 1.2},
+	"mr_bubbles": {"name": "Mr. Bubbles", "variant": "warrior", "creature": "bear", "hp": 12500.0, "dmg": 70.0, "speed": 4.2, "range": 4.2,
+		"windup": 0.75, "cooldown": 1.1, "xp": 3000, "weapon": "", "shield": "", "eye": Color(1.0, 0.92, 0.3),
 		"scale": 2.0, "aggro": 26.0, "poise": 220.0, "gold": [400, 600], "heavy": true, "leash": 40.0, "nova": true, "summon": true,
-		"fly": 0.4, "dive": true},
+		"fly": 0.4, "dive": true, "look_size": 1.6, "radius": 1.2},
 }
 const GOBLIN_SKIN := Color(0.42, 0.62, 0.24)
 
@@ -123,6 +124,7 @@ var _strafe := 1.0
 var _hurt_t := -1.0
 var _stagger_acc := 0.0
 var _summoned := false
+var _summoned2 := false
 
 func configure(type_name: String, id: String, wake_range := 0.0) -> void:
 	type_id = type_name
@@ -141,6 +143,9 @@ func _ready() -> void:
 	hit_radius = 0.45 * t.scale / 0.84
 	var cs := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new(); cap.radius = 0.38 * t.scale / 0.84; cap.height = 1.7 * t.scale / 0.84
+	if t.has("radius"):        # big round creatures: a body as wide as they look
+		cap.radius = float(t.radius)
+		hit_radius = float(t.radius) + 0.1
 	cs.shape = cap; cs.position.y = cap.height * 0.5
 	add_child(cs)
 	body = CharacterModel.new()
@@ -562,6 +567,11 @@ func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) 
 		_summoned = true
 		if get_parent().has_method("summon_for"):
 			get_parent().summon_for(self)
+	# Mr. Bubbles calls his friends twice: at half health and again near the end
+	elif type_id == "mr_bubbles" and _summoned and not _summoned2 and hp < max_hp * 0.2 and hp > 0.0:
+		_summoned2 = true
+		if get_parent().has_method("summon_for"):
+			get_parent().summon_for(self)
 	body.flash(Color(1, 1, 1), 0.85)
 	Sfx.play_at("hit", global_position + Vector3(0, 1, 0), -3.0, 0.15)
 	FX.hit(global_position + Vector3(0, 1.1, 0), Color(1.0, 0.9, 0.7))
@@ -625,7 +635,9 @@ func _creature() -> void:
 		(n as MeshInstance3D).visible = false
 	look = CreatureLook.make(String(t.creature), body.flash_mat)
 	body.add_child(look)
-	look.scale = Vector3.ONE * (t.scale / 0.9)
+	# the look sits inside the (already scaled) body; "look_size" sets the final
+	# size directly so a boss's scale isn't applied twice
+	look.scale = Vector3.ONE * (float(t.look_size) / t.scale if t.has("look_size") else t.scale / 0.9)
 
 ## Ghosts: see-through, glowing a cold blue, with a misty trail.
 func _spectral() -> void:

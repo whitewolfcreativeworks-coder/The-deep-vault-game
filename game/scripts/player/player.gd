@@ -40,6 +40,10 @@ const PITCH_MAX := 0.85
 var camera: Camera3D
 var zoom := 4.2
 var zoom_target := 4.2
+const BOSS_ZOOM := 7.5
+var _boss_lift := 0.0
+var _boss_near := false
+var _boss_scan := 0.0
 var first_person := false
 var trauma := 0.0
 var input_enabled := true
@@ -1197,7 +1201,19 @@ func snap_view() -> void:
 func _update_camera(delta: float) -> void:
 	if camera == null:
 		return
-	zoom = lerpf(zoom, zoom_target, 1.0 - exp(-9.0 * delta))
+	# a giant boss close by: pull back (third person only) so the whole boss fits
+	_boss_scan -= delta
+	if _boss_scan <= 0.0:
+		_boss_scan = 0.25
+		_boss_near = false
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and not e.dead and e.t.has("look_size") and e.global_position.distance_to(global_position) < 18.0:
+				_boss_near = true
+				break
+	var zt := zoom_target
+	if _boss_near and zoom_target >= FP_THRESHOLD:
+		zt = maxf(zoom_target, BOSS_ZOOM)
+	zoom = lerpf(zoom, zt, 1.0 - exp(-(9.0 if zt == zoom_target else 3.0) * delta))
 	var fp := zoom < FP_THRESHOLD
 	# --- look smoothing (touch input is noisier, so it gets more)
 	var tc := 0.05 if Game.touch_active else 0.03
@@ -1208,10 +1224,12 @@ func _update_camera(delta: float) -> void:
 	_look_idle += delta
 	var hspeed := Vector2(velocity.x, velocity.z).length()
 	if _look_idle > 1.2 and hspeed > 1.0 and (not fp or Game.touch_active) and not dead:
-		pitch = lerpf(pitch, -0.18, 1.0 - exp(-0.9 * delta))
+		pitch = lerpf(pitch, -0.04 if _boss_near else -0.18, 1.0 - exp(-0.9 * delta))
 	# --- follow the interpolated body position
 	var base := get_global_transform_interpolated().origin
-	var head_pos := base + Vector3(0, EYE_H * float(Game.profile.get("height", 1.0)) + ((_seat_h() - 0.46) if mounted else 0.0), 0)
+	# near a giant boss, look from a bit higher so the boss's head stays on screen
+	_boss_lift = lerpf(_boss_lift, 1.2 if _boss_near and not fp else 0.0, 1.0 - exp(-2.0 * delta))
+	var head_pos := base + Vector3(0, EYE_H * float(Game.profile.get("height", 1.0)) + ((_seat_h() - 0.46) if mounted else 0.0) + _boss_lift, 0)
 	if body.dead:
 		head_pos = base + Vector3(0, 0.6, 0)
 	if fp:

@@ -851,9 +851,12 @@ func _on_quests() -> void:
 					if lb is LightningBubble:
 						lb.queue_free()
 				_boss_chest()
-				Game.say("Mr. Bubbles tumbles onto the cloud... and starts to cry. The storm is over!", Color(1.0, 0.9, 0.5)))
+				_rainbow_slide()
+				Game.say("Mr. Bubbles tumbles onto the cloud... and starts to cry. The storm is over!", Color(1.0, 0.9, 0.5))
+				_victory_banner("MR. BUBBLES IS CALMED!", "Grab your reward from the golden chest,\nthen ride the RAINBOW SLIDE down to Anu for your DRAGONFLY!"))
 	if Game.flags.get("mr_bubbles", false):
 		_boss_chest()
+		_rainbow_slide()
 	# Anu's reward: the dragonfly!
 	if Game.quest_state("mr_bubbles") == "done" and not Game.flags.get("mount_dragonfly", false):
 		if Game.has_method("grant_dragonfly"):
@@ -874,6 +877,52 @@ func _boss_chest() -> void:
 		return
 	var ch := Interactable.create(self, "chest", ISLANDS.E.c + Vector3(4, 0, -10), -20.0, "cl_chest_bubbles", [{"roll": "boss", "ilvl": 12}])
 	ch.name = "BubblesChest"
+
+## The way home after the boss: a rainbow from the thunderhead down to Anu.
+const SLIDE_TOP := Vector3(8, 86, -128)
+const SLIDE_BOTTOM := Vector3(2, 20, 10)
+func _rainbow_slide() -> RainbowSlide:
+	var old := get_node_or_null("RainbowSlide") as RainbowSlide
+	if old:
+		return old
+	var sl := RainbowSlide.make(self, SLIDE_TOP, Vector3(22, 92, -88), Vector3(30, 26, 22), SLIDE_BOTTOM, 0.0)
+	sl.finished.connect(func() -> void:
+		if Game.quest_state("mr_bubbles") == "ready":
+			Game.say("Anu is waiting for you. Talk to her for your reward!", Color(1.0, 0.9, 0.5)))
+	return sl
+
+func _victory_banner(title: String, sub: String) -> void:
+	var cl := CanvasLayer.new(); cl.layer = 20; add_child(cl)
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	box.position.y = 110
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cl.add_child(box)
+	var t := Label.new(); t.text = title
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t.add_theme_font_size_override("font_size", 54)
+	t.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35))
+	t.add_theme_color_override("font_outline_color", Color(0.25, 0.12, 0.0))
+	t.add_theme_constant_override("outline_size", 12)
+	box.add_child(t)
+	var u := Label.new(); u.text = sub
+	u.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	u.add_theme_font_size_override("font_size", 26)
+	u.add_theme_color_override("font_color", Color(1, 1, 1))
+	u.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	u.add_theme_constant_override("outline_size", 8)
+	box.add_child(u)
+	box.modulate.a = 0.0
+	await get_tree().process_frame
+	box.position.x = (box.get_viewport_rect().size.x - box.size.x) * 0.5
+	Sfx.play("levelup", -2.0, 0.0)
+	FX.screen_flash(Color(1.0, 0.95, 0.7), 0.5, 0.8)
+	var tw := box.create_tween()
+	tw.tween_property(box, "modulate:a", 1.0, 0.5)
+	tw.tween_interval(6.0)
+	tw.tween_property(box, "modulate:a", 0.0, 1.0)
+	tw.tween_callback(cl.queue_free)
 
 func summon_for(e: Enemy) -> void:
 	var foes := ["thunder_bird", "storm_bat", "thunder_bird"] if e.type_id == "mr_bubbles" else ["storm_sprite", "storm_sprite"]
