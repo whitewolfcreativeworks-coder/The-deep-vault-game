@@ -127,7 +127,7 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 - **Hero special abilities (new).** Each hero has a special move on its own button, with a cooldown:
   - **Rogue: Backstab** (6 s). Vanish in shadow, reappear behind the nearest enemy and strike for a 5x critical, with a crossed slash, slow motion and a purple flash.
-  - **Mage: Shadow Step** (5 s). Blink up to 13 m the way you look (or move). An implosion at the start leaves a shadow pool that keeps burning enemies; a shadow nova, light pillar and shockwave hit everything within 5 m of where you land.
+  - **Mage: Fireball** (6 s). A blazing fireball seeks the enemy in front of you (or flies 14 m ahead) and explodes in a 5 m blast that knocks everything down and leaves the ground burning.
   - **Knight: Shield Charge** (7 s). Rush forward inside a barrier of light, smashing and stunning everything in the way, and finish with a shield slam shockwave.
   - **Barbarian: Whirlwind** (8 s). A burning vortex: four spinning hits on every enemy around you, the last one hurling them away with a pillar of fire.
   - **Ranger: Volley** (7 s). Two waves of nine arrows that burst on impact, damaging enemies nearby.
@@ -177,7 +177,7 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
     - The Ghost Lord, who calls up more ghosts.
   - **Places.** The graveyard, a crypt down the stairs beneath it, the ruined chapel, the hilltop beacons (light all three and the mist thins), the castle courtyard, the great hall, the library and the throne room.
   - **Better gear.** Drops are castle-tier and stronger: Spectral Blades, Ghostforged Greatswords, Moonsilver Mail, Phantom Cuirasses and more.
-  - **Second special abilities.** Every class learns one on arrival:
+  - **Second special abilities.** Every class learns one on reaching **Cloud Island** (Level 4):
     - Knight: Holy Ward (a golden shield that heals you and cuts damage).
     - Barbarian: Earthshatter (leap and smash).
     - Rogue: Smoke Bomb (vanish, poison the air and dash away).
@@ -224,6 +224,25 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
     - Mr. Bubbles Cub, Thunder Bird and Baby Sky Whale;
     - Snowman and Penguin (heavy), and Rubber Duck.
   - **New gear:** Skyforged and Thunderclap gear.
+
+- **Update (Nov 13), from the designer's playtest:**
+  - **No more shaking at the start.** Next to the arrival portal, the camera kept re-deciding whether to swing up over the arch, so it trembled until you moved. It now decides once and holds still. A new `settle` test measures camera movement while standing still at every arrival point.
+  - **Second powers come on Cloud Island**, not at the castle.
+  - **The Mage's first power is now Fireball;** his second power is Frost Nova.
+  - **Attack always responds:**
+    - a press is remembered for a moment, so pressing early in a swing, during a roll or after a bolt still counts;
+    - holding ATTACK keeps swinging;
+    - a tired hero still swings.
+  - **The bolt grows with you:**
+    - Arcane Bolt at level 1;
+    - Greater Bolt at level 4: bigger, with a small blast;
+    - Twin Bolts at level 8;
+    - Storm Bolts at level 12: three golden, crackling bolts;
+    - Star Bolts at level 16: lightning leaps to a second enemy.
+  - **A bigger Goblin Warren.** Chief Gruk's hall is sealed by a gate of bones held shut by two War Totems:
+    - **The Mushroom Grotto (west):** cross a deep chasm on a rope bridge, jumping the missing planks. If you fall, a rope leads back up.
+    - **The Goblin Mines (east):** pull the lever to raise the barred gate, free the caged chickens and smash the second totem.
+    - The compass leads to the totems until the gate opens.
 
 ## Repository layout
 

@@ -603,3 +603,27 @@ The plan was written into a project doc first and approved with "go".
 - the storm layer, the Hail Golem and the vents opening;
 - Mr. Bubbles: lightning bubbles, the storm dive, summons, the chest, the turn-in and the Dragonfly;
 - a floaty skin, all twelve skins building, and the save.
+
+## Follow-up 15: playtest fixes (Nov 12–13)
+
+**Shaking camera at the start.** We measured the camera's frame-to-frame movement while the hero stood still after each arrival. At the Vault's arrival portal it moved up to 0.56 m per frame; after the forest portal and the Warren door it didn't move at all. Two feedback loops caused it:
+- the "crane" that swings the camera up over a wall judged its options from its own, already tilted, view;
+- the over-the-shoulder offset was scaled by how far the camera had been pushed in, which moved the camera, which changed that distance.
+
+Both are now measured independently of the camera's current pose, and the crane only switches when another option is clearly better. Movement is now 0.000 at every arrival, including pressed against the arch. **Lesson:** measure "it feels shaky" with numbers before guessing; the first fix, moving the start spot, hid the bug rather than fixing it.
+
+**Attack responsiveness.** Presses were silently dropped in four ways:
+- in the first 45% of a swing;
+- during a roll or a bolt cast;
+- when stamina was below 6;
+- holding the button only ever swung once.
+
+Now a 0.4 s input buffer, hold-to-repeat, and swinging without stamina fix all four, with four new `combat2` checks.
+
+**Abilities.**
+- The Mage's Shadow Step (a blink) didn't help in a fight, so his first power is now an auto-aimed Fireball.
+- The second powers moved from the castle to Cloud Island, as the designer asked.
+
+**The bolt.** It now tiers up by level: 1, 2 or 3 bolts, bigger, recoloured, with a splash, a crackle and finally chain lightning. Each level-up announces it.
+
+**Warren layout.** Two side caves and a totem-locked gate make the second dungeon play differently from the first. It's tested end to end: the gate blocks you, the compass points to the totems, you jump the bridge gap and fall into the pit and climb out, the mine lever works, and the gate opens.
