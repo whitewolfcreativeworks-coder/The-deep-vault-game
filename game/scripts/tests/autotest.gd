@@ -1636,7 +1636,59 @@ func _combat2_test() -> void:
 	Input.action_press("block"); await wait(0.15)
 	check("block_cancels_swing", player.blocking and not player.attacking)
 	Input.action_release("attack"); Input.action_release("block")
-	e.queue_free()
+	await wait(0.8)
+	# the attack button never ignores you
+	var sw0 := player.swings
+	await tap("attack")
+	await wait(0.08)
+	await tap("attack")        # pressed very early in the first swing
+	await wait(1.4)
+	check("early_press_chains_combo", player.swings - sw0 >= 2, "%d swings" % (player.swings - sw0))
+	await wait(0.6)
+	Game.stamina = 0.0
+	sw0 = player.swings
+	await tap("attack")
+	await wait(0.2)
+	check("tired_hero_still_swings", player.swings - sw0 >= 1)
+	await wait(1.0)
+	Game.stamina = Game.max_stamina()
+	sw0 = player.swings
+	await tap("dodge")
+	await wait(0.15)
+	await tap("attack")        # pressed mid-roll: swings as soon as the roll ends
+	await wait(0.8)
+	check("press_during_dodge_counts", player.swings - sw0 >= 1)
+	await wait(0.8)
+	sw0 = player.swings
+	Input.action_press("attack")
+	await wait(2.0)
+	Input.action_release("attack")
+	check("holding_attack_keeps_swinging", player.swings - sw0 >= 3, "%d swings in 2 s" % (player.swings - sw0))
+	# the bolt grows up with you
+	god = true
+	for e2 in get_tree().get_nodes_in_group("enemy"):
+		e2.queue_free()
+	if player.dead:
+		main._respawn()
+		await wait(1.0)
+	await tp(at, 0.0)
+	player.facing = 0.0; player.yaw = 0.0; player.pitch = -0.1; player.zoom_target = 4.2; player.zoom = 4.2; player.snap_view()
+	var lv0 := Game.level
+	for tier in [[1, 1], [4, 1], [8, 2], [12, 3], [16, 3]]:
+		Game.level = tier[0]
+		Game.mana = Game.max_mana()
+		player.yaw = 0.0; player.snap_view()
+		await wait(0.5)
+		await tap("spell")
+		await wait(0.24)
+		var bolts := get_tree().current_scene.get_children().filter(func(n) -> bool: return n is Area3D and n.get("team") == "player" and n.get("_done") == false).size()
+		check("bolt_level_%d_fires_%d" % [tier[0], tier[1]], bolts == tier[1], "%d bolts (%s)" % [bolts, player.BOLT_TIERS[player.bolt_tier()].name])
+		await wait(0.05)
+		await shot("c_bolt_level_%02d" % tier[0])
+		await wait(0.8)
+	Game.level = lv0
+	if is_instance_valid(e):
+		e.queue_free()
 	await wait(0.6)
 	# 3. swing trails and the three camera views
 	for v in [[0.0, "first"], [4.2, "behind"], [9.5, "high"]]:
@@ -1700,8 +1752,7 @@ func _special_test() -> void:
 				check("rogue_backstab_behind", is_instance_valid(f) and player.global_position.z < f.global_position.z, "player z %.1f enemy z %.1f" % [player.global_position.z, f.global_position.z if is_instance_valid(f) else 0.0])
 				check("rogue_backstab_hits", hurt == 1 and player.special_damage - d0 > Game.attack_damage() * 3.0, "%.0f dmg" % (player.special_damage - d0))
 			"Mage":
-				check("mage_shadow_step_moves", moved > 4.0, "%.1f m" % moved)
-				check("mage_shadow_burst_hits", hurt == 1, "%d hit" % hurt)
+				check("mage_fireball_hits", hurt == 1 and player.special_damage - d0 > Game.attack_damage() * 2.0, "%d hit, %.0f dmg" % [hurt, player.special_damage - d0])
 			"Knight":
 				check("knight_charge_moves", moved > 2.0, "%.1f m" % moved)
 				check("knight_charge_hits", hurt == 1, "%d hit" % hurt)
@@ -2167,7 +2218,8 @@ func _castle_test() -> bool:
 	god = true
 	var w = main.world
 	check("castle_loaded", w is CastleWorld and Game.zone == "castle" and main.state == "play", Game.zone)
-	check("special2_granted", Game.has_special2())
+	check("no_special2_until_cloud_island", not Game.has_special2())
+	Game.flags["special2"] = true
 	await wait(1.0)
 	await shot("ck_02_arrival")
 	var all_npcs := true
@@ -2446,7 +2498,6 @@ func _cloud_test() -> bool:
 			Game.delete_slot(i)
 		await _start()
 		Game.set_meta("cl_phase", 2)
-		Game.flags["special2"] = true
 		main._travel("castle")
 		return true
 	if phase == 2:
@@ -2474,6 +2525,7 @@ func _cloud_test() -> bool:
 	god = true
 	var w = main.world
 	check("cloud_loaded", w is CloudWorld and Game.zone == "cloud", Game.zone)
+	check("special2_granted_in_cloud_island", Game.has_special2())
 	await shot("cl_02_arrival_bubble")
 	var t := 0.0
 	while t < 20.0 and not (player.is_on_floor() and w._ride.is_empty()):

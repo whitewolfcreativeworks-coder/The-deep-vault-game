@@ -54,6 +54,7 @@ var attack_time := 0.0
 var attack_dur := 0.55
 var combo := 0
 var combo_queued := false
+var _attack_buffer := 0.0
 var hit_done := false
 var casting := false
 var cast_time := 0.0
@@ -108,6 +109,7 @@ func _ready() -> void:
 	# the body moves in physics ticks; interpolate it so it glides at any refresh rate
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_ON
 	Game.inventory_changed.connect(_on_inventory_changed)
+	Game.leveled_up.connect(_on_level_up)
 	cam_yaw.global_position = global_position + Vector3(0, EYE_H, 0)
 
 func rebuild_body() -> void:
@@ -662,6 +664,7 @@ func _update_timers(delta: float) -> void:
 		hurt_time += delta
 		if hurt_time > 0.3:
 			hurt_time = -1.0
+	_attack_buffer -= delta
 	stamina_delay -= delta
 	if stamina_delay <= 0.0 and not blocking:
 		Game.stamina = minf(Game.max_stamina(), Game.stamina + 30.0 * delta)
@@ -699,11 +702,22 @@ func _handle_actions() -> void:
 	if mounted and not (mount_kind == "dragonfly" and flying) and (Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("block") or Input.is_action_just_pressed("dodge")
 			or Input.is_action_just_pressed("spell") or Input.is_action_just_pressed("special") or Input.is_action_just_pressed("special2")):
 		dismount()
-	if Input.is_action_just_pressed("attack") and not dodging and not casting:
+	# Attack never ignores you: a press is remembered for a moment (so pressing
+	# during a dodge, a spell or early in a swing still counts), holding the
+	# button keeps swinging, and a tired hero still swings (just slower to recover).
+	if Input.is_action_just_pressed("attack"):
+		_attack_buffer = 0.4
+	var holding := Input.is_action_pressed("attack")
+	var free_to_swing := not dodging and special_kind == "" and not (mounted and not flying) and not Input.is_action_pressed("block")
+	if casting and cast_time > 0.2 and (_attack_buffer > 0.0 or holding):
+		casting = false          # the bolt has already flown: cut the cast short
+	if free_to_swing and not casting:
 		if not attacking:
-			if Game.stamina >= 6:
+			if _attack_buffer > 0.0 or holding:
+				_attack_buffer = 0.0
 				_start_attack(0)
-		elif attack_time / attack_dur > 0.45:
+		elif _attack_buffer > 0.0 or (holding and attack_time / attack_dur > 0.5):
+			_attack_buffer = 0.0
 			combo_queued = true
 	# Block raises instantly, even mid-swing (the swing is cancelled), so it can
 	# be used on reaction. The first PARRY_WINDOW seconds count as a parry.
@@ -835,13 +849,51 @@ func _fire_bolt() -> void:
 		b.position = start
 	else:
 		b.position = camera.global_position + fwd * 0.8 + Vector3(0, -0.15, 0)
-	get_tree().current_scene.add_child(b)
 	bolts_fired += 1
-	# spell power makes bolts bigger and hotter
+	# the bolt grows up with you: bigger and brighter, then two, then three
+	# crackling bolts, then lightning that leaps on to a second enemy
+	var tier := bolt_tier()
+	var t: Dictionary = BOLT_TIERS[tier]
 	var sp := Game.spell_power()
-	b.size = 1.0 + clampf(sp / 60.0, 0.0, 1.2)
-	var bolt_c := Color(0.45, 0.7, 1.0).lerp(Color(0.85, 0.4, 1.0), clampf(sp / 80.0, 0.0, 1.0))
-	b.launch(fwd, "player", Game.spell_damage(), bolt_c, 24.0)
+	var count: int = t.count
+	var side := fwd.cross(Vector3.UP).normalized()
+	for i in count:
+		var bb: Area3D = b if i == 0 else Area3D.new()
+		if i > 0:
+			bb.set_script(bolt_scene_script)
+		var spread := (i - (count - 1) * 0.5)
+		bb.position = b.position + side * spread * 0.45
+		get_tree().current_scene.add_child(bb)
+		bb.size = float(t.size) + clampf(sp / 60.0, 0.0, 1.0)
+		bb.splash = float(t.splash)
+		bb.chain = bool(t.get("chain", false))
+		bb.sparkle = tier >= 3
+		var d := fwd.rotated(Vector3.UP, -spread * 0.06)
+		bb.launch(d, "player", Game.spell_damage() * float(t.dmg) / count, t.color, 24.0 + tier * 2.0)
+	if tier >= 3:
+		Sfx.play("spell", -4.0, 0.15)
+
+## The bolt levels up with you (name, level it arrives, bolts, size, damage, blast).
+const BOLT_TIERS := [
+	{"name": "Arcane Bolt", "level": 1, "count": 1, "size": 1.0, "dmg": 1.0, "splash": 0.0, "color": Color(0.45, 0.7, 1.0)},
+	{"name": "Greater Bolt", "level": 4, "count": 1, "size": 1.5, "dmg": 1.15, "splash": 2.0, "color": Color(0.6, 0.55, 1.0)},
+	{"name": "Twin Bolts", "level": 8, "count": 2, "size": 1.4, "dmg": 1.35, "splash": 2.5, "color": Color(0.8, 0.45, 1.0)},
+	{"name": "Storm Bolts", "level": 12, "count": 3, "size": 1.5, "dmg": 1.6, "splash": 3.0, "color": Color(1.0, 0.85, 0.4)},
+	{"name": "Star Bolts", "level": 16, "count": 3, "size": 1.8, "dmg": 1.9, "splash": 3.5, "color": Color(0.95, 0.95, 1.0), "chain": true},
+]
+
+func bolt_tier() -> int:
+	var t := 0
+	for i in BOLT_TIERS.size():
+		if Game.level >= int(BOLT_TIERS[i].level):
+			t = i
+	return t
+
+func _on_level_up(lv: int) -> void:
+	for i in BOLT_TIERS.size():
+		if int(BOLT_TIERS[i].level) == lv and i > 0:
+			Game.say("Your bolt grew stronger: %s! (Q / BOLT)" % BOLT_TIERS[i].name, BOLT_TIERS[i].color)
+			FX.burst(global_position + Vector3(0, 1.4, 0), BOLT_TIERS[i].color, 50, 4.0, 0.2, 0.9, 0.5)
 
 func drink_potion() -> void:
 	if potion_cd > 0.0:
@@ -1395,7 +1447,7 @@ func use_special() -> void:
 	var ok := false
 	match Game.profile.hero:
 		"Rogue": ok = _backstab()
-		"Mage": ok = _shadow_step()
+		"Mage": ok = _fireball()
 		"Knight": ok = _start_charge()
 		"Barbarian": ok = _start_whirl()
 		"Ranger": ok = _volley()
@@ -1675,6 +1727,81 @@ func _backstab() -> bool:
 	fov_kick = 14.0
 	add_trauma(0.55)
 	_slowmo(0.2, 0.28)
+	return true
+
+## Mage: a blazing fireball that seeks the enemy in front of you (or flies
+## 14 m straight ahead), then explodes: big damage, everything knocked down,
+## and a patch of burning ground left behind.
+func _fireball() -> bool:
+	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
+	var head := global_position + Vector3(0, 1.3, 0)
+	var target: Node3D = null
+	var best := INF
+	for e in _live_enemies():
+		var to: Vector3 = e.global_position - global_position
+		var d := to.length()
+		if d > 22.0 or absf(to.y) > 5.0:
+			continue
+		var facing_dot := fwd.dot(Vector3(to.x, 0, to.z).normalized()) if d > 0.1 else 1.0
+		if facing_dot < 0.25:
+			continue
+		if not _blocked(head, e.global_position + Vector3(0, 1.0, 0)).is_empty():
+			continue
+		var sc := d - facing_dot * 6.0
+		if sc < best:
+			best = sc; target = e
+	var dest := global_position + fwd * 14.0
+	if target:
+		dest = target.global_position
+	else:
+		var hit := _blocked(head, head + fwd * 14.0)
+		if not hit.is_empty():
+			dest = hit.position - fwd * 0.5
+		var fl = _floor_at(dest)
+		if fl != null:
+			dest = fl
+	var orange := Color(1.0, 0.45, 0.12)
+	var ball := Node3D.new()
+	get_tree().current_scene.add_child(ball)
+	var start := head + fwd * 0.7 + Vector3(0, 0.1, 0)
+	ball.global_position = start
+	var core := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.42; sm.height = 0.84
+	core.mesh = sm; core.material_override = FX.glow_material(Color(1.0, 0.75, 0.3), 4.0); ball.add_child(core)
+	var shell := MeshInstance3D.new(); var sm2 := SphereMesh.new(); sm2.radius = 0.65; sm2.height = 1.3
+	shell.mesh = sm2; var shm := FX._add_mat(orange, 1.5); shm.albedo_color.a = 0.5; shell.material_override = shm; ball.add_child(shell)
+	var trail := CPUParticles3D.new(); trail.amount = 60; trail.lifetime = 0.5; trail.local_coords = false
+	trail.mesh = FX.quad(0.35); trail.material_override = FX.glow_material(orange, 3.0)
+	trail.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; trail.emission_sphere_radius = 0.35
+	trail.spread = 180; trail.initial_velocity_min = 0.5; trail.initial_velocity_max = 1.5; trail.gravity = Vector3(0, 1.5, 0)
+	trail.color_ramp = FX._fade_ramp(orange)
+	ball.add_child(trail)
+	var l := OmniLight3D.new(); l.light_color = orange; l.light_energy = 4.0; l.omni_range = 7.0; ball.add_child(l)
+	var aim := dest + Vector3(0, 1.0, 0)
+	var flight := clampf(start.distance_to(aim) / 26.0, 0.12, 0.7)
+	var dmg := Game.attack_damage() * 2.4 + Game.spell_damage() * 1.6
+	var tw := ball.create_tween()
+	tw.tween_property(ball, "global_position", aim, flight).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func() -> void:
+		var at := ball.global_position - Vector3(0, 1.0, 0)
+		ball.queue_free()
+		var n := _aoe(at, 5.0, dmg, 10.0, true)
+		FX.shockwave(at + Vector3(0, 0.2, 0), orange, 6.5, 0.5)
+		FX.dome(at, Color(1.0, 0.6, 0.2), 5.0, 0.45)
+		FX.pillar(at, Color(1.0, 0.5, 0.15), 2.2, 7.0, 0.5)
+		FX.burst(at + Vector3(0, 1.0, 0), Color(1.0, 0.65, 0.2), 110, 10.0, 0.35, 0.9, -3.0)
+		FX.burst(at + Vector3(0, 0.5, 0), Color(0.4, 0.3, 0.25), 40, 4.0, 0.6, 1.4, 1.0)
+		FX.flash_light(at + Vector3(0, 2, 0), Color(1.0, 0.6, 0.25), 12.0, 16.0, 0.5)
+		FX.shadow_pool(at, Color(1.0, 0.4, 0.1), 3.5, 3.0, Game.attack_damage() * 0.6)
+		FX.screen_flash(Color(1.0, 0.5, 0.15), 0.3, 0.35)
+		Sfx.play_at("fire_burst", at, 0.0, 0.05)
+		Sfx.play_at("spell_hit", at, -2.0, 0.05)
+		add_trauma(0.55 if n > 0 else 0.35)
+		_hitstop(0.08))
+	casting = true
+	cast_time = 0.15
+	fov_kick = 10.0
+	Sfx.play("spell", 0.0, 0.05)
+	FX.burst(start, orange, 30, 3.0, 0.2, 0.4, 0.0)
 	return true
 
 ## Mage: blink up to 13 m, imploding where you leave (and leaving a damaging

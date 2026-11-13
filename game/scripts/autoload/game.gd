@@ -50,8 +50,8 @@ const HERO_BLURB := {
 const ABILITIES := {
 	"Rogue": {"name": "Backstab", "short": "STAB", "cd": 6.0, "color": Color(0.75, 0.35, 1.0),
 		"desc": "Vanish in a puff of shadow, reappear behind the nearest enemy and strike for a massive 5x critical."},
-	"Mage": {"name": "Shadow Step", "short": "BLINK", "cd": 5.0, "color": Color(0.55, 0.3, 1.0),
-		"desc": "Blink 13 m across the room. Shadow implodes where you leave (and lingers, burning enemies) and explodes where you land."},
+	"Mage": {"name": "Fireball", "short": "FIRE", "cd": 6.0, "color": Color(1.0, 0.45, 0.15),
+		"desc": "Hurl a blazing fireball at the enemy in front of you. It explodes in a huge blast that knocks everything down and leaves the ground burning."},
 	"Knight": {"name": "Shield Charge", "short": "CHARGE", "cd": 7.0, "color": Color(0.5, 0.75, 1.0),
 		"desc": "Rush forward inside a barrier of light, smashing through enemies, and finish with a stunning shield slam."},
 	"Barbarian": {"name": "Whirlwind", "short": "SPIN", "cd": 8.0, "color": Color(1.0, 0.55, 0.25),

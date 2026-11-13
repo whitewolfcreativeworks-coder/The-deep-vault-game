@@ -145,13 +145,13 @@ func _continue_game() -> void:
 	Game.set_objective(Game.objective if Game.objective != "" else "Enter the Deep Vault beneath the cliffs.")
 	if Game.zone == "cloud" and Game.resume_pos == Vector3.ZERO:
 		Game.say("Up, up, up through the clouds... Welcome to Cloud Island!", Color(0.85, 0.95, 1.0))
-	elif Game.zone == "castle" and Game.resume_pos == Vector3.ZERO:
-		Game.say("You step out under a cold moon. Somewhere a ghost wails... Welcome to Ghost Knight Castle!", Color(0.7, 0.85, 1.0))
 		if not Game.flags.get("special2_told", false):
 			Game.flags["special2_told"] = true
 			var a2: Dictionary = Game.ability2()
-			get_tree().create_timer(3.0).timeout.connect(func() -> void:
-				Game.say("NEW POWER! %s: press %s to use it." % [a2.name, "B / 3" if not Game.touch_active else "the new button"], Color(0.6, 1.0, 0.9)))
+			get_tree().create_timer(4.0).timeout.connect(func() -> void:
+				Game.say("The sky gives you a NEW POWER! %s: press %s to use it." % [a2.name, "B / 3" if not Game.touch_active else "the new button"], Color(0.6, 1.0, 0.9)))
+	elif Game.zone == "castle" and Game.resume_pos == Vector3.ZERO:
+		Game.say("You step out under a cold moon. Somewhere a ghost wails... Welcome to Ghost Knight Castle!", Color(0.7, 0.85, 1.0))
 	elif Game.zone == "forest" and Game.play_time > 0.0 and Game.resume_pos == Vector3.ZERO:
 		Game.say("You step out of the portal into the Goblin Forest.", UIKit.GOLD)
 	else:
@@ -213,7 +213,6 @@ func go_to_forest() -> void:
 ## Every class learns its second special power on arrival.
 func go_to_castle() -> void:
 	Game.zone = "castle"
-	Game.flags["special2"] = true
 	Game.checkpoint_pos = Vector3.ZERO
 	Game.resume_pos = Vector3.ZERO
 	Game.objective = ""
@@ -262,6 +261,8 @@ func go_back_to_castle() -> void:
 
 func _travel(z: String) -> void:
 	Game.zone = z
+	if z == "cloud":
+		Game.flags["special2"] = true      # every hero learns a second power in the sky
 	Game.checkpoint_pos = Vector3.ZERO
 	Game.resume_pos = Vector3.ZERO
 	Game.objective = ""
