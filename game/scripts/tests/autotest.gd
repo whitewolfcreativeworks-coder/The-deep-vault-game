@@ -1466,7 +1466,7 @@ func _forest_test() -> bool:
 		_kill_near(Enemy.TYPES.keys(), 40.0, Vector3(-36, Y, -152))
 		await _look(Vector3(-36, Y, -154), Vector3(-24, Y + 0.1, -147), 6.0, -0.25)
 		await shot("fo_11a_rope_bridge")
-		await tp(Vector3(-30.0, Y + 0.3, -154.0), -PI * 0.5)
+		await tp(Vector3(-28.5, Y + 0.3, -154.0), PI * 0.5)
 		await wait(0.4)
 		var bx := player.global_position.x
 		Input.action_press("move_forward")
