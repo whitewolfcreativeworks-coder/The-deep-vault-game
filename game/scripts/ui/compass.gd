@@ -131,6 +131,11 @@ func quest_target(id: String) -> Variant:
 					spot = _first("enemy", func(n: Node) -> bool: return n.get("type_id") in types and not n.get("dead"))
 			"boss":
 				spot = _first("enemy", func(n: Node) -> bool: return n.get("uid") == g.uid and not n.get("dead"))
+				# Gruk's gate is shut until both War Totems are smashed: show the way to them
+				if g.uid == "gruk" and spot and _level(player.global_position) == 1:
+					var tot := _first("warren_totem", func(n: Node) -> bool: return true)
+					if tot:
+						spot = tot
 	if spot == null:
 		return null
 	var at := spot.global_position

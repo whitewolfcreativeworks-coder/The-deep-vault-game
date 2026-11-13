@@ -759,7 +759,8 @@ func _warren() -> void:
 	# tunnel
 	b.room(-2.5, 2.5, -140, -126, Y, 4.5, wm, fm, {"s": [[-2.5, 2.5, 4.5]], "n": [[-2.5, 2.5, 4.5]]})
 	# goblin den
-	b.room(-13, 13, -164, -140, Y, 8.0, wm, fm, {"s": [[-2.5, 2.5, 4.5]], "n": [[-3.0, 3.0, 5.0]]})
+	b.room(-13, 13, -164, -140, Y, 8.0, wm, fm, {"s": [[-2.5, 2.5, 4.5]], "n": [[-3.0, 3.0, 5.0]],
+		"w": [[-153.0, -147.0, 4.5]], "e": [[-153.0, -147.0, 4.5]]})
 	# Gruk's hall
 	b.room(-16, 16, -198, -164, Y, 10.0, wm, fm, {"s": [[-3.0, 3.0, 5.0]]})
 	for z in [-170.0, -182.0, -192.0]:
@@ -789,6 +790,7 @@ func _warren() -> void:
 	_model("post_skull", Vector3(-4, Y, -195), 0.0, 1.2, true)
 	_model("post_skull", Vector3(4, Y, -195), 0.0, 1.2, true)
 	Interactable.create(self, "shrine", Vector3(-5, Y, -114), 0.0, "", [], "the Warren Mouth")
+	_warren_wings()
 	ClimbOut.make(self, Vector3(5, Y, -113), ground(0, -94) + Vector3(0, 0.2, 0))
 	# goblins
 	var n := 0
@@ -806,6 +808,160 @@ func _warren() -> void:
 			Game.say("Chief Gruk falls with a mighty THUD. The Warren is yours!", Color(1.0, 0.85, 0.4)))
 	elif not Game.flags.get("w_chest_gruk", false):
 		Interactable.create(self, "chest", Vector3(6, Y, -193), -30.0, "w_chest_gruk", [{"roll": "boss"}])
+
+# ---------------------------------------------------------------------------
+# The Warren's side caves. Gruk's hall is sealed by a goblin gate held shut by
+# two War Totems: one past the rope bridge in the Mushroom Grotto (west), one
+# behind the barred gate of the Goblin Mines (east). Smash both to open it.
+var _gruk_gate: Node3D
+var _mine_gate: Node3D
+
+func _warren_wings() -> void:
+	var Y := WY
+	var wm: Material = b.wall_mat(Color(0.3, 0.26, 0.2), 0.5, Y - 16.0, 1.6, 0.7)
+	var fm: Material = b.mats.floor
+	var wood := StandardMaterial3D.new(); wood.albedo_color = Color(0.45, 0.3, 0.17); wood.roughness = 0.9
+	var rope := StandardMaterial3D.new(); rope.albedo_color = Color(0.6, 0.48, 0.3)
+	# --- corridors out of the den
+	b.room(-20, -14, -153, -147, Y, 4.5, wm, fm, {"w": [[-153.0, -147.0, 4.5]], "e": [[-153.0, -147.0, 4.5]]})
+	b.room(14, 20, -153, -147, Y, 4.5, wm, fm, {"w": [[-153.0, -147.0, 4.5]], "e": [[-153.0, -147.0, 4.5]]})
+	# --- WEST: the Mushroom Grotto, split by a deep chasm with a rope bridge
+	b.room(-52, -21, -172, -132, Y, 9.0, wm, fm, {"e": [[-153.0, -147.0, 4.5]]}, true, [Rect2(-41, -172, 11, 40)])
+	var PY := Y - 15.0
+	b.box(Vector3(-41.5, PY - 1.0, -173), Vector3(-29.5, PY, -131), fm)                 # the pit floor
+	b.box(Vector3(-42.0, PY, -173), Vector3(-41.0, Y - 1.0, -131), wm)                 # pit sides
+	b.box(Vector3(-30.0, PY, -173), Vector3(-29.0, Y - 1.0, -131), wm)
+	b.box(Vector3(-41.0, PY, -173.0), Vector3(-30.0, Y - 1.0, -172.0), wm)
+	b.box(Vector3(-41.0, PY, -132.0), Vector3(-30.0, Y - 1.0, -131.0), wm)
+	# the rope bridge (one plank is missing: jump the gap!)
+	for seg in [[-41.2, -36.6], [-35.0, -29.8]]:
+		b.box(Vector3(seg[0], Y - 0.35, -155.2), Vector3(seg[1], Y - 0.05, -152.8), wood)
+		var k: float = seg[0]
+		while k < seg[1] - 0.1:
+			var plank := MeshInstance3D.new(); var pm := BoxMesh.new(); pm.size = Vector3(0.35, 0.08, 2.6)
+			plank.mesh = pm; plank.material_override = wood; plank.position = Vector3(k + 0.2, Y, -154.0)
+			add_child(plank)
+			k += 0.45
+	for z in [-155.4, -152.6]:
+		var rail := MeshInstance3D.new(); var rm := CylinderMesh.new(); rm.top_radius = 0.04; rm.bottom_radius = 0.04; rm.height = 12.0
+		rail.mesh = rm; rail.material_override = rope; rail.rotation.z = PI * 0.5; rail.position = Vector3(-35.5, Y + 1.0, z)
+		add_child(rail)
+		for x in [-41.0, -30.0]:
+			var post := MeshInstance3D.new(); var pcm := CylinderMesh.new(); pcm.top_radius = 0.1; pcm.bottom_radius = 0.12; pcm.height = 1.4
+			post.mesh = pcm; post.material_override = wood; post.position = Vector3(x, Y + 0.7, z)
+			add_child(post)
+	# glowing mushrooms everywhere, and lots down in the pit
+	for k in 22:
+		var mp := Vector3(_rng.randf_range(-50, -22), Y, _rng.randf_range(-170, -134))
+		if mp.x < -42.0 or mp.x > -29.0:
+			_mushroom(mp)
+	for k in 10:
+		_mushroom(Vector3(_rng.randf_range(-40, -31), PY, _rng.randf_range(-170, -134)))
+	var gl := OmniLight3D.new(); gl.light_color = Color(0.4, 0.9, 0.75); gl.light_energy = 1.4; gl.omni_range = 20.0
+	gl.position = Vector3(-36, Y + 6.0, -152); add_child(gl)
+	var pl := OmniLight3D.new(); pl.light_color = Color(0.5, 0.8, 1.0); pl.light_energy = 1.2; pl.omni_range = 16.0
+	pl.position = Vector3(-35.5, PY + 4.0, -152); add_child(pl)
+	# fell in? a rope ladder back up to the bridge end
+	Passage.make(self, Vector3(-32.0, PY, -136.0), Vector3(-26.0, Y + 0.2, -150.0), PI * 0.5, "Climb the rope back up", "The Mushroom Grotto", Color(0.6, 1.0, 0.8))
+	var lad := MeshInstance3D.new(); var lm := BoxMesh.new(); lm.size = Vector3(1.0, 15.0, 0.1)
+	lad.mesh = lm; lad.material_override = rope; lad.position = Vector3(-32.0, PY + 7.5, -131.6); add_child(lad)
+	WarrenTotem.make(self, Vector3(-46.0, Y, -160.0), "warren_totem_w")
+	var n := 0
+	for e in [[Vector3(-45, Y, -148), "goblin_archer"], [Vector3(-47, Y, -156), "goblin"], [Vector3(-44, Y, -166), "goblin_brute"],
+			[Vector3(-25, Y, -140), "goblin"], [Vector3(-26, Y, -165), "goblin_archer"]]:
+		_enemy(e[1], e[0], "w_grotto_%d" % n, PI * 0.5)
+		n += 1
+	Interactable.create(self, "chest", Vector3(-49, Y, -137), 90.0, "w_chest_grotto", [{"roll": "big", "ilvl": 5}])
+	# --- EAST: the Goblin Mines, with a barred gate worked by a lever
+	b.room(21, 54, -176, -128, Y, 8.0, wm, fm, {"w": [[-153.0, -147.0, 4.5]]})
+	b.wall_z(37.0, -176.0, -128.0, Y, 8.0, 1.0, wm, [[-156.0, -150.0, 4.5]])
+	# mine-cart rails and carts
+	var iron := StandardMaterial3D.new(); iron.albedo_color = Color(0.3, 0.3, 0.33); iron.metallic = 0.8; iron.roughness = 0.4
+	for x in [24.2, 25.4]:
+		var r := MeshInstance3D.new(); var rbm := BoxMesh.new(); rbm.size = Vector3(0.1, 0.08, 44.0)
+		r.mesh = rbm; r.material_override = iron; r.position = Vector3(x, Y + 0.04, -152.0); add_child(r)
+	for z in [-140.0, -166.0]:
+		b.box(Vector3(23.6, Y + 0.25, z - 1.0), Vector3(26.0, Y + 1.3, z + 1.0), wood)
+		_model("barrel", Vector3(24.8, Y + 1.3, z), 0.0, 3.0)
+	for k in 6:
+		_model(["crate_A_big", "barrel", "sack", "resource_lumber"][k % 4], Vector3(_rng.randf_range(28, 35), Y, _rng.randf_range(-174, -130)), _rng.randf() * 360.0, 5.0, true)
+	for p in [Vector3(21.6, Y + 3.0, -140.0), Vector3(21.6, Y + 3.0, -166.0), Vector3(53.4, Y + 3.0, -140.0), Vector3(53.4, Y + 3.0, -166.0)]:
+		Props.torch(self, p, 90.0 if p.x < 30.0 else -90.0, true)
+	# the barred mine gate and its lever
+	_mine_gate = Node3D.new(); add_child(_mine_gate); _mine_gate.position = Vector3(37.0, Y, -153.0)
+	for k in 7:
+		var bar := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(0.16, 4.5, 0.16)
+		bar.mesh = bm; bar.material_override = iron; bar.position = Vector3(0, 2.25, -2.7 + k * 0.9); _mine_gate.add_child(bar)
+	var gsb := StaticBody3D.new(); gsb.collision_layer = 1; _mine_gate.add_child(gsb)
+	var gcs := CollisionShape3D.new(); var gbs := BoxShape3D.new(); gbs.size = Vector3(0.6, 4.5, 6.0)
+	gcs.shape = gbs; gcs.position.y = 2.25; gsb.add_child(gcs)
+	var lever := Interactable.create(self, "lever", Vector3(31.0, Y, -172.0), 0.0, "w_mine_lever", [], "Mine gate lever")
+	if Game.flags.get("w_mine_lever", false):
+		_mine_gate.position.y += 4.3
+	else:
+		lever.used.connect(func(_by: Node) -> void:
+			Sfx.play("rumble", -4.0, 0.0)
+			var tw := create_tween()
+			tw.tween_property(_mine_gate, "position:y", _mine_gate.position.y + 4.3, 1.6).set_trans(Tween.TRANS_SINE)
+			Game.say("Clank! The mine gate grinds open.", Color(1.0, 0.8, 0.5)))
+	# behind it: cages of stolen chickens, and the second totem
+	for k in 3:
+		var cz := -168.0 + k * 5.0
+		var cage := Node3D.new(); add_child(cage); cage.position = Vector3(50.0, Y, cz)
+		for i in 8:
+			var a := i * TAU / 8.0
+			var cb := MeshInstance3D.new(); var cbm := BoxMesh.new(); cbm.size = Vector3(0.08, 1.6, 0.08)
+			cb.mesh = cbm; cb.material_override = iron; cb.position = Vector3(cos(a) * 0.9, 0.8, sin(a) * 0.9); cage.add_child(cb)
+		var top := MeshInstance3D.new(); var tcm := CylinderMesh.new(); tcm.top_radius = 1.0; tcm.bottom_radius = 1.0; tcm.height = 0.1
+		top.mesh = tcm; top.material_override = iron; top.position.y = 1.6; cage.add_child(top)
+		var hen := ChickenMount.new()
+		cage.add_child(hen); hen.scale = Vector3.ONE * 0.32
+	WarrenTotem.make(self, Vector3(46.0, Y, -146.0), "warren_totem_e")
+	n = 0
+	for e in [[Vector3(28, Y, -138), "goblin"], [Vector3(30, Y, -160), "goblin"], [Vector3(26, Y, -170), "goblin_archer"],
+			[Vector3(44, Y, -140), "goblin_brute"], [Vector3(46, Y, -160), "goblin"], [Vector3(48, Y, -150), "goblin_archer"]]:
+		_enemy(e[1], e[0], "w_mines_%d" % n, -PI * 0.5)
+		n += 1
+	Interactable.create(self, "chest", Vector3(51.0, Y, -133.0), -90.0, "w_chest_mines", [{"roll": "big", "ilvl": 5}])
+	# --- Gruk's gate between the den and his hall
+	_gruk_gate = Node3D.new(); add_child(_gruk_gate); _gruk_gate.position = Vector3(0, Y, -164.0)
+	var bone := StandardMaterial3D.new(); bone.albedo_color = Color(0.85, 0.8, 0.65)
+	for k in 7:
+		var gbar := MeshInstance3D.new(); var gbm2 := BoxMesh.new(); gbm2.size = Vector3(0.22, 5.0, 0.22)
+		gbar.mesh = gbm2; gbar.material_override = wood; gbar.position = Vector3(-2.7 + k * 0.9, 2.5, 0); _gruk_gate.add_child(gbar)
+	for y in [1.0, 3.6]:
+		var cross := MeshInstance3D.new(); var cbm2 := BoxMesh.new(); cbm2.size = Vector3(6.0, 0.25, 0.3)
+		cross.mesh = cbm2; cross.material_override = wood; cross.position = Vector3(0, y, 0); _gruk_gate.add_child(cross)
+	var skull := MeshInstance3D.new(); var ssm := SphereMesh.new(); ssm.radius = 0.4; ssm.height = 0.7
+	skull.mesh = ssm; skull.material_override = bone; skull.position = Vector3(0, 4.4, 0.2); _gruk_gate.add_child(skull)
+	var ksb := StaticBody3D.new(); ksb.collision_layer = 1; _gruk_gate.add_child(ksb)
+	var kcs := CollisionShape3D.new(); var kbs := BoxShape3D.new(); kbs.size = Vector3(6.0, 5.0, 0.6)
+	kcs.shape = kbs; kcs.position.y = 2.5; ksb.add_child(kcs)
+	Interactable.create(self, "inscription", Vector3(-4.0, Y, -161.5), 180.0, "", [], "Goblin gate",
+		"A GATE OF BONES AND LOGS\n\nGoblin scratchings: \"ONLY DA TOTEMS OPEN DA GATE\"\n\nTwo War Totems burn somewhere in the Warren:\none past the chasm (west), one in the mines (east).\nSmash them both!")
+	for t in get_tree().get_nodes_in_group("warren_totem"):
+		(t as WarrenTotem).broken.connect(func(_t: WarrenTotem) -> void: _check_gruk_gate(false))
+	_check_gruk_gate(true)
+
+func totems_left() -> int:
+	return int(not Game.flags.get("warren_totem_w", false)) + int(not Game.flags.get("warren_totem_e", false))
+
+func _check_gruk_gate(instant: bool) -> void:
+	var left := totems_left()
+	if left > 0:
+		if not instant:
+			Game.say("A War Totem crumbles! %d to go." % left, Color(1.0, 0.7, 0.4))
+		return
+	if _gruk_gate == null or _gruk_gate.get_meta("open", false):
+		return
+	_gruk_gate.set_meta("open", true)
+	if instant:
+		_gruk_gate.position.y += 5.2
+		return
+	Sfx.play("rumble", 0.0, 0.0)
+	var tw := create_tween()
+	tw.tween_property(_gruk_gate, "position:y", _gruk_gate.position.y + 5.2, 2.5).set_trans(Tween.TRANS_SINE)
+	Game.say("Both totems are smashed! Gruk's gate rumbles open...", Color(1.0, 0.75, 0.4))
 
 func _mushroom(p: Vector3) -> void:
 	var col := Color(0.35, 0.9, 0.75) if _rng.randf() < 0.6 else Color(0.75, 0.45, 1.0)
