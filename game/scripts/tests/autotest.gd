@@ -256,6 +256,9 @@ func _run() -> void:
 	elif mode == "cloud":
 		if await _cloud_test():
 			return
+	elif mode == "bubblesfight":
+		if await _bubbles_fight_test():
+			return
 	elif mode == "crypt":
 		if await _crypt_walk_test():
 			return
@@ -3199,3 +3202,80 @@ func _designer_test() -> void:
 	await wait(0.3)
 	check("close_returns_to_inventory", main.menus.current == "inventory")
 	main._resume()
+
+
+## A real fight with Mr. Bubbles: walk up and swing, no shortcuts.
+func _bubbles_fight_test() -> bool:
+	if not Game.get_meta("bf_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("bf_phase", true)
+		for q in Game.zone_quests("castle"):
+			Game.quests[q] = {"state": "done", "n": 99}
+		main._travel("cloud")
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	Game.level = 12          # about where you'd be by Mr. Bubbles
+	Game.hp = Game.max_hp()
+	var w = main.world
+	for q in Game.zone_quests("cloud"):
+		Game.quests[q] = {"state": "done", "n": 99}
+	Game.quests["mr_bubbles"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await wait(0.3)
+	var lord: Enemy = w.lord
+	check("bf_lord_spawned", lord != null)
+	# ride the real bubble up from the storm-gate vent
+	var vent: Vector3 = CloudWorld.VENTS[7][0]
+	await tp(vent + Vector3(0, 0.3, 3.0), 0.0)
+	await wait(1.0)
+	print("BF near vent ", player.global_position, " floor ", player.is_on_floor())
+	await tp(vent + Vector3(0, 0.3, 0), 0.0)
+	var popped_at := -1.0
+	for k in 40:
+		await wait(0.5)
+		if popped_at < 0.0 and w._ride.is_empty():
+			popped_at = k * 0.5
+		if k % 4 == 0:
+			print("BF ride t=%.1f pos=%s ride=%s" % [k * 0.5, player.global_position, w._ride.get("phase", "-")])
+	var ec: Vector3 = CloudWorld.ISLANDS.E.c
+	var into := Vector2(player.global_position.x - ec.x, player.global_position.z - ec.z).length()
+	check("bf_bubble_carries_you_in", popped_at > 0.0 and popped_at < 12.0 and into < 15.0, "popped %.1fs, %.1fm from centre" % [popped_at, into])
+	await shot("bf_arrival")
+	# no teleport: walk up from wherever the bubble dropped you
+	print("BF after pop: input=%s dead=%s lift=%.1f wind=%s vel=%s floor=%s mounted=%s talking=%s paused=%s hp=%.0f" % [player.input_enabled, player.dead, player.lift, player.wind, player.velocity, player.is_on_floor(), player.mounted, player.get("talking"), get_tree().paused, Game.hp])
+	await wait(2.0)
+	print("BF lord pos ", lord.global_position, " player ", player.global_position, " state ", lord.state)
+	var hp0 := lord.hp
+	var swings := 0
+	for k in 80:
+		var to := lord.global_position - player.global_position
+		player.facing = atan2(-to.x, -to.z)
+		var fl := Vector3(to.x, 0, to.z)
+		if fl.length() > 2.5:
+			Input.action_press("move_forward")
+		else:
+			Input.action_release("move_forward")
+		Input.action_press("attack")
+		await wait(0.1)
+		if k % 20 == 0:
+			print("BF t=%d dist=%.2f dy=%.2f hp=%.0f lordstate=%s dive=%d" % [k, fl.length(), to.y, lord.hp, lord.state, lord._dive_phase])
+	Input.action_release("attack"); Input.action_release("move_forward")
+	check("bf_walked_up_to_mr_bubbles", Vector2(lord.global_position.x - player.global_position.x, lord.global_position.z - player.global_position.z).length() < 5.0)
+	check("bf_melee_hurts_mr_bubbles", lord.hp < hp0, "%.0f -> %.0f" % [hp0, lord.hp])
+	var hp1 := lord.hp
+	for k in 6:
+		var to := lord.global_position - player.global_position
+		player.facing = atan2(-to.x, -to.z)
+		player._fire_bolt()
+		await wait(0.8)
+	check("bf_bolt_hurts_mr_bubbles", lord.hp < hp1, "%.0f -> %.0f" % [hp1, lord.hp])
+	await shot("bf_fight")
+	await tp(ec + Vector3(0, 0.5, -28.0), PI)
+	await wait(4.0)
+	print("BF fall: dead=%s hp=%.0f" % [player.dead, Game.hp])
+	check("bf_far_side_fall_is_safe", not player.dead and player.global_position.y > -5.0, str(player.global_position))
+	return false

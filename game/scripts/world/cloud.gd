@@ -18,6 +18,7 @@ class_name CloudWorld
 signal area_changed(area: String)
 
 const PLAY := 125.0
+const NORTH := 195.0     # the thunderhead (island E) sits past PLAY to the north
 const ISLANDS := {
 	"A": {"c": Vector3(0, 20, 0), "r": 32.0, "storm": false},
 	"B": {"c": Vector3(-58, 40, -45), "r": 18.0, "storm": false},
@@ -198,8 +199,8 @@ func _flush_puffs() -> void:
 func _sea() -> void:
 	# a soft floor of clouds as far as you can see (and it catches you)
 	var sb := StaticBody3D.new(); sb.collision_layer = 1; add_child(sb)
-	var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(PLAY * 2.0 + 40, 2.0, PLAY * 2.0 + 40)
-	cs.shape = bs; cs.position = Vector3(0, -1.0, 0); sb.add_child(cs)
+	var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(PLAY * 2.0 + 40, 2.0, PLAY + NORTH + 40)
+	cs.shape = bs; cs.position = Vector3(0, -1.0, (PLAY - NORTH) * 0.5); sb.add_child(cs)
 	var x := -180.0
 	while x <= 180.0:
 		var z := -200.0
@@ -484,8 +485,11 @@ func _enemy(type_name: String, pos: Vector3, uid: String) -> Enemy:
 
 func _bounds() -> void:
 	var sb := StaticBody3D.new(); sb.collision_layer = 1; add_child(sb)
-	for w in [[Vector3(0, 60, -PLAY - 1), Vector3(PLAY * 2 + 4, 200, 2)], [Vector3(0, 60, PLAY + 1), Vector3(PLAY * 2 + 4, 200, 2)],
-			[Vector3(-PLAY - 1, 60, 0), Vector3(2, 200, PLAY * 2 + 4)], [Vector3(PLAY + 1, 60, 0), Vector3(2, 200, PLAY * 2 + 4)]]:
+	# (the north wall sits well past Mr. Bubbles' thunderhead, so nothing stops you reaching it)
+	var mid_z := (PLAY - NORTH) * 0.5
+	var len_z := PLAY + NORTH + 4
+	for w in [[Vector3(0, 60, -NORTH - 1), Vector3(PLAY * 2 + 4, 200, 2)], [Vector3(0, 60, PLAY + 1), Vector3(PLAY * 2 + 4, 200, 2)],
+			[Vector3(-PLAY - 1, 60, mid_z), Vector3(2, 200, len_z)], [Vector3(PLAY + 1, 60, mid_z), Vector3(2, 200, len_z)]]:
 		var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = w[1]
 		cs.shape = bs; cs.position = w[0]; sb.add_child(cs)
 
