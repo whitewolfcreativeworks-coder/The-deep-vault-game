@@ -30,7 +30,7 @@ var warden: Warden
 var altar: Interactable
 var boss_started := false
 var rivers: Array[GlowRiver] = []
-var spawn_point := Vector3(-22.5, 0.1, 25.0)   # inside the arrival portal (west side area)
+var spawn_point := Vector3(-21.0, 0.1, 25.0)   # just out of the arrival portal (west side area)
 var spawn_yaw := -1.15                          # facing out of the portal toward the vault gate
 const ARRIVAL := Vector3(-24.0, 0, 25.0)
 var hall_woken := false

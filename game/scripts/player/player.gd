@@ -1180,8 +1180,24 @@ func _update_camera(delta: float) -> void:
 		cam_yaw.global_position = cp
 	cam_yaw.rotation = Vector3(0, view_yaw, 0)
 	cam_pitch.rotation = Vector3(clampf(view_pitch - high_t() * 0.55 - (_crane if zoom > FP_THRESHOLD else 0.0), -1.3, PITCH_MAX), 0, 0)
-	# --- shoulder offset shrinks when the camera is squeezed by walls
-	var squeeze := clampf(cam_len / maxf(zoom, 0.01), 0.0, 1.0)
+	# --- shoulder offset shrinks when the camera is squeezed by walls. The room
+	# is measured straight back from the head (not from where the camera ended
+	# up), so moving the camera can't change it and set off a back-and-forth.
+	var room := zoom
+	if zoom > 0.05 and not fp:
+		var q0 := PhysicsShapeQueryParameters3D.new()
+		q0.shape = _probe
+		q0.transform = Transform3D(Basis.IDENTITY, cam_pitch.global_position)
+		q0.motion = cam_pitch.global_transform.basis.z * zoom
+		q0.collision_mask = 1
+		q0.exclude = [get_rid()]
+		var r0 := get_world_3d().direct_space_state.cast_motion(q0)
+		if r0.size() == 2 and r0[0] < 1.0:
+			room = zoom * r0[0]
+	_squeeze = lerpf(_squeeze, clampf(room / maxf(zoom, 0.01), 0.0, 1.0), 1.0 - exp(-8.0 * delta))
+	if absf(_squeeze - room / maxf(zoom, 0.01)) < 0.002:
+		_squeeze = clampf(room / maxf(zoom, 0.01), 0.0, 1.0)
+	var squeeze := _squeeze
 	# close in, the camera moves further over the right shoulder (and a little up)
 	# so the head, hair and hats don't fill the middle of the screen
 	var ramp := clampf((zoom - 0.6) / 0.8, 0.0, 1.0)
@@ -1227,19 +1243,34 @@ func _update_camera(delta: float) -> void:
 			safe = maxf(0.0, want * res[0] - 0.05)
 		# crane: if a wall behind would push the camera into the back of the head,
 		# swing it up and over (looking down) instead, if that gives more room
-		var best_extra := 0.0
+		# Judge every option from the camera's direction *without* the current
+		# crane, so the choice doesn't feed back on itself (that made the view
+		# tremble when standing still next to a wall or the portal arch), and
+		# only switch when another option is clearly better.
+		var side := arm.global_transform.basis.x.normalized()
+		var base_dir: Vector3 = arm.global_transform.basis.z.rotated(side, _crane)
+		var options := [0.0, 0.3, 0.6, 0.9] if high_t() < 0.5 else [0.0, 0.3, 0.5]
+		var scores := {}
 		if want > 1.5:
-			var best_score := safe
-			for extra in [0.3, 0.6, 0.9] if high_t() < 0.5 else [0.3, 0.5]:
-				var dir: Vector3 = arm.global_transform.basis.z.rotated(arm.global_transform.basis.x.normalized(), -extra)
-				q.motion = dir * want
+			for extra in options:
+				q.motion = base_dir.rotated(side, -extra) * want
 				var r2 := space.cast_motion(q)
 				var s2: float = want if r2.size() < 2 or r2[0] >= 1.0 else maxf(0.0, want * r2[0] - 0.05)
-				var score: float = s2 - extra * 0.9
-				if s2 > safe + 0.8 and score > best_score:
-					best_score = score
-					best_extra = extra
+				scores[extra] = s2 - extra * 0.9
+		var best_extra := _crane_pick
+		if scores.is_empty():
+			best_extra = 0.0
+		else:
+			var top: float = options[0]
+			for extra in options:
+				if scores[extra] > scores[top]:
+					top = extra
+			if not scores.has(_crane_pick) or scores[top] > scores[_crane_pick] + 0.6:
+				best_extra = top
+		_crane_pick = best_extra
 		_crane = lerpf(_crane, best_extra, 1.0 - exp(-4.0 * delta))
+		if absf(_crane - best_extra) < 0.002:
+			_crane = best_extra
 	if safe < cam_len - 0.01:
 		cam_len = lerpf(cam_len, safe, 1.0 - exp(-delta / 0.03))   # pull in almost instantly
 		_hold = 0.55                                                # then wait before easing out
@@ -1268,6 +1299,8 @@ func _update_camera(delta: float) -> void:
 var _head_hidden := false
 var kill_y := -40.0      # falling below this is death (the forest Warren sits deeper)
 var _crane := 0.0
+var _crane_pick := 0.0
+var _squeeze := 1.0
 var _move_input := Vector2.ZERO
 var _coyote := 0.0
 var _jump_buffer := 0.0

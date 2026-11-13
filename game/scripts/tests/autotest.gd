@@ -250,6 +250,9 @@ func _run() -> void:
 	elif mode == "sinkhole":
 		if await _sinkhole_test():
 			return
+	elif mode == "settle":
+		if await _settle_test():
+			return
 	elif mode == "cloud":
 		if await _cloud_test():
 			return
@@ -2370,6 +2373,69 @@ func _castle_test() -> bool:
 	check("g_gets_off_moped", not player.mounted)
 	Game.save_slot()
 	check("castle_saved", Game.read_slot(Game.active_slot).get("zone", "") == "castle")
+	return false
+
+# --- standing still after arriving: the camera must not shake ---------------------
+func _measure_still(label: String, secs := 2.5) -> float:
+	var cam: Camera3D = player.camera
+	var prev := cam.global_transform
+	var worst := 0.0
+	var total := 0.0
+	var n := 0
+	var t := 0.0
+	var crane_min := 9.0
+	var crane_max := -9.0
+	var len_min := 99.0
+	var len_max := -1.0
+	while t < secs:
+		await get_tree().process_frame
+		var d := get_process_delta_time()
+		t += d
+		var now := cam.global_transform
+		var mv := now.origin.distance_to(prev.origin) + (now.basis.z - prev.basis.z).length() * 3.0
+		if t > 0.8:     # after the fade-in has settled
+			worst = maxf(worst, mv); total += mv; n += 1
+			crane_min = minf(crane_min, player._crane); crane_max = maxf(crane_max, player._crane)
+			len_min = minf(len_min, player.cam_len); len_max = maxf(len_max, player.cam_len)
+		prev = now
+	print("SETTLE %s worst=%.4f mean=%.4f crane=[%.3f..%.3f] cam_len=[%.3f..%.3f] zoom=%.2f pos=%s" % [label, worst, total / maxf(n, 1), crane_min, crane_max, len_min, len_max, player.zoom, player.global_position])
+	return worst
+
+func _settle_test() -> bool:
+	var phase: int = Game.get_meta("st_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		player = main.player
+		await wait(1.5)
+		var w0 := await _measure_still("vault_start")
+		check("still_after_start", w0 < 0.02, "%.4f" % w0)
+		# right up against the arch (the old start spot): still no trembling
+		await tp(Vector3(-22.6, 0.1, 25.0), -1.15)
+		await wait(3.5)     # let it glide up over the arch first
+		var wa := await _measure_still("against_the_arch")
+		check("still_against_the_arch", wa < 0.02, "%.4f" % wa)
+		Game.set_meta("st_phase", 2)
+		main.go_to_forest()
+		return true
+	await wait(1.0)
+	player = main.player
+	god = true
+	await wait(1.0)
+	var w1 := await _measure_still("forest_arrival")
+	check("still_after_forest_arrival", w1 < 0.02, "%.4f" % w1)
+	var door: Node = null
+	for n in get_tree().get_nodes_in_group("interactable"):
+		if n is WarrenDoor:
+			door = n
+	await tp((door as Node3D).global_position + Vector3(0, 0.3, 2.0), 0.0)
+	await wait(0.5)
+	door.interact(player)
+	await wait(1.2)
+	await shot("st_warren_arrival")
+	var w2 := await _measure_still("warren_arrival")
+	check("still_after_warren_door", w2 < 0.02, "%.4f" % w2)
 	return false
 
 # --- Level 4: Cloud Island -------------------------------------------------------
