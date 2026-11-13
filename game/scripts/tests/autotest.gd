@@ -1448,6 +1448,78 @@ func _forest_test() -> bool:
 		await wait(0.8)
 		await shot("fo_11_goblin_den")
 		_kill_near(Enemy.TYPES.keys(), 20.0, Vector3(0, ForestWorld.WY, -150))
+		# the bigger Warren: Gruk's gate is shut until both War Totems are smashed
+		var Y := ForestWorld.WY
+		var totems := get_tree().get_nodes_in_group("warren_totem")
+		check("two_war_totems", totems.size() == 2, "%d" % totems.size())
+		check("gruk_gate_shut", w.totems_left() == 2 and not w._gruk_gate.get_meta("open", false))
+		await tp(Vector3(0, Y + 0.1, -158), PI)
+		await wait(0.4)
+		await press("move_back", 1.4)
+		check("gate_blocks_the_way", player.global_position.z > -164.5, str(player.global_position))
+		var cp2: QuestCompass = main.hud.compass
+		Game.quests["warren"] = {"state": "active", "n": 0}
+		Game.track_quest("warren")
+		await wait(0.8)
+		check("compass_leads_to_a_totem", cp2._has_target and totems.any(func(t) -> bool: return (t as Node3D).global_position.distance_to(cp2._target) < 2.0))
+		# west: the Mushroom Grotto and its rope bridge
+		_kill_near(Enemy.TYPES.keys(), 40.0, Vector3(-36, Y, -152))
+		await _look(Vector3(-36, Y, -154), Vector3(-24, Y + 0.1, -147), 6.0, -0.25)
+		await shot("fo_11a_rope_bridge")
+		await tp(Vector3(-30.0, Y + 0.3, -154.0), -PI * 0.5)
+		await wait(0.4)
+		var bx := player.global_position.x
+		Input.action_press("move_forward")
+		await wait(0.6)
+		await tap("jump")
+		await wait(1.8)
+		Input.action_release("move_forward")
+		check("bridge_can_be_crossed", player.global_position.x < -41.0 and player.global_position.y > Y - 1.0, str(player.global_position))
+		# fall into the pit and climb back up
+		await tp(Vector3(-35.5, Y + 0.3, -164.0), 0.0)
+		await wait(2.0)
+		check("chasm_is_deep", player.global_position.y < Y - 10.0, str(player.global_position))
+		var rope: Node = null
+		for n2 in get_tree().get_nodes_in_group("interactable"):
+			if n2 is Passage and (n2 as Node3D).global_position.y < Y - 10.0:
+				rope = n2
+		check("rope_out_of_the_pit", rope != null)
+		rope.interact(player)
+		await wait(1.5)
+		check("climbed_out_of_the_pit", player.global_position.y > Y - 1.0, str(player.global_position))
+		var tw_: WarrenTotem = null
+		var te_: WarrenTotem = null
+		for t2 in totems:
+			if (t2 as Node3D).global_position.x < 0.0: tw_ = t2
+			else: te_ = t2
+		await _look(tw_.global_position + Vector3(0, 2, 0), tw_.global_position + Vector3(5, 0.1, 6), 5.0, -0.1)
+		await shot("fo_11b_war_totem")
+		tw_.take_damage(9999.0, player.global_position)
+		await wait(0.6)
+		check("totem_breaks", w.totems_left() == 1)
+		# east: the Goblin Mines; the lever opens the barred gate
+		_kill_near(Enemy.TYPES.keys(), 40.0, Vector3(38, Y, -152))
+		await tp(Vector3(33.0, Y + 0.3, -153.0), -PI * 0.5)
+		await wait(0.3)
+		await press("move_forward", 1.2)
+		check("mine_gate_bars_the_way", player.global_position.x < 37.0, str(player.global_position))
+		var lev: Interactable = null
+		for n3 in get_tree().get_nodes_in_group("interactable"):
+			if n3 is Interactable and (n3 as Interactable).kind == "lever" and (n3 as Node3D).global_position.x > 20.0:
+				lev = n3
+		check("mine_lever_exists", lev != null)
+		await tp(lev.global_position + Vector3(0, 0.3, 1.5), 0.0)
+		await wait(0.3)
+		lev.interact(player)
+		await wait(2.2)
+		check("lever_opens_mine_gate", w._mine_gate.position.y > Y + 3.5)
+		await _look(Vector3(48, Y + 1, -160), Vector3(34, Y + 0.1, -150), 6.0, -0.2)
+		await shot("fo_11c_goblin_mines")
+		te_.take_damage(9999.0, player.global_position)
+		await wait(3.2)
+		check("gruk_gate_opens", w.totems_left() == 0 and w._gruk_gate.position.y > Y + 4.5)
+		await _look(Vector3(0, Y + 2, -170), Vector3(0, Y + 0.1, -152), 5.0, -0.1)
+		await shot("fo_11d_gate_open")
 		await tp(Vector3(0, ForestWorld.WY + 0.1, -176), 0.0)
 		await wait(1.5)
 		await shot("fo_12_gruk")
