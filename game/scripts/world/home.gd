@@ -53,7 +53,7 @@ const SEA_Y := 40.0
 func build() -> void:
 	_rng.seed = 77
 	_cloud_mat = ShaderMaterial.new(); _cloud_mat.shader = load("res://shaders/cloud.gdshader")
-	_cloud_mat.set_shader_parameter("tint", Color(1.0, 0.94, 0.88)); _cloud_mat.set_shader_parameter("shade", Color(0.62, 0.55, 0.72))
+	_cloud_mat.set_shader_parameter("tint", Color(1.0, 0.9, 0.82)); _cloud_mat.set_shader_parameter("shade", Color(0.42, 0.38, 0.62))
 	_cloud_mat.set_shader_parameter("rim_glow", 0.4)
 	_environment()
 	_valley()
@@ -79,9 +79,9 @@ func _environment() -> void:
 	env = Environment.new()
 	var sky := Sky.new()
 	var psm := ProceduralSkyMaterial.new()
-	psm.sky_top_color = Color(0.2, 0.32, 0.72)
-	psm.sky_horizon_color = Color(1.0, 0.68, 0.45)
-	psm.ground_horizon_color = Color(0.95, 0.72, 0.6)
+	psm.sky_top_color = Color(0.1, 0.2, 0.58)
+	psm.sky_horizon_color = Color(1.0, 0.6, 0.36)
+	psm.ground_horizon_color = Color(0.9, 0.62, 0.55)
 	psm.ground_bottom_color = Color(0.55, 0.5, 0.6)
 	psm.sun_angle_max = 25.0
 	sky.sky_material = psm
@@ -94,15 +94,15 @@ func _environment() -> void:
 	env.glow_intensity = 0.55
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
-	env.fog_light_color = Color(1.0, 0.78, 0.62)
-	env.fog_depth_begin = 160.0
-	env.fog_depth_end = 700.0
+	env.fog_light_color = Color(0.95, 0.7, 0.58)
+	env.fog_depth_begin = 320.0
+	env.fog_depth_end = 1200.0
 	we.environment = env
 	add_child(we)
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-14, 180, 0)        # low in the sky, out ahead of you: home is towards the sunset
 	sun.light_color = Color(1.0, 0.75, 0.5)
-	sun.light_energy = 1.25
+	sun.light_energy = 1.5
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 80.0
 	add_child(sun)

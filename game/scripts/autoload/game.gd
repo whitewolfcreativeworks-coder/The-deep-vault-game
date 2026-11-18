@@ -847,13 +847,6 @@ const QUESTS := {
 		"busy": "The Hail Golem is on the storm layer, by the last bubble vent. Heavy hits: block!",
 		"thanks": "Crunch! The golem is just slush now. The vent to the thunderhead is bubbling.",
 		"reward": {"xp": 1100, "gold": 280, "potions": 3, "roll": "big"}},
-	"flight_home": {"giver": "anu", "zone": "home", "title": "The Flight Home", "requires": "mr_bubbles",
-		"goal": {"type": "collect", "item": "home", "count": 1}, "track": "Home",
-		"locked": "When the storm is calmed, there is one last journey for you.",
-		"offer": "You've done everything we asked, little one, and more. Now it's time to go home.\n\nYour cabin is far, far below, past the storm clouds, the floating rocks and the mountains. I'll open the Sky Gate at the south edge of the temple island. Fly through it on your dragonfly and follow the golden rings all the way home.\n\nHold JUMP to climb, let go to glide, and hold BLOCK to dive. Green rings rest its wings. Fly well!",
-		"busy": "The Sky Gate is at the south edge of the temple island. Fly through it on your dragonfly!",
-		"thanks": "Welcome home.",
-		"reward": {"xp": 3000, "gold": 800, "potions": 5, "roll": "boss"}},
 	"mr_bubbles": {"giver": "anu", "zone": "cloud", "title": "Mr. Bubbles", "requires": "storm_gate",
 		"goal": {"type": "boss", "uid": "mr_bubbles", "count": 1}, "track": "Mr. Bubbles defeated",
 		"locked": "I am Anu, eldest of the sky. When the storm gate is open, come to me.",
@@ -861,6 +854,13 @@ const QUESTS := {
 		"busy": "Mr. Bubbles is on the thunderhead at the top. Rings on the ground mean lightning: get out of them!",
 		"thanks": "He's... crying? He says he's sorry, and he only wanted friends. The storm is gone.\n\nAnd look who's come to thank you: a dragonfly! It has chosen you. It will carry you anywhere, in every land below.",
 		"reward": {"xp": 2000, "gold": 600, "potions": 4, "roll": "boss"}},
+	"flight_home": {"giver": "anu", "zone": "home", "title": "The Flight Home", "requires": "mr_bubbles",
+		"goal": {"type": "collect", "item": "home", "count": 1}, "track": "Home",
+		"locked": "When the storm is calmed, there is one last journey for you.",
+		"offer": "You've done everything we asked, little one, and more. Now it's time to go home.\n\nYour cabin is far, far below, past the storm clouds, the floating rocks and the mountains. I'll open the Sky Gate at the south edge of the temple island. Fly through it on your dragonfly and follow the golden rings all the way home.\n\nHold JUMP to climb, let go to glide, and hold BLOCK to dive. Green rings rest its wings. Fly well!",
+		"busy": "The Sky Gate is at the south edge of the temple island. Fly through it on your dragonfly!",
+		"thanks": "Welcome home.",
+		"reward": {"xp": 3000, "gold": 800, "potions": 5, "roll": "boss"}},
 }
 
 ## Quests belonging to a zone (the forest's six have no "zone" key).

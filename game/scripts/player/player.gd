@@ -183,7 +183,7 @@ func _dragonfly_move(delta: float, target_v: Vector3) -> void:
 		_fly_ground_y = (below.position as Vector3).y
 		_fly_safe = global_position
 		_fly_warned = false
-	elif flying and not free_flight:
+	elif flying and not free_flight and Game.zone != "home":
 		# nothing underneath (off the edge of the map): the dragonfly turns back
 		var back := _fly_safe - global_position
 		back.y = 0.0
@@ -194,7 +194,7 @@ func _dragonfly_move(delta: float, target_v: Vector3) -> void:
 			_fly_warned = true
 			Game.say("Whoa, there's nothing down there! Your dragonfly turns back.", Color(0.5, 1.0, 0.85))
 	var climb := input_enabled and Input.is_action_pressed("jump") and not wings_tired
-	var under_ceiling := free_flight or global_position.y < _fly_ground_y + FLY_CEILING
+	var under_ceiling := free_flight or Game.zone == "home" or global_position.y < _fly_ground_y + FLY_CEILING
 	var dive := input_enabled and Input.is_action_pressed("block") and not climb
 	if mount:
 		mount.climbing = climb
