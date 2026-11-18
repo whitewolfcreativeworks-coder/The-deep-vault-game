@@ -52,6 +52,9 @@ var boss_started := false
 var pal := {"grass_a": Color(0.33, 0.52, 0.2), "grass_b": Color(0.45, 0.58, 0.22), "dirt": Color(0.5, 0.39, 0.25),
 	"rock": Color(0.45, 0.43, 0.38), "bed": Color(0.32, 0.34, 0.26)}
 const MOON_PORTAL := Vector2(80.0, 78.0)
+const BALLOON_PORT := Vector2(-26.0, 70.0)
+var balloon: BalloonRide
+var discoveries: ForestDiscoveries
 var _moon_area: Area3D
 var _moon_mat: ShaderMaterial
 var _moon_light: OmniLight3D
@@ -64,7 +67,7 @@ func build() -> void:
 	b = Builder.new(self)
 	clearings = [[Vector2(0, 92), 16.0], [Vector2(-55, 45), 16.0], [Vector2(55, 8), 13.0], [Vector2(-14, -18), 10.0],
 		[Vector2(-58, -42), 15.0], [Vector2(60, -50), 15.0], [Vector2(36, 62), 10.0], [Vector2(0, -92), 15.0],
-		[SinkholeOfDeath.HOLE, 12.0], [MOON_PORTAL, 12.0]]
+		[SinkholeOfDeath.HOLE, 12.0], [MOON_PORTAL, 12.0], [BALLOON_PORT, 9.0]]
 	_environment()
 	_terrain()
 	_stream()
@@ -79,6 +82,7 @@ func build() -> void:
 	_goblin_outpost(Vector2(36, 62))
 	_warren_entrance()
 	_moon_portal()
+	_balloon_port()
 	_scatter_forest()
 	_horizon()
 	_bounds()
@@ -88,6 +92,7 @@ func build() -> void:
 	b.fix_coplanar()
 	_quest_items()
 	sinkhole = SinkholeOfDeath.build_in(self)
+	discoveries = ForestDiscoveries.build_in(self)
 	# treasure chests in random spots out in the woods (new ones keep popping up)
 	wild_chests = WildChests.create(self, Rect2(-PLAY + 8, -86, (PLAY - 8) * 2, 86 + PLAY - 8), ground, _wild_spot_ok, 7, 5)
 	if Game.is_compat():
@@ -647,6 +652,31 @@ func _motes() -> void:
 		p.color_ramp = FX._fade_ramp(Color(1.0, 0.95, 0.6))
 		add_child(p)
 		p.position = c + Vector3(0, height(c.x, c.z), 0)
+
+## A wooden launch deck with a hot air balloon you can ride anywhere.
+func _balloon_port() -> void:
+	var c := BALLOON_PORT
+	var g := -INF
+	for d in [Vector2(-3.5, -3.5), Vector2(3.5, -3.5), Vector2(-3.5, 3.5), Vector2(3.5, 3.5), Vector2.ZERO]:
+		g = maxf(g, height(c.x + d.x, c.y + d.y))
+	var top := g + 0.9
+	var low := minf(minf(height(c.x - 3.5, c.y - 3.5), height(c.x + 3.5, c.y + 3.5)), minf(height(c.x - 3.5, c.y + 3.5), height(c.x + 3.5, c.y - 3.5)))
+	var plank := StandardMaterial3D.new(); plank.albedo_color = Color(0.62, 0.44, 0.26); plank.roughness = 0.9
+	var post := StandardMaterial3D.new(); post.albedo_color = Color(0.42, 0.28, 0.16); post.roughness = 0.9
+	b.box(Vector3(c.x - 3.5, top - 0.25, c.y - 3.5), Vector3(c.x + 3.5, top, c.y + 3.5), plank)
+	for d in [Vector2(-3.2, -3.2), Vector2(3.2, -3.2), Vector2(-3.2, 3.2), Vector2(3.2, 3.2)]:
+		b.box(Vector3(c.x + d.x - 0.2, low - 1.0, c.y + d.y - 0.2), Vector3(c.x + d.x + 0.2, top - 0.25, c.y + d.y + 0.2), post)
+	# railings on three sides, the stair on the side facing the glade
+	for r in [[Vector3(c.x - 3.5, top, c.y - 3.5), Vector3(c.x + 3.5, top + 1.0, c.y - 3.4)],
+			[Vector3(c.x - 3.5, top, c.y - 3.5), Vector3(c.x - 3.4, top + 1.0, c.y + 3.5)],
+			[Vector3(c.x + 3.4, top, c.y - 3.5), Vector3(c.x + 3.5, top + 1.0, c.y + 3.5)]]:
+		b.box(r[0], r[1], post)
+	b.stairs(c.x - 1.3, c.x + 1.3, c.y + 3.5, c.y + 3.5 + (top - low + 0.4) * 1.3, top, low - 0.4, plank)
+	var sg := Label3D.new(); sg.text = "HOT AIR BALLOON\nfree rides for heroes!"; sg.font_size = 64; sg.pixel_size = 0.006
+	sg.modulate = Color(1.0, 0.85, 0.35); sg.outline_size = 12; sg.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	sg.position = Vector3(c.x + 3.0, top + 2.6, c.y + 4.0); add_child(sg)
+	balloon = BalloonRide.make(self, Vector3(c.x, top, c.y))
+	balloon.bound = PLAY - 4.0
 
 ## The Moonlit Portal (south-east): it wakes when every forest quest is done
 ## and leads to Level 3, Ghost Knight Castle.

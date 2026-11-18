@@ -106,17 +106,86 @@ func _build() -> void:
 			var pm2 := ShaderMaterial.new(); pm2.shader = load("res://shaders/stone.gdshader"); pm2.set_shader_parameter("mode", 0)
 			pm2.set_shader_parameter("base_color", Color(0.3, 0.3, 0.34))
 			ped2.material_override = pm2; ped2.position = Vector3(0, 0.5, 0); add_child(ped2)
-			var heart := MeshInstance3D.new(); var hs := SphereMesh.new(); hs.radius = 0.22; hs.height = 0.5; heart.mesh = hs
-			var hm := StandardMaterial3D.new(); hm.albedo_color = Color(1, 0.7, 0.3); hm.emission_enabled = true
-			hm.emission = Color(1.0, 0.55, 0.2); hm.emission_energy_multiplier = 6.0
-			heart.material_override = hm; heart.position = Vector3(0, 1.45, 0); add_child(heart)
-			_vis = heart
-			_light = OmniLight3D.new(); _light.light_color = Color(1.0, 0.65, 0.3); _light.light_energy = 3.0; _light.omni_range = 9.0
-			_light.shadow_enabled = true
-			_light.position = Vector3(0, 1.6, 0); add_child(_light)
-			Props.fire_particles(heart, 0.7, Color(1.0, 0.6, 0.3), true)
+			# a dim rune ring on top until the Heart appears
+			var rune := MeshInstance3D.new(); var rq := QuadMesh.new(); rq.size = Vector2(1.3, 1.3); rune.mesh = rq
+			var rmat := ShaderMaterial.new(); rmat.shader = load("res://shaders/rune.gdshader")
+			rmat.set_shader_parameter("color", Color(1.0, 0.7, 0.3)); rmat.set_shader_parameter("intensity", 0.6)
+			rune.material_override = rmat; rune.rotation.x = -PI / 2; rune.position = Vector3(0, 1.01, 0); add_child(rune)
+			_build_heart()
 			var sb4 := StaticBody3D.new(); var cs4 := CollisionShape3D.new(); var bs4 := BoxShape3D.new(); bs4.size = bx.size
 			cs4.shape = bs4; cs4.position = Vector3(0, 0.5, 0); sb4.add_child(cs4); add_child(sb4)
+
+## The Heart of the Vault: a big faceted amber crystal that floats above the
+## altar inside three spinning golden rings, with runes circling it. Hidden
+## until the Warden falls; then a pillar of light brings it down (reveal()).
+var _crystal: Node3D
+var _rings: Array[Node3D] = []
+var _orbit: Node3D
+func _build_heart() -> void:
+	_vis = Node3D.new(); _vis.position = Vector3(0, 2.1, 0); add_child(_vis)
+	_crystal = Node3D.new(); _vis.add_child(_crystal)
+	var amber := StandardMaterial3D.new(); amber.albedo_color = Color(1.0, 0.62, 0.22, 0.85)
+	amber.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; amber.metallic = 0.3; amber.roughness = 0.05
+	amber.emission_enabled = true; amber.emission = Color(1.0, 0.5, 0.15); amber.emission_energy_multiplier = 2.2
+	amber.rim_enabled = true; amber.rim = 0.8
+	for up in [1.0, -1.0]:
+		var cone := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.0; cm.bottom_radius = 0.42
+		cm.height = 0.75 if up > 0 else 0.55; cm.radial_segments = 6; cm.rings = 1
+		cone.mesh = cm; cone.material_override = amber
+		cone.position.y = cm.height * 0.5 * up; cone.rotation.x = 0.0 if up > 0 else PI
+		_crystal.add_child(cone)
+	var core := MeshInstance3D.new(); var cs := SphereMesh.new(); cs.radius = 0.16; cs.height = 0.32; core.mesh = cs
+	core.material_override = FX.beam_material(Color(1.0, 0.85, 0.5), 3.0, 1.0)
+	_crystal.add_child(core)
+	var gold := _metal(Color(1.0, 0.78, 0.3))
+	gold.emission_enabled = true; gold.emission = Color(1.0, 0.6, 0.2); gold.emission_energy_multiplier = 0.6
+	for i in 3:
+		var r := Node3D.new(); _vis.add_child(r)
+		r.rotation = [Vector3(0.0, 0.0, 0.0), Vector3(PI / 2, 0.0, 0.0), Vector3(0.0, 0.0, PI / 2)][i]
+		r.rotate_object_local(Vector3.RIGHT, 0.35 * (i + 1))
+		var ring := MeshInstance3D.new(); var tm := TorusMesh.new()
+		var rr := 0.75 + i * 0.16
+		tm.inner_radius = rr - 0.035; tm.outer_radius = rr + 0.035; tm.rings = 48; tm.ring_segments = 8
+		ring.mesh = tm; ring.material_override = gold; r.add_child(ring)
+		_rings.append(r)
+	_orbit = Node3D.new(); _vis.add_child(_orbit)
+	for k in 6:
+		var a := k * TAU / 6.0
+		var g := MeshInstance3D.new(); var gq := QuadMesh.new(); gq.size = Vector2(0.32, 0.32); g.mesh = gq
+		var gm := ShaderMaterial.new(); gm.shader = load("res://shaders/rune.gdshader")
+		gm.set_shader_parameter("color", Color(1.0, 0.8, 0.4)); gm.set_shader_parameter("intensity", 1.6)
+		g.material_override = gm; g.position = Vector3(cos(a) * 1.35, sin(a * 2.0) * 0.2, sin(a) * 1.35)
+		g.rotation.y = -a + PI / 2
+		_orbit.add_child(g)
+	_light = OmniLight3D.new(); _light.light_color = Color(1.0, 0.65, 0.3); _light.light_energy = 4.0; _light.omni_range = 12.0
+	_light.shadow_enabled = true
+	_vis.add_child(_light)
+	Props.fire_particles(_crystal, 0.5, Color(1.0, 0.7, 0.35), true)
+	_vis.visible = Game.flags.get("warden_dead", false) and not Game.flags.get(uid, false)
+
+## The Warden has fallen: a pillar of light, and the Heart descends onto the altar.
+func reveal() -> void:
+	if _vis == null:
+		return
+	_vis.visible = true
+	_vis.position.y = 7.0
+	_vis.scale = Vector3.ONE * 0.1
+	var beam := MeshInstance3D.new(); var bm := CylinderMesh.new(); bm.top_radius = 0.9; bm.bottom_radius = 0.9; bm.height = 14.0
+	bm.cap_top = false; bm.cap_bottom = false
+	beam.mesh = bm; beam.material_override = FX.beam_material(Color(1.0, 0.8, 0.45), 1.4, 0.0)
+	beam.position.y = 7.0; add_child(beam)
+	var bmat := beam.material_override as StandardMaterial3D
+	var tw := create_tween()
+	tw.tween_property(bmat, "albedo_color:a", 0.45, 0.6)
+	tw.parallel().tween_property(_vis, "position:y", 2.1, 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(_vis, "scale", Vector3.ONE, 2.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void:
+		Sfx.play_at("victory", global_position, -4.0, 0.0)
+		FX.burst(global_position + Vector3(0, 2.1, 0), Color(1.0, 0.75, 0.35), 90, 6.0, 0.25, 1.4, 0.0)
+		FX.flash_light(global_position + Vector3(0, 2.2, 0), Color(1.0, 0.7, 0.35), 10.0, 14.0, 0.8))
+	tw.tween_property(bmat, "albedo_color:a", 0.0, 1.5)
+	tw.tween_callback(beam.queue_free)
+	Sfx.play_at("portal", global_position, -2.0, 0.0)
 
 func _metal(c: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new(); m.albedo_color = c; m.metallic = 0.8; m.roughness = 0.4
@@ -126,9 +195,13 @@ func _process(delta: float) -> void:
 	if kind == "shrine" and _vis:
 		_vis.rotation.y += delta
 		_vis.position.y = 1.25 + sin(Time.get_ticks_msec() * 0.002) * 0.06
-	elif kind == "altar" and _vis and not spent:
-		var s := 1.0 + sin(Time.get_ticks_msec() * 0.006) * 0.08
-		_vis.scale = Vector3(s, s, s)
+	elif kind == "altar" and _vis and _vis.visible and not spent:
+		var tt := Time.get_ticks_msec() * 0.001
+		_crystal.rotation.y += delta * 0.9
+		_crystal.position.y = sin(tt * 1.6) * 0.08
+		for i in _rings.size():
+			_rings[i].rotate_object_local(Vector3.UP, delta * (1.4 + i * 0.6) * (1.0 if i % 2 == 0 else -1.0))
+		_orbit.rotation.y -= delta * 0.6
 
 func get_prompt() -> String:
 	match kind:
@@ -191,9 +264,18 @@ func interact(by: Node) -> void:
 		"altar":
 			Sfx.play("victory", -2.0, 0.0)
 			if _vis:
+				# the rings whirl, the crystal soars up and bursts into light
 				var tw := create_tween()
-				tw.tween_property(_vis, "position:y", 3.0, 1.5).set_trans(Tween.TRANS_SINE)
-				tw.parallel().tween_property(_vis, "scale", Vector3.ONE * 0.1, 1.5)
+				tw.tween_method(func(v: float) -> void:
+					for r in _rings:
+						r.rotate_object_local(Vector3.UP, v * 0.05), 1.0, 12.0, 1.2)
+				tw.parallel().tween_property(_vis, "position:y", 3.4, 1.2).set_trans(Tween.TRANS_SINE)
+				tw.tween_property(_vis, "scale", Vector3.ONE * 0.05, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+				tw.tween_callback(func() -> void:
+					_vis.visible = false
+					FX.flash_light(global_position + Vector3(0, 3.0, 0), Color(1.0, 0.8, 0.4), 14.0, 18.0, 0.9)
+					FX.burst(global_position + Vector3(0, 3.2, 0), Color(1.0, 0.85, 0.5), 140, 8.0, 0.3, 1.6, -1.0)
+					FX.screen_flash(Color(1.0, 0.9, 0.7), 0.6, 0.8))
 			FX.burst(global_position + Vector3(0, 1.6, 0), Color(1.0, 0.7, 0.3), 80, 6.0, 0.3, 2.0, 0.5)
 			Game.add_item("heart_vault", false)
 	_apply_spent(false)
@@ -216,3 +298,6 @@ func _apply_spent(silent: bool) -> void:
 			if _lid:
 				var tw2 := create_tween()
 				tw2.tween_property(_lid, "rotation:x", 0.7, 0.0 if silent else 0.35)
+		"altar":
+			if silent and _vis:
+				_vis.visible = false

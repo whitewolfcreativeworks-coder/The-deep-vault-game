@@ -128,6 +128,15 @@ func quest_target(id: String) -> Variant:
 		match String(g.type):
 			"collect":
 				spot = _first("quest_item", func(n: Node) -> bool: return n.get("item") == g.item and (n as Node3D).visible)
+				if spot == null:
+					spot = _first("dig_mound", func(n: Node) -> bool: return n.get("item") == g.item and n.can_interact())
+				if g.item == "fish":
+					spot = _first("fishing_spot", func(_n: Node) -> bool: return true)
+				elif g.item == "horse":
+					# leading a horse home: point at the paddock; otherwise at the nearest lost horse
+					var led := _first("ghost_horse", func(n: Node) -> bool: return n.get("calm") and not n.get("_done"))
+					spot = _first("paddock", func(_n: Node) -> bool: return true) if led \
+						else _first("ghost_horse", func(n: Node) -> bool: return not n.get("_done"))
 			"kill":
 				var types: Array = g.get("types", Game.GOBLINS)
 				spot = _first("enemy", func(n: Node) -> bool: return n.get("type_id") in types and not n.get("dead") \

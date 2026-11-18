@@ -256,6 +256,17 @@ func _run() -> void:
 	elif mode == "cloud":
 		if await _cloud_test():
 			return
+	elif mode == "views":
+		if await _views_test():
+			return
+	elif mode == "polish2":
+		if await _polish2_test():
+			return
+	elif mode == "classes":
+		await _classes_test()
+	elif mode == "castle5":
+		if await _castle5_test():
+			return
 	elif mode == "polish1":
 		if await _polish1_test():
 			return
@@ -2162,26 +2173,74 @@ func _sinkhole_test() -> bool:
 	var cp: QuestCompass = main.hud.compass
 	await wait(0.6)
 	check("compass_points_to_grimgor", cp._has_target and cp._below == 0 and cp._target.distance_to(sk.cyclops.global_position) < 2.0)
-	# the lava river cavern
-	_kill_near(Enemy.TYPES.keys(), 26.0, Vector3(-32, SinkholeOfDeath.SY, -64))
-	await tp(Vector3(-32, SinkholeOfDeath.SY + 0.3, -96), 0.0)
-	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.25; player.snap_view()
+	# the Cauldron: a lava lake with Grimgor's island in the middle
+	var SY := SinkholeOfDeath.SY
+	_kill_near(Enemy.TYPES.keys(), 26.0, Vector3(-32, SY, -64))
+	await tp(Vector3(-32, SY + 0.3, -94), 0.0)
+	player.zoom_target = 9.0; player.zoom = 9.0; player.pitch = -0.3; player.snap_view()
 	await wait(1.5)
-	await shot("sk_04_lava_river")
+	await shot("sk_04_cauldron")
+	check("bridge_sunk_at_first", not sk._bridge_up and sk._bridge.position.y < SY - 3.0)
 	var hp0 := Game.hp
 	god = false
-	await tp(Vector3(-46, SinkholeOfDeath.SY - 0.6, -110), 0.0)
+	await tp(Vector3(-46, SY - 0.6, -110), 0.0)
 	await wait(1.4)
 	check("lava_burns", Game.hp < hp0, "%.0f -> %.0f" % [hp0, Game.hp])
 	god = true
 	Game.hp = Game.max_hp()
-	_kill_near(Enemy.TYPES.keys(), 40.0, Vector3(-32, SinkholeOfDeath.SY, -110))
-	await tp(Vector3(-32, SinkholeOfDeath.SY + 0.3, -146), 0.0)
-	await wait(1.0)
-	await shot("sk_05_ember_den")
-	_kill_near(Enemy.TYPES.keys(), 30.0, Vector3(-32, SinkholeOfDeath.SY, -155))
+	_kill_near(Enemy.TYPES.keys(), 140.0, Vector3(-32, SY, -124))
+	# hop the stepping stones over the lava channel to the west ledge
+	await tp(Vector3(-64.5, SY + 0.3, -95.5), 0.0)
+	var stones: Array = SinkholeOfDeath.STONES
+	var hops := 0
+	for st in stones:
+		var target_p: Vector3 = st
+		face(target_p)
+		Input.action_press("move_forward"); Input.action_press("sprint")
+		await frames(4)
+		Input.action_press("jump")
+		await wait(0.15)
+		Input.action_release("jump")
+		for k in 30:
+			await wait(0.05)
+			if player.is_on_floor():
+				break
+		Input.action_release("move_forward"); Input.action_release("sprint")
+		await wait(0.2)
+		if Vector2(player.global_position.x - target_p.x, player.global_position.z - target_p.z).length() < 1.6 and player.global_position.y > SY - 0.2:
+			hops += 1
+		else:
+			print("HOP miss ", target_p, " at ", player.global_position)
+			await tp(target_p + Vector3(0, 0.6, 0), player.yaw)
+	face(Vector3(-74, SY, -109)); Input.action_press("move_forward"); Input.action_press("sprint")
+	await frames(4); Input.action_press("jump"); await wait(0.15); Input.action_release("jump")
+	await wait(0.8)
+	Input.action_release("move_forward"); Input.action_release("sprint")
+	await wait(0.3)
+	check("stepping_stones_hop", hops >= 2 and player.global_position.z < -104.5 and player.global_position.y > SY - 0.2, "%d hops, at %s" % [hops, player.global_position])
+	await shot("sk_05_stepping_stones")
+	# the Ember Forge's lava sluice
+	await tp(Vector3(-108.6, SY + 0.3, -120.0), PI * 0.5)
+	await wait(0.6)
+	await shot("sk_05b_forge")
+	await tap("interact")
+	await wait(0.8)
+	check("west_sluice_open", Game.flags.get("s_sluice_w", false) and not sk._bridge_up)
+	# the Magma Mines' sluice
+	await tp(Vector3(48.8, SY + 0.3, -133.0), -PI * 0.5)
+	await wait(0.6)
+	await shot("sk_05c_mines")
+	await tap("interact")
+	await wait(4.5)
+	check("bridge_rises", sk._bridge_up and sk._bridge.position.y > SY - 1.0)
+	# walk across the bridge onto the island
+	await tp(Vector3(-32, SY + 0.3, -99.5), 0.0)
+	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.2; player.snap_view()
+	await wait(0.5)
+	await shot("sk_05d_bridge")
+	await press("move_forward", 4.4)
+	check("walked_onto_island", SinkholeOfDeath.ISLAND.has_point(Vector2(player.global_position.x, player.global_position.z)) and player.global_position.y > SY - 0.3, str(player.global_position))
 	# Grimgor
-	await tp(Vector3(-32, SinkholeOfDeath.SY + 0.3, -190), 0.0)
 	player.yaw = 0.0; player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.08; player.snap_view()
 	await wait(2.5)
 	check("boss_awake", sk._boss_started)
@@ -2208,9 +2267,9 @@ func _sinkhole_test() -> bool:
 	claim.interact(player)
 	await wait(1.0)
 	check("mount_unlocked", Game.flags.get("mount_chicken", false) and player.mounted)
-	# riding is faster than running
-	await tp(Vector3(-32, SinkholeOfDeath.SY + 0.3, -196), 0.0)
-	player.yaw = PI; player.snap_view()
+	# riding is faster than running (along the south ledge)
+	await tp(Vector3(-60, SinkholeOfDeath.SY + 0.3, -95), 0.0)
+	player.yaw = -PI * 0.5; player.snap_view()
 	await wait(0.4)
 	var p0 := player.global_position
 	await press("move_forward", 1.5)
@@ -3449,4 +3508,449 @@ func _polish1_test() -> bool:
 	await wait(0.3)
 	await shot("p1_06b_moon_beacon_off")
 	beacon.visible = true
+	return false
+
+
+## Scouting shots: VIEW_ZONE=vault|forest|castle|cloud and
+## VIEWS="x,y,z,yaw_deg,pitch,zoom;..." (FLAGS="a,b" sets flags first).
+func _views_test() -> bool:
+	var zone := OS.get_environment("VIEW_ZONE")
+	if zone == "":
+		zone = "vault"
+	if not Game.get_meta("vw_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		for f in OS.get_environment("FLAGS").split(",", false):
+			Game.flags[f] = true
+		if zone != "vault":
+			Game.set_meta("vw_phase", true)
+			main._travel(zone)
+			return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	if Game.flags.get("warden_dead", false) and main.world.get("altar") and main.world.altar:
+		if main.world.warden and is_instance_valid(main.world.warden):
+			main.world.warden.queue_free()
+		main.world.altar.reveal()
+		await wait(3.0)
+	if OS.get_environment("COSTUME") != "":
+		Game.wear_costume(OS.get_environment("COSTUME"))
+		await wait(1.0)
+	var i := 0
+	for v in OS.get_environment("VIEWS").split(";", false):
+		var a := v.split(",")
+		var pos := Vector3(float(a[0]), float(a[1]), float(a[2]))
+		if a[1] == "g" and main.world.has_method("ground"):
+			pos = main.world.ground(pos.x, pos.z) + Vector3(0, 0.3, 0)
+		await tp(pos, deg_to_rad(float(a[3])), float(a[4]) if a.size() > 4 else -0.2)
+		var z := float(a[5]) if a.size() > 5 else 4.2
+		player.zoom_target = z; player.zoom = z; player.snap_view()
+		await wait(1.2)
+		await shot("view_%02d" % i)
+		i += 1
+	return false
+
+
+## Nov 17 playtest, batch 2: the playground, the Heart, the balloon, discoveries.
+func _polish2_test() -> bool:
+	if not Game.get_meta("p2_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		await wait(1.5)
+		god = true
+		var w = main.world
+		var pg: Node = w.get_node_or_null("Playground")
+		check("p2_playground_built", pg != null)
+		check("p2_rogue_statue", pg != null and pg.get_node_or_null("RogueStatue") != null)
+		# trampoline: walk on and bounce
+		var tr: Node3D = pg.find_children("*", "", true, false).filter(func(n) -> bool: return n is Playground.Trampoline)[0]
+		await tp(tr.global_position + Vector3(0, 1.2, 0), 0.0)
+		var top_y := 0.0
+		for k in 30:
+			await wait(0.1)
+			top_y = maxf(top_y, player.global_position.y)
+		check("p2_trampoline_bounces", top_y > tr.global_position.y + 3.0, "peak %.1f m" % (top_y - tr.global_position.y))
+		Input.action_press("jump")
+		var top2 := 0.0
+		for k in 40:
+			await wait(0.1)
+			top2 = maxf(top2, player.global_position.y)
+		Input.action_release("jump")
+		check("p2_hold_jump_bounces_higher", top2 > top_y + 1.0, "%.1f vs %.1f" % [top2 - tr.global_position.y, top_y - tr.global_position.y])
+		await wait(2.0)
+		# merry-go-round: spin it with USE and get carried round
+		var mgr: Node3D = pg.find_children("*", "", true, false).filter(func(n) -> bool: return n is Playground.MerryGoRound)[0]
+		await tp(mgr.global_position + Vector3(1.4, 0.6, 0), 0.0)
+		await wait(0.6)
+		await tap("interact")
+		await tap("interact")
+		var a0 := Vector2(player.global_position.x - mgr.global_position.x, player.global_position.z - mgr.global_position.z).angle()
+		await wait(1.5)
+		var a1 := Vector2(player.global_position.x - mgr.global_position.x, player.global_position.z - mgr.global_position.z).angle()
+		check("p2_merry_go_round_carries_you", absf(angle_difference(a0, a1)) > 0.8 and mgr.spin > 1.0, "turned %.2f rad, spin %.1f" % [absf(angle_difference(a0, a1)), mgr.spin])
+		await shot("p2_01_merry_go_round")
+		# swings: sit, swing, leap off
+		var sw: Node3D = pg.find_children("*", "", true, false).filter(func(n) -> bool: return n is Playground.Swing)[0]
+		await tp(Vector3(sw.global_position.x, 0.1, sw.global_position.z + 1.2), 0.0)
+		await wait(0.4)
+		await tap("interact")
+		await wait(0.3)
+		check("p2_sit_on_swing", player.vehicle == sw)
+		await wait(4.0)
+		await shot("p2_02_swinging")
+		var swing_amp: float = sw.amp
+		check("p2_swing_goes_higher", swing_amp > 0.5, "%.2f" % swing_amp)
+		await tap("jump")
+		await wait(0.2)
+		var launch_v := player.velocity.length()
+		await wait(2.0)
+		check("p2_leap_off_swing", player.vehicle == null and launch_v > 3.0 and player.is_on_floor(), "launch %.1f m/s" % launch_v)
+		# the Heart of the Vault comes down after the Warden falls
+		await tp(Vector3(0, -5.9, -150), 0.0)
+		await wait(1.0)
+		if w.warden and is_instance_valid(w.warden):
+			w.warden.take_damage(999999.0, player.global_position)
+		await wait(4.5)
+		check("p2_heart_appears_after_boss", w.altar._vis.visible)
+		await _look(Vector3(0, -6 + 2.1, -169), Vector3(2.5, -5.9, -164.5), 2.5, 0.15)
+		await shot("p2_03_heart")
+		await tp(Vector3(0, -5.9, -167.2), 0.0)
+		await wait(0.4)
+		await tap("interact")
+		await wait(2.5)
+		check("p2_heart_claimed", Game.flags.get("altar", false) and not w.altar._vis.visible)
+		Game.set_meta("p2_phase", true)
+		main.go_to_forest()
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var fw: ForestWorld = main.world
+	var bl: BalloonRide = fw.balloon
+	check("p2_balloon_ready", bl != null)
+	await tp(bl.global_position + Vector3(0, 0.3, 2.0), 0.0)
+	await wait(0.5)
+	await tap("interact")
+	await wait(0.3)
+	check("p2_board_balloon", player.vehicle == bl)
+	var y0 := bl.global_position.y
+	Input.action_press("jump")
+	await wait(5.0)
+	Input.action_release("jump")
+	check("p2_burner_lifts", bl.global_position.y > y0 + 8.0, "+%.1f m" % (bl.global_position.y - y0))
+	var h0 := Vector2(bl.global_position.x, bl.global_position.z)
+	player.yaw = 0.0; player.view_yaw = 0.0
+	Input.action_press("move_forward"); Input.action_press("jump")
+	await wait(4.0)
+	await shot("p2_04_balloon_flight")
+	Input.action_release("move_forward"); Input.action_release("jump")
+	var moved := h0.distance_to(Vector2(bl.global_position.x, bl.global_position.z))
+	check("p2_balloon_steers", moved > 8.0, "%.1f m" % moved)
+	await tap("interact")
+	await wait(0.3)
+	check("p2_cant_step_out_midair", player.vehicle == bl)
+	Input.action_press("dodge")
+	for k in 60:
+		await wait(0.5)
+		if bl._landed:
+			break
+	Input.action_release("dodge")
+	check("p2_balloon_lands", bl._landed)
+	await wait(0.6)
+	await tap("interact")
+	await wait(1.0)
+	check("p2_step_out_on_ground", player.vehicle == null and player.is_on_floor() and player.global_position.distance_to(bl.global_position) < 4.0)
+	await shot("p2_05_landed")
+	# discoveries
+	var spots := fw.discoveries.get_children().filter(func(n) -> bool: return n.get("kind") != null)
+	check("p2_discoveries_placed", spots.size() >= 5, "%d" % spots.size())
+	var found := 0
+	for sp in spots:
+		print("DISC visiting ", sp.kind, " at ", sp.global_position)
+		await tp(sp.global_position + Vector3(0, 0.4, 2.6), 0.0)
+		face(sp.global_position)
+		await wait(0.4)
+		print("DISC target ", player.interact_target, " paused ", get_tree().paused, " menu ", main.menus.current)
+		if player.interact_target == sp:
+			await tap("interact")
+			await wait(1.5)
+			if main.menus.current != "":
+				main._resume()
+			if Game.flags.get("disc_" + sp.kind, false):
+				found += 1
+			await _look(sp.global_position + Vector3(0, 0.6, 0), sp.global_position + Vector3(2.2, 0.4, 2.2), 2.8, -0.2)
+			await shot("p2_06_disc_" + sp.kind)
+	check("p2_discoveries_work", found >= spots.size() - 1, "%d of %d" % [found, spots.size()])
+	return false
+
+
+## The nine classes: how each looks in the creator, and the new classes'
+## special moves used for real in a fight.
+func _classes_test() -> void:
+	for i in Game.SAVE_SLOTS:
+		Game.delete_slot(i)
+	var m = main.menus
+	m.show_panel("creator")
+	await wait(0.6)
+	m._set_tab("hero")
+	await wait(0.4)
+	m.current = "looks"
+	var cam: Camera3D = m._preview_vp.find_children("*", "Camera3D", true, false)[0]
+	for hero in Game.HERO_ORDER:
+		Game.profile.hero = hero
+		Game.profile.show_hat = true
+		Game.profile.face = "none"; Game.profile.hair_style = "natural"; Game.profile.cape = 0; Game.profile.skin = 0
+		m._refresh_preview()
+		m._preview.rotation.y = PI + 0.35
+		cam.position = Vector3(0, 1.5, 5.6); cam.look_at(Vector3(0, 1.1, 0))
+		await frames(6)
+		await RenderingServer.frame_post_draw
+		m._preview_vp.get_texture().get_image().save_png(out_dir.path_join("cls_%s.png" % hero))
+	m.current = "creator"
+	await shot("cls_creator_page")
+	check("cls_nine_classes", Game.HERO_ORDER.size() == 9)
+	Game.profile.hero = "Knight"
+	await _start()
+	await wait(1.5)
+	god = true
+	Game.flags["special2"] = true
+	var w = main.world
+	for hero in ["Priest", "Druid", "Necromancer", "Beastmaster"]:
+		Game.profile.hero = hero
+		player.rebuild_body()
+		await tp(Vector3(-4, 0.1, 14), PI)
+		await wait(0.6)
+		var foe := Enemy.new(); foe.configure("revenant", "", 0.0)
+		foe.position = Vector3(-4, 0.2, 18.0)
+		w.add_child(foe)
+		await wait(0.3)
+		player.special_cd = 0.0; player.special2_cd = 0.0
+		var hp0: float = foe.hp
+		face(foe.global_position); player.view_yaw = player.yaw; player.facing = player.yaw
+		await wait(0.2)
+		await tap("special")
+		await wait(6.0 if hero in ["Necromancer", "Beastmaster"] else 2.0)
+		await shot("cls_%s_special" % hero)
+		check("cls_%s_special_hurts" % hero, foe.dead or foe.hp < hp0, "%.0f -> %.0f" % [hp0, foe.hp])
+		if hero == "Necromancer":
+			check("cls_skeletons_rise", get_tree().get_nodes_in_group("ally").filter(func(a) -> bool: return a.kind == "skeleton").size() >= 2)
+		if hero == "Beastmaster":
+			check("cls_wolf_companion", player.pet != null and is_instance_valid(player.pet))
+		# second power
+		if not is_instance_valid(foe) or foe.dead:
+			foe = Enemy.new(); foe.configure("revenant", "", 0.0)
+			foe.position = Vector3(-4, 0.2, 17.0)
+			w.add_child(foe)
+			await wait(0.3)
+		god = false
+		Game.hp = Game.max_hp() * 0.4
+		var php := Game.hp
+		var hp1: float = foe.hp
+		face(foe.global_position); player.view_yaw = player.yaw
+		await tap("special2")
+		await wait(3.0)
+		await shot("cls_%s_power" % hero)
+		match hero:
+			"Priest", "Druid":
+				check("cls_%s_power_heals" % hero, Game.hp > php + Game.max_hp() * 0.1, "%.0f -> %.0f" % [php, Game.hp])
+			"Necromancer":
+				check("cls_drain_hurts_and_heals", foe.hp < hp1 and Game.hp > php, "foe %.0f -> %.0f, you %.0f -> %.0f" % [hp1, foe.hp, php, Game.hp])
+			"Beastmaster":
+				check("cls_bear_friend", get_tree().get_nodes_in_group("ally").filter(func(a) -> bool: return a.kind == "bear").size() == 1)
+		god = true
+		if is_instance_valid(foe) and not foe.dead:
+			foe.take_damage(99999.0, player.global_position)
+		for a in get_tree().get_nodes_in_group("ally"):
+			if a.kind != "wolf" or hero != "Beastmaster":
+				a.queue_free()
+		await wait(0.5)
+	# the wolf fights on its own
+	var foe2 := Enemy.new(); foe2.configure("warrior", "", 0.0)
+	foe2.position = player.global_position + Vector3(0, 0.2, 5.0)
+	w.add_child(foe2)
+	var hp2: float = foe2.hp
+	await wait(5.0)
+	check("cls_wolf_fights", foe2.dead or foe2.hp < hp2)
+
+
+## Castle notes (Nov 17): the Bone Crypt, fishing, the cloud beacon, boss moves.
+func _castle5_test() -> bool:
+	if not Game.get_meta("c5_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("c5_phase", true)
+		main._travel("castle")
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: CastleWorld = main.world
+	var cr: BoneCrypt = w.crypt
+	var CY := CastleWorld.CY
+	check("c5_crypt_built", cr != null)
+	# the catacombs
+	await tp(Vector3(-62, CY + 0.3, -10), PI)
+	player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = -0.25; player.yaw = 0.0; player.snap_view()
+	await wait(1.5)
+	await shot("c5_01_catacombs")
+	var dormant := get_tree().get_nodes_in_group("enemy").filter(func(e) -> bool: return e.type_id == "crypt_skeleton" and e.state == Enemy.S.DORMANT)
+	check("c5_skeletons_lie_in_wait", dormant.size() >= 4, "%d" % dormant.size())
+	if dormant.size() > 0:
+		var d0: Enemy = dormant[0]
+		await tp(d0.global_position + Vector3(2.5, 0.3, 0), PI * 0.5)
+		await wait(2.0)
+		await shot("c5_02_skeleton_rises")
+		check("c5_skeleton_claws_out", d0.state != Enemy.S.DORMANT)
+	_kill_near(Enemy.TYPES.keys(), 80.0, Vector3(-62, CY, -26))
+	# the Bone Bridge
+	await tp(BoneCrypt.BRIDGE_START + Vector3(0, 0.3, 0), 0.0)
+	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.3; player.snap_view()
+	await wait(1.0)
+	await shot("c5_03_bone_bridge")
+	Input.action_press("move_forward"); Input.action_press("sprint")
+	await wait(4.6)
+	Input.action_release("move_forward"); Input.action_release("sprint")
+	await wait(0.5)
+	check("c5_crossed_bone_bridge", player.global_position.z < -62.0 and player.global_position.y > CY - 1.0, str(player.global_position))
+	var fell := 0
+	for sl in cr.get_children():
+		if sl is BoneCrypt.BridgeSlab and sl._t >= 0.0:
+			fell += 1
+	check("c5_slabs_crumble_behind_you", fell >= 6, "%d" % fell)
+	await shot("c5_04_crossed")
+	# stand still on the bridge: it gives way, and the ghosts throw you back
+	await wait(6.5)
+	await tp(Vector3(-105.0, CY + 0.4, -48.0), 0.0)
+	await wait(4.0)
+	check("c5_fall_puts_you_back", player.global_position.distance_to(BoneCrypt.BRIDGE_START) < 3.0, str(player.global_position))
+	# the Hall of Bells
+	await tp(Vector3(-102, CY + 0.3, -78), 0.0)
+	await wait(1.0)
+	for k in 40:
+		await wait(0.25)
+		if not cr._bells_busy and cr._bell_order.size() > 0:
+			break
+	await shot("c5_05_bells")
+	check("c5_bells_shown", cr._bell_order.size() == 4)
+	for i in cr._bell_order:
+		var bell: Node3D = cr._bells[i]
+		await tp(bell.global_position + Vector3(0, 0.3, 1.6), 0.0)
+		await wait(0.4)
+		await tap("interact")
+		await wait(0.5)
+	await wait(3.0)
+	check("c5_bells_open_ossuary", cr._gate_open and Game.flags.get("crypt_bells", false))
+	# the Ossuary and the Bone Colossus
+	await tp(Vector3(-78, CY + 0.3, -86), -PI * 0.5)
+	player.zoom_target = 8.0; player.zoom = 8.0; player.pitch = -0.1; player.snap_view()
+	await wait(2.0)
+	await shot("c5_06_ossuary")
+	check("c5_bone_colossus", cr.colossus != null and is_instance_valid(cr.colossus) and cr.colossus.max_hp >= 4600.0)
+	cr.colossus._move_cd = 0.0
+	await wait(4.0)
+	check("c5_colossus_special_move", cr.colossus.moves_done.size() >= 1, str(cr.colossus.moves_done))
+	await shot("c5_07_colossus_move")
+	cr.colossus.take_damage(999999.0, player.global_position)
+	await wait(1.0)
+	check("c5_three_holy_waters", get_tree().get_nodes_in_group("quest_item").filter(func(q) -> bool: return q.item == "holywater").size() == 3)
+	# fishing at the Misty Mere
+	Game.quests["fishing"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	var spot: FishingSpot = get_tree().get_first_node_in_group("fishing_spot")
+	check("c5_fishing_spot", spot != null)
+	await tp(spot.global_position + Vector3(-1.5, 0.3, 0), -PI * 0.5)
+	await wait(0.4)
+	await tap("interact")
+	await wait(0.4)
+	check("c5_start_fishing", player.vehicle == spot)
+	player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.25; player.snap_view()
+	for fish_n in 5:
+		for k in 80:
+			await wait(0.1)
+			if spot._state == "bite":
+				break
+		if fish_n == 0:
+			await shot("c5_08_bite")
+		await tap("attack")
+		for k in 70:
+			if spot._state != "reel":
+				break
+			await tap("attack")
+			await wait(0.05)
+		await wait(0.6)
+		if fish_n == 0:
+			await shot("c5_09_catch")
+	check("c5_five_fish", Game.quest_state("fishing") == "ready" and Game.flags.get("ghost_pike", false), "%s %d" % [Game.quest_state("fishing"), spot.catches])
+	await tap("jump")
+	await wait(0.5)
+	check("c5_stop_fishing", player.vehicle == null)
+	# Spooked Horses: calm a see-through horse with an apple and lead it home
+	Game.quests["wraith_hunt"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	check("c5_four_horses", w.horses.size() == 4 and w.horses.all(func(h) -> bool: return not h._done))
+	var h0: GhostHorse = w.horses[0]
+	_kill_near(["wraith"], 400.0, h0.global_position)
+	await tp(h0.global_position + Vector3(2.0, 0.4, 0.0), PI * 0.5)
+	player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.15; player.snap_view()
+	await wait(0.3)
+	await shot("c5_12_ghost_horse")
+	await tp(h0.global_position + Vector3(1.6, 0.4, 0.0), PI * 0.5)
+	await tap("interact")
+	await wait(0.3)
+	check("c5_horse_calmed", h0.calm)
+	var hp0 := h0.global_position
+	await tp(hp0 + Vector3(-12.0, 0.4, 0.0), PI * 0.5)
+	await wait(3.0)
+	check("c5_horse_follows", h0.global_position.distance_to(player.global_position) < 7.0, "%.1f" % h0.global_position.distance_to(player.global_position))
+	await tp(w.ground(CastleWorld.PADDOCK.x, CastleWorld.PADDOCK.y) + Vector3(0, 0.4, 0), PI * 0.5)
+	await wait(2.5)
+	check("c5_horse_home", h0._done and Game.flags.get("c_horse_0", false) and Game.quest_progress("wraith_hunt") == 1, "%s %d" % [h0._done, Game.quest_progress("wraith_hunt")])
+	await _look(w.ground(CastleWorld.PADDOCK.x, CastleWorld.PADDOCK.y) + Vector3(0, 1, 0), w.ground(CastleWorld.PADDOCK.x - 13, CastleWorld.PADDOCK.y + 4) + Vector3(0, 0.4, 0), 5.0, -0.2)
+	await shot("c5_13_paddock")
+	# Lockets in the Graveyard: dig them out of the mounds (one has a skeleton in it)
+	Game.quests["lost_lockets"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	var mounds := get_tree().get_nodes_in_group("dig_mound")
+	check("c5_five_mounds", mounds.size() == 5, "%d" % mounds.size())
+	var m1: DigMound = mounds.filter(func(m) -> bool: return m.grabby)[0]
+	await tp(m1.global_position + Vector3(0, 0.4, 1.8), 0.0)
+	player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.3; player.snap_view()
+	await wait(0.4)
+	await shot("c5_14_mound")
+	var skel_before := get_tree().get_nodes_in_group("enemy").filter(func(e) -> bool: return e.type_id == "crypt_skeleton" and not e.dead).size()
+	await tap("interact")
+	await wait(1.0)
+	await shot("c5_15_dig")
+	await wait(0.6)
+	var lk := get_tree().get_nodes_in_group("quest_item").filter(func(q) -> bool: return q.item == "locket" and q.visible)
+	check("c5_locket_dug_up", lk.size() == 1, "%d" % lk.size())
+	var skel_after := get_tree().get_nodes_in_group("enemy").filter(func(e) -> bool: return e.type_id == "crypt_skeleton" and not e.dead).size()
+	check("c5_skeleton_climbs_out", skel_after == skel_before + 1, "%d -> %d" % [skel_before, skel_after])
+	if lk.size() > 0:
+		await tp((lk[0] as Node3D).global_position + Vector3(0, 0.3, 0), 0.0)
+		await wait(0.5)
+	check("c5_locket_collected", Game.quest_progress("lost_lockets") == 1, "%d" % Game.quest_progress("lost_lockets"))
+	_kill_near(["crypt_skeleton"], 20.0, m1.global_position)
+	# the cloud lift shines once the Ghost Lord is gone
+	Game.quests["ghost_lord"] = {"state": "done", "n": 1}
+	Game.quests_changed.emit()
+	await wait(0.6)
+	var lift: Node = w.get_node_or_null("CloudLift")
+	check("c5_cloud_beacon", lift != null and lift.find_child("SkyBeacon", true, false) != null)
+	await _look(lift.global_position + Vector3(0, 10, 0), w.ground(-30, 90) + Vector3(0, 0.3, 0), 6.0, 0.15)
+	await shot("c5_10_cloud_beacon")
+	# a castle boss uses its special moves
+	var gk := Enemy.new(); gk.configure("gatekeeper", "", 0.0)
+	gk.position = w.ground(20, 20) + Vector3(0, 0.3, 0)
+	w.add_child(gk)
+	await tp(w.ground(20, 28) + Vector3(0, 0.3, 0), 0.0)
+	await wait(1.0)
+	gk._move_cd = 0.0
+	await wait(3.5)
+	await shot("c5_11_boss_move")
+	check("c5_gatekeeper_moves", gk.moves_done.size() >= 1, str(gk.moves_done))
 	return false

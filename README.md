@@ -72,6 +72,40 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### New in the Nov 17 playtest round
+- **Four new classes (nine in all), each with two powers and its own outfit:**
+  - **Priest:** Holy Smite and Prayer of Light (a big heal).
+  - **Druid:** Entangling Roots and Wild Growth.
+  - **Necromancer:** Raise Dead (skeleton helpers) and Soul Drain.
+  - **Beastmaster:** a loyal wolf that fights beside you, Sic 'Em! and Bear Friend.
+  - The old classes look more different too.
+- **Faces:** the scar and rosy cheeks are replaced by glowing eyes and a ninja mask.
+- **Energy (stamina) potions:** found around every level; drink one for a burst of stamina.
+- **The Vault:**
+  - The arrival yard has a playground (merry-go-round, swings and a trampoline), street lights and a Rogue statue.
+  - Fire vents burn harder.
+  - Switches and levers are gold.
+  - The glowing orb is replaced by the Heart of the Vault, which rises out of the altar after the Warden falls.
+- **The Goblin Forest:**
+  - A hot air balloon you can fly and land anywhere.
+  - Cute random discoveries.
+  - Chickens, and now and then a turkey, that you can hunt for food.
+  - The Moonlit Portal glows when it's awake.
+- **Underground:**
+  - Enemies can no longer hit you through walls.
+  - The Warren's goblins and Chief Gruk are tougher, and Gruk has special moves.
+  - The Sinkhole of Death has a brand-new layout (still red and fiery), with more and harder fire goblins.
+  - Grimgor the Cyclops is much stronger and cooler-looking: horns, spikes, an eye beam, thrown boulders and a leaping slam.
+- **Ghost Knight Castle:**
+  - Enemies get tougher the further into the game you go. They dodge, block with shields, and become enraged when badly hurt.
+  - Every boss has its own special moves.
+  - The crypt is now **the Bone Crypt**: skeletons that rise from their coffins, a crumbling Bone Bridge, a Hall of Bells puzzle, and the **Bone Colossus**.
+  - **Fishing** at the Misty Mere, for Old Gill.
+  - Pip's *Spooked Horses* quest is now a rescue. Calm four see-through ghost horses with an apple and lead them home to the paddock. Keep them away from the wraiths!
+  - A beam of light marks the cloud lift from anywhere on the moor.
+  - The glowing blue patch under ghostly costumes is fixed.
+  - Every portal still works backwards, so you can revisit older areas.
+
 - **Look at your hero.** Press **P**, tap **ME** (iPad), or pick "Look at my hero" in the pause menu. The camera swings round to your front and slowly circles you. Swipe or move the mouse to spin it yourself, zoom in or out, tap **POSE!** (or click) to strike a pose, and **DONE** (or P) to go back.
 - **Armour skins (common).** New outfit looks drop often from chests and now and then from monsters. Each one is a small upgrade (a bit of defence and health) and goes on by itself when it beats the one you're wearing.
   - They include Ranger's Leathers, Druid's Robes, Knight's Surcoat, Paladin's Tabard, Treasure Hunter's Coat and Parade Uniform.

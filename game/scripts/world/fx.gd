@@ -49,6 +49,29 @@ static func beam_material(color: Color, energy := 1.0, alpha := 0.35, additive :
 	m.disable_receive_shadows = true
 	return m
 
+## A tall column of light into the sky that you can see from anywhere in a
+## zone: marks where to go next (the cloud lift, an open portal...).
+static func sky_beacon(parent: Node, pos: Vector3, color: Color, height := 90.0) -> Node3D:
+	var n := Node3D.new(); n.name = "SkyBeacon"
+	parent.add_child(n); n.global_position = pos
+	var beam := MeshInstance3D.new(); var bcm := CylinderMesh.new(); bcm.top_radius = 1.0; bcm.bottom_radius = 1.6; bcm.height = height
+	bcm.cap_top = false; bcm.cap_bottom = false
+	beam.mesh = bcm; beam.material_override = beam_material(color.lerp(Color.WHITE, 0.3), 1.2, 0.28, false)
+	beam.position.y = height * 0.5; beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	n.add_child(beam)
+	var core := MeshInstance3D.new(); var ccm := CylinderMesh.new(); ccm.top_radius = 0.25; ccm.bottom_radius = 0.45; ccm.height = height
+	ccm.cap_top = false; ccm.cap_bottom = false
+	core.mesh = ccm; core.material_override = beam_material(color.lerp(Color.WHITE, 0.6), 1.5, 0.75, false)
+	core.position.y = height * 0.5; core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	n.add_child(core)
+	var sp := CPUParticles3D.new(); sp.amount = 50; sp.lifetime = 3.0
+	sp.mesh = quad(0.14); sp.material_override = glow_material(color.lerp(Color.WHITE, 0.4), 3.0)
+	sp.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; sp.emission_sphere_radius = 1.6
+	sp.direction = Vector3.UP; sp.spread = 10; sp.initial_velocity_min = 2.0; sp.initial_velocity_max = 4.0
+	sp.gravity = Vector3.ZERO; sp.color_ramp = _fade_ramp(color.lerp(Color.WHITE, 0.4))
+	sp.position.y = 0.5; n.add_child(sp)
+	return n
+
 static func quad(size: float) -> QuadMesh:
 	var q := QuadMesh.new()
 	q.size = Vector2(size, size)

@@ -38,13 +38,17 @@ const HAIR_COLOR_NAMES := ["Hero's own", "Black", "Dark brown", "Chestnut", "Blo
 const FACES := ["none", "beard", "mustache", "eyepatch", "glow_eyes", "mask", "warpaint"]
 const FACE_NAMES := {"none": "Plain", "beard": "Beard", "mustache": "Mustache", "eyepatch": "Eyepatch",
 	"glow_eyes": "Glowing eyes", "mask": "Ninja mask", "warpaint": "War paint"}
-const HERO_ORDER := ["Knight", "Rogue", "Barbarian", "Ranger", "Mage"]
+const HERO_ORDER := ["Knight", "Rogue", "Barbarian", "Ranger", "Mage", "Priest", "Druid", "Necromancer", "Beastmaster"]
 const HERO_BLURB := {
 	"Knight": "A sworn blade of the old roads.",
 	"Rogue": "Quick hands, sharper eyes. Bobek's favourite.",
 	"Barbarian": "Northland strength, few words.",
-	"Ranger": "A hooded tracker of deep places.",
+	"Ranger": "A tracker of deep places, quiver always full.",
 	"Mage": "A hedge-wizard who learned the sword.",
+	"Priest": "A healer in white and gold who smites the wicked.",
+	"Druid": "A friend of root and leaf. The forest fights beside them.",
+	"Necromancer": "Wears a crown of bone. The dead rise to serve.",
+	"Beastmaster": "Never alone: a loyal wolf runs at their side.",
 }
 ## Each hero's special ability (X key, or the big purple button on a touchscreen).
 const ABILITIES := {
@@ -58,6 +62,14 @@ const ABILITIES := {
 		"desc": "Become a burning whirlwind: four spinning hits on everything around you, the last one hurling them away."},
 	"Ranger": {"name": "Volley", "short": "VOLLEY", "cd": 7.0, "color": Color(0.55, 1.0, 0.45),
 		"desc": "Two waves of nine glowing arrows that burst on impact."},
+	"Priest": {"name": "Holy Smite", "short": "SMITE", "cd": 6.0, "color": Color(1.0, 0.88, 0.45),
+		"desc": "A pillar of golden light slams down on the enemy in front of you, stunning everything nearby and healing you."},
+	"Druid": {"name": "Entangling Roots", "short": "ROOTS", "cd": 8.0, "color": Color(0.45, 0.85, 0.3),
+		"desc": "Thorny roots burst from the ground ahead of you: enemies there are stuck fast and torn by thorns."},
+	"Necromancer": {"name": "Raise Dead", "short": "RAISE", "cd": 14.0, "color": Color(0.45, 1.0, 0.5),
+		"desc": "Two skeleton warriors claw out of the ground and fight for you for a while."},
+	"Beastmaster": {"name": "Sic 'Em!", "short": "SIC 'EM", "cd": 6.0, "color": Color(1.0, 0.65, 0.3),
+		"desc": "Point at an enemy: your wolf pounces on it for a huge stunning bite, and a second wolf joins the hunt."},
 }
 func ability() -> Dictionary:
 	return ABILITIES.get(profile.hero, ABILITIES.Knight)
@@ -74,6 +86,14 @@ const ABILITIES2 := {
 		"desc": "A storm of arrows falls on the ground ahead of you."},
 	"Mage": {"name": "Frost Nova", "short": "FROST", "cd": 12.0, "color": Color(0.6, 0.9, 1.0),
 		"desc": "A blast of ice freezes every enemy around you solid."},
+	"Priest": {"name": "Prayer of Light", "short": "PRAYER", "cd": 18.0, "color": Color(1.0, 0.95, 0.7),
+		"desc": "Heals you a lot at once and more over time, and a burst of holy light dazzles every enemy around you."},
+	"Druid": {"name": "Wild Growth", "short": "GROW", "cd": 16.0, "color": Color(0.6, 1.0, 0.45),
+		"desc": "A ring of flowers blooms around you: you heal while you stand in it, and thorns hurt enemies inside."},
+	"Necromancer": {"name": "Soul Drain", "short": "DRAIN", "cd": 12.0, "color": Color(0.5, 1.0, 0.6),
+		"desc": "Green beams pull the life out of every enemy near you, and it flows into you."},
+	"Beastmaster": {"name": "Bear Friend", "short": "BEAR", "cd": 24.0, "color": Color(0.8, 0.55, 0.3),
+		"desc": "A huge brown bear crashes out of nowhere and fights at your side for a while."},
 }
 
 func ability2() -> Dictionary:
@@ -698,8 +718,8 @@ const QUESTS := {
 		"reward": {"xp": 520, "gold": 120, "potions": 2, "roll": "armor"}},
 	"lost_lockets": {"giver": "mott", "zone": "castle", "title": "Lockets in the Graveyard",
 		"goal": {"type": "collect", "item": "locket", "count": 5}, "track": "Lockets found",
-		"offer": "Eh? Oh, a living one! Ha. I'm Mott, the gravedigger.\n\nThe ghosts have been digging up the graveyard looking for their old lockets. If you find five of them first, the ghosts might settle down. They glint gold between the graves, west of here.",
-		"busy": "Five lockets. West, in the graveyard. Mind the archers in the trees.",
+		"offer": "Eh? Oh, a living one! Ha. I'm Mott, the gravedigger.\n\nThe ghosts have been digging up my graveyard looking for their old lockets, and they've left mounds of earth everywhere! If you dig the lockets up first, the ghosts might settle down.\n\nThe graveyard's west of here. Wherever a mound glints gold, dig! And if something digs back... well. Run.",
+		"busy": "Five lockets, buried in the mounds of loose earth in the graveyard, west. Dig where it glints (USE). Mind the archers in the trees.",
 		"thanks": "Five lockets, safe and sound. I'll put them back where they belong. You've a good heart.",
 		"reward": {"xp": 480, "gold": 110, "potions": 2, "roll": "skin"}},
 	"light_beacons": {"giver": "brannoc", "zone": "castle", "title": "Light the Beacons",
@@ -723,16 +743,22 @@ const QUESTS := {
 		"reward": {"xp": 520, "gold": 130, "potions": 2, "roll": "weapon"}},
 	"holy_water": {"giver": "ansel", "zone": "castle", "title": "Holy Water",
 		"goal": {"type": "collect", "item": "holywater", "count": 3}, "track": "Holy water found",
-		"offer": "Brother Ansel, of the chapel. The Ghost Lord in the castle can't be beaten by steel alone.\n\nThe old monks hid three flasks of holy water in the crypt under the graveyard. Bring them to me and I'll bless your blade.",
-		"busy": "The crypt is under the graveyard, west. Look for the stone crypt with the stairs going down.",
+		"offer": "Brother Ansel, of the chapel. The Ghost Lord in the castle can't be beaten by steel alone.\n\nThe old monks hid three flasks of holy water in the Bone Crypt under the graveyard: one deep in the catacombs, one past the Bone Bridge, and one in the Ossuary itself, where the Bone Colossus keeps watch. Bring them to me and I'll bless your blade.",
+		"busy": "The Bone Crypt is under the graveyard, west. Keep moving on the Bone Bridge, it crumbles! And in the Hall of Bells, watch the wisps: the bells must ring in their order.",
 		"thanks": "Three flasks of holy water! Hold out your weapon... there. Now the Ghost Lord will feel your blows.",
 		"reward": {"xp": 520, "gold": 120, "mana_potions": 3, "roll": "big"}},
 	"wraith_hunt": {"giver": "pip", "zone": "castle", "title": "Spooked Horses",
-		"goal": {"type": "kill", "types": ["wraith"], "count": 6}, "track": "Wraiths banished",
-		"offer": "M-m-mister! The wraiths keep scaring our horses and they've all run off!\n\nCould you chase away six of those floaty, wailing things? They hang about the old ruined chapel to the east.",
-		"busy": "Six wraiths. East, at the ruined chapel. They throw cold magic, so dodge!",
-		"thanks": "The horses are coming back! Thank you thank you thank you! Here, it's all my savings.",
-		"reward": {"xp": 480, "gold": 90, "potions": 2, "roll": "skin"}},
+		"goal": {"type": "collect", "item": "horse", "count": 4}, "track": "Horses brought home",
+		"offer": "M-m-mister! The wraiths wailed so loud that all four of our horses ran off, and now they're so scared they've gone see-through!\n\nCould you find them out on the moor and bring them home? Walk up gently and give each one an apple: then it'll follow you anywhere. Lead it back to my paddock, just east of the village.\n\nBut keep them away from the wraiths!",
+		"busy": "Four see-through horses, out on the moor. Give each one an apple (USE) and lead it home to my paddock east of the village. If a wraith wails near your horse, it bolts: beat the wraith and calm it again.",
+		"thanks": "All four, home and solid again! Look at them munch! Thank you thank you thank you! Here, it's all my savings.",
+		"reward": {"xp": 520, "gold": 110, "potions": 2, "roll": "skin"}},
+	"fishing": {"giver": "gill", "zone": "castle", "title": "Something Fishy",
+		"goal": {"type": "collect", "item": "fish", "count": 5}, "track": "Fish caught",
+		"offer": "Ahoy there! Name's Gill. I've fished the Misty Mere for sixty years, but since the ghosts came my old knees won't carry me down the pier.\n\nCatch me five fish, would you? Use the rod at the end of the pier. And if the Ghost Pike bites... don't you let go!",
+		"busy": "The pier's just behind me. Wait for the bobber to dip, hook it quick, then reel, reel, REEL!",
+		"thanks": "Five fish! And... is that the GHOST PIKE?! Sixty years I've tried to catch that fellow. You're a natural. Here, take this, and come fish any time you like.",
+		"reward": {"xp": 620, "gold": 160, "potions": 2, "stamina_potions": 2, "roll": "skin"}},
 	"music_box": {"giver": "wren", "zone": "castle", "title": "Lady Wren's Music Box", "requires": "the_gatehouse",
 		"goal": {"type": "collect", "item": "musicbox", "count": 1}, "track": "Music box found",
 		"locked": "Oh... a visitor. I can't leave the castle gate, and the gate is shut. If only someone could open it...",
@@ -888,6 +914,7 @@ func quest_turn_in(id: String) -> Array:
 		add_gold(int(r.gold))
 	potions += int(r.get("potions", 0))
 	mana_potions += int(r.get("mana_potions", 0))
+	stamina_potions += int(r.get("stamina_potions", 0))
 	var items_got: Array = []
 	if r.has("roll"):
 		for d in Loot.roll_chest(String(r.roll), zone_level() + (1 if r.roll == "boss" else 0)):
@@ -910,7 +937,7 @@ func quest_turn_in(id: String) -> Array:
 	return items_got
 
 const NPC_NAMES := {"fenn": "Ranger Fenn", "bram": "Bram the Woodcutter", "maera": "Old Maera", "tobble": "Tobble the Merchant", "aldric": "Captain Aldric", "dunstan": "Digger Dunstan",
-	"elowen": "Sister Elowen", "mott": "Old Mott", "brannoc": "Captain Brannoc", "holt": "Sergeant Holt", "ansel": "Brother Ansel", "pip": "Pip the Stablehand", "wren": "Lady Wren",
+	"elowen": "Sister Elowen", "mott": "Old Mott", "brannoc": "Captain Brannoc", "holt": "Sergeant Holt", "ansel": "Brother Ansel", "pip": "Pip the Stablehand", "wren": "Lady Wren", "gill": "Old Gill the Fisher",
 	"ninlil": "Ninlil of the Winds", "nanshe": "Nanshe the Keeper", "enki": "Enki the Rainmaker", "utu": "Utu the Gate-Warden", "anu": "Anu, Eldest of the Sky"}
 
 ## Quests listed in the tracker: active and ready ones.

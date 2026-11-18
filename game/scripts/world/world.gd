@@ -271,9 +271,12 @@ func _outpost() -> void:
 	var dust := _motes(Vector3(0, 3, 18), Vector3(18, 3, 16), Color(0.8, 0.85, 1.0), 120, 0.05)
 	dust.position = Vector3(0, 3, 18)
 
+	# the playground and street lamps on the dark east side, and the Rogue statue
+	Playground.build(self)
+
 	# a couple of treasure chests in random spots around the outpost's edges
 	var wc := WildChests.create(self, Rect2(-31, 2, 62, 40), func(x: float, z: float) -> Vector3: return Vector3(x, 0.0, z),
-		func(p: Vector2) -> bool: return absf(p.x) > 16.0 and p.distance_to(Vector2(ARRIVAL.x, ARRIVAL.z)) > 7.0 and p.y < 40.0, 2, 1, false)
+		func(p: Vector2) -> bool: return p.x < -16.0 and p.distance_to(Vector2(ARRIVAL.x, ARRIVAL.z)) > 7.0 and p.y < 40.0, 2, 1, false)
 	wc.max_chests = 3
 	wc.respawn_every = 300.0
 
@@ -808,7 +811,9 @@ func _on_warden_defeated() -> void:
 	FX.burst(reward.global_position + Vector3(0, 1, 0), Loot.rarity_color(4), 60, 4.0, 0.25, 1.5, 0.5)
 	Sfx.music("music_explore", -12.0)
 	Game.set_objective("Claim the Heart of the Vault upon the altar.")
-	Game.say("The Warden crumbles. The Heart's light pulses from the altar.", Color(1.0, 0.8, 0.5))
+	Game.say("The Warden crumbles... and a pillar of light brings the Heart of the Vault down onto the altar!", Color(1.0, 0.8, 0.5))
+	if altar and is_instance_valid(altar):
+		get_tree().create_timer(1.2).timeout.connect(altar.reveal)
 	var sc := get_tree().current_scene
 	if sc.has_method("hide_boss_bar"):
 		get_tree().create_timer(2.0).timeout.connect(sc.hide_boss_bar)

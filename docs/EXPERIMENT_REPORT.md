@@ -643,3 +643,28 @@ The same playtest found two more problems:
 - There was no exit after the win.
 
 Both are fixed: a `look_size` and `radius` per boss, camera framing near a giant boss, and a rainbow slide home.
+
+## Follow-up 17: a long playtest list (Nov 17)
+
+The designer sent about thirty notes in two messages, covering every level. We worked through them in five batches. Each batch got its own autotest mode, and screenshots were checked before anything was published:
+- `polish1`: the playground, fire, levers, the Heart, wall line-of-sight and fowl.
+- `polish2`: the balloon, discoveries and the moon portal.
+- `classes`: the four new classes and their pets and powers.
+- `sinkhole`: rewritten for the new caverns.
+- `castle5`: the Bone Crypt, fishing, the horses, the cloud beacon and boss moves.
+
+**Attacks through walls.** Enemies only checked distance, so a goblin on the other side of a cave wall, or a floor above, could still hit you. Now:
+- engaging and every strike need a line-of-sight ray, cached every 0.3 s so it stays cheap on iPad;
+- strikes also need a height check;
+- an enemy that loses you across a level gives up and goes home.
+
+**Harder, smarter enemies.** "Harder" was done three ways rather than just bigger numbers:
+- **Progression scaling:** enemies get stronger with the zone's level, and with how many of the zone's quests are already done.
+- **Skills:** agile types sidestep your swings, shield-bearers block from the front, and many types become enraged below 35% health.
+- **A special-move system for bosses:** leap slam, charge, whirlwind, projectile fan, eye beam, thrown boulders and blink, each with a warning ring.
+
+**Lessons:**
+- **Glowing materials don't work on big meshes.** A material made for glowing particles turns every mesh into a camera-facing billboard. That's why the first moon beacon was invisible, and it is also the likely cause of the "blue square under my feet" the designer screenshotted (a ghostly costume's cape). The fix was a separate material for beams, with the capes toned down.
+- **Run tests one at a time.** Two Godot test runs on the same machine share the same saved games and fight over the CPU. Tests were run in sequence, each on a frozen copy of the code with its own save folder.
+- **Keep private details out of the repository.** The designer's name had slipped into two code comments. It was replaced with "Jason's son", and the private name now lives only in the private project notes.
+

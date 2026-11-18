@@ -244,7 +244,7 @@ func _zone_extras() -> void:
 		"cloud":
 			n_pot = 4
 		_:
-			areas = [[Vector3(-3.0, 0, 31.0), 6.0, 2], [Vector3(20.0, 0, 36.0), 5.0, 2]]
+			areas = [[Vector3(-3.0, 0, 31.0), 6.0, 2], [Vector3(-26.0, 0, 36.0), 5.0, 2]]
 	ZoneExtras.attach(world, n_pot, areas)
 
 func go_to_cloud() -> void:

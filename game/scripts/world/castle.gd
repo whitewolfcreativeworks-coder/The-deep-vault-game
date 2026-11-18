@@ -27,6 +27,12 @@ const GRAVES := Vector2(-62.0, 22.0)
 const CHAPEL := Vector2(62.0, 18.0)
 const BEACONS := [Vector2(-92.0, -22.0), Vector2(92.0, -26.0), Vector2(-70.0, 80.0)]
 const CRYPT_DOOR := Vector2(-62.0, 6.0)
+const MERE := Vector2(48.0, 74.0)        # the Misty Mere: fishing (Old Gill)
+const MERE_R := 11.0
+var mere_y := 0.0
+const PADDOCK := Vector2(29.0, 54.0)     # Pip's paddock, where the spooked horses come home
+const HORSE_SPOTS := [Vector2(44.0, 30.0), Vector2(-34.0, 38.0), Vector2(26.0, 90.0), Vector2(-44.0, 86.0)]
+var horses: Array[GhostHorse] = []
 
 var spawn_yaw := 0.0
 var warden: Enemy
@@ -61,7 +67,7 @@ func build() -> void:
 	road = PackedVector2Array([Vector2(0, 104), Vector2(-3, 80), Vector2(2, 62), Vector2(0, 40), Vector2(-4, 14),
 		Vector2(3, -14), Vector2(0, -36), Vector2(0, -52)])
 	b = Builder.new(self)
-	clearings = [[PORTAL, 12.0], [VILLAGE, 22.0], [GRAVES, 20.0], [CHAPEL, 15.0], [Vector2(0, -40), 12.0]]
+	clearings = [[PORTAL, 12.0], [VILLAGE, 22.0], [GRAVES, 20.0], [CHAPEL, 15.0], [Vector2(0, -40), 12.0], [MERE, MERE_R + 6.0], [PADDOCK, 8.0]]
 	for bp in BEACONS:
 		clearings.append([bp, 6.0])
 	_environment()
@@ -74,6 +80,8 @@ func build() -> void:
 	_beacons()
 	_castle()
 	_crypt()
+	_mere()
+	_paddock()
 	b.fix_coplanar()      # stone boxes that share a face would flicker: nudge them apart
 	_moors()
 	_scatter()
@@ -104,6 +112,11 @@ func height(x: float, z: float) -> float:
 		var cd: float = p.distance_to(c[0])
 		var ch := noise.get_noise_2d(c[0].x, c[0].y) * 6.0 * 0.3 + 0.45
 		h = lerpf(h, ch, smoothstep(c[1] + 8.0, c[1] * 0.6, cd))
+	# the Misty Mere: a bowl in the moor that holds the water
+	var md := p.distance_to(MERE)
+	if md < MERE_R + 5.0:
+		var rim := noise.get_noise_2d(MERE.x, MERE.y) * 6.0 * 0.3 + 0.45
+		h = lerpf(h, rim - 2.4, smoothstep(MERE_R + 4.0, MERE_R - 3.0, md))
 	# the beacon hills
 	for bp in BEACONS:
 		h += smoothstep(18.0, 3.0, p.distance_to(bp)) * 9.0
@@ -207,7 +220,7 @@ func _set_area(a: String) -> void:
 ## in the crypt, ghost knights on the moors, archers on the hills. [quest, type,
 ## spots, how many to keep around at once].
 const HAUNTS := [
-	["wraith_hunt", "wraith", [Vector2(62, 12), Vector2(56, 22), Vector2(68, 24), Vector2(62, 32), Vector2(74, 10)], 4],
+	["wraith_hunt", "wraith", [Vector2(62, 12), Vector2(56, 22), Vector2(68, 24), Vector2(62, 32), Vector2(74, 10), Vector2(30, 34), Vector2(-20, 80)], 3],
 	["restless_dead", "ghost_knight", [Vector2(-6, 20), Vector2(28, -12), Vector2(-30, -8), Vector2(42, 48), Vector2(-40, 70)], 4],
 	["archers_on_walls", "ghost_archer", [Vector2(-86, -18), Vector2(86, -22), Vector2(-66, 30), Vector2(-74, 76), Vector2(60, -40)], 4],
 ]
@@ -262,6 +275,14 @@ func reset_boss() -> void:
 
 ## The Ghost Lord and the Warden call up more ghosts when badly hurt.
 func summon_for(e: Enemy) -> void:
+	if e.type_id == "bone_colossus":
+		Game.say("The Bone Colossus roars, and the floor cracks open...", Color(0.55, 1.0, 0.75))
+		for k in 3:
+			var sp := e.global_position + Vector3(-6.0 + k * 6.0, 0.3, 6.0)
+			var s2 := Enemy.new(); s2.configure("crypt_skeleton", "", 2.0)
+			s2.position = sp
+			add_child(s2)
+		return
 	Game.say("%s: \"Rise, my knights!\"" % ("Morwen" if e.type_id == "ghost_lord" else "The Warden"), Color(0.6, 0.8, 1.0))
 	var foes := ["ghost_knight", "wraith", "ghost_knight"] if e.type_id == "ghost_lord" else ["ghost_knight", "ghost_archer"]
 	for k in foes.size():
@@ -392,11 +413,13 @@ func _graveyard() -> void:
 		_hw("candle_triple", cd + Vector3(sx, 0, 5.0), 0.0, 1.5)
 	var cl := OmniLight3D.new(); cl.light_color = Color(0.5, 0.75, 1.0); cl.light_energy = 2.0; cl.omni_range = 8.0
 	cl.position = cd + Vector3(0, 2.0, 5.0); add_child(cl)
-	Passage.make(self, cd + Vector3(0, 0, 4.9), Vector3(-62, CY + 0.1, 18), 0.0, "Go down into the crypt", "The Crypt")
-	# lockets glinting between the graves
+	Passage.make(self, cd + Vector3(0, 0, 4.9), Vector3(-62, CY + 0.1, 18), 0.0, "Go down into the Bone Crypt", "The Bone Crypt")
+	# mounds of dug-up earth between the graves, each hiding a locket (dig with USE);
+	# two of them have a skeleton in them too
 	var k2 := 0
 	for p in [Vector2(-70, 12), Vector2(-54, 18), Vector2(-66, 30), Vector2(-50, 32), Vector2(-74, 24)]:
-		QuestItem.create(self, "locket", "qi_locket_%d" % k2, ground(p.x, p.y))
+		if not Game.flags.get("qi_locket_%d" % k2, false):
+			DigMound.make(self, ground(p.x, p.y), "qi_locket_%d" % k2, k2 == 1 or k2 == 3)
 		k2 += 1
 	var n := 0
 	for e in [[Vector2(-70, 8), "ghost_archer"], [Vector2(-52, 10), "ghost_knight"], [Vector2(-60, 34), "ghost_archer"],
@@ -553,40 +576,121 @@ func _castle() -> void:
 	var ll := OmniLight3D.new(); ll.light_color = Color(1.0, 0.8, 0.55); ll.light_energy = 1.6; ll.omni_range = 9.0
 	ll.position = Vector3(25, KY + 3.0, -89); add_child(ll)
 
+var crypt: BoneCrypt
 func _crypt() -> void:
-	var wm: Material = b.wall_mat(Color(0.3, 0.3, 0.34), 0.1, CY, 1.2, 0.5)
-	var fm: Material = b.mats.floor
-	var Y := CY
-	b.room(-70, -54, 8, 24, Y, 6.0, wm, fm, {"n": [[-64.5, -59.5, 4.5]]})
-	b.room(-64.5, -59.5, -8, 8, Y, 4.5, wm, fm, {"s": [[-64.5, -59.5, 4.5]], "n": [[-64.5, -59.5, 4.5]]})
-	b.room(-80, -44, -34, -8, Y, 8.0, wm, fm, {"s": [[-64.5, -59.5, 4.5]], "e": [[-24.0, -18.0, 4.5]]})
-	b.room(-42, -32, -26, -16, Y, 5.0, wm, fm, {"w": [[-24.0, -18.0, 4.5]]})
-	for z in [-14.0, -21.0, -28.0]:
-		b.pillar(Vector3(-72, Y, z), 8.0, 0.6, wm)
-		b.pillar(Vector3(-52, Y, z), 8.0, 0.6, wm)
-	for k in 8:
-		var cp := Vector3(-77.0 if k % 2 == 0 else -47.0, Y, -12.0 - int(k / 2) * 5.5)
-		_hw("coffin" if k % 3 else "coffin_decorated", cp, 90.0, 1.6, true)
-	for p in [Vector3(-69.4, Y + 2.6, 12), Vector3(-54.6, Y + 2.6, 20), Vector3(-79.4, Y + 3.0, -16), Vector3(-44.6, Y + 3.0, -30),
-			Vector3(-79.4, Y + 3.0, -30), Vector3(-44.6, Y + 3.0, -12)]:
-		Props.torch(self, p, 90.0 if p.x < -60.0 else -90.0, true, false, Color(0.5, 0.8, 1.0))
-	for k in 10:
-		_hw(["candle_melted", "skull_candle", "candle_triple"][k % 3], Vector3(_rng.randf_range(-78, -46), Y, _rng.randf_range(-32, -10)), _rng.randf() * 360.0, 1.4)
-	var gl := OmniLight3D.new(); gl.light_color = Color(0.45, 0.65, 1.0); gl.light_energy = 2.0; gl.omni_range = 22.0
-	gl.position = Vector3(-62, Y + 6.0, -21); add_child(gl)
-	Interactable.create(self, "shrine", Vector3(-66, Y, 21), 0.0, "", [], "the Crypt Stairs")
-	Passage.make(self, Vector3(-62, Y, 22.5), ground(CRYPT_DOOR.x, CRYPT_DOOR.y + 7.5) + Vector3(0, 0.3, 0), PI,
-		"Climb the stairs back to the graveyard", "The Graveyard")
-	# holy water: one in the coffin hall, one by the far pillars, one in the side vault
-	QuestItem.create(self, "holywater", "qi_holy_0", Vector3(-62, Y, -12))
-	QuestItem.create(self, "holywater", "qi_holy_1", Vector3(-74, Y, -32))
-	QuestItem.create(self, "holywater", "qi_holy_2", Vector3(-37, Y, -21))
-	var n := 0
-	for e in [[Vector3(-66, Y, -16), "ghost_knight"], [Vector3(-58, Y, -20), "wraith"], [Vector3(-70, Y, -28), "wraith"],
-			[Vector3(-52, Y, -30), "ghost_knight"], [Vector3(-38, Y, -18), "wraith"], [Vector3(-62, Y, 0), "ghost_knight"]]:
-		_enemy(e[1], e[0], "c_crypt_%d" % n, 0.0)
-		n += 1
-	Interactable.create(self, "chest", Vector3(-35, Y, -25), 0.0, "c_chest_crypt", [{"roll": "big", "ilvl": 8}])
+	crypt = BoneCrypt.build_in(self)
+
+## The Misty Mere: glowing ghost-water, reeds, a pier and Old Gill the Fisher.
+func _mere() -> void:
+	var rim := noise.get_noise_2d(MERE.x, MERE.y) * 6.0 * 0.3 + 0.45
+	mere_y = rim - 0.6
+	var side := (MERE_R - 0.5) * 2.0
+	GlowRiver.create(self, Rect2(MERE.x - side * 0.5, MERE.y - side * 0.5, side, side), mere_y, Vector2(0.2, 1.0), Color(0.35, 0.75, 0.95), true, false)
+	# the pier, from the west shore out over the water
+	var plank := StandardMaterial3D.new(); plank.albedo_color = Color(0.42, 0.32, 0.22); plank.roughness = 0.9
+	var px0 := MERE.x - MERE_R - 3.5
+	var px1 := MERE.x - 3.5
+	var top := rim + 0.3
+	b.box(Vector3(px0, top - 0.2, MERE.y - 1.3), Vector3(px1, top, MERE.y + 1.3), plank)
+	var x := px0 + 1.0
+	while x < px1:
+		for sd in [-1.2, 1.2]:
+			b.box(Vector3(x - 0.15, rim - 3.0, MERE.y + sd - 0.15), Vector3(x + 0.15, top + (0.9 if x > px1 - 1.2 else 0.0), MERE.y + sd + 0.15), plank, x > px1 - 4.0)
+		x += 3.0
+	FishingSpot.make(self, Vector3(px1 - 0.9, top, MERE.y), Vector3(1, 0, 0), mere_y)
+	_lamp(Vector3(px1 - 0.4, top, MERE.y + 1.1), Color(0.6, 0.85, 1.0))
+	# reeds, lily pads, a little rowboat, and mist on the water
+	var reed := StandardMaterial3D.new(); reed.albedo_color = Color(0.35, 0.45, 0.28)
+	var pad := StandardMaterial3D.new(); pad.albedo_color = Color(0.25, 0.45, 0.25)
+	for k in 40:
+		var a := _rng.randf() * TAU
+		var r := MERE_R + _rng.randf_range(-2.0, 1.5)
+		var rp := Vector2(MERE.x + cos(a) * r, MERE.y + sin(a) * r)
+		if absf(rp.y - MERE.y) < 2.5 and rp.x < MERE.x:
+			continue
+		var rm := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.0; cm.bottom_radius = 0.04; cm.height = _rng.randf_range(0.9, 1.8)
+		cm.radial_segments = 4; rm.mesh = cm; rm.material_override = reed
+		add_child(rm); rm.position = Vector3(rp.x, maxf(mere_y, height(rp.x, rp.y)) + cm.height * 0.5, rp.y)
+		rm.rotation = Vector3(_rng.randf_range(-0.2, 0.2), 0, _rng.randf_range(-0.2, 0.2))
+	for k in 14:
+		var a2 := _rng.randf() * TAU
+		var r2 := _rng.randf_range(2.0, MERE_R - 2.0)
+		var lp := MeshInstance3D.new(); var lc := CylinderMesh.new(); lc.top_radius = _rng.randf_range(0.3, 0.55); lc.bottom_radius = lc.top_radius; lc.height = 0.02
+		lp.mesh = lc; lp.material_override = pad; add_child(lp)
+		lp.position = Vector3(MERE.x + cos(a2) * r2, mere_y + 0.03, MERE.y + sin(a2) * r2)
+	var boat := Node3D.new(); add_child(boat); boat.position = Vector3(MERE.x + 4.0, mere_y + 0.1, MERE.y - 5.0); boat.rotation.y = 0.6
+	var bw := StandardMaterial3D.new(); bw.albedo_color = Color(0.5, 0.36, 0.22)
+	for sd in [-1.0, 1.0]:
+		var bs := MeshInstance3D.new(); var bbm := BoxMesh.new(); bbm.size = Vector3(0.1, 0.45, 2.6)
+		bs.mesh = bbm; bs.material_override = bw; bs.position = Vector3(sd * 0.55, 0.15, 0); bs.rotation.z = sd * 0.25; boat.add_child(bs)
+	var bb := MeshInstance3D.new(); var bbb := BoxMesh.new(); bbb.size = Vector3(1.0, 0.08, 2.4); bb.mesh = bbb; bb.material_override = bw
+	boat.add_child(bb)
+	var mist := CPUParticles3D.new(); mist.amount = 40; mist.lifetime = 7.0; mist.preprocess = 7.0
+	mist.mesh = FX.quad(3.0); mist.material_override = FX.glow_material(Color(0.6, 0.75, 0.85), 0.25)
+	mist.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX; mist.emission_box_extents = Vector3(MERE_R, 0.2, MERE_R)
+	mist.direction = Vector3(1, 0.05, 0); mist.spread = 180; mist.initial_velocity_min = 0.1; mist.initial_velocity_max = 0.3
+	mist.gravity = Vector3.ZERO; mist.color_ramp = FX._fade_ramp(Color(0.6, 0.75, 0.85))
+	add_child(mist); mist.position = Vector3(MERE.x, mere_y + 0.6, MERE.y)
+	var wl := OmniLight3D.new(); wl.light_color = Color(0.45, 0.75, 1.0); wl.light_energy = 1.5; wl.omni_range = 16.0
+	add_child(wl); wl.position = Vector3(MERE.x, mere_y + 3.0, MERE.y)
+	NPC.create(self, "gill", ground(px0 - 2.5, MERE.y + 3.0), -60.0, {"hero": "Barbarian", "hat": false, "hair_style": "bald",
+		"hair_color": Color(0.85, 0.85, 0.85), "hair_tint": Color(0.85, 0.85, 0.85), "face": "beard",
+		"outfit_color": Color(0.3, 0.4, 0.5), "cape_color": Color(0.25, 0.3, 0.35), "build": 1.1, "height": 0.9,
+		"skin_color": Color(0.88, 0.68, 0.52), "weapon": ""})
+
+## Pip's paddock east of the village: a rail fence with the gate facing the
+## village, a water trough and hay. The four spooked horses come home here.
+func _paddock() -> void:
+	var c := PADDOCK
+	var y0 := height(c.x, c.y)
+	var wood := StandardMaterial3D.new(); wood.albedo_color = Color(0.45, 0.33, 0.22); wood.roughness = 0.9
+	var hw := 6.0
+	# posts every 2 m round a 12 x 12 m square, with a 4 m gap (the gate) on the west side
+	var sides := [[Vector2(-hw, -hw), Vector2(hw, -hw)], [Vector2(hw, -hw), Vector2(hw, hw)], [Vector2(hw, hw), Vector2(-hw, hw)], [Vector2(-hw, hw), Vector2(-hw, -hw)]]
+	for sd in sides:
+		var a: Vector2 = sd[0]
+		var bb: Vector2 = sd[1]
+		var n := 6
+		for i in n:
+			var p0 := a.lerp(bb, float(i) / n)
+			var p1 := a.lerp(bb, float(i + 1) / n)
+			var west := absf(p0.x + hw) < 0.1 and absf(p1.x + hw) < 0.1
+			if west and absf((p0.y + p1.y) * 0.5) < 2.0:
+				continue                                   # the gate gap
+			var gy := height(c.x + p0.x, c.y + p0.y)
+			b.box(Vector3(c.x + p0.x - 0.12, gy - 0.3, c.y + p0.y - 0.12), Vector3(c.x + p0.x + 0.12, gy + 1.35, c.y + p0.y + 0.12), wood, true)
+			for ry in [0.55, 1.1]:
+				var lo := Vector3(c.x + minf(p0.x, p1.x) - 0.05, gy + ry - 0.07, c.y + minf(p0.y, p1.y) - 0.05)
+				var hi := Vector3(c.x + maxf(p0.x, p1.x) + 0.05, gy + ry + 0.07, c.y + maxf(p0.y, p1.y) + 0.05)
+				b.box(lo, hi, wood, true)
+	# gate posts with a little arch and sign
+	for gz in [-2.0, 2.0]:
+		b.box(Vector3(c.x - hw - 0.15, y0 - 0.3, c.y + gz - 0.15), Vector3(c.x - hw + 0.15, y0 + 2.6, c.y + gz + 0.15), wood, true)
+	b.box(Vector3(c.x - hw - 0.15, y0 + 2.45, c.y - 2.3), Vector3(c.x - hw + 0.15, y0 + 2.7, c.y + 2.3), wood, false)
+	var sg := Label3D.new(); sg.text = "PIP'S PADDOCK"; sg.font_size = 56; sg.pixel_size = 0.006; sg.outline_size = 12
+	sg.modulate = Color(1.0, 0.9, 0.7); sg.position = Vector3(c.x - hw - 0.2, y0 + 3.0, c.y); sg.rotation.y = -PI * 0.5
+	add_child(sg)
+	_lamp(ground(c.x - hw - 1.0, c.y + 3.2))
+	var mk := Marker3D.new(); mk.name = "Paddock"; mk.add_to_group("paddock"); add_child(mk); mk.position = Vector3(c.x, y0, c.y)
+	# water trough and hay bales
+	var trough := StandardMaterial3D.new(); trough.albedo_color = Color(0.38, 0.3, 0.22)
+	b.box(Vector3(c.x + 3.2, y0, c.y - 4.6), Vector3(c.x + 5.0, y0 + 0.6, c.y - 3.6), trough, true)
+	var water := StandardMaterial3D.new(); water.albedo_color = Color(0.25, 0.45, 0.6); water.metallic = 0.4; water.roughness = 0.1
+	b.box(Vector3(c.x + 3.3, y0 + 0.5, c.y - 4.5), Vector3(c.x + 4.9, y0 + 0.56, c.y - 3.7), water, false)
+	var hay := StandardMaterial3D.new(); hay.albedo_color = Color(0.85, 0.72, 0.35); hay.roughness = 1.0
+	for hp in [Vector3(4.0, 0, 3.6), Vector3(4.2, 0, 2.2), Vector3(4.1, 0.75, 2.9)]:
+		b.box(Vector3(c.x + hp.x - 0.6, y0 + hp.y, c.y + hp.z - 0.6),
+			Vector3(c.x + hp.x + 0.6, y0 + hp.y + 0.75, c.y + hp.z + 0.6), hay, true)
+	# the horses: home already, or out on the moor waiting to be found
+	var pad := Rect2(c.x - hw - 1.5, c.y - hw - 1.5, hw * 2.0 + 3.0, hw * 2.0 + 3.0)
+	var done := Game.quest_state("wraith_hunt") == "done"
+	for k in HORSE_SPOTS.size():
+		var id := "c_horse_%d" % k
+		var hs: Vector2 = HORSE_SPOTS[k]
+		var h := GhostHorse.make(self, ground(hs.x, hs.y) + Vector3(0, 0.3, 0), id, pad)
+		horses.append(h)
+		if done or Game.flags.get(id, false):
+			h.settle(false, y0)
 
 func _moors() -> void:
 	# ghost knights patrol the road and moors; archers keep to the high ground
@@ -713,6 +817,8 @@ func _cloud_lift() -> void:
 		return
 	var sl := SkyLift.make(self, ground(-1, 61) + Vector3(0, 0.1, 0), "Step onto the cloud: up to Cloud Island!", "go_to_cloud")
 	sl.name = "CloudLift"
+	# a golden beam of light up into the sky marks the cloud from anywhere on the moor
+	FX.sky_beacon(sl, sl.global_position, Color(1.0, 0.85, 0.45))
 
 func _lord_chest() -> void:
 	if Game.flags.get("c_chest_lord", false) or get_node_or_null("LordChest") != null:

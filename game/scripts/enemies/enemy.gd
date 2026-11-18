@@ -34,6 +34,7 @@ const TYPES := {
 	"goblin_chief": {"name": "Chief Gruk", "hp": 2800.0, "dmg": 42.0, "speed": 3.6, "range": 2.9,
 		"windup": 0.7, "cooldown": 1.2, "xp": 600, "weapon": "skel_axe", "shield": "Skeleton_Shield_Large_A", "eye": Color(1.0, 0.3, 0.1),
 		"scale": 1.35, "aggro": 16.0, "poise": 110.0, "gold": [70, 110], "heavy": true, "leash": 40.0, "summon": true, "nova": true, "enrage": true,
+		"moves": ["leap_slam", "whirl"],
 		"look": {"hero": "Barbarian", "hair_style": "mohawk", "hair_color": Color(0.85, 0.12, 0.08), "face": "warpaint", "outfit": Color(0.5, 0.12, 0.1), "build": 1.3, "hat": true}},
 	# --- the Sinkhole of Death: fire goblins and the Cyclops Goblin
 	"fire_goblin": {"name": "Ember Goblin", "hp": 110.0, "dmg": 17.0, "speed": 4.5, "range": 1.8,
@@ -49,10 +50,24 @@ const TYPES := {
 		"scale": 1.05, "aggro": 15.0, "poise": 35.0, "gold": [18, 32], "heavy": true, "leash": 28.0, "skin": Color(0.62, 0.2, 0.12),
 		"look": {"hero": "Barbarian", "hair_style": "spiky", "hair_color": Color(1.0, 0.5, 0.05), "face": "warpaint", "outfit": Color(0.2, 0.06, 0.04), "build": 1.3}},
 	"cyclops": {"name": "Grimgor the Cyclops Goblin", "hp": 5200.0, "dmg": 52.0, "speed": 3.5, "range": 3.6,
-		"windup": 0.75, "cooldown": 1.2, "xp": 1100, "enrage": true, "weapon": "skel_axe", "shield": "", "eye": Color(1.0, 0.25, 0.05),
+		"windup": 0.75, "cooldown": 1.2, "xp": 1100, "enrage": true, "moves": ["eye_beam", "boulders", "leap_slam"], "weapon": "skel_axe", "shield": "", "eye": Color(1.0, 0.25, 0.05),
 		"scale": 2.3, "aggro": 20.0, "poise": 180.0, "gold": [140, 220], "heavy": true, "leash": 50.0, "summon": true, "nova": true,
 		"skin": Color(0.45, 0.6, 0.22),
 		"look": {"hero": "Barbarian", "hair_style": "natural", "hair_color": Color(0.15, 0.1, 0.05), "face": "none", "outfit": Color(0.4, 0.1, 0.08), "build": 1.4, "cyclops": true}},
+	# --- the Bone Crypt under Ghost Knight Castle: the risen dead, ghost-fire eyes
+	"crypt_skeleton": {"name": "Restless Bones", "variant": "minion", "hp": 210.0, "dmg": 27.0, "speed": 3.9, "range": 1.9,
+		"windup": 0.4, "cooldown": 0.95, "xp": 95, "weapon": "skel_blade", "shield": "", "eye": Color(0.4, 1.0, 0.65),
+		"scale": 0.86, "aggro": 13.0, "poise": 5.0, "gold": [8, 18], "leash": 26.0},
+	"bone_knight": {"name": "Bone Knight", "variant": "warrior", "hp": 360.0, "dmg": 33.0, "speed": 3.2, "range": 2.1,
+		"windup": 0.5, "cooldown": 1.15, "xp": 160, "weapon": "skel_axe", "shield": "Skeleton_Shield_Large_A", "eye": Color(0.4, 1.0, 0.65),
+		"scale": 0.98, "aggro": 13.0, "poise": 30.0, "gold": [12, 26], "leash": 26.0},
+	"crypt_hexer": {"name": "Crypt Hexer", "variant": "mage", "hp": 200.0, "dmg": 29.0, "speed": 2.8, "range": 14.0,
+		"windup": 0.65, "cooldown": 2.0, "xp": 130, "weapon": "skel_staff", "shield": "", "eye": Color(0.5, 1.0, 0.75),
+		"scale": 0.86, "aggro": 16.0, "poise": 0.0, "gold": [10, 22], "ranged": true, "leash": 26.0},
+	"bone_colossus": {"name": "The Bone Colossus", "variant": "warrior", "hp": 4600.0, "dmg": 48.0, "speed": 3.1, "range": 3.6,
+		"windup": 0.75, "cooldown": 1.25, "xp": 1300, "weapon": "skel_axe", "shield": "", "eye": Color(0.4, 1.0, 0.65),
+		"scale": 2.4, "aggro": 18.0, "poise": 160.0, "gold": [140, 220], "heavy": true, "leash": 30.0, "nova": true, "summon": true,
+		"enrage": true, "moves": ["leap_slam", "whirl"]},
 	# --- Level 3: Ghost Knight Castle (spectral: see-through and glowing)
 	"ghost_knight": {"name": "Ghost Knight", "hp": 210.0, "dmg": 27.0, "speed": 3.6, "range": 2.0,
 		"windup": 0.45, "cooldown": 1.1, "xp": 120, "weapon": "sword_1handed", "shield": "shield_round", "eye": Color(0.5, 0.9, 1.0),
@@ -65,13 +80,13 @@ const TYPES := {
 	"wraith": {"name": "Wailing Wraith", "variant": "mage", "hp": 150.0, "dmg": 26.0, "speed": 3.0, "range": 14.0,
 		"windup": 0.6, "cooldown": 1.8, "xp": 115, "weapon": "skel_staff", "shield": "", "eye": Color(0.6, 0.8, 1.0),
 		"scale": 0.9, "aggro": 18.0, "poise": 0.0, "gold": [10, 24], "ranged": true, "leash": 30.0, "skin_look": "spectral"},
-	"gatekeeper": {"name": "The Gatehouse Warden", "hp": 1600.0, "dmg": 36.0, "speed": 3.0, "range": 3.2,
-		"windup": 0.8, "cooldown": 1.4, "xp": 700, "weapon": "sword_2handed_color", "shield": "", "eye": Color(0.45, 0.85, 1.0),
+	"gatekeeper": {"name": "The Gatehouse Warden", "hp": 3200.0, "dmg": 44.0, "speed": 3.3, "range": 3.2,
+		"windup": 0.7, "cooldown": 1.2, "xp": 800, "enrage": true, "moves": ["charge", "leap_slam"], "weapon": "sword_2handed_color", "shield": "", "eye": Color(0.45, 0.85, 1.0),
 		"scale": 1.7, "aggro": 18.0, "poise": 90.0, "gold": [80, 140], "heavy": true, "leash": 30.0, "nova": true, "armor_drop": 1.0,
 		"skin": Color(0.8, 0.9, 1.0),
 		"look": {"hero": "Knight", "hat": true, "hair_style": "natural", "hair_color": Color(0.7, 0.8, 0.9), "face": "none", "outfit": Color(0.4, 0.5, 0.75), "build": 1.25, "skin_look": "spectral"}},
-	"ghost_lord": {"name": "Morwen, the Ghost Lord", "hp": 3800.0, "dmg": 44.0, "speed": 3.3, "range": 3.6,
-		"windup": 0.8, "cooldown": 1.3, "xp": 1400, "weapon": "sword_2handed_color", "shield": "", "eye": Color(0.55, 0.75, 1.0),
+	"ghost_lord": {"name": "Morwen, the Ghost Lord", "hp": 7000.0, "dmg": 54.0, "speed": 3.6, "range": 3.6,
+		"windup": 0.7, "cooldown": 1.1, "xp": 1700, "enrage": true, "moves": ["fan", "blink", "whirl", "leap_slam"], "weapon": "sword_2handed_color", "shield": "", "eye": Color(0.55, 0.75, 1.0),
 		"scale": 2.2, "aggro": 22.0, "poise": 140.0, "gold": [200, 320], "heavy": true, "leash": 40.0, "nova": true, "summon": true, "armor_drop": 1.0,
 		"skin": Color(0.75, 0.85, 1.0),
 		"look": {"hero": "Knight", "hat": true, "hair_style": "natural", "hair_color": Color(0.6, 0.7, 0.9), "face": "none", "outfit": Color(0.25, 0.25, 0.45), "build": 1.35, "skin_look": "spectral"}},
@@ -92,11 +107,11 @@ const TYPES := {
 	"hail_golem": {"name": "The Hail Golem", "variant": "warrior", "creature": "golem", "hp": 5200.0, "dmg": 58.0, "speed": 2.8, "range": 3.6,
 		"windup": 0.85, "cooldown": 1.5, "xp": 1600, "weapon": "", "shield": "", "eye": Color(0.6, 0.85, 1.0),
 		"scale": 2.0, "aggro": 20.0, "poise": 160.0, "gold": [200, 300], "heavy": true, "leash": 30.0, "nova": true,
-		"look_size": 2.0, "radius": 1.2},
+		"look_size": 2.0, "radius": 1.2, "enrage": true, "moves": ["boulders", "charge"]},
 	"mr_bubbles": {"name": "Mr. Bubbles", "variant": "warrior", "creature": "bear", "hp": 12500.0, "dmg": 70.0, "speed": 4.2, "range": 4.2,
 		"windup": 0.75, "cooldown": 1.1, "xp": 3000, "weapon": "", "shield": "", "eye": Color(1.0, 0.92, 0.3),
 		"scale": 2.0, "aggro": 26.0, "poise": 220.0, "gold": [400, 600], "heavy": true, "leash": 40.0, "nova": true, "summon": true,
-		"fly": 0.4, "dive": true, "look_size": 1.6, "radius": 1.2},
+		"fly": 0.4, "dive": true, "look_size": 1.6, "radius": 1.2, "enrage": true, "moves": ["charge"]},
 }
 const GOBLIN_SKIN := Color(0.42, 0.62, 0.24)
 
@@ -130,6 +145,14 @@ var dmg_mult := 1.0
 var _enraged := false
 var _los_t := 0.0
 var _los_ok := true
+## Skills that grow with the zone: quick foes sidestep your swings, shield
+## bearers sometimes catch a blow on their shield.
+const AGILE := ["goblin", "fire_goblin", "ghost_knight", "minion", "wraith", "storm_sprite"]
+var _side_t := 0.0
+var _side_dir := Vector3.ZERO
+var _dodge_cd := 0.0
+func _skill() -> float:
+	return clampf(0.04 * float(Game.zone_level()) - 0.06, 0.08, 0.38)
 
 func configure(type_name: String, id: String, wake_range := 0.0) -> void:
 	type_id = type_name
@@ -138,6 +161,15 @@ func configure(type_name: String, id: String, wake_range := 0.0) -> void:
 
 func _ready() -> void:
 	t = TYPES[type_id]
+	# The deeper into the game, the tougher: foes grow when you out-level their
+	# zone, and again as you finish more of that zone's quests.
+	var over := maxi(0, Game.level - Game.zone_level())
+	var done := 0
+	for q in Game.zone_quests(Game.zone):
+		if Game.quest_state(q) == "done":
+			done += 1
+	hp_mult *= (1.0 + 0.1 * minf(over, 10.0)) * (1.0 + 0.05 * done)
+	dmg_mult *= (1.0 + 0.07 * minf(over, 10.0)) * (1.0 + 0.03 * done)
 	if hp_mult != 1.0 or dmg_mult != 1.0:
 		t = t.duplicate()
 		t.hp = float(t.hp) * hp_mult
@@ -262,7 +294,7 @@ var _blind_t := 0.0
 var _ice: MeshInstance3D
 
 ## Frost Nova: frozen solid in a block of ice for a few seconds.
-func freeze(sec: float) -> void:
+func freeze(sec: float, style := "ice") -> void:
 	if dead or t.get("heavy", false) and sec > 1.5:
 		sec = 1.5 if not dead else 0.0     # bosses only shiver for a moment
 	if sec <= 0.0:
@@ -271,6 +303,19 @@ func freeze(sec: float) -> void:
 	velocity = Vector3.ZERO
 	if body and body.anim:
 		body.anim.speed_scale = 0.0
+	if style == "roots":
+		# held fast by thorny roots instead of a block of ice
+		if _ice == null or not is_instance_valid(_ice):
+			_ice = MeshInstance3D.new(); add_child(_ice)
+			var vine := StandardMaterial3D.new(); vine.albedo_color = Color(0.28, 0.5, 0.16); vine.roughness = 0.8
+			for k in 6:
+				var v := MeshInstance3D.new(); var tm := TorusMesh.new()
+				var r: float = 0.42 * t.scale / 0.84
+				tm.inner_radius = r; tm.outer_radius = r + 0.09; tm.rings = 16; tm.ring_segments = 6
+				v.mesh = tm; v.material_override = vine
+				v.position.y = 0.2 + k * 0.28 * t.scale / 0.84; v.rotation = Vector3(randf_range(-0.3, 0.3), 0, randf_range(-0.3, 0.3))
+				_ice.add_child(v)
+		return
 	if _ice == null or not is_instance_valid(_ice):
 		_ice = MeshInstance3D.new()
 		var bm := BoxMesh.new(); bm.size = Vector3(1.1, 2.0, 1.1) * t.scale / 0.84
@@ -322,6 +367,9 @@ func _physics_process(delta: float) -> void:
 		_hurt_t += delta
 		if _hurt_t > 0.35:
 			_hurt_t = -1.0
+	if _move_busy:
+		body.move_speed = 0.0
+		return
 	var to_p: Vector3 = player.global_position - global_position
 	to_p.y = 0
 	var dist := to_p.length()
@@ -329,6 +377,28 @@ func _physics_process(delta: float) -> void:
 	var move := Vector3.ZERO
 	var spd: float = t.speed
 
+	_dodge_cd -= delta
+	if _side_t > 0.0:
+		_side_t -= delta
+		velocity.x = _side_dir.x * 7.5
+		velocity.z = _side_dir.z * 7.5
+		if not is_on_floor():
+			velocity.y -= 22.0 * delta
+		move_and_slide()
+		return
+	if type_id in AGILE and state in [S.CHASE, S.WINDUP] and _dodge_cd <= 0.0 and dist < 3.4 and not pdead \
+			and player.get("attacking") == true and float(player.get("attack_time")) < 0.12:
+		_dodge_cd = 2.2
+		if randf() < _skill():
+			_side_dir = to_p.normalized().cross(Vector3.UP) * (1.0 if randf() < 0.5 else -1.0)
+			_side_t = 0.3
+			_go(S.CHASE)
+			body.dodge_t = 0.0
+			body.dodge_dir = Vector2(_side_dir.dot(Vector3.RIGHT), 0)
+			get_tree().create_timer(0.35).timeout.connect(func() -> void:
+				if is_instance_valid(body):
+					body.dodge_t = -1.0)
+			return
 	match state:
 		S.DORMANT:
 			if dist < dormant_wake and not pdead:
@@ -342,6 +412,13 @@ func _physics_process(delta: float) -> void:
 				_go(S.CHASE)
 				Sfx.play_at("skel_attack", global_position, -10.0)
 		S.CHASE:
+			if t.has("moves") and not pdead and dist < 22.0 and _can_engage(delta):
+				_move_cd -= delta
+				if _move_cd <= 0.0:
+					_move_cd = randf_range(3.5, 5.5) if _enraged else randf_range(5.5, 8.0)
+					var mv: Array = t.moves
+					_boss_move(String(mv[randi() % mv.size()]))
+					return
 			if t.get("nova", false):
 				_nova_cd -= delta
 				if _nova_cd <= 0.0 and dist < 9.0 and not pdead:
@@ -519,6 +596,54 @@ func _cyclops_eye() -> void:
 	root.add_child(brow)
 	var glow := OmniLight3D.new(); glow.light_color = Color(1.0, 0.35, 0.05); glow.light_energy = 1.5; glow.omni_range = 4.0
 	glow.position = Vector3(0, 0, -r * 1.2); root.add_child(glow)
+	if type_id == "cyclops":
+		_grimgor_regalia(root, r, ab)
+
+## Grimgor dresses to impress: two great curling horns, a crown of iron
+## spikes, glowing lava cracks over his shoulders and a cloak of embers.
+func _grimgor_regalia(root: Node3D, r: float, ab: AABB) -> void:
+	var horn := StandardMaterial3D.new(); horn.albedo_color = Color(0.2, 0.12, 0.08); horn.roughness = 0.5
+	var tip := StandardMaterial3D.new(); tip.albedo_color = Color(1.0, 0.45, 0.1); tip.emission_enabled = true
+	tip.emission = Color(1.0, 0.35, 0.05); tip.emission_energy_multiplier = 2.5
+	var iron := StandardMaterial3D.new(); iron.albedo_color = Color(0.15, 0.13, 0.13); iron.metallic = 0.8; iron.roughness = 0.35
+	var top := Vector3(0, ab.size.y * 0.45, r * 1.2)
+	for sd in [-1.0, 1.0]:
+		# each horn: three cones bending up and out
+		var prev := top + Vector3(sd * ab.size.x * 0.32, -ab.size.y * 0.05, 0)
+		var dirs := [Vector3(sd * 0.9, 0.5, 0.1), Vector3(sd * 0.5, 0.9, -0.1), Vector3(sd * 0.1, 1.0, -0.4)]
+		var rad := r * 0.55
+		for i in 3:
+			var d: Vector3 = (dirs[i] as Vector3).normalized()
+			var ln := r * (1.3 - i * 0.25)
+			var c := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = rad * 0.6; cm.bottom_radius = rad; cm.height = ln
+			cm.radial_segments = 8; c.mesh = cm; c.material_override = tip if i == 2 else horn
+			c.position = prev + d * ln * 0.5; c.basis = Basis(Quaternion(Vector3.UP, d))
+			root.add_child(c)
+			prev += d * ln
+			rad *= 0.6
+	for k in 7:
+		var a := (k - 3) * 0.32
+		var sp := MeshInstance3D.new(); var scm := CylinderMesh.new(); scm.top_radius = 0.0; scm.bottom_radius = r * 0.16; scm.height = r * (0.9 if k == 3 else 0.6)
+		scm.radial_segments = 6; sp.mesh = scm; sp.material_override = iron
+		sp.position = top + Vector3(sin(a) * ab.size.x * 0.28, scm.height * 0.4, cos(a) * ab.size.z * 0.1)
+		root.add_child(sp)
+	# embers drifting off him all the time, and a hot glow at his feet
+	var em := CPUParticles3D.new(); em.amount = 50; em.lifetime = 1.4
+	em.mesh = FX.quad(0.14); em.material_override = FX.glow_material(Color(1.0, 0.4, 0.1), 3.0)
+	em.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX; em.emission_box_extents = Vector3(0.8, 1.6, 0.6) * t.scale / 0.84
+	em.direction = Vector3.UP; em.spread = 25; em.initial_velocity_min = 0.6; em.initial_velocity_max = 1.6
+	em.gravity = Vector3(0, 1.0, 0); em.color_ramp = FX._fade_ramp(Color(1.0, 0.45, 0.1))
+	em.position.y = 1.6 * t.scale / 0.84; add_child(em)
+	var feet := OmniLight3D.new(); feet.light_color = Color(1.0, 0.35, 0.08); feet.light_energy = 2.5; feet.omni_range = 7.0
+	feet.position.y = 0.8; add_child(feet)
+	# a molten rim glow over his whole body (chained after the hit-flash pass,
+	# so taking a hit still flashes him white)
+	var lava := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = "shader_type spatial;\nrender_mode blend_add, unshaded, depth_draw_never;\nuniform vec3 col = vec3(1.0, 0.3, 0.05);\nvoid fragment() {\n\tfloat f = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 2.5);\n\tALBEDO = col * f * 1.6;\n}\n"
+	lava.shader = sh
+	if body.flash_mat:
+		body.flash_mat.next_pass = lava
 
 func _in_bounds(p: Vector3, margin := 0.0) -> bool:
 	if bounds.size == Vector3.ZERO:
@@ -529,6 +654,232 @@ func _in_bounds(p: Vector3, margin := 0.0) -> bool:
 func _has_los() -> bool:
 	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.4, 0), player.global_position + Vector3(0, 1.2, 0), 1)
 	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
+# ---------------------------------------------------------------------------
+# Boss special moves. Every boss has a few (TYPES[..].moves); each one is shown
+# first (a glowing ring or line on the ground) so you can get out of the way.
+var _move_cd := 4.0
+var _move_busy := false
+
+func _warn_ring(at: Vector3, radius: float, secs: float, col := Color(1.0, 0.35, 0.1)) -> void:
+	var root := get_tree().current_scene
+	var ring := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = radius - 0.2; tm.outer_radius = radius
+	ring.mesh = tm; ring.material_override = FX.beam_material(col, 2.0, 0.9); ring.scale = Vector3(1, 0.06, 1)
+	root.add_child(ring); ring.global_position = at + Vector3(0, 0.08, 0)
+	var disc := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = radius; cm.bottom_radius = radius; cm.height = 0.02
+	disc.mesh = cm; disc.material_override = FX.beam_material(col, 0.8, 0.3)
+	root.add_child(disc); disc.global_position = at + Vector3(0, 0.06, 0); disc.scale = Vector3(0.05, 1, 0.05)
+	disc.create_tween().tween_property(disc, "scale", Vector3.ONE, secs)
+	get_tree().create_timer(secs).timeout.connect(func() -> void:
+		ring.queue_free(); disc.queue_free())
+
+func _player_hit(at: Vector3, radius: float, dmg: float, knock: float, fire := false) -> void:
+	if player == null or player.get("dead") == true:
+		return
+	var d := Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length()
+	if d < radius and absf(player.global_position.y - at.y) < 3.0:
+		if fire and player.has_method("burn"):
+			player.burn(dmg, 1.5, dmg * 0.08)
+		else:
+			player.take_damage(dmg, at, knock)
+
+func _face_player() -> void:
+	var to: Vector3 = player.global_position - global_position
+	facing = atan2(-to.x, -to.z)
+	body.rotation.y = facing
+
+var moves_done: Array[String] = []
+func _boss_move(mv: String) -> void:
+	_move_busy = true
+	moves_done.append(mv)
+	velocity = Vector3.ZERO
+	_face_player()
+	match mv:
+		"leap_slam": await _mv_leap_slam()
+		"charge": await _mv_charge()
+		"whirl": await _mv_whirl()
+		"fan": await _mv_fan()
+		"eye_beam": await _mv_eye_beam()
+		"boulders": await _mv_boulders()
+		"blink": await _mv_blink()
+	if is_inside_tree() and not dead and state != S.WINDUP:
+		_go(S.CHASE)
+	_move_busy = false
+
+## Leap high and crash down where you were standing.
+func _mv_leap_slam() -> void:
+	var to: Vector3 = player.global_position
+	var from := global_position
+	_warn_ring(to, 4.2, 1.15)
+	Game.say("%s leaps!" % display_name, Color(1.0, 0.6, 0.35))
+	body.play_role("jump", 1.1)
+	Sfx.play_at("roar", global_position, -4.0, 0.1)
+	await get_tree().create_timer(0.35, false).timeout
+	if dead or not is_inside_tree():
+		return
+	var tw := create_tween()
+	tw.tween_method(func(k: float) -> void:
+		global_position = from.lerp(to, k) + Vector3(0, sin(k * PI) * 6.0, 0), 0.0, 1.0, 0.8)
+	await tw.finished
+	if dead or not is_inside_tree():
+		return
+	FX.shockwave(to + Vector3(0, 0.2, 0), t.eye, 5.0, 0.4)
+	FX.burst(to + Vector3(0, 0.4, 0), Color(0.6, 0.5, 0.4), 60, 7.0, 0.35, 0.9, -6.0)
+	Sfx.play_at("slam", to, 0.0, 0.05)
+	if player and player.has_method("add_trauma"):
+		player.add_trauma(0.6)
+	_player_hit(to, 4.2, float(t.dmg) * 1.3, 9.0)
+	await get_tree().create_timer(0.5, false).timeout
+
+## Lower the head, then thunder forward in a straight line.
+func _mv_charge() -> void:
+	var dir: Vector3 = player.global_position - global_position; dir.y = 0
+	dir = dir.normalized() if dir.length() > 0.1 else -Vector3(sin(facing), 0, cos(facing))
+	var length := 16.0
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.0, 0), global_position + Vector3(0, 1.0, 0) + dir * length, 1)
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if not hit.is_empty():
+		length = maxf(2.0, global_position.distance_to(hit.position) - 1.5)
+	var line := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(2.2, 0.03, length)
+	line.mesh = bm; line.material_override = FX.beam_material(Color(1.0, 0.35, 0.15), 1.4, 0.55)
+	get_tree().current_scene.add_child(line)
+	line.global_position = global_position + dir * length * 0.5 + Vector3(0, 0.08, 0)
+	line.rotation.y = atan2(dir.x, dir.z)
+	body.flash(Color(1.0, 0.3, 0.1), 0.8)
+	Sfx.play_at("roar_big", global_position, -4.0, 0.1)
+	await get_tree().create_timer(0.85, false).timeout
+	line.queue_free()
+	if dead or not is_inside_tree():
+		return
+	var from := global_position
+	var hit_once := false
+	var tw := create_tween()
+	tw.tween_method(func(k: float) -> void:
+		global_position = from + dir * length * k
+		if not hit_once and player and Vector2(player.global_position.x - global_position.x, player.global_position.z - global_position.z).length() < 2.0 + hit_radius:
+			hit_once = true
+			_player_hit(player.global_position, 1.0, float(t.dmg) * 1.4, 12.0)
+		if Engine.get_physics_frames() % 3 == 0:
+			FX.burst(global_position + Vector3(0, 0.3, 0), Color(0.6, 0.5, 0.4), 6, 2.5, 0.3, 0.5, -3.0), 0.0, 1.0, 0.65)
+	await tw.finished
+	Sfx.play_at("slam", global_position, -2.0, 0.1)
+	await get_tree().create_timer(0.6, false).timeout
+
+## Spin like a top, weapon out, drifting toward you.
+func _mv_whirl() -> void:
+	Game.say("%s spins into a whirlwind!" % display_name, Color(1.0, 0.6, 0.35))
+	for k in 7:
+		if dead or not is_inside_tree():
+			return
+		var to: Vector3 = player.global_position - global_position; to.y = 0
+		if to.length() > 1.5:
+			global_position += to.normalized() * minf(1.2, to.length() - 1.0)
+		body.rotation.y += 2.4
+		FX.shockwave(global_position + Vector3(0, 1.0, 0), t.eye, 3.4, 0.25)
+		Sfx.play_at("swing", global_position, -2.0, 0.2)
+		_player_hit(global_position, 3.4 + hit_radius * 0.5, float(t.dmg) * 0.5, 4.0)
+		await get_tree().create_timer(0.32, false).timeout
+
+## A fan of seven ghostly bolts.
+func _mv_fan() -> void:
+	body.cast_t = 0.0
+	await get_tree().create_timer(0.5, false).timeout
+	if dead or not is_inside_tree():
+		return
+	var base_dir: Vector3 = player.global_position - global_position; base_dir.y = 0
+	base_dir = base_dir.normalized()
+	for k in 7:
+		var d := base_dir.rotated(Vector3.UP, (k - 3) * 0.17)
+		var bolt := Area3D.new()
+		bolt.set_script(load("res://scripts/player/projectile.gd"))
+		get_tree().current_scene.add_child(bolt)
+		bolt.global_position = global_position + Vector3(0, 1.6 * t.scale / 0.84 * 0.6, 0) + d * 1.2
+		bolt.launch(d + Vector3(0, -0.04, 0), "enemy", float(t.dmg) * 0.55, t.eye, 12.0)
+	Sfx.play_at("spell", global_position, -2.0, 0.1)
+	body.cast_t = -1.0
+	await get_tree().create_timer(0.6, false).timeout
+
+## Grimgor's eye beam: a red line, then a sweeping beam of fire.
+func _mv_eye_beam() -> void:
+	var eye := global_position + Vector3(0, 2.0 * t.scale / 0.84 * 0.95, 0)
+	var dir0: Vector3 = player.global_position - global_position; dir0.y = 0
+	dir0 = dir0.normalized()
+	Game.say("Grimgor's eye glows red hot...", Color(1.0, 0.35, 0.15))
+	Sfx.play_at("spell", global_position, 0.0, 0.0)
+	for k in 6:
+		FX.beam(eye, global_position + dir0 * 18.0 + Vector3(0, 0.1, 0), Color(1.0, 0.2, 0.05), 0.05, 0.2)
+		await get_tree().create_timer(0.16, false).timeout
+	if dead or not is_inside_tree():
+		return
+	var sweep := -0.6 if randf() < 0.5 else 0.6
+	for k in 12:
+		if dead or not is_inside_tree():
+			return
+		var d := dir0.rotated(Vector3.UP, sweep * (-1.0 + 2.0 * k / 11.0))
+		var end := global_position + d * 18.0
+		var q := PhysicsRayQueryParameters3D.create(eye, end + Vector3(0, 0.3, 0), 1)
+		var hit := get_world_3d().direct_space_state.intersect_ray(q)
+		if not hit.is_empty():
+			end = hit.position
+		FX.beam(eye, end, Color(1.0, 0.3, 0.05), 0.4, 0.16)
+		FX.burst(end, Color(1.0, 0.5, 0.1), 8, 3.0, 0.2, 0.4, -2.0)
+		body.rotation.y = atan2(-d.x, -d.z)
+		if player and player.get("dead") != true:
+			var pp: Vector3 = player.global_position
+			var seg := end - global_position; seg.y = 0
+			var rel := pp - global_position; rel.y = 0
+			var u := clampf(rel.dot(seg) / maxf(seg.length_squared(), 0.01), 0.0, 1.0)
+			if (rel - seg * u).length() < 1.1 and absf(pp.y - global_position.y) < 3.0:
+				_player_hit(pp, 1.0, float(t.dmg) * 0.35, 3.0, true)
+		await get_tree().create_timer(0.1, false).timeout
+	await get_tree().create_timer(0.4, false).timeout
+
+## Hurl flaming (or icy) boulders where you're standing.
+func _mv_boulders() -> void:
+	var col := Color(0.6, 0.85, 1.0) if type_id == "hail_golem" else Color(1.0, 0.45, 0.1)
+	Sfx.play_at("roar", global_position, -4.0, 0.1)
+	for k in 3:
+		if dead or not is_inside_tree() or player == null:
+			return
+		var land: Vector3 = player.global_position + Vector3(randf_range(-2.0, 2.0), 0, randf_range(-2.0, 2.0)) * (0.0 if k == 0 else 1.0)
+		_warn_ring(land, 2.6, 1.0, col)
+		var rock := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.6; sm.height = 1.2; rock.mesh = sm
+		var rm := StandardMaterial3D.new(); rm.albedo_color = col.darkened(0.6); rm.emission_enabled = true; rm.emission = col
+		rm.emission_energy_multiplier = 1.5; rock.material_override = rm
+		get_tree().current_scene.add_child(rock)
+		var from := global_position + Vector3(0, 3.0 * t.scale / 0.84 * 0.7, 0)
+		rock.global_position = from
+		var tw := rock.create_tween()
+		tw.tween_method(func(f: float) -> void:
+			if is_instance_valid(rock):
+				rock.global_position = from.lerp(land, f) + Vector3(0, sin(f * PI) * 7.0, 0)
+				rock.rotation += Vector3(0.2, 0.3, 0.1), 0.0, 1.0, 1.0)
+		tw.tween_callback(func() -> void:
+			if is_instance_valid(rock):
+				rock.queue_free()
+			FX.shockwave(land + Vector3(0, 0.2, 0), col, 3.0, 0.35)
+			FX.burst(land + Vector3(0, 0.5, 0), col, 50, 6.0, 0.25, 0.9, -5.0)
+			Sfx.play_at("slam", land, -2.0, 0.1)
+			_player_hit(land, 2.6, float(t.dmg) * 0.9, 7.0, type_id != "hail_golem"))
+		await get_tree().create_timer(0.45, false).timeout
+	await get_tree().create_timer(1.0, false).timeout
+
+## Vanish in mist and appear right behind you, blade already swinging.
+func _mv_blink() -> void:
+	FX.burst(global_position + Vector3(0, 1.5, 0), t.eye, 50, 4.0, 0.3, 0.8, 0.5)
+	Sfx.play_at("portal", global_position, -4.0, 0.1)
+	body.visible = false
+	await get_tree().create_timer(0.6, false).timeout
+	if dead or not is_inside_tree() or player == null:
+		body.visible = true
+		return
+	var behind: Vector3 = player.global_position + Vector3(sin(player.get("facing")), 0, cos(player.get("facing"))) * 3.0
+	global_position = behind + Vector3(0, 0.3, 0)
+	body.visible = true
+	FX.burst(global_position + Vector3(0, 1.5, 0), t.eye, 50, 4.0, 0.3, 0.8, 0.5)
+	_face_player()
+	_go(S.WINDUP)
+	_move_busy = false
 
 ## Bosses fight harder when nearly beaten: faster, quicker swings, a red glow.
 func _enrage() -> void:
@@ -608,6 +959,18 @@ func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) 
 		return
 	if state == S.DORMANT:
 		_awaken()
+	# a shield bearer facing the blow sometimes takes it on the shield
+	if String(t.get("shield", "")) != "" and not t.get("heavy", false) and state in [S.CHASE, S.RECOVER] and randf() < _skill() * 0.8:
+		var fwd := -Vector3(sin(facing), 0, cos(facing))
+		var from_dir := from_pos - global_position; from_dir.y = 0
+		if from_dir.length() > 0.01 and fwd.dot(from_dir.normalized()) > 0.3:
+			amount *= 0.25
+			Sfx.play_at("clang", global_position, -4.0, 0.15)
+			FX.sparks(global_position + Vector3(0, 1.1, 0) + fwd * 0.5, Color(1.0, 0.85, 0.5))
+			body.blocking = true
+			get_tree().create_timer(0.4).timeout.connect(func() -> void:
+				if is_instance_valid(body):
+					body.blocking = false)
 	hp -= amount
 	if t.get("summon", false) and not _summoned and hp < max_hp * 0.5 and hp > 0.0:
 		_summoned = true

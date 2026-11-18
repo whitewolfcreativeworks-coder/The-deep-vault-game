@@ -489,6 +489,11 @@ func _physics_process(delta: float) -> void:
 	if mantling:
 		_mantle_step(delta)
 		return
+	if vehicle != null:
+		if is_instance_valid(vehicle):
+			_vehicle_look(delta)
+			return
+		leave_vehicle()
 	in_river = false
 	for r in get_tree().get_nodes_in_group("river"):
 		if r.contains(global_position):
@@ -649,8 +654,13 @@ func _physics_process(delta: float) -> void:
 				Sfx.play("splash", -22.0, 0.2)
 	_update_interact()
 
+var _pet_check := 0.5
 func _update_timers(delta: float) -> void:
 	invuln = maxf(0.0, invuln - delta)
+	_pet_check -= delta
+	if _pet_check <= 0.0:
+		_pet_check = 1.0
+		_ensure_pet()
 	_burn_step(delta)
 	if second_wind_t > 0.0:
 		second_wind_t -= delta
@@ -1024,6 +1034,36 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 	Game.stats_changed.emit()
 	if Game.hp <= 0.0:
 		die()
+
+## Riding something (a swing, the hot air balloon): the vehicle moves you each
+## physics frame and reads the controls it cares about; you can still look
+## around and zoom. `pose` is the body clip to hold (e.g. sitting).
+var vehicle: Node = null
+func ride_vehicle(v: Node, pose := "") -> void:
+	if mounted:
+		dismount()
+	set_auto_run(false)
+	attacking = false; blocking = false; casting = false; dodging = false
+	vehicle = v
+	velocity = Vector3.ZERO
+	body.hold_clip = pose
+	body.grounded = true
+	body.move_speed = 0.0
+
+func leave_vehicle(launch := Vector3.ZERO) -> void:
+	vehicle = null
+	body.hold_clip = ""
+	velocity = launch
+
+func _vehicle_look(delta: float) -> void:
+	var lk := Input.get_vector("look_left", "look_right", "look_up", "look_down")
+	if lk.length() > 0.05:
+		yaw -= lk.x * 2.2 * delta
+		pitch = clampf(pitch - lk.y * 1.3 * delta, PITCH_MIN, PITCH_MAX)
+	velocity = Vector3.ZERO
+	body.rotation.y = facing
+	body.grounded = true
+	body.move_speed = 0.0
 
 ## Fire (vents, lava): a shield can't stop it, and you keep burning a moment.
 var _burn_t := 0.0
@@ -1480,7 +1520,8 @@ func special_ready() -> bool:
 func _live_enemies() -> Array:
 	var out: Array = []
 	for e in get_tree().get_nodes_in_group("damageable"):
-		if is_instance_valid(e) and e != self and e.has_method("take_damage") and e.get("dead") != true and e is Node3D:
+		if is_instance_valid(e) and e != self and e.has_method("take_damage") and e.get("dead") != true and e is Node3D \
+				and not e.is_in_group("critter"):     # specials never aim at the chickens
 			out.append(e)
 	return out
 
@@ -1545,6 +1586,10 @@ func use_special() -> void:
 		"Knight": ok = _start_charge()
 		"Barbarian": ok = _start_whirl()
 		"Ranger": ok = _volley()
+		"Priest": ok = _holy_smite()
+		"Druid": ok = _entangling_roots()
+		"Necromancer": ok = _raise_dead()
+		"Beastmaster": ok = _sic_em()
 	if ok:
 		special_cd = ab.cd
 		specials_used += 1
@@ -1574,6 +1619,10 @@ func use_special2() -> void:
 		"Barbarian": _earthshatter()
 		"Rogue": _smoke_bomb()
 		"Ranger": _rain_of_arrows()
+		"Priest": _prayer_of_light()
+		"Druid": _wild_growth()
+		"Necromancer": _soul_drain()
+		"Beastmaster": _bear_friend()
 		_: _frost_nova()
 	special2_cd = ab.cd
 	specials2_used += 1
@@ -1669,6 +1718,231 @@ func _rain_of_arrows() -> void:
 			FX.burst(p + Vector3(0, 0.1, 0), Color(0.75, 0.65, 0.45), 4, 2.0, 0.12, 0.4, -4.0)
 		_aoe(at, 5.0, Game.attack_damage() * 0.75, 1.5, wave == 5)
 		Sfx.play("hit", -10.0, 0.25)
+
+# ---------------------------------------------------------------------------
+# The four newer classes (Priest, Druid, Necromancer, Beastmaster)
+
+## The foe you're facing (or the closest one roughly in front), if any.
+func _aim_target(max_d := 20.0, min_dot := 0.25) -> Node3D:
+	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
+	var head := global_position + Vector3(0, 1.3, 0)
+	var best: Node3D = null
+	var bs := INF
+	for e in _live_enemies():
+		var to: Vector3 = e.global_position - global_position
+		var d := to.length()
+		if d > max_d or absf(to.y) > 4.0:
+			continue
+		var fd := fwd.dot(Vector3(to.x, 0, to.z).normalized()) if d > 0.1 else 1.0
+		if fd < min_dot or not _blocked(head, e.global_position + Vector3(0, 1.0, 0)).is_empty():
+			continue
+		var sc := d - fd * 6.0
+		if sc < bs:
+			bs = sc; best = e
+	return best
+
+func _ahead_floor(dist: float) -> Vector3:
+	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
+	var at := global_position + fwd * dist
+	var hit := _blocked(global_position + Vector3(0, 1.2, 0), at + Vector3(0, 1.2, 0))
+	if not hit.is_empty():
+		at = (hit.position as Vector3) - fwd * 0.6
+	var fl = _floor_at(at)
+	return fl if fl != null else at
+
+## Priest: a pillar of golden light crashes down on the foe in front.
+func _holy_smite() -> bool:
+	var tgt := _aim_target(20.0)
+	var at: Vector3 = tgt.global_position if tgt else _ahead_floor(8.0)
+	var gold := Color(1.0, 0.88, 0.45)
+	casting = true; cast_time = 0.2
+	FX.pillar(at, gold, 1.6, 14.0, 0.9)
+	FX.flash_light(at + Vector3(0, 2, 0), gold, 10.0, 12.0, 0.5)
+	Sfx.play("spell", -3.0, 0.05)
+	get_tree().create_timer(0.22, false).timeout.connect(func() -> void:
+		if dead:
+			return
+		_aoe(at, 3.4, Game.attack_damage() * 2.2 + Game.spell_damage() * 1.4, 6.0, true)
+		FX.shockwave(at + Vector3(0, 0.15, 0), gold, 4.0, 0.4)
+		FX.burst(at + Vector3(0, 0.8, 0), Color(1.0, 0.95, 0.7), 70, 7.0, 0.2, 0.9, -1.0)
+		Sfx.play("spell_hit", 0.0, 0.05)
+		add_trauma(0.3)
+		heal(Game.max_hp() * 0.1))
+	return true
+
+## Priest: heal a lot now and more over a few seconds; dazzle foes around you.
+func _prayer_of_light() -> void:
+	var gold := Color(1.0, 0.95, 0.7)
+	heal(Game.max_hp() * 0.4)
+	casting = true; cast_time = 0.25
+	FX.dome(global_position, gold, 6.0, 0.6)
+	FX.pillar(global_position, gold, 1.0, 10.0, 1.2)
+	FX.screen_flash(gold, 0.35, 0.5)
+	Sfx.play("levelup", -4.0, 0.0)
+	for e in _live_enemies():
+		var to: Vector3 = e.global_position - global_position
+		if absf(to.y) < 3.0 and Vector2(to.x, to.z).length() < 6.5:
+			_special_hit_enemy(e, Game.spell_damage() * 0.8, 6.0, false, true)
+			if e.has_method("lose_target"):
+				e.lose_target(2.5)
+	for k in 10:
+		await get_tree().create_timer(0.5, false).timeout
+		if dead:
+			return
+		heal(Game.max_hp() * 0.035)
+		FX.burst(global_position + Vector3(0, 1.0, 0), gold, 8, 1.5, 0.12, 0.8, 1.0)
+
+## Druid: thorny roots burst up ahead and hold every foe there.
+func _entangling_roots() -> bool:
+	var tgt := _aim_target(16.0)
+	var at: Vector3 = tgt.global_position if tgt else _ahead_floor(6.0)
+	var green := Color(0.45, 0.85, 0.3)
+	casting = true; cast_time = 0.2
+	Sfx.play("collapse", -6.0, 0.1)
+	FX.shockwave(at + Vector3(0, 0.1, 0), green, 5.0, 0.5)
+	FX.burst(at + Vector3(0, 0.3, 0), Color(0.45, 0.32, 0.18), 50, 5.0, 0.25, 0.8, -6.0)
+	var vine := StandardMaterial3D.new(); vine.albedo_color = Color(0.25, 0.45, 0.15); vine.roughness = 0.8
+	var thorns := Node3D.new(); get_tree().current_scene.add_child(thorns); thorns.global_position = at
+	for k in 16:
+		var a := randf() * TAU
+		var r := sqrt(randf()) * 4.0
+		var v := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.0; cm.bottom_radius = randf_range(0.08, 0.16)
+		cm.height = randf_range(1.0, 2.2); cm.radial_segments = 6
+		v.mesh = cm; v.material_override = vine
+		v.position = Vector3(cos(a) * r, 0.0, sin(a) * r); v.rotation = Vector3(randf_range(-0.4, 0.4), 0, randf_range(-0.4, 0.4))
+		v.scale = Vector3(1, 0.01, 1)
+		thorns.add_child(v)
+		var tw := v.create_tween()
+		tw.tween_property(v, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK)
+		tw.tween_interval(3.6)
+		tw.tween_property(v, "scale", Vector3(1, 0.01, 1), 0.4)
+	get_tree().create_timer(4.5, false).timeout.connect(thorns.queue_free)
+	for e in _live_enemies():
+		var to: Vector3 = e.global_position - at
+		if absf(to.y) < 3.0 and Vector2(to.x, to.z).length() < 4.5 + _hit_radius(e):
+			_special_hit_enemy(e, Game.attack_damage() * 1.5 + Game.spell_damage() * 0.9, 0.0, false, false)
+			if e.has_method("freeze"):
+				e.freeze(3.5, "roots")
+	return true
+
+## Druid: a ring of flowers that heals you inside it and pricks foes.
+func _wild_growth() -> void:
+	var at := global_position
+	var ring := Node3D.new(); get_tree().current_scene.add_child(ring); ring.global_position = at
+	var cols := [Color(1.0, 0.5, 0.7), Color(1.0, 0.85, 0.3), Color(0.7, 0.55, 1.0), Color(1.0, 1.0, 1.0)]
+	var stem := StandardMaterial3D.new(); stem.albedo_color = Color(0.3, 0.65, 0.25)
+	for k in 22:
+		var a := k * TAU / 22.0
+		var f := Node3D.new(); f.position = Vector3(cos(a) * 4.0, 0, sin(a) * 4.0); f.scale = Vector3.ONE * 0.01; ring.add_child(f)
+		var st := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.025; cm.bottom_radius = 0.03; cm.height = 0.5
+		st.mesh = cm; st.material_override = stem; st.position.y = 0.25; f.add_child(st)
+		var bl := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.16; sm.height = 0.18
+		var pm := StandardMaterial3D.new(); pm.albedo_color = cols[k % cols.size()]; pm.emission_enabled = true
+		pm.emission = cols[k % cols.size()]; pm.emission_energy_multiplier = 0.6
+		bl.mesh = sm; bl.material_override = pm; bl.position.y = 0.55; f.add_child(bl)
+		f.create_tween().tween_property(f, "scale", Vector3.ONE * randf_range(0.9, 1.4), 0.4).set_delay(k * 0.02).set_trans(Tween.TRANS_BACK)
+	var glow := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 3.85; tm.outer_radius = 4.15
+	glow.mesh = tm; glow.material_override = FX.beam_material(Color(0.6, 1.0, 0.45), 1.5, 0.7); glow.scale = Vector3(1, 0.08, 1)
+	glow.position.y = 0.1; ring.add_child(glow)
+	var l := OmniLight3D.new(); l.light_color = Color(0.6, 1.0, 0.5); l.light_energy = 1.5; l.omni_range = 7.0
+	l.position.y = 1.5; ring.add_child(l)
+	casting = true; cast_time = 0.25
+	Sfx.play("levelup", -8.0, 0.2)
+	for tick in 16:
+		await get_tree().create_timer(0.5, false).timeout
+		if not is_instance_valid(ring):
+			return
+		if not dead and global_position.distance_to(at) < 4.3:
+			heal(Game.max_hp() * 0.035)
+			FX.burst(global_position + Vector3(0, 1.0, 0), Color(0.6, 1.0, 0.5), 6, 1.5, 0.1, 0.7, 1.0)
+		for e in _live_enemies():
+			var to: Vector3 = e.global_position - at
+			if absf(to.y) < 3.0 and Vector2(to.x, to.z).length() < 4.2:
+				_special_hit_enemy(e, Game.attack_damage() * 0.35 + Game.spell_damage() * 0.2, 0.5)
+	var tw := ring.create_tween()
+	tw.tween_property(ring, "scale", Vector3(1, 0.01, 1), 0.5)
+	tw.tween_callback(ring.queue_free)
+
+## Necromancer: two skeletons claw out of the ground to fight for you.
+func _raise_dead() -> bool:
+	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
+	var side := fwd.cross(Vector3.UP)
+	casting = true; cast_time = 0.25
+	Sfx.play("bone_break", -2.0, 0.1)
+	for sd in [-1.0, 1.0]:
+		var at: Vector3 = global_position + fwd * 1.8 + side * sd * 1.4
+		var fl = _floor_at(at)
+		if fl != null:
+			at = fl
+		FX.pillar(at, Color(0.45, 1.0, 0.5), 0.8, 4.0, 0.7)
+		FX.burst(at + Vector3(0, 0.3, 0), Color(0.35, 0.3, 0.25), 30, 3.0, 0.3, 0.8, -6.0)
+		Ally.spawn(self, "skeleton", at + Vector3(0, 0.1, 0), 20.0)
+	return true
+
+## Necromancer: green beams drain the life from every foe around you.
+func _soul_drain() -> void:
+	var green := Color(0.45, 1.0, 0.55)
+	casting = true; cast_time = 0.3
+	Sfx.play("spell", -3.0, 0.1)
+	for tick in 5:
+		var near: Array = []
+		for e in _live_enemies():
+			var to: Vector3 = e.global_position - global_position
+			if absf(to.y) < 3.5 and to.length() < 9.5:
+				near.append(e)
+		near = near.slice(0, 7)
+		var drained := 0.0
+		for e in near:
+			var dmg := Game.spell_damage() * 0.45 + Game.attack_damage() * 0.35
+			_special_hit_enemy(e, dmg, 0.0)
+			drained += dmg
+			FX.beam((e as Node3D).global_position + Vector3(0, 1.1, 0), global_position + Vector3(0, 1.2, 0), green, 0.12, 0.35)
+		if drained > 0.0:
+			heal(drained * 0.5)
+			FX.burst(global_position + Vector3(0, 1.1, 0), green, 10, 1.5, 0.12, 0.6, 0.0)
+		await get_tree().create_timer(0.45, false).timeout
+		if dead:
+			return
+
+## Beastmaster: your wolf pounces on the foe you're facing; a second wolf joins.
+var pet: Ally
+func _sic_em() -> bool:
+	var tgt := _aim_target(22.0, 0.0)
+	if tgt == null:
+		Game.say("No enemy in sight to sic 'em on!", Color(1.0, 0.75, 0.5))
+		return false
+	_ensure_pet()
+	if pet:
+		pet.pounce(tgt)
+	var side := -Vector3(sin(view_yaw), 0, cos(view_yaw)).cross(Vector3.UP)
+	var extra := Ally.spawn(self, "wolf", global_position + side * 1.5 + Vector3(0, 0.1, 0), 15.0)
+	extra.pounce(tgt)
+	Sfx.play("whistle", -2.0, 0.1)
+	Game.say("Sic 'em!", Color(1.0, 0.7, 0.35))
+	casting = true; cast_time = 0.2
+	return true
+
+## Beastmaster: a big bear fights with you for a while.
+func _bear_friend() -> void:
+	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
+	var at := global_position + fwd * 2.5
+	var fl = _floor_at(at)
+	if fl != null:
+		at = fl
+	Ally.spawn(self, "bear", at + Vector3(0, 0.1, 0), 22.0)
+	Sfx.play("roar_big", -4.0, 0.05)
+	add_trauma(0.35)
+	FX.shockwave(at, Color(0.8, 0.55, 0.3), 4.0, 0.4)
+	Game.say("A bear friend joins the fight!", Color(0.9, 0.65, 0.4))
+	casting = true; cast_time = 0.2
+
+## The Beastmaster's own wolf is always with them.
+func _ensure_pet() -> void:
+	if Game.profile.get("hero", "") != "Beastmaster" or dead:
+		return
+	if pet == null or not is_instance_valid(pet):
+		var behind := Vector3(sin(facing), 0, cos(facing)) * 1.6
+		pet = Ally.spawn(self, "wolf", global_position + behind + Vector3(0, 0.2, 0), -1.0)
 
 ## Mage: a ring of ice bursts out; every foe nearby is frozen solid.
 func _frost_nova() -> void:

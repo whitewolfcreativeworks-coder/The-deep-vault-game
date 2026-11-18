@@ -47,10 +47,24 @@ var _base_scale := 1.0
 
 const HEROES := {
 	"Knight": {"path": "res://assets/kaykit/adventurers/Knight.glb", "sex": "male", "head": ["Knight_Head", "Knight_Helmet"], "hat": "Knight_Helmet", "cape": "Knight_Cape"},
-	"Barbarian": {"path": "res://assets/kaykit/adventurers/Barbarian.glb", "sex": "male", "head": ["Barbarian_Head", "Barbarian_Hat"], "hat": "Barbarian_Hat", "cape": "Barbarian_Cape"},
+	"Barbarian": {"path": "res://assets/kaykit/adventurers/Barbarian.glb", "body": "res://assets/kaykit/adv2/Barbarian.glb",
+		"sex": "male", "head": ["Barbarian_Head", "Barbarian_BearHat"], "hat": "Barbarian_BearHat", "cape": ""},
 	"Rogue": {"path": "res://assets/kaykit/adventurers/Rogue.glb", "sex": "female", "head": ["Rogue_Head"], "hat": "", "cape": "Rogue_Cape"},
-	"Ranger": {"path": "res://assets/kaykit/adventurers/Rogue_Hooded.glb", "sex": "female", "head": ["Rogue_Head_Hooded"], "hat": "", "cape": "Rogue_Cape"},
+	"Ranger": {"path": "res://assets/kaykit/adventurers/Rogue.glb", "body": "res://assets/kaykit/adv2/Ranger.glb",
+		"sex": "female", "head": ["Ranger_Head"], "hat": "", "cape": "Ranger_Cape"},
 	"Mage": {"path": "res://assets/kaykit/adventurers/Mage.glb", "sex": "male", "head": ["Mage_Head", "Mage_Hat"], "hat": "Mage_Hat", "cape": "Mage_Cape"},
+	# Classes with their own body: the rig and animations come from "path", the
+	# whole body (head, clothes, gear) is swapped for the "body" model's pieces.
+	"Priest": {"path": "res://assets/kaykit/adventurers/Mage.glb", "body": "res://assets/kaykit/costumes/Cleric.glb",
+		"sex": "female", "head": ["Cleric_Head"], "hat": "", "cape": ""},
+	"Druid": {"path": "res://assets/kaykit/adventurers/Mage.glb", "body": "res://assets/kaykit/adv2/Druid.glb",
+		"sex": "male", "head": ["Druid_Head"], "hat": "", "cape": ""},
+	"Necromancer": {"path": "res://assets/kaykit/adventurers/Mage.glb", "body": "res://assets/kaykit/costumes/Necromancer.glb",
+		"sex": "male", "head": ["Necromancer_Head", "Necromancer_Crown"], "hat": "Necromancer_Crown", "cape": ""},
+	"Beastmaster": {"path": "res://assets/kaykit/adventurers/Barbarian.glb", "body": "res://assets/kaykit/costumes/Survivalist.glb",
+		"sex": "male", "head": ["Survivalist_Head"], "hat": "", "cape": ""},
+	# the green-hooded Rogue of the cover art (the statue at the Outpost)
+	"HoodedRogue": {"path": "res://assets/kaykit/adventurers/Rogue_Hooded.glb", "sex": "female", "head": ["Rogue_Head_Hooded"], "hat": "", "cape": "Rogue_Cape"},
 }
 const SKELETONS := {
 	"minion": "res://assets/kaykit/skeletons/Skeleton_Minion.glb",
@@ -107,7 +121,8 @@ static func _small_mage_hat(src: Mesh) -> Mesh:
 const HEAD_OWN_HAIR := {"short": Color(0.86, 0.72, 0.46), "long": Color(0.13, 0.11, 0.11), "shoulder": Color(0.55, 0.32, 0.2)}
 ## Each hero's own hair colour (for face details on "hero's own").
 const HERO_OWN_HAIR := {"Knight": Color(0.86, 0.74, 0.5), "Rogue": Color(0.8, 0.62, 0.36),
-	"Barbarian": Color(0.62, 0.62, 0.66), "Mage": Color(0.13, 0.11, 0.11), "Ranger": Color(0.42, 0.26, 0.15)}
+	"Barbarian": Color(0.62, 0.62, 0.66), "Mage": Color(0.13, 0.11, 0.11), "Ranger": Color(0.42, 0.26, 0.15),
+	"Priest": Color(0.85, 0.7, 0.4), "Druid": Color(0.55, 0.4, 0.25), "Necromancer": Color(0.9, 0.9, 0.92), "Beastmaster": Color(0.4, 0.26, 0.15)}
 
 static func hair_style_of(st: String) -> String:
 	return HAIR_ALIASES.get(st, st)
@@ -221,6 +236,8 @@ func setup(cfg: Dictionary) -> void:
 				em.emission_enabled = true; em.emission = cfg.eye; em.emission_energy_multiplier = 6.0
 				m.material_override = em
 	_setup_anims()
+	if kind == "hero" and hero.has("body") and costume_file == "":
+		_wear_class_body(hero, cfg)
 	if costume_file != "":
 		_wear_costume(costume_file, cfg)
 		if DARK_LOOKS.has(costume_fx):
@@ -637,6 +654,22 @@ func _wear_costume(path: String, cfg: Dictionary) -> void:
 	_base_scale = float(cfg.get("scale", 0.84))
 	scale = Vector3.ONE * _base_scale
 	_play(anims.idle, 0.0)
+
+## A class with its own model: hide the base rig's pieces and wear the class
+## body (head and all) on the same skeleton, so the animations still fit.
+func _wear_class_body(hero: Dictionary, cfg: Dictionary) -> void:
+	for m in all_meshes:
+		m.visible = false
+		_never_show.append(m)
+	all_meshes.clear(); head_meshes.clear()
+	for m in _borrow_meshes(String(hero.body), func(n: String) -> bool: return not n.contains("Weapon")):
+		if String(m.name) in hero.head:
+			head_meshes.append(m)
+		if hero.hat != "" and String(m.name) == hero.hat and not cfg.get("show_hat", true):
+			m.visible = false
+			_never_show.append(m)
+		if hero.cape != "" and String(m.name) == hero.cape and cfg.has("cape_color"):
+			_recolor(m, cfg.cape_color, 1.0, 0.0, null)
 
 ## Visible armour: swap the body, arms and legs (and cape) for an outfit,
 ## keeping your own head and hair.
