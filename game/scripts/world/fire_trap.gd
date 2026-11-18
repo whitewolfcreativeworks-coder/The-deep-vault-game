@@ -126,11 +126,15 @@ func _process(delta: float) -> void:
 	if on:
 		_tick -= delta
 		if _tick <= 0.0:
-			_tick = 0.45
+			_tick = 0.4
 			for b in _area.get_overlapping_bodies():
 				if not b.has_method("take_damage") or b.get("dead") == true:
 					continue
 				if b.is_in_group("player"):
-					b.take_damage(16.0, global_position + Vector3(0, 0, 3.0), 2.0)
+					# a real burn: a big hit that grows with your level, and you keep burning a moment
+					if b.has_method("burn"):
+						b.burn(18.0 + Game.max_hp() * 0.07, 2.0, 4.0 + Game.max_hp() * 0.015)
+					else:
+						b.take_damage(18.0 + Game.max_hp() * 0.07, global_position + Vector3(0, 0, 3.0), 2.0)
 				elif b.is_in_group("enemy"):
 					b.take_damage(14.0, global_position, 1.0, false)

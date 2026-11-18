@@ -35,6 +35,7 @@ func _ready() -> void:
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(world)
 	world.build()
+	_zone_extras()
 	player = Player.new()
 	player.name = "Player"
 	player.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -226,6 +227,26 @@ func go_to_castle() -> void:
 	get_tree().reload_current_scene()
 
 ## Level 3 -> Level 4: a cloud forms around you and lifts you into the sky.
+## Energy potions in random spots, and chickens and turkeys out in the open air.
+func _zone_extras() -> void:
+	var areas: Array = []
+	var n_pot := 4
+	match Game.zone:
+		"forest", "castle":
+			n_pot = 6 if Game.zone == "forest" else 5
+			var k := 0
+			for n in get_tree().get_nodes_in_group("npc"):
+				var np := (n as Node3D).global_position
+				if np.y < -20.0 or k >= 5:
+					continue
+				areas.append([np + Vector3(7.0, 0, 5.0), 6.0, 2 if k % 2 == 0 else 1])
+				k += 1
+		"cloud":
+			n_pot = 4
+		_:
+			areas = [[Vector3(-3.0, 0, 31.0), 6.0, 2], [Vector3(20.0, 0, 36.0), 5.0, 2]]
+	ZoneExtras.attach(world, n_pot, areas)
+
 func go_to_cloud() -> void:
 	if state != "play" or player.dead:
 		return

@@ -21,6 +21,17 @@ static func spawn(pos: Vector3, k: String, amt := 1, id := "") -> Pickup:
 	p._vel = Vector3(randf_range(-1.5, 1.5), 4.0, randf_range(-1.5, 1.5))
 	return p
 
+## Lay a pickup on the ground somewhere in a level (no toss).
+static func place(parent: Node, pos: Vector3, k: String, amt := 1, id := "") -> Pickup:
+	var p := Pickup.new()
+	p.kind = k; p.amount = amt; p.item_id = id
+	parent.add_child(p)
+	p.global_position = pos
+	p._vel = Vector3.ZERO
+	p._settled = true
+	p._base_y = pos.y
+	return p
+
 func _ready() -> void:
 	collision_layer = 16
 	collision_mask = 2
@@ -36,8 +47,8 @@ func _ready() -> void:
 			var c: Node3D = Props.make("coin_stack_small")
 			_vis.add_child(c)
 			c.scale = Vector3.ONE * 0.9
-		"potion", "mana":
-			col = Color(1.0, 0.25, 0.3) if kind == "potion" else Color(0.3, 0.5, 1.0)
+		"potion", "mana", "stamina":
+			col = {"potion": Color(1.0, 0.25, 0.3), "mana": Color(0.3, 0.5, 1.0), "stamina": Color(0.7, 1.0, 0.2)}[kind]
 			var b: Node3D = Props.make("bottle_A_labeled_brown")
 			_vis.add_child(b)
 			for mi in b.find_children("*", "MeshInstance3D", true, false):
@@ -46,6 +57,21 @@ func _ready() -> void:
 				m.emission = col; m.emission_energy_multiplier = 1.6
 				m.roughness = 0.2
 				(mi as MeshInstance3D).material_override = m
+		"food":
+			# a roast drumstick: golden-brown meat on a bone
+			col = Color(1.0, 0.65, 0.3)
+			var meat := MeshInstance3D.new(); var ms := SphereMesh.new(); ms.radius = 0.16; ms.height = 0.32
+			meat.mesh = ms; meat.scale = Vector3(1.0, 1.0, 1.45)
+			var mm := StandardMaterial3D.new(); mm.albedo_color = Color(0.6, 0.32, 0.12); mm.roughness = 0.45
+			meat.material_override = mm; _vis.add_child(meat)
+			var bone_m := StandardMaterial3D.new(); bone_m.albedo_color = Color(0.95, 0.92, 0.82)
+			var bone := MeshInstance3D.new(); var bc := CylinderMesh.new(); bc.top_radius = 0.035; bc.bottom_radius = 0.035; bc.height = 0.22
+			bone.mesh = bc; bone.material_override = bone_m; bone.rotation.x = PI / 2; bone.position.z = 0.28; _vis.add_child(bone)
+			for sx in [-0.04, 0.04]:
+				var knob := MeshInstance3D.new(); var ks := SphereMesh.new(); ks.radius = 0.05; ks.height = 0.1
+				knob.mesh = ks; knob.material_override = bone_m; knob.position = Vector3(sx, 0, 0.4); _vis.add_child(knob)
+			if amount > 1:
+				_vis.scale = Vector3.ONE * 1.4
 		"costume":
 			# a little spinning figure of what you'll turn into, in a rainbow glow
 			col = Color.from_hsv(randf(), 0.6, 1.0)
@@ -121,6 +147,21 @@ func _collect() -> void:
 			Game.mana_potions += amount
 			Game.say("+1 Mana Potion", Color(0.45, 0.6, 1.0))
 			Sfx.play("pickup", -6.0, 0.0)
+			Game.stats_changed.emit()
+		"stamina":
+			Game.stamina_potions += amount
+			Game.say("+1 Energy Potion", Color(0.75, 1.0, 0.35))
+			Sfx.play("pickup", -6.0, 0.1)
+			Game.stats_changed.emit()
+		"food":
+			var p := get_tree().get_first_node_in_group("player")
+			var big := amount > 1
+			Game.hp = minf(Game.max_hp(), Game.hp + 20.0 + Game.max_hp() * (0.35 if big else 0.2))
+			Game.stamina = Game.max_stamina()
+			Game.say("Yum! A roast %s. Health and energy restored." % ("turkey leg" if big else "drumstick"), Color(1.0, 0.75, 0.4))
+			Sfx.play("sip", -6.0, 0.2)
+			if p:
+				FX.burst((p as Node3D).global_position + Vector3(0, 1.2, 0), Color(1.0, 0.7, 0.35), 18, 2.0)
 			Game.stats_changed.emit()
 		"costume":
 			Game.wear_costume(item_id)

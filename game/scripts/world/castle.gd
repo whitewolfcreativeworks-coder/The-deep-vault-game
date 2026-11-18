@@ -345,7 +345,7 @@ func _village() -> void:
 		"hair_color": Color(0.6, 0.6, 0.6), "face": "beard", "outfit_color": Color(0.35, 0.3, 0.25), "cape_color": Color(0.25, 0.2, 0.18),
 		"skin_color": Color(0.8, 0.62, 0.5), "build": 1.1, "height": 0.9, "weapon": "skel_axe"})
 	NPC.create(self, "brannoc", ground(9, 47), -120.0, {"hero": "Knight", "hat": true, "hair_style": "natural",
-		"hair_color": Color(0.3, 0.2, 0.12), "face": "scar", "outfit_color": Color(0.55, 0.15, 0.15), "cape_color": Color(0.5, 0.1, 0.1),
+		"hair_color": Color(0.3, 0.2, 0.12), "face": "eyepatch", "outfit_color": Color(0.55, 0.15, 0.15), "cape_color": Color(0.5, 0.1, 0.1),
 		"skin_color": Color(0.75, 0.55, 0.4), "build": 1.15})
 	NPC.create(self, "holt", ground(13, 40), -150.0, {"hero": "Ranger", "hair_style": "natural",
 		"hair_color": Color(0.15, 0.12, 0.1), "face": "mustache", "outfit_color": Color(0.5, 0.15, 0.15), "cape_color": Color(0.4, 0.12, 0.12),

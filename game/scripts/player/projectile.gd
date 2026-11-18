@@ -87,7 +87,7 @@ func _on_body(b: Node) -> void:
 	if _done:
 		return
 	if b.has_method("take_damage"):
-		if (team == "player" and b.is_in_group("enemy")) or (team == "enemy" and b.is_in_group("player")):
+		if (team == "player" and (b.is_in_group("enemy") or b.is_in_group("critter"))) or (team == "enemy" and b.is_in_group("player")):
 			b.take_damage(damage, global_position - dir * 2.0, 3.0, false)
 	_explode()
 

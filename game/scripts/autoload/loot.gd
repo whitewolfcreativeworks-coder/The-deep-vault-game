@@ -406,7 +406,8 @@ static func make_random(ilvl: int, luck := 0.0, floor_r := 0, kind := "") -> Str
 
 static func _potions(out: Array, n: int, mana_bias := 0.4) -> void:
 	for i in n:
-		out.append({"kind": "mana" if rng.randf() < mana_bias else "potion", "amount": 1})
+		var r := rng.randf()
+		out.append({"kind": "stamina" if r < 0.2 else ("mana" if r < 0.2 + mana_bias * 0.8 else "potion"), "amount": 1})
 
 ## Chest tiers: small, big, supply (before the boss), boss (after it), skin, weapon, armor.
 static func roll_chest(tier: String, ilvl: int) -> Array:
@@ -450,6 +451,7 @@ static func roll_chest(tier: String, ilvl: int) -> Array:
 		"supply":
 			out.append({"kind": "potion", "amount": 1}); out.append({"kind": "potion", "amount": 1})
 			out.append({"kind": "mana", "amount": 1}); out.append({"kind": "mana", "amount": 1})
+			out.append({"kind": "stamina", "amount": 1})
 			_potions(out, rng.randi_range(0, 2), 0.5)
 			if rng.randf() < 0.5:
 				out.append({"kind": "item", "id": make_random(ilvl, 0.6, 1)})

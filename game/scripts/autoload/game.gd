@@ -35,9 +35,9 @@ const HAIR_STYLE_NAMES := {"natural": "Natural", "short": "Short", "long": "Long
 const HAIR_COLORS2 := [Color(0.5, 0.3, 0.2), Color(0.12, 0.08, 0.06), Color(0.32, 0.19, 0.1), Color(0.55, 0.3, 0.14), Color(0.85, 0.66, 0.35),
 	Color(0.78, 0.33, 0.12), Color(0.9, 0.9, 0.92), Color(0.25, 0.45, 0.95), Color(0.95, 0.4, 0.7), Color(0.3, 0.75, 0.35)]
 const HAIR_COLOR_NAMES := ["Hero's own", "Black", "Dark brown", "Chestnut", "Blonde", "Ginger", "White", "Blue", "Pink", "Green"]
-const FACES := ["none", "beard", "mustache", "eyepatch", "scar", "warpaint", "blush"]
+const FACES := ["none", "beard", "mustache", "eyepatch", "glow_eyes", "mask", "warpaint"]
 const FACE_NAMES := {"none": "Plain", "beard": "Beard", "mustache": "Mustache", "eyepatch": "Eyepatch",
-	"scar": "Scar", "warpaint": "War paint", "blush": "Rosy cheeks"}
+	"glow_eyes": "Glowing eyes", "mask": "Ninja mask", "warpaint": "War paint"}
 const HERO_ORDER := ["Knight", "Rogue", "Barbarian", "Ranger", "Mage"]
 const HERO_BLURB := {
 	"Knight": "A sworn blade of the old roads.",
@@ -138,6 +138,7 @@ var xp := 0
 var gold := 0
 var potions := 3          # healing draughts
 var mana_potions := 2
+var stamina_potions := 2   # energy potions: full stamina and a Second Wind
 var hp := 100.0
 var mana := 60.0
 var stamina := 100.0
@@ -298,7 +299,7 @@ func mitigate(raw: float) -> float:
 
 # ---------------------------------------------------------------------------
 func reset_run() -> void:
-	level = 1; xp = 0; gold = 0; potions = 3; mana_potions = 2; kills = 0; play_time = 0.0
+	level = 1; xp = 0; gold = 0; potions = 3; mana_potions = 2; stamina_potions = 2; kills = 0; play_time = 0.0
 	_reset_items()
 	inventory = ["rusty_sword", "traveler_garb"]
 	equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
@@ -450,7 +451,7 @@ func _register_inputs() -> void:
 		"look_left": [KEY_LEFT], "look_right": [KEY_RIGHT], "look_up": [KEY_UP], "look_down": [KEY_DOWN],
 		"jump": [KEY_SPACE], "sprint": [KEY_SHIFT], "dodge": [KEY_C, KEY_ALT],
 		"interact": [KEY_E], "inventory": [KEY_I], "character": [KEY_TAB],
-		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1], "mana_potion": [KEY_F, KEY_2],
+		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1], "mana_potion": [KEY_F, KEY_2], "stamina_potion": [KEY_H, KEY_4],
 		"zoom_in_key": [KEY_EQUAL, KEY_KP_ADD], "zoom_out_key": [KEY_MINUS, KEY_KP_SUBTRACT],
 		"toggle_view": [KEY_V], "special": [KEY_X], "track_quest": [KEY_T], "mount": [KEY_G], "pose": [KEY_P], "auto_run": [KEY_Z, KEY_NUMLOCK], "special2": [KEY_B, KEY_3],
 	}
@@ -470,7 +471,7 @@ func _register_inputs() -> void:
 	var pad_buttons := {"jump": JOY_BUTTON_A, "attack": JOY_BUTTON_X, "interact": JOY_BUTTON_Y,
 		"block": JOY_BUTTON_LEFT_SHOULDER, "spell": JOY_BUTTON_RIGHT_SHOULDER,
 		"dodge": JOY_BUTTON_B, "pause": JOY_BUTTON_START, "inventory": JOY_BUTTON_BACK,
-		"potion": JOY_BUTTON_DPAD_UP, "mana_potion": JOY_BUTTON_DPAD_DOWN, "special": JOY_BUTTON_RIGHT_STICK, "special2": JOY_BUTTON_LEFT_STICK}
+		"potion": JOY_BUTTON_DPAD_UP, "mana_potion": JOY_BUTTON_DPAD_DOWN, "stamina_potion": JOY_BUTTON_DPAD_LEFT, "special": JOY_BUTTON_RIGHT_STICK, "special2": JOY_BUTTON_LEFT_STICK}
 	for action in pad_buttons:
 		var jb := InputEventJoypadButton.new()
 		jb.button_index = pad_buttons[action]
@@ -521,7 +522,7 @@ func save_slot(i := -1) -> bool:
 		"saved_at": Time.get_unix_time_from_system(),
 		"profile": profile.duplicate(true),
 		"level": level, "xp": xp, "gold": gold,
-		"potions": potions, "mana_potions": mana_potions,
+		"potions": potions, "mana_potions": mana_potions, "stamina_potions": stamina_potions,
 		"hp": hp, "mana": mana,
 		"items": items.duplicate(true),
 		"inventory": Array(inventory),
@@ -563,8 +564,13 @@ func load_slot(i: int) -> bool:
 	var p: Dictionary = d.get("profile", {})
 	for k in p:
 		profile[k] = p[k]
+	# retired face options (Nov 17): scar -> glowing eyes, rosy cheeks -> plain
+	if profile.get("face", "none") == "scar":
+		profile.face = "glow_eyes"
+	elif not profile.get("face", "none") in FACES:
+		profile.face = "none"
 	level = int(d.get("level", 1)); xp = int(d.get("xp", 0)); gold = int(d.get("gold", 0))
-	potions = int(d.get("potions", 3)); mana_potions = int(d.get("mana_potions", 2))
+	potions = int(d.get("potions", 3)); mana_potions = int(d.get("mana_potions", 2)); stamina_potions = int(d.get("stamina_potions", 2))
 	var its: Dictionary = d.get("items", {})
 	for k in its:
 		items[k] = its[k]

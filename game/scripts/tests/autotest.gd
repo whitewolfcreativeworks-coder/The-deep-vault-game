@@ -256,6 +256,9 @@ func _run() -> void:
 	elif mode == "cloud":
 		if await _cloud_test():
 			return
+	elif mode == "polish1":
+		if await _polish1_test():
+			return
 	elif mode == "bubblesfight":
 		if await _bubbles_fight_test():
 			return
@@ -1873,7 +1876,7 @@ func _looks_test() -> void:
 	m.show_panel("creator")
 	await wait(0.5)
 	await shot("k_creator_default")
-	Game.profile.merge({"hero": "Rogue", "hair_style": "spiky", "hair_color": 4, "skin": 3, "face": "scar", "cape": 3}, true)
+	Game.profile.merge({"hero": "Rogue", "hair_style": "spiky", "hair_color": 4, "skin": 3, "face": "glow_eyes", "cape": 3}, true)
 	for t in ["hero", "body", "hair", "face", "colours"]:
 		m._set_tab(t)
 		await wait(1.6)
@@ -1883,10 +1886,10 @@ func _looks_test() -> void:
 	var cam: Camera3D = m._preview_vp.find_children("*", "Camera3D", true, false)[0]
 	var combos := [
 		{"hair_style": "short", "face": "beard", "hair_color": 4, "skin": 5},
-		{"hair_style": "long", "face": "blush", "hair_color": 3, "skin": 2},
+		{"hair_style": "long", "face": "mask", "hair_color": 3, "skin": 2},
 		{"hair_style": "shoulder", "face": "eyepatch", "hair_color": 0, "skin": 4},
 		{"hair_style": "buns", "face": "warpaint", "hair_color": 7, "skin": 1},
-		{"hair_style": "spiky", "face": "scar", "hair_color": 6, "skin": 3},
+		{"hair_style": "spiky", "face": "glow_eyes", "hair_color": 6, "skin": 3},
 		{"hair_style": "swept", "face": "mustache", "hair_color": 8, "skin": 6},
 		{"hair_style": "bald", "face": "beard", "hair_color": 5, "skin": 7},
 		{"hair_style": "wild", "face": "none", "hair_color": 1, "skin": 0},
@@ -3309,4 +3312,141 @@ func _bubbles_fight_test() -> bool:
 	await wait(4.0)
 	print("BF fall: dead=%s hp=%.0f" % [player.dead, Game.hp])
 	check("bf_far_side_fall_is_safe", not player.dead and player.global_position.y > -5.0, str(player.global_position))
+	return false
+
+
+## Nov 17 playtest, batch 1: real-input checks for the quick fixes.
+func _polish1_test() -> bool:
+	var phase: int = Game.get_meta("p1_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		await wait(2.0)
+		var w = main.world
+		# --- chickens, turkeys and energy potions in the outpost
+		var fowl := get_tree().get_nodes_in_group("critter")
+		var turkeys := fowl.filter(func(f) -> bool: return f.kind == "turkey").size()
+		check("p1_fowl_wander_the_outpost", fowl.size() >= 3, "%d fowl, %d turkeys" % [fowl.size(), turkeys])
+		var pots: Array = w.find_children("*", "Pickup", true, false).filter(func(pk) -> bool: return pk.kind == "stamina")
+		check("p1_energy_potions_scattered", pots.size() >= 3, "%d" % pots.size())
+		var chickens := fowl.filter(func(f) -> bool: return f.kind == "chicken")
+		var f0: Fowl = chickens[0] if chickens.size() > 0 else null
+		if f0:
+			await _look(f0.global_position + Vector3(0, 0.5, 0), f0.global_position + Vector3(2.2, 0.3, 2.2), 3.0, -0.25)
+			await shot("p1_01_chicken")
+			# walk up and hit it with real attack presses
+			var hp0 := Game.hp
+			Game.hp = Game.max_hp() * 0.5
+			var hp_before := Game.hp
+			for k in 100:
+				if not is_instance_valid(f0) or f0.dead:
+					break
+				face(f0.global_position)
+				player.facing = player.yaw
+				var d := Vector2(f0.global_position.x - player.global_position.x, f0.global_position.z - player.global_position.z).length()
+				if d > 1.6:
+					Input.action_press("move_forward")
+				else:
+					Input.action_release("move_forward")
+				Input.action_press("attack")
+				await wait(0.1)
+			Input.action_release("attack"); Input.action_release("move_forward")
+			check("p1_chicken_can_be_hit", not is_instance_valid(f0) or f0.dead)
+			var food: Array = w.get_tree().current_scene.find_children("*", "Pickup", true, false).filter(func(pk) -> bool: return pk.kind == "food")
+			check("p1_chicken_drops_food", food.size() >= 1)
+			if food.size() > 0:
+				await wait(0.8)
+				if is_instance_valid(food[0]):
+					await tp((food[0] as Node3D).global_position + Vector3(0, 0.1, 0), player.yaw)
+				await wait(1.0)
+				check("p1_food_heals", Game.hp > hp_before + 10.0, "%.0f -> %.0f" % [hp_before, Game.hp])
+		# --- energy potion with the real key
+		Game.stamina = 5.0
+		var sp0 := Game.stamina_potions
+		await tap("stamina_potion")
+		await wait(0.3)
+		check("p1_energy_potion_drinks", Game.stamina_potions == sp0 - 1 and Game.stamina >= Game.max_stamina() - 1.0 and player.second_wind_t > 0.0)
+		await press("sprint", 0.0)
+		Input.action_press("move_forward"); Input.action_press("sprint")
+		await wait(2.0)
+		Input.action_release("move_forward"); Input.action_release("sprint")
+		check("p1_second_wind_endless_sprint", Game.stamina >= Game.max_stamina() - 1.0, "%.0f" % Game.stamina)
+		await shot("p1_02_second_wind")
+		# --- a goblin brute behind a wall can't hit you
+		var wall := StaticBody3D.new(); w.add_child(wall)
+		var wcs := CollisionShape3D.new(); var wbs := BoxShape3D.new(); wbs.size = Vector3(8, 4, 0.4)
+		wcs.shape = wbs; wall.add_child(wcs); wall.global_position = Vector3(20, 2, 18.0)
+		var wm := MeshInstance3D.new(); var wbm := BoxMesh.new(); wbm.size = wbs.size; wm.mesh = wbm; wall.add_child(wm)
+		await wait(0.3)
+		var brute := Enemy.new(); brute.configure("goblin_brute", "", 0.0)
+		brute.position = Vector3(20, 0.2, 16.9)
+		w.add_child(brute)
+		await tp(Vector3(20, 0.2, 19.1), 0.0)
+		await wait(0.2)
+		Game.hp = Game.max_hp()
+		var hpw := Game.hp
+		await wait(4.0)
+		check("p1_no_hits_through_walls", Game.hp >= hpw - 0.5 and brute.state != Enemy.S.WINDUP, "%.0f -> %.0f, state %d" % [hpw, Game.hp, brute.state])
+		wall.queue_free()
+		await wait(4.0)
+		check("p1_same_brute_hits_without_wall", Game.hp < hpw - 1.0, "%.0f -> %.0f" % [hpw, Game.hp])
+		brute.take_damage(99999.0, player.global_position)
+		# --- the fire vents bite now, even through a raised shield
+		god = false
+		Game.hp = Game.max_hp()
+		var trap: FireTrap = w.corridor_traps[0]
+		await tp(trap.global_position + Vector3(0, 0.2, 0), 0.0)
+		Input.action_press("block")
+		var hpf := Game.hp
+		for k in 50:
+			if trap.is_burning():
+				break
+			await wait(0.1)
+		await wait(1.2)          # stand in one full burst of flame, shield up
+		Input.action_release("block")
+		await tp(trap.global_position + Vector3(0, 0.2, 4.0), 0.0)
+		await wait(2.2)          # still burning a moment after stepping out
+		var burnt := hpf - Game.hp
+		check("p1_fire_vent_burns_through_shield", burnt > Game.max_hp() * 0.3 and not player.dead, "lost %.0f of %.0f" % [burnt, Game.max_hp()])
+		Game.hp = Game.max_hp()
+		await shot("p1_03_burning")
+		# --- the corridor lever is gold
+		await _look(Vector3(2.45, -6 + 1.2, -58.8), Vector3(-1.0, -6 + 0.3, -55.5), 3.0, -0.05)
+		await shot("p1_04_gold_lever")
+		god = true
+		Game.set_meta("p1_phase", 2)
+		for q in Game.zone_quests("forest"):
+			pass
+		main.go_to_forest()
+		return true
+	# phase 2: the forest
+	await wait(2.5)
+	player = main.player
+	god = true
+	var fw: ForestWorld = main.world
+	var fowl2 := get_tree().get_nodes_in_group("critter")
+	check("p1_forest_fowl", fowl2.size() >= 3, "%d" % fowl2.size())
+	# underground goblins are tougher, the forest ones aren't
+	var under := get_tree().get_nodes_in_group("enemy").filter(func(e) -> bool: return e.type_id == "goblin" and e.global_position.y < ForestWorld.WY + 20.0)
+	var above := get_tree().get_nodes_in_group("enemy").filter(func(e) -> bool: return e.type_id == "goblin" and e.global_position.y > ForestWorld.WY + 20.0)
+	check("p1_warren_goblins_tougher", under.size() > 0 and absf(under[0].max_hp - 72.0 * 1.6) < 1.0, "%d under" % under.size())
+	check("p1_forest_goblins_unchanged", above.size() == 0 or absf(above[0].max_hp - 72.0) < 1.0)
+	check("p1_gruk_tougher", fw.gruk != null and fw.gruk.max_hp >= 2800.0)
+	# the Moonlit Portal shines once the forest is done
+	var beacon: Node3D = fw.get_node_or_null("MoonBeacon")
+	check("p1_moon_beacon_hidden_until_done", beacon != null and not beacon.visible)
+	for q in Game.zone_quests("forest"):
+		Game.quests[q] = {"state": "done", "n": 99}
+	Game.quests_changed.emit()
+	await wait(0.5)
+	check("p1_moon_beacon_shines", beacon.visible)
+	var mp := fw.ground(ForestWorld.MOON_PORTAL.x, ForestWorld.MOON_PORTAL.y)
+	await _look(mp + Vector3(0, 6, 0), fw.ground(0, 0) + Vector3(0, 0.3, 0), 8.0, 0.05)
+	await shot("p1_06_moon_beacon_from_afar")
+	main.menus.show_panel("")
+	beacon.visible = false
+	await wait(0.3)
+	await shot("p1_06b_moon_beacon_off")
+	beacon.visible = true
 	return false

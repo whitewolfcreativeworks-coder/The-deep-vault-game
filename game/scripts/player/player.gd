@@ -651,6 +651,12 @@ func _physics_process(delta: float) -> void:
 
 func _update_timers(delta: float) -> void:
 	invuln = maxf(0.0, invuln - delta)
+	_burn_step(delta)
+	if second_wind_t > 0.0:
+		second_wind_t -= delta
+		Game.stamina = Game.max_stamina()
+		if second_wind_t <= 0.0 and _wind_fx and is_instance_valid(_wind_fx):
+			_wind_fx.emitting = false
 	potion_cd = maxf(0.0, potion_cd - delta)
 	special_cd = maxf(0.0, special_cd - delta)
 	special2_cd = maxf(0.0, special2_cd - delta)
@@ -759,6 +765,8 @@ func _handle_actions() -> void:
 		use_special2()
 	if Input.is_action_just_pressed("mana_potion"):
 		drink_mana_potion()
+	if Input.is_action_just_pressed("stamina_potion"):
+		drink_stamina_potion()
 	if Input.is_action_just_pressed("potion"):
 		drink_potion()
 	if Input.is_action_just_pressed("interact") and interact_target and is_instance_valid(interact_target):
@@ -933,6 +941,37 @@ func drink_mana_potion() -> void:
 	FX.burst(global_position + Vector3(0, 1.0, 0), Color(0.35, 0.55, 1.0), 24, 2.0)
 	Game.stats_changed.emit()
 
+## Energy potion: stamina back to full, then a Second Wind: for a while running,
+## rolling, blocking and swinging cost nothing (and tired dragonfly wings recover).
+var second_wind_t := 0.0
+var _wind_fx: CPUParticles3D
+func drink_stamina_potion() -> void:
+	if potion_cd > 0.0:
+		return
+	if Game.stamina_potions <= 0:
+		Game.say("No energy potions left.", Color(0.9, 1.0, 0.5))
+		return
+	Game.stamina_potions -= 1
+	potion_cd = 1.0
+	Game.stamina = Game.max_stamina()
+	second_wind_t = 12.0
+	wing_stamina = 1.0
+	wings_tired = false
+	Sfx.play("sip", -4.0)
+	Sfx.play("levelup", -14.0, 0.2)
+	FX.burst(global_position + Vector3(0, 1.0, 0), Color(0.75, 1.0, 0.3), 36, 3.0)
+	Game.say("Second Wind! Endless energy for a few seconds.", Color(0.8, 1.0, 0.45))
+	if _wind_fx == null or not is_instance_valid(_wind_fx):
+		_wind_fx = CPUParticles3D.new(); _wind_fx.amount = 24; _wind_fx.lifetime = 0.8
+		_wind_fx.mesh = FX.quad(0.1); _wind_fx.material_override = FX.glow_material(Color(0.75, 1.0, 0.35), 2.5)
+		_wind_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; _wind_fx.emission_sphere_radius = 0.6
+		_wind_fx.direction = Vector3.UP; _wind_fx.spread = 30; _wind_fx.initial_velocity_min = 0.8; _wind_fx.initial_velocity_max = 1.6
+		_wind_fx.gravity = Vector3.ZERO; _wind_fx.color_ramp = FX._fade_ramp(Color(0.75, 1.0, 0.35))
+		_wind_fx.position.y = 0.9
+		add_child(_wind_fx)
+	_wind_fx.emitting = true
+	Game.stats_changed.emit()
+
 # ---------------------------------------------------------------------------
 func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false) -> void:
 	if dead or invuln > 0.0:
@@ -985,6 +1024,43 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 	Game.stats_changed.emit()
 	if Game.hp <= 0.0:
 		die()
+
+## Fire (vents, lava): a shield can't stop it, and you keep burning a moment.
+var _burn_t := 0.0
+var _burn_dps := 0.0
+var _burn_fx: CPUParticles3D
+func burn(amount: float, secs: float, dps: float) -> void:
+	if dead or invuln > 0.0:
+		return
+	var was := blocking
+	blocking = false
+	take_damage(amount, global_position, 0.0)
+	blocking = was
+	_burn_t = maxf(_burn_t, secs)
+	_burn_dps = dps
+	if _burn_fx == null or not is_instance_valid(_burn_fx):
+		_burn_fx = CPUParticles3D.new(); _burn_fx.amount = 36; _burn_fx.lifetime = 0.5
+		_burn_fx.mesh = FX.quad(0.3); _burn_fx.material_override = FX.glow_material(Color(1.0, 0.5, 0.15), 2.5)
+		_burn_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX; _burn_fx.emission_box_extents = Vector3(0.3, 0.7, 0.3)
+		_burn_fx.direction = Vector3.UP; _burn_fx.spread = 15; _burn_fx.initial_velocity_min = 1.5; _burn_fx.initial_velocity_max = 2.5
+		_burn_fx.gravity = Vector3(0, 2, 0); _burn_fx.color_ramp = FX._fade_ramp(Color(1.0, 0.5, 0.15))
+		_burn_fx.position.y = 1.0
+		add_child(_burn_fx)
+	_burn_fx.emitting = true
+
+func _burn_step(delta: float) -> void:
+	if _burn_t <= 0.0:
+		return
+	_burn_t -= delta
+	if not dead:
+		Game.hp -= _burn_dps * delta
+		damage_taken += _burn_dps * delta
+		if Game.hp <= 0.0:
+			die()
+	if _burn_t <= 0.0 or dead:
+		_burn_t = 0.0
+		if _burn_fx and is_instance_valid(_burn_fx):
+			_burn_fx.emitting = false
 
 func heal(v: float) -> void:
 	Game.hp = minf(Game.max_hp(), Game.hp + v)

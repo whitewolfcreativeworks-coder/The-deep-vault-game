@@ -50,10 +50,17 @@ func _build() -> void:
 			add_child(_light)
 		"lever":
 			var base := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(0.5, 0.6, 0.2); base.mesh = bm
-			base.material_override = _metal(Color(0.25, 0.24, 0.26)); base.position = Vector3(0, 1.1, 0); add_child(base)
+			# gold, with a soft glow, so it never blends into the wall
+			var gold := _metal(Color(1.0, 0.76, 0.28))
+			gold.emission_enabled = true; gold.emission = Color(1.0, 0.7, 0.25); gold.emission_energy_multiplier = 0.35
+			base.material_override = gold; base.position = Vector3(0, 1.1, 0); add_child(base)
+			var plate := MeshInstance3D.new(); var pbm := BoxMesh.new(); pbm.size = Vector3(0.7, 0.85, 0.06); plate.mesh = pbm
+			plate.material_override = gold; plate.position = Vector3(0, 1.1, 0.1); add_child(plate)
+			var glow := OmniLight3D.new(); glow.light_color = Color(1.0, 0.8, 0.4); glow.light_energy = 0.9; glow.omni_range = 3.0
+			glow.position = Vector3(0, 1.3, -0.5); add_child(glow)
 			_lid = Node3D.new(); _lid.position = Vector3(0, 1.1, -0.12); add_child(_lid)
 			var arm := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.03; cm.bottom_radius = 0.03; cm.height = 0.55
-			arm.mesh = cm; arm.material_override = _metal(Color(0.45, 0.4, 0.35)); arm.position = Vector3(0, 0.25, 0); _lid.add_child(arm)
+			arm.mesh = cm; arm.material_override = gold; arm.position = Vector3(0, 0.25, 0); _lid.add_child(arm)
 			var knob := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.06; sm.height = 0.12; knob.mesh = sm
 			knob.material_override = _metal(Color(0.8, 0.2, 0.15)); knob.position = Vector3(0, 0.52, 0); _lid.add_child(knob)
 			_lid.rotation.x = -0.7

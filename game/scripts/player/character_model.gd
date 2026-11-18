@@ -1229,8 +1229,38 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 					var yy := c.y - ry * (0.26 + 0.12 * k)
 					_piece(_boxm(rx * 0.32, ry * 0.05, 0.02), paint, Vector3(sd * rx * 0.48, yy, fz.call(sd * rx * 0.48, yy) + 0.005), Vector3.ONE, Vector3(0, sd * 0.45, 0))
 		"blush":
-			var pink := _look_mat(Color(1.0, 0.5, 0.55), 0.6)
+			# soft rosy cheeks: a gentle pink glow that fades out at the edges
+			var pink := StandardMaterial3D.new()
+			pink.albedo_color = Color(1.0, 0.45, 0.5, 0.55)
+			pink.albedo_texture = FX.soft_texture()
+			pink.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			pink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			pink.cull_mode = BaseMaterial3D.CULL_DISABLED
 			for sd in [-1.0, 1.0]:
-				var yy2 := c.y - ry * 0.3
-				var d2 := CylinderMesh.new(); d2.top_radius = rx * 0.13; d2.bottom_radius = rx * 0.13; d2.height = 0.02
-				_piece(d2, pink, Vector3(sd * rx * 0.5, yy2, fz.call(sd * rx * 0.5, yy2) - 0.005), Vector3.ONE, Vector3(PI / 2, sd * 0.5, 0))
+				var yy2 := c.y - ry * 0.28
+				var xx2: float = sd * rx * 0.52
+				var qd := QuadMesh.new(); qd.size = Vector2(rx * 0.5, ry * 0.32)
+				_piece(qd, pink, Vector3(xx2, yy2, fz.call(xx2, yy2) + 0.006), Vector3.ONE, Vector3(0, sd * 0.55, 0))
+		"glow_eyes":
+			# magic glowing eyes with a soft halo
+			var gc := Color(0.35, 0.95, 1.0)
+			var glow := StandardMaterial3D.new(); glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			glow.albedo_color = gc; glow.emission_enabled = true; glow.emission = gc; glow.emission_energy_multiplier = 6.0
+			var halo := StandardMaterial3D.new(); halo.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			halo.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; halo.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+			halo.albedo_texture = FX.soft_texture(); halo.albedo_color = Color(gc.r, gc.g, gc.b, 0.8)
+			halo.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+			for sd in [-1.0, 1.0]:
+				var ex: float = sd * eye_x
+				var ez: float = fz.call(ex, eye_y)
+				_piece(_sphere(), glow, Vector3(ex, eye_y, ez + 0.004), Vector3(rx * 0.11, ry * 0.1, rx * 0.05))
+				var hq := QuadMesh.new(); hq.size = Vector2(rx * 0.75, rx * 0.75)
+				_piece(hq, halo, Vector3(ex, eye_y, ez + 0.03))
+		"mask":
+			# a ninja mask: cloth wrapped over the nose and mouth, knotted at the back
+			var cloth := _look_mat(Color(0.1, 0.12, 0.22), 0.7)
+			_piece(_sphere(), cloth, Vector3(c.x, c.y - ry * 0.64, c.z + rz * 0.05), Vector3(rx * 1.03, ry * 0.36, rz * 1.02))
+			var knot := _piece(_sphere(), cloth, Vector3(c.x, c.y - ry * 0.4, c.z - rz * 1.0), Vector3(rx * 0.16, ry * 0.12, rz * 0.12))
+			for sd in [-1.0, 1.0]:
+				var tail := _piece(_boxm(rx * 0.12, ry * 0.5, 0.02), cloth, knot.position + Vector3(sd * rx * 0.12, -ry * 0.25, -rz * 0.05))
+				tail.rotation.z = sd * 0.35

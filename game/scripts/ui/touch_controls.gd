@@ -75,7 +75,8 @@ func _defaults() -> Array:
 		{"name": "interact", "action": "interact", "label": "USE", "center": Vector2(w - 572, h - 105), "radius": 52.0, "hold": false},
 		{"name": "mount", "action": "mount", "label": "RIDE", "center": Vector2(w - 560, h - 250), "radius": 46.0, "hold": false},
 		{"name": "auto", "action": "auto_run", "label": "AUTO", "center": Vector2(w - 560, h - 372), "radius": 44.0, "hold": false},
-		{"name": "pose", "action": "pose", "label": "ME", "center": Vector2(w - 576, 62), "radius": 44.0, "hold": false},
+		{"name": "pose", "action": "pose", "label": "ME", "center": Vector2(w - 678, 62), "radius": 44.0, "hold": false},
+		{"name": "energy", "action": "stamina_potion", "label": "ENERGY", "center": Vector2(w - 576, 62), "radius": 44.0, "hold": false},
 		{"name": "emote", "action": "attack", "label": "POSE!", "center": Vector2(w - 170, h - 170), "radius": 80.0, "hold": false},
 		{"name": "potion", "action": "potion", "label": "HEAL", "center": Vector2(w - 372, 62), "radius": 44.0, "hold": false},
 		{"name": "mana", "action": "mana_potion", "label": "MANA", "center": Vector2(w - 474, 62), "radius": 44.0, "hold": false},
@@ -491,6 +492,8 @@ func _draw_pad() -> void:
 			fill = Color(0.35, 0.05, 0.07, 0.5 if Game.potions > 0 else 0.2)
 		elif b.name == "mana":
 			fill = Color(0.06, 0.12, 0.38, 0.5 if Game.mana_potions > 0 else 0.2)
+		elif b.name == "energy":
+			fill = Color(0.22, 0.32, 0.04, 0.5 if Game.stamina_potions > 0 else 0.2)
 		elif b.name == "special":
 			var abc: Color = Game.ability().color
 			fill = Color(abc.r * 0.45, abc.g * 0.3, abc.b * 0.55, 0.6 if player == null or player.special_cd <= 0.0 else 0.25)
@@ -526,6 +529,8 @@ func _draw_pad() -> void:
 			label = "HEAL %d" % Game.potions
 		elif b.name == "mana":
 			label = "MANA %d" % Game.mana_potions
+		elif b.name == "energy":
+			label = "ENERGY %d" % Game.stamina_potions
 		elif b.name == "view" and player:
 			label = player.view_name()
 		elif b.name == "mount" and player:

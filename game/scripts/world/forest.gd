@@ -415,7 +415,7 @@ func _portal_glade() -> void:
 		ll.position = lp + Vector3(0, 1.1, 0); add_child(ll)
 	Interactable.create(self, "shrine", ground(-8, 84), 30.0, "", [], "the Portal Glade")
 	NPC.create(self, "fenn", ground(7.5, 85.5), -110.0, {"hero": "Ranger", "outfit_color": Color(0.3, 0.45, 0.22),
-		"cape_color": Color(0.25, 0.4, 0.2), "skin_color": Color(0.82, 0.6, 0.42), "face": "scar", "hair_color": Color(0.32, 0.19, 0.1)})
+		"cape_color": Color(0.25, 0.4, 0.2), "skin_color": Color(0.82, 0.6, 0.42), "face": "eyepatch", "hair_color": Color(0.32, 0.19, 0.1)})
 	Interactable.create(self, "inscription", ground(-3.5, 101.0), 180.0, "", [], "Waystone",
 		"THE OLD PORTAL\\n\\nRoad north: the Warren of the goblins (keep away!)\\nWest: Bram's lumber camp\\nEast, by the stream: Old Maera's hut\\n\\n(Scratched below: \\\"GOBLINS STOLE MY CART  - T.\\\")")
 
@@ -683,15 +683,45 @@ func _moon_portal() -> void:
 			var sc := get_tree().current_scene
 			if sc.has_method("go_to_castle"):
 				get_tree().create_timer(0.5).timeout.connect(sc.go_to_castle))
+	# awake, it shines: a tall moonbeam you can see from anywhere in the forest,
+	# a glowing ring on the ground and drifting silver sparks
+	_moon_fx = Node3D.new(); _moon_fx.name = "MoonBeacon"; add_child(_moon_fx); _moon_fx.position = c
+	var beam := MeshInstance3D.new(); var bcm := CylinderMesh.new(); bcm.top_radius = 1.4; bcm.bottom_radius = 2.2; bcm.height = 90.0
+	bcm.cap_top = false; bcm.cap_bottom = false
+	beam.mesh = bcm
+	beam.material_override = FX.beam_material(Color(0.7, 0.82, 1.0), 1.2, 0.3, false); beam.position.y = 45.0
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_moon_fx.add_child(beam)
+	var core := MeshInstance3D.new(); var ccm := CylinderMesh.new(); ccm.top_radius = 0.35; ccm.bottom_radius = 0.6; ccm.height = 90.0
+	ccm.cap_top = false; ccm.cap_bottom = false
+	core.mesh = ccm; core.material_override = FX.beam_material(Color(0.9, 0.95, 1.0), 1.5, 0.75, false); core.position.y = 45.0; core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_moon_fx.add_child(core)
+	var ring := MeshInstance3D.new(); var rtm := TorusMesh.new(); rtm.inner_radius = 3.6; rtm.outer_radius = 4.0
+	ring.mesh = rtm; ring.material_override = FX.beam_material(Color(0.65, 0.8, 1.0), 2.0, 0.8)
+	ring.scale = Vector3(1, 0.08, 1); ring.position.y = 0.15; _moon_fx.add_child(ring)
+	var sparks := CPUParticles3D.new(); sparks.amount = 70; sparks.lifetime = 3.0
+	sparks.mesh = FX.quad(0.14); sparks.material_override = FX.glow_material(Color(0.8, 0.88, 1.0), 3.0)
+	sparks.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING; sparks.emission_ring_radius = 3.8; sparks.emission_ring_inner_radius = 2.0
+	sparks.emission_ring_height = 0.2; sparks.emission_ring_axis = Vector3.UP
+	sparks.direction = Vector3.UP; sparks.spread = 10; sparks.initial_velocity_min = 1.5; sparks.initial_velocity_max = 3.5
+	sparks.gravity = Vector3.ZERO; sparks.color_ramp = FX._fade_ramp(Color(0.8, 0.88, 1.0))
+	sparks.position.y = 0.3; _moon_fx.add_child(sparks)
 	Game.quests_changed.connect(_moon_refresh)
 	_moon_refresh()
 
+var _moon_fx: Node3D
+var _moon_was_open := false
 func _moon_refresh() -> void:
 	var open := Game.zone_complete("forest")
-	_moon_mat.set_shader_parameter("intensity", 2.2 if open else 0.25)
-	_moon_light.light_energy = 4.0 if open else 0.6
+	_moon_mat.set_shader_parameter("intensity", 2.6 if open else 0.25)
+	_moon_light.light_energy = 7.0 if open else 0.6
+	_moon_light.omni_range = 22.0 if open else 14.0
 	_moon_area.monitoring = open
 	_moon_disc.visible = open          # asleep: just an empty stone arch
+	_moon_fx.visible = open
+	if open and not _moon_was_open and player != null:
+		Game.say("The Moonlit Portal has woken! Follow the beam of moonlight.", Color(0.75, 0.85, 1.0))
+	_moon_was_open = open
 
 # ---------------------------------------------------------------------------
 # Enemies and quests
@@ -700,6 +730,10 @@ func _enemy(type_name: String, pos: Vector3, uid: String, yaw: float) -> Enemy:
 		return null
 	var e := Enemy.new()
 	e.configure(type_name, uid, 0.0)
+	# the underground (the Warren and the Sinkhole) is meaner than the forest above
+	if pos.y < WY + 20.0 and not type_name in ["goblin_chief", "cyclops"]:
+		e.hp_mult = 1.6
+		e.dmg_mult = 1.3
 	e.position = pos + Vector3(0, 0.3, 0)
 	e.rotation.y = yaw
 	add_child(e)

@@ -103,12 +103,8 @@ func spawn_one(announce: bool) -> void:
 			_sign(root, Vector3(-2.4, 0, 1.4), "SHHH!\nGoblin napping")
 		"chickens":
 			for k in 4:
-				var ch := ChickenMount.new()
-				root.add_child(ch)
 				var a := k * TAU / 4.0 + 0.4
-				ch.position = Vector3(cos(a), 0, sin(a)) * 2.3
-				ch.rotation.y = -a + PI * 0.5
-				ch.scale = Vector3.ONE * 0.33
+				Fowl.make(root, root.global_position + Vector3(cos(a) * 2.3, 0.3, sin(a) * 2.3), "chicken", 2.5)
 			_sign(root, Vector3(-2.8, 0, 1.6), "CHICKEN TREASURE\nDO NOT TOUCH\n- the chickens")
 		"picnic":
 			_prop("skull", root, Vector3(1.6, 0.0, 0.2), 200.0, 1.2)

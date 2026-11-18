@@ -288,7 +288,7 @@ func _process(delta: float) -> void:
 		msg_box.position.y = compass.position.y + compass.size.y + 24.0
 	if Input.is_action_just_pressed("track_quest") and get_tree().current_scene.get("state") == "play":
 		Game.track_next()
-	potion_label.text = ("Heal %d   Mana %d" if Game.touch_active else "Heal %d [R]   Mana %d [F]") % [Game.potions, Game.mana_potions]
+	potion_label.text = ("Heal %d   Mana %d   Energy %d" if Game.touch_active else "Heal %d [R]   Mana %d [F]   Energy %d [H]") % [Game.potions, Game.mana_potions, Game.stamina_potions]
 	var ab := Game.ability()
 	var ab_state := "ready" if player.special_cd <= 0.0 else "%ds" % ceili(player.special_cd)
 	special_label.text = ("%s: %s" if Game.touch_active else "%s [X]: %s") % [ab.name, ab_state]

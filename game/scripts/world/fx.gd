@@ -36,6 +36,19 @@ static func glow_material(color: Color, energy := 2.0) -> StandardMaterial3D:
 	m.disable_receive_shadows = true
 	return m
 
+## For solid glowing shapes (beams, rings, columns): no billboarding, no soft
+## particle texture, just additive light of the given colour and strength.
+static func beam_material(color: Color, energy := 1.0, alpha := 0.35, additive := true) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD if additive else BaseMaterial3D.BLEND_MODE_MIX
+	m.set("disable_fog", true)        # stays bright even far away
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.albedo_color = Color(color.r * energy, color.g * energy, color.b * energy, alpha)
+	m.disable_receive_shadows = true
+	return m
+
 static func quad(size: float) -> QuadMesh:
 	var q := QuadMesh.new()
 	q.size = Vector2(size, size)

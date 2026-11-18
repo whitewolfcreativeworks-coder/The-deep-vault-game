@@ -30,10 +30,10 @@ const TYPES := {
 	"goblin_brute": {"name": "Goblin Brute", "hp": 280.0, "dmg": 27.0, "speed": 3.0, "range": 2.4,
 		"windup": 0.75, "cooldown": 1.55, "xp": 120, "weapon": "skel_axe", "shield": "", "eye": Color(1.0, 0.45, 0.15),
 		"scale": 0.95, "aggro": 14.0, "poise": 25.0, "gold": [12, 24], "heavy": true, "leash": 26.0,
-		"look": {"hero": "Barbarian", "hair_style": "bald", "hair_color": Color(0.1, 0.1, 0.1), "face": "scar", "outfit": Color(0.35, 0.22, 0.14), "build": 1.25}},
-	"goblin_chief": {"name": "Chief Gruk", "hp": 1150.0, "dmg": 33.0, "speed": 3.3, "range": 2.9,
-		"windup": 0.8, "cooldown": 1.45, "xp": 450, "weapon": "skel_axe", "shield": "Skeleton_Shield_Large_A", "eye": Color(1.0, 0.3, 0.1),
-		"scale": 1.35, "aggro": 16.0, "poise": 70.0, "gold": [60, 90], "heavy": true, "leash": 40.0, "summon": true,
+		"look": {"hero": "Barbarian", "hair_style": "bald", "hair_color": Color(0.1, 0.1, 0.1), "face": "warpaint", "outfit": Color(0.35, 0.22, 0.14), "build": 1.25}},
+	"goblin_chief": {"name": "Chief Gruk", "hp": 2800.0, "dmg": 42.0, "speed": 3.6, "range": 2.9,
+		"windup": 0.7, "cooldown": 1.2, "xp": 600, "weapon": "skel_axe", "shield": "Skeleton_Shield_Large_A", "eye": Color(1.0, 0.3, 0.1),
+		"scale": 1.35, "aggro": 16.0, "poise": 110.0, "gold": [70, 110], "heavy": true, "leash": 40.0, "summon": true, "nova": true, "enrage": true,
 		"look": {"hero": "Barbarian", "hair_style": "mohawk", "hair_color": Color(0.85, 0.12, 0.08), "face": "warpaint", "outfit": Color(0.5, 0.12, 0.1), "build": 1.3, "hat": true}},
 	# --- the Sinkhole of Death: fire goblins and the Cyclops Goblin
 	"fire_goblin": {"name": "Ember Goblin", "hp": 110.0, "dmg": 17.0, "speed": 4.5, "range": 1.8,
@@ -47,10 +47,10 @@ const TYPES := {
 	"magma_brute": {"name": "Magma Brute", "hp": 420.0, "dmg": 34.0, "speed": 3.0, "range": 2.6,
 		"windup": 0.75, "cooldown": 1.5, "xp": 200, "weapon": "skel_axe", "shield": "", "eye": Color(1.0, 0.35, 0.05),
 		"scale": 1.05, "aggro": 15.0, "poise": 35.0, "gold": [18, 32], "heavy": true, "leash": 28.0, "skin": Color(0.62, 0.2, 0.12),
-		"look": {"hero": "Barbarian", "hair_style": "spiky", "hair_color": Color(1.0, 0.5, 0.05), "face": "scar", "outfit": Color(0.2, 0.06, 0.04), "build": 1.3}},
-	"cyclops": {"name": "Grimgor the Cyclops Goblin", "hp": 2200.0, "dmg": 40.0, "speed": 3.2, "range": 3.6,
-		"windup": 0.85, "cooldown": 1.5, "xp": 900, "weapon": "skel_axe", "shield": "", "eye": Color(1.0, 0.25, 0.05),
-		"scale": 2.3, "aggro": 20.0, "poise": 120.0, "gold": [120, 180], "heavy": true, "leash": 50.0, "summon": true, "nova": true,
+		"look": {"hero": "Barbarian", "hair_style": "spiky", "hair_color": Color(1.0, 0.5, 0.05), "face": "warpaint", "outfit": Color(0.2, 0.06, 0.04), "build": 1.3}},
+	"cyclops": {"name": "Grimgor the Cyclops Goblin", "hp": 5200.0, "dmg": 52.0, "speed": 3.5, "range": 3.6,
+		"windup": 0.75, "cooldown": 1.2, "xp": 1100, "enrage": true, "weapon": "skel_axe", "shield": "", "eye": Color(1.0, 0.25, 0.05),
+		"scale": 2.3, "aggro": 20.0, "poise": 180.0, "gold": [140, 220], "heavy": true, "leash": 50.0, "summon": true, "nova": true,
 		"skin": Color(0.45, 0.6, 0.22),
 		"look": {"hero": "Barbarian", "hair_style": "natural", "hair_color": Color(0.15, 0.1, 0.05), "face": "none", "outfit": Color(0.4, 0.1, 0.08), "build": 1.4, "cyclops": true}},
 	# --- Level 3: Ghost Knight Castle (spectral: see-through and glowing)
@@ -125,6 +125,11 @@ var _hurt_t := -1.0
 var _stagger_acc := 0.0
 var _summoned := false
 var _summoned2 := false
+var hp_mult := 1.0          # set before add_child: tougher versions (e.g. underground goblins)
+var dmg_mult := 1.0
+var _enraged := false
+var _los_t := 0.0
+var _los_ok := true
 
 func configure(type_name: String, id: String, wake_range := 0.0) -> void:
 	type_id = type_name
@@ -133,6 +138,10 @@ func configure(type_name: String, id: String, wake_range := 0.0) -> void:
 
 func _ready() -> void:
 	t = TYPES[type_id]
+	if hp_mult != 1.0 or dmg_mult != 1.0:
+		t = t.duplicate()
+		t.hp = float(t.hp) * hp_mult
+		t.dmg = float(t.dmg) * dmg_mult
 	display_name = t.name
 	add_to_group("enemy")
 	add_to_group("damageable")
@@ -329,7 +338,7 @@ func _physics_process(delta: float) -> void:
 			if state_time > 1.6:
 				_go(S.CHASE)
 		S.IDLE:
-			if not pdead and dist < t.aggro and _in_bounds(player.global_position):
+			if not pdead and dist < t.aggro and _in_bounds(player.global_position) and _can_engage(delta):
 				_go(S.CHASE)
 				Sfx.play_at("skel_attack", global_position, -10.0)
 		S.CHASE:
@@ -338,7 +347,8 @@ func _physics_process(delta: float) -> void:
 				if _nova_cd <= 0.0 and dist < 9.0 and not pdead:
 					_nova_cd = randf_range(6.5, 9.0) if hp > max_hp * 0.5 else randf_range(4.5, 6.5)
 					_fire_nova()
-			if pdead or dist > t.aggro * 2.2 or global_position.distance_to(home) > leash or not _in_bounds(player.global_position, 3.0):
+			if pdead or dist > t.aggro * 2.2 or global_position.distance_to(home) > leash or not _in_bounds(player.global_position, 3.0) \
+					or absf(player.global_position.y - global_position.y) > 6.0 + float(t.get("fly", 0.0)) + (16.0 if _dive_phase > 0 else 0.0):
 				_go(S.RETURN)
 			elif t.get("ranged", false):
 				# keep a comfortable distance and circle
@@ -394,7 +404,7 @@ func _physics_process(delta: float) -> void:
 				hp = minf(max_hp, hp + max_hp * 0.5)
 			else:
 				move = th.normalized()
-			if not pdead and dist < t.aggro * 0.7 and global_position.distance_to(home) < leash * 0.6:
+			if not pdead and dist < t.aggro * 0.7 and global_position.distance_to(home) < leash * 0.6 and _can_engage(delta):
 				_go(S.CHASE)
 
 	# separation from other enemies
@@ -520,6 +530,39 @@ func _has_los() -> bool:
 	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.4, 0), player.global_position + Vector3(0, 1.2, 0), 1)
 	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
+## Bosses fight harder when nearly beaten: faster, quicker swings, a red glow.
+func _enrage() -> void:
+	_enraged = true
+	t = t.duplicate()
+	t.speed = float(t.speed) * 1.25
+	t.cooldown = float(t.cooldown) * 0.65
+	t.windup = float(t.windup) * 0.8
+	t.dmg = float(t.dmg) * 1.15
+	Game.say("%s is ENRAGED!" % display_name, Color(1.0, 0.35, 0.2))
+	Sfx.play_at("roar_big", global_position, 0.0, 0.05)
+	FX.burst(global_position + Vector3(0, 1.5, 0), Color(1.0, 0.25, 0.1), 60, 5.0, 0.3, 0.8, 0.0)
+	body.flash(Color(1.0, 0.2, 0.1), 1.0)
+	var aura := OmniLight3D.new(); aura.light_color = Color(1.0, 0.25, 0.1); aura.light_energy = 2.5; aura.omni_range = 5.0
+	aura.position.y = 1.5 * t.scale; add_child(aura)
+	var embers := CPUParticles3D.new(); embers.amount = 40; embers.lifetime = 0.9
+	embers.mesh = FX.quad(0.12); embers.material_override = FX.glow_material(Color(1.0, 0.35, 0.1), 3.0)
+	embers.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; embers.emission_sphere_radius = 0.6 * t.scale
+	embers.direction = Vector3.UP; embers.spread = 30; embers.initial_velocity_min = 1.0; embers.initial_velocity_max = 2.5
+	embers.gravity = Vector3(0, 1, 0); embers.color_ramp = FX._fade_ramp(Color(1.0, 0.4, 0.1))
+	embers.position.y = 1.0 * t.scale; add_child(embers)
+
+## Only notice the player on (about) the same floor and with nothing solid in
+## between, so foes behind walls or on the level above/below leave you alone.
+## The sight check is cached for a moment to keep it cheap.
+func _can_engage(delta: float) -> bool:
+	if absf(player.global_position.y - global_position.y) > 4.0 + float(t.get("fly", 0.0)):
+		return false
+	_los_t -= delta
+	if _los_t <= 0.0:
+		_los_t = 0.3
+		_los_ok = _has_los()
+	return _los_ok
+
 func _awaken() -> void:
 	_go(S.AWAKEN)
 	body.visible = true
@@ -554,6 +597,9 @@ func _strike(dist: float, to_p: Vector3) -> void:
 			player.add_trauma(0.3)
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
 	var reach: float = t.range + 0.35
+	var dy := absf(player.global_position.y - global_position.y)
+	if dy > 2.6 + float(t.get("fly", 0.0)) or not _has_los():
+		return       # a wall or floor in the way: the blow can't land
 	if dist < reach and (dist < 0.6 or fwd.dot(to_p.normalized()) > 0.35) and player.get("dead") != true:
 		player.take_damage(t.dmg * randf_range(0.9, 1.1), global_position, 5.0 if t.get("heavy", false) else 3.0)
 
@@ -572,6 +618,8 @@ func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) 
 		_summoned2 = true
 		if get_parent().has_method("summon_for"):
 			get_parent().summon_for(self)
+	if t.get("enrage", false) and not _enraged and hp < max_hp * 0.35 and hp > 0.0:
+		_enrage()
 	body.flash(Color(1, 1, 1), 0.85)
 	Sfx.play_at("hit", global_position + Vector3(0, 1, 0), -3.0, 0.15)
 	FX.hit(global_position + Vector3(0, 1.1, 0), Color(1.0, 0.9, 0.7))
