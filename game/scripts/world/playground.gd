@@ -87,7 +87,7 @@ func _build() -> void:
 	_statue(Vector3(0, 0, 39.6), PI)
 
 func _sandbox(at: Vector3) -> void:
-	var n := Node3D.new(); add_child(n); n.position = at
+	var n := Node3D.new(); add_child(n); n.position = at + Vector3(0, 0.08, 0)     # sits on top of the rubber mat
 	var wood := m(Color(0.6, 0.4, 0.22), 0.9)
 	for s in [[Vector3(3.2, 0.35, 0.2), Vector3(0, 0.17, -1.5)], [Vector3(3.2, 0.35, 0.2), Vector3(0, 0.17, 1.5)],
 			[Vector3(0.2, 0.35, 3.2), Vector3(-1.5, 0.17, 0)], [Vector3(0.2, 0.35, 3.2), Vector3(1.5, 0.17, 0)]]:

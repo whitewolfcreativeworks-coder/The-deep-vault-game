@@ -3874,11 +3874,15 @@ func _castle5_test() -> bool:
 	await wait(0.4)
 	check("c5_start_fishing", player.vehicle == spot)
 	player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.25; player.snap_view()
-	for fish_n in 5:
-		for k in 80:
+	for fish_n in 10:
+		if Game.quest_progress("fishing") >= 5:
+			break
+		for k in 120:
 			await wait(0.1)
 			if spot._state == "bite":
 				break
+		if spot._state != "bite":
+			continue
 		if fish_n == 0:
 			await shot("c5_08_bite")
 		await tap("attack")
@@ -3912,6 +3916,7 @@ func _castle5_test() -> bool:
 	await tp(hp0 + Vector3(-12.0, 0.4, 0.0), PI * 0.5)
 	await wait(3.0)
 	check("c5_horse_follows", h0.global_position.distance_to(player.global_position) < 7.0, "%.1f" % h0.global_position.distance_to(player.global_position))
+	_kill_near(["wraith"], 400.0, h0.global_position)
 	await tp(w.ground(CastleWorld.PADDOCK.x, CastleWorld.PADDOCK.y) + Vector3(0, 0.4, 0), PI * 0.5)
 	await wait(2.5)
 	check("c5_horse_home", h0._done and Game.flags.get("c_horse_0", false) and Game.quest_progress("wraith_hunt") == 1, "%s %d" % [h0._done, Game.quest_progress("wraith_hunt")])
@@ -3949,6 +3954,8 @@ func _castle5_test() -> bool:
 	check("c5_cloud_beacon", lift != null and lift.find_child("SkyBeacon", true, false) != null)
 	await _look(lift.global_position + Vector3(0, 10, 0), w.ground(-30, 90) + Vector3(0, 0.3, 0), 6.0, 0.15)
 	await shot("c5_10_cloud_beacon")
+	main.menus._close_dialogue()          # the "Castle Morwen is free" panel pauses the game
+	await wait(0.3)
 	# a castle boss uses its special moves
 	var gk := Enemy.new(); gk.configure("gatekeeper", "", 0.0)
 	gk.position = w.ground(20, 20) + Vector3(0, 0.3, 0)

@@ -115,7 +115,7 @@ func _physics_process(delta: float) -> void:
 		if _spook_t <= 0.0:
 			_spook_t = 0.25
 			for e in get_tree().get_nodes_in_group("enemy"):
-				if e is Enemy and not e.dead and e.type_id == "wraith" and e.global_position.distance_to(global_position) < 5.0:
+				if e is Enemy and not e.dead and e.type_id == "wraith" and e.global_position.distance_to(global_position) < 4.0:
 					calm = false
 					var away: Vector3 = global_position - e.global_position; away.y = 0
 					away = away.normalized() if away.length() > 0.1 else Vector3.FORWARD

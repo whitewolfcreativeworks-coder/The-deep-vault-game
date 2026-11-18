@@ -220,7 +220,7 @@ func _set_area(a: String) -> void:
 ## in the crypt, ghost knights on the moors, archers on the hills. [quest, type,
 ## spots, how many to keep around at once].
 const HAUNTS := [
-	["wraith_hunt", "wraith", [Vector2(62, 12), Vector2(56, 22), Vector2(68, 24), Vector2(62, 32), Vector2(74, 10), Vector2(30, 34), Vector2(-20, 80)], 3],
+	["wraith_hunt", "wraith", [Vector2(62, 12), Vector2(56, 22), Vector2(68, 24), Vector2(62, 32), Vector2(74, 10)], 3],
 	["restless_dead", "ghost_knight", [Vector2(-6, 20), Vector2(28, -12), Vector2(-30, -8), Vector2(42, 48), Vector2(-40, 70)], 4],
 	["archers_on_walls", "ghost_archer", [Vector2(-86, -18), Vector2(86, -22), Vector2(-66, 30), Vector2(-74, 76), Vector2(60, -40)], 4],
 ]
