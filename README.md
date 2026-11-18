@@ -102,6 +102,8 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - The crypt is now **the Bone Crypt**: skeletons that rise from their coffins, a crumbling Bone Bridge, a Hall of Bells puzzle, and the **Bone Colossus**.
   - **Fishing** at the Misty Mere, for Old Gill.
   - Pip's *Spooked Horses* quest is now a rescue. Calm four see-through ghost horses with an apple and lead them home to the paddock. Keep them away from the wraiths!
+  - Old Mott's lockets are now dug out of mounds of earth in the graveyard, and sometimes a skeleton climbs out too.
+  - Pets and summoned skeletons hop and step around obstacles instead of getting stuck.
   - A beam of light marks the cloud lift from anywhere on the moor.
   - The glowing blue patch under ghostly costumes is fixed.
   - Every portal still works backwards, so you can revisit older areas.
