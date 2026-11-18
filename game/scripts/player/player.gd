@@ -18,6 +18,8 @@ var jump_mult := 1.0
 var fall_cap := 60.0         # fastest you can fall (floaty skins drift down)
 var lift := -999.0           # a bubble carrying you: target vertical speed (none below -100)
 var wind := Vector3.ZERO     # a push from the wind (m/s), already scaled by your weight
+var grip := 1.0              # 1 = normal footing; lower = slippery (wet cloud, ice): you slide
+var float_hold: Node = null  # a bubble that's floating you (it owns `lift` until it pops)
 const EYE_H := 1.62
 const FP_THRESHOLD := 0.45
 const MAX_ZOOM := 11.0
@@ -580,7 +582,7 @@ func _physics_process(delta: float) -> void:
 		target_v *= 0.6
 	if dodging:
 		target_v = dodge_dir * 10.5 * (1.0 - dodge_time / 0.42 * 0.5)
-	var a := ACCEL if is_on_floor() else AIR_ACCEL
+	var a := ACCEL * grip if is_on_floor() else AIR_ACCEL
 	velocity.x = lerpf(velocity.x, target_v.x + wind.x, 1.0 - exp(-a * delta))
 	velocity.z = lerpf(velocity.z, target_v.z + wind.z, 1.0 - exp(-a * delta))
 	if mounted and mount_kind == "dragonfly":

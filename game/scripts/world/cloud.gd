@@ -25,6 +25,8 @@ const ISLANDS := {
 	"C": {"c": Vector3(58, 40, -45), "r": 18.0, "storm": false},
 	"D": {"c": Vector3(0, 62, -95), "r": 22.0, "storm": true},
 	"E": {"c": Vector3(0, 86, -145), "r": 24.0, "storm": true},
+	"F": {"c": Vector3(-62, 74, -112), "r": 16.0, "storm": false},     # the Snow Cloud
+	"G": {"c": Vector3(62, 74, -112), "r": 16.0, "storm": false},      # the Ice Cloud
 }
 ## [base position, destination island, quest that must be done first ("" = always)]
 const VENTS := [
@@ -32,7 +34,28 @@ const VENTS := [
 	[Vector3(-20, 20, -22), "B", ""], [Vector3(20, 20, -22), "C", ""],
 	[Vector3(-56, 40, -60), "D", "bubble_lifts"], [Vector3(56, 40, -60), "D", "bubble_lifts"],
 	[Vector3(0, 62, -114), "E", "storm_gate"],
+	# up from the storm layer to the Snow Cloud and the Ice Cloud
+	[Vector3(-16, 62, -90), "F", ""], [Vector3(17, 62, -97), "G", ""],
+	# the way back DOWN: a bubble that floats you gently down to the sky temple
+	[Vector3(-4, 62, -80), "A", "", true], [Vector3(-8, 86, -128), "A", "", true],
+	[Vector3(-56, 74, -103), "A", "", true], [Vector3(56, 74, -103), "A", "", true],
 ]
+## Holes right through an island (you drop to whatever is below) and patches of
+## thin cloud that only hold you while you're light. [x/z centre, radius]
+const HOLES := {
+	"A": [[Vector2(26, -2), 2.4], [Vector2(-26, 4), 2.4]],
+	"B": [[Vector2(-70, -48), 2.2]], "C": [[Vector2(70, -48), 2.2]],
+	"D": [[Vector2(14, -104), 2.5], [Vector2(-15, -100), 2.5]],
+	"F": [[Vector2(-73, -114), 2.2]], "G": [[Vector2(66, -115), 2.0]],
+}
+const THIN := {
+	"A": [[Vector2(-14, 26), 3.0]],
+	"B": [[Vector2(-62, -53), 3.0]], "C": [[Vector2(62, -53), 3.0]],
+	"D": [[Vector2(8, -82), 3.0]],
+	"E": [[Vector2(-14, -152), 3.0], [Vector2(14, -138), 3.0]],
+	"F": [[Vector2(-58, -121), 2.6]], "G": [[Vector2(58, -113), 2.2], [Vector2(62, -104), 2.0]],
+}
+const THIN_HOLDS := 0.72         # thin cloud holds you while your weight is under this
 const GARDEN := Vector3(19, 20, 11)
 const UPDRAFTS := [Vector3(-18, 20, 8), Vector3(-62, 40, -36), Vector3(64, 40, -54)]
 
@@ -47,8 +70,12 @@ var _rng := RandomNumberGenerator.new()
 var _cloud_mat: ShaderMaterial
 var _storm_mat: ShaderMaterial
 var _wisp_mat: ShaderMaterial
+var _thin_mat: StandardMaterial3D
 var _puffs: Array = []          # [Transform3D, Color]
 var _wisps: Array[StaticBody3D] = []
+var _thin: Array[StaticBody3D] = []
+var _thin_spots: Array = []     # [Vector3 centre, radius, warned-at time]
+var _hole_spots: Array = []     # [Vector3 centre, radius]
 var _vent_nodes: Array = []     # [Node3D, index]
 var _beacon_lights := {}
 var warden: Enemy               # (the Hail Golem; named for the shared boss code)
@@ -57,6 +84,7 @@ var _boss_started := false
 var _whale: Node3D
 var _whale_cloud: Node3D
 var _flowers: Node3D
+var weather: WeatherWorks
 
 # --- weight -------------------------------------------------------------------
 var weight := 0.5               # 0 = floaty ... 1 = heavy
@@ -89,6 +117,9 @@ func build() -> void:
 	_storm_mat.set_shader_parameter("rim_glow", 0.25)
 	_wisp_mat = _cloud_mat.duplicate()
 	_wisp_mat.set_shader_parameter("tint", Color(0.95, 0.97, 1.0))
+	_thin_mat = StandardMaterial3D.new()
+	_thin_mat.albedo_color = Color(0.85, 0.92, 1.0, 0.45); _thin_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_thin_mat.roughness = 1.0; _thin_mat.emission_enabled = true; _thin_mat.emission = Color(0.55, 0.7, 0.95); _thin_mat.emission_energy_multiplier = 0.25
 	_environment()
 	_sea()
 	for k in ISLANDS:
@@ -104,6 +135,7 @@ func build() -> void:
 	_quest_items()
 	_raindrops()
 	_enemies()
+	weather = WeatherWorks.build_in(self)
 	_flush_puffs()
 	_bounds()
 	_motes()
@@ -206,39 +238,138 @@ func _sea() -> void:
 		var z := -200.0
 		while z <= 180.0:
 			var r := _rng.randf_range(7.0, 12.0)
-			_puff(Vector3(x + _rng.randf_range(-4, 4), -r * 0.55 + _rng.randf_range(-0.6, 0.4), z + _rng.randf_range(-4, 4)),
+			_puff(Vector3(x + _rng.randf_range(-4, 4), -r * 0.6 + 0.05 - _rng.randf_range(0.0, 0.5), z + _rng.randf_range(-4, 4)),
 				Vector3(r, r * 0.6, r), Color(1, 1, 1).darkened(_rng.randf_range(0.0, 0.08)))
 			z += 14.0
 		x += 14.0
 
-## An island: a flat-topped cylinder you stand on, dressed in puffs.
+## An island: a flat cloud floor you stand on, dressed in puffs. The floor is a
+## grid of cells so holes can be cut right through it, and patches of thin cloud
+## get their own floor that only holds you while you're light.
 func _island(k: String) -> void:
 	var c: Vector3 = ISLANDS[k].c
 	var r: float = ISLANDS[k].r
 	var storm: bool = ISLANDS[k].storm
-	var sb := StaticBody3D.new(); sb.collision_layer = 1; add_child(sb)
-	var cs := CollisionShape3D.new(); var cy := CylinderShape3D.new(); cy.radius = r; cy.height = 6.0
-	cs.shape = cy; cs.position = c - Vector3(0, 3.0, 0); sb.add_child(cs)
+	var cuts: Array = []
+	for h in HOLES.get(k, []):
+		cuts.append(h)
+		_hole_spots.append([Vector3(h[0].x, c.y, h[0].y), float(h[1])])
+	for t in THIN.get(k, []):
+		cuts.append(t)
+	_floor_mesh(c, r, cuts)
+	for t in THIN.get(k, []):
+		_thin_patch(Vector3(t[0].x, c.y, t[0].y), float(t[1]))
+	for h in HOLES.get(k, []):
+		_hole_look(Vector3(h[0].x, c.y, h[0].y), float(h[1]), storm)
 	var col := Color(0.62, 0.64, 0.74) if storm else Color(1, 1, 1)
-	# flattened puffs make the walking surface (their tops sit a hair above it)
+	# flattened puffs make the walking surface: their tops sit right on the floor
+	# (any higher and your feet sink into the cloud)
 	var n := int(r * r / 22.0) + 6
 	for i in n:
 		var a := _rng.randf() * TAU
 		var d := sqrt(_rng.randf()) * (r - 3.0)
 		var pr := _rng.randf_range(3.5, 6.0)
-		_puff(c + Vector3(cos(a) * d, -pr * 0.32 + 0.15, sin(a) * d), Vector3(pr, pr * 0.35, pr), col.darkened(_rng.randf_range(0.0, 0.06)))
-	# a fat puffy rim
+		var at := c + Vector3(cos(a) * d, 0, sin(a) * d)
+		if _near_cut(at, cuts, pr * 0.8):
+			continue
+		_puff(at + Vector3(0, -pr * 0.35 + 0.05, 0), Vector3(pr, pr * 0.35, pr), col.darkened(_rng.randf_range(0.0, 0.06)))
+	# a rounded, puffy rim (level with the floor on top, bulging out and down)
 	var rim := int(r * 0.9)
 	for i in rim:
 		var a := TAU * i / rim + _rng.randf_range(-0.1, 0.1)
 		var pr := _rng.randf_range(3.0, 4.6)
-		_puff(c + Vector3(cos(a) * (r - 1.2), -pr * 0.45, sin(a) * (r - 1.2)), Vector3(pr, pr * 0.8, pr), col.darkened(_rng.randf_range(0.0, 0.1)))
+		var at := c + Vector3(cos(a) * (r - 1.2), 0, sin(a) * (r - 1.2))
+		if _near_cut(at, cuts, pr * 0.7):
+			continue
+		_puff(at + Vector3(0, -pr * 0.75 + 0.08, 0), Vector3(pr, pr * 0.8, pr), col.darkened(_rng.randf_range(0.0, 0.1)))
 	# and a soft underside
 	for i in int(r * 0.6):
 		var a := _rng.randf() * TAU
 		var d := sqrt(_rng.randf()) * r * 0.75
 		var pr := _rng.randf_range(4.0, 7.0)
-		_puff(c + Vector3(cos(a) * d, -3.5 - _rng.randf_range(0, 3.0), sin(a) * d), Vector3(pr, pr * 0.7, pr), col.darkened(0.12))
+		var at := c + Vector3(cos(a) * d, 0, sin(a) * d)
+		if _near_cut(at, cuts, pr * 0.6):
+			continue
+		_puff(at + Vector3(0, -3.5 - _rng.randf_range(0, 3.0), 0), Vector3(pr, pr * 0.7, pr), col.darkened(0.12))
+
+func _near_cut(at: Vector3, cuts: Array, pad: float) -> bool:
+	for h in cuts:
+		if Vector2(at.x, at.z).distance_to(h[0]) < float(h[1]) + pad:
+			return true
+	return false
+
+## The walkable top of an island: 1 m cells inside the disc, minus the cut-outs.
+func _floor_mesh(c: Vector3, r: float, cuts: Array) -> void:
+	var faces := PackedVector3Array()
+	var cell := 1.0
+	var n := int(ceil(r / cell))
+	for ix in range(-n, n):
+		for iz in range(-n, n):
+			var x0 := c.x + ix * cell
+			var z0 := c.z + iz * cell
+			var mid := Vector2(x0 + cell * 0.5, z0 + cell * 0.5)
+			if mid.distance_to(Vector2(c.x, c.z)) > r:
+				continue
+			var cut := false
+			for h in cuts:
+				if mid.distance_to(h[0]) < float(h[1]):
+					cut = true
+					break
+			if cut:
+				continue
+			var a := Vector3(x0, c.y, z0); var b2 := Vector3(x0 + cell, c.y, z0)
+			var cc := Vector3(x0 + cell, c.y, z0 + cell); var d := Vector3(x0, c.y, z0 + cell)
+			faces.append_array([a, cc, b2, a, d, cc])      # wound to face up
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	shape.backface_collision = true
+	var sb := StaticBody3D.new(); sb.collision_layer = 1; add_child(sb)
+	var cs := CollisionShape3D.new(); cs.shape = shape; sb.add_child(cs)
+
+## A patch of thin, wispy cloud: see-through, and it only holds you while you're light.
+func _thin_patch(at: Vector3, r: float) -> void:
+	var sb := StaticBody3D.new(); sb.collision_layer = 1; add_child(sb)
+	var cs := CollisionShape3D.new(); var cy := CylinderShape3D.new(); cy.radius = r; cy.height = 1.0
+	cs.shape = cy; cs.position = at - Vector3(0, 0.5, 0); sb.add_child(cs)
+	_thin.append(sb)
+	_thin_spots.append([at, r, -100.0])
+	var k := 0
+	while k < int(r * r * 0.9) + 3:
+		var a := _rng.randf() * TAU; var d := sqrt(_rng.randf()) * (r - 0.6)
+		var mi := MeshInstance3D.new(); var smh := SphereMesh.new(); smh.radius = _rng.randf_range(0.9, 1.4); smh.height = smh.radius * 0.7
+		smh.radial_segments = 12; smh.rings = 5
+		mi.mesh = smh; mi.material_override = _thin_mat; mi.position = at + Vector3(cos(a) * d, -0.22, sin(a) * d)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
+		k += 1
+
+## A hole right through the cloud: a darker funnel going down, and a ring of
+## sparkles round the edge so you can see it coming.
+func _hole_look(at: Vector3, r: float, storm: bool) -> void:
+	var tube := MeshInstance3D.new(); var cm := CylinderMesh.new()
+	cm.top_radius = r + 0.2; cm.bottom_radius = r * 0.7; cm.height = 4.0; cm.cap_top = false; cm.cap_bottom = false
+	cm.radial_segments = 24
+	tube.mesh = cm
+	var tm := StandardMaterial3D.new(); tm.albedo_color = Color(0.55, 0.62, 0.8) if not storm else Color(0.3, 0.32, 0.42)
+	tm.cull_mode = BaseMaterial3D.CULL_FRONT; tm.roughness = 1.0
+	tm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; tm.albedo_color.a = 0.85
+	tube.material_override = tm; tube.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	tube.position = at - Vector3(0, 2.0, 0)
+	add_child(tube)
+	# a lip of small puffs round the edge
+	var lip := int(r * 4.0)
+	for i in lip:
+		var a := TAU * i / lip
+		var pr := _rng.randf_range(0.8, 1.2)
+		_puff(at + Vector3(cos(a) * (r + pr * 0.6), -pr * 0.45 + 0.05, sin(a) * (r + pr * 0.6)), Vector3(pr, pr * 0.45, pr), Color(1, 1, 1).darkened(0.05))
+	var sp := CPUParticles3D.new(); sp.amount = 24; sp.lifetime = 2.0
+	sp.mesh = FX.quad(0.1); sp.material_override = FX.glow_material(Color(0.6, 0.85, 1.0), 2.0)
+	sp.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING; sp.emission_ring_axis = Vector3.UP
+	sp.emission_ring_radius = r + 0.3; sp.emission_ring_inner_radius = r; sp.emission_ring_height = 0.1
+	sp.direction = Vector3.UP; sp.spread = 10; sp.initial_velocity_min = 0.3; sp.initial_velocity_max = 0.8
+	sp.gravity = Vector3.ZERO; sp.color_ramp = FX._fade_ramp(Color(0.6, 0.85, 1.0))
+	sp.position = at + Vector3(0, 0.15, 0)
+	add_child(sp)
 
 # ---------------------------------------------------------------------------
 # The angels' temple island (A)
@@ -380,6 +511,17 @@ func _vents() -> void:
 		v.add_child(bub)
 		var l := OmniLight3D.new(); l.light_color = Color(0.6, 0.85, 1.0); l.light_energy = 1.4; l.omni_range = 6.0
 		l.position.y = 1.5; v.add_child(l)
+		if (VENTS[i] as Array).size() > 3:
+			# a way down: green ring, a sign, and a big bobbing arrow you can see across the island
+			rm.albedo_color = Color(0.45, 0.95, 0.55)
+			var sg := Label3D.new(); sg.text = "WAY DOWN\nto the Sky Temple\n(step in)"; sg.font_size = 64; sg.pixel_size = 0.006
+			sg.outline_size = 14; sg.modulate = Color(0.7, 1.0, 0.75); sg.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+			sg.position.y = 3.6; v.add_child(sg)
+			var arrow := MeshInstance3D.new(); var am := CylinderMesh.new(); am.top_radius = 0.9; am.bottom_radius = 0.0; am.height = 1.2
+			arrow.mesh = am; arrow.material_override = FX.beam_material(Color(0.5, 1.0, 0.6), 1.6, 0.8, false)
+			arrow.position.y = 2.2; v.add_child(arrow)
+			arrow.create_tween().set_loops().tween_property(arrow, "position:y", 1.7, 0.6).set_trans(Tween.TRANS_SINE).from(2.4)
+			v.add_to_group("down_vent")
 		v.add_to_group("bubble_vent")
 		_vent_nodes.append([v, i])
 
@@ -469,6 +611,9 @@ func _enemies() -> void:
 		[ISLANDS.C.c + Vector3(-10, 3, -8), "thunder_bird"], [ISLANDS.C.c + Vector3(0, 0, -14), "bubble_mimic"],
 		[ISLANDS.D.c + Vector3(-10, 2, 4), "storm_bat"], [ISLANDS.D.c + Vector3(10, 2, -4), "storm_bat"], [ISLANDS.D.c + Vector3(6, 2, 10), "storm_sprite"],
 		[ISLANDS.D.c + Vector3(-6, 3, -10), "thunder_bird"],
+		[ISLANDS.F.c + Vector3(6, 3, -4), "thunder_bird"], [ISLANDS.F.c + Vector3(-5, 2, 6), "storm_bat"],
+		[ISLANDS.G.c + Vector3(-6, 3, -2), "thunder_bird"], [ISLANDS.G.c + Vector3(5, 3, 7), "thunder_bird"],
+		[ISLANDS.E.c + Vector3(-16, 3, 8), "thunder_bird"], [ISLANDS.E.c + Vector3(16, 3, 8), "thunder_bird"],
 	]
 	for e in list:
 		_enemy(e[1], e[0], "cl_%d" % n)
@@ -582,6 +727,23 @@ func _weight_step(delta: float) -> void:
 	var solid := is_floaty()
 	for wb in _wisps:
 		wb.collision_layer = 1 if solid else 0
+	# thin cloud patches on the islands hold you unless you're carrying lots of rain
+	var holds := weight < THIN_HOLDS or not _ride.is_empty()
+	for tb in _thin:
+		tb.collision_layer = 1 if holds else 0
+	if not holds:
+		var now := Time.get_ticks_msec() * 0.001
+		for ts in _thin_spots:
+			var tc: Vector3 = ts[0]
+			if now - float(ts[2]) > 30.0 and absf(pp.y - tc.y) < 2.0 and Vector2(pp.x - tc.x, pp.z - tc.z).length() < float(ts[1]) + 4.0:
+				ts[2] = now
+				Game.say("That cloud looks thin... with all this rain in you, you'll fall right through it! (Stand still to rain it out.)", Color(0.75, 0.88, 1.0))
+	# wet cloud is slippery: the more rain you carry, the less grip you have
+	player.grip = lerpf(1.0, 0.2, smoothstep(0.55, 1.0, weight))
+	match island_of(pp):
+		"D": player.grip *= 0.8
+		"G": player.grip = minf(player.grip, 0.14)       # glazed in clear ice by freezing rain
+		"F": player.grip = maxf(player.grip, 0.65)       # crunchy snow gives you grip
 	# heavy landing = ground-pound
 	var on := player.is_on_floor()
 	if not on:
@@ -594,7 +756,8 @@ func _weight_step(delta: float) -> void:
 	_weight_bar.value = weight
 	var hc := Color(0.55, 0.75, 1.0).lerp(Color(0.25, 0.35, 0.7), weight)
 	(_weight_bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = hc
-	_weight_label.text = "%s   ·   %s" % ["FLOATY" if weight < 0.35 else ("HEAVY" if weight > 0.7 else "WEIGHT"), "raining..." if _raining else "stand still to rain"]
+	var wl := "FLOATY" if weight < 0.35 else ("HEAVY · SLIPPERY" if weight > 0.75 else ("WET · SLIPPERY" if weight > 0.62 else "WEIGHT"))
+	_weight_label.text = "%s   ·   %s" % [wl, "raining..." if _raining else "stand still to rain"]
 
 func _ground_pound() -> void:
 	var at: Vector3 = player.global_position
@@ -636,7 +799,7 @@ func _bubble_step(delta: float) -> void:
 			if du < 2.2 and dy > -1.0 and dy < 11.0:
 				player.lift = lerpf(8.0, 1.5, weight) if dy < 9.0 else 0.0
 				return
-		if player.lift > -100.0 and player.lift < 9.0 and _arrival_done:
+		if player.lift > -100.0 and player.lift < 9.0 and _arrival_done and not is_instance_valid(player.float_hold):
 			player.lift = -999.0
 		return
 	var r: Dictionary = _ride
@@ -655,12 +818,13 @@ func _bubble_step(delta: float) -> void:
 			if pp.y > dc.y + 5.0:
 				r.phase = "drift"
 		"drift":
-			player.lift = 0.6 if pp.y < dc.y + 4.0 else 0.0
-			player.wind = Vector3(to_c.x, 0, to_c.y).normalized() * 7.0 if to_c.length() > 1.0 else Vector3.ZERO
+			# hover a few metres over the destination island (gliding down to it if you start higher)
+			player.lift = clampf((dc.y + 4.0 - pp.y) * 0.5, -8.0, 0.6)
+			player.wind = Vector3(to_c.x, 0, to_c.y).normalized() * clampf(to_c.length() / 6.0, 7.0, 14.0) if to_c.length() > 1.0 else Vector3.ZERO
 			if to_c.length() < dest.r * 0.55:
 				_pop_ride()
 				return
-	if r.t > 14.0 or (r.t > 0.5 and Input.is_action_just_pressed("attack")) or player.dead:
+	if r.t > 26.0 or (r.t > 0.5 and Input.is_action_just_pressed("attack")) or player.dead:
 		_pop_ride()
 
 func _start_ride(to: String, from: Vector3) -> void:
@@ -702,7 +866,7 @@ var _strike_t := 2.0
 var _bubble_t := 4.0
 var _haunt_t := 0.0
 const HAUNTS := [
-	["thunder_birds", "thunder_bird", [Vector3(-24, 23, 18), Vector3(24, 23, -20), Vector3(-58, 43, -45), Vector3(58, 43, -45)], 4],
+	["thunder_birds", "thunder_bird", [Vector3(-24, 23, 18), Vector3(24, 23, -20), Vector3(-58, 43, -45), Vector3(58, 43, -45)], 5],
 	["sky_whale", "storm_sprite", [Vector3(58, 42, -38), Vector3(66, 42, -46), Vector3(52, 42, -52)], 3],
 ]
 
@@ -738,6 +902,25 @@ func _physics_process(delta: float) -> void:
 		return
 	_weight_step(delta)
 	_bubble_step(delta)
+	# during the boss fight, storm winds round the thunderhead's edge blow you back in
+	var push := arena_push(player.global_position)
+	if push != Vector3.ZERO and _ride.is_empty() and not is_instance_valid(player.float_hold):
+		player.wind = push
+		if not _arena_told:
+			_arena_told = true
+			Game.say("The storm winds blow you back into the fight!", Color(0.8, 0.9, 1.0))
+
+var _arena_told := false
+## The push back towards the middle of Mr. Bubbles' arena while he's fighting you
+## (so a charge or a bubble can't knock you right off the thunderhead).
+func arena_push(p: Vector3) -> Vector3:
+	if not _boss_started or lord == null or not is_instance_valid(lord) or lord.dead:
+		return Vector3.ZERO
+	var c: Vector3 = ISLANDS.E.c
+	var d := Vector2(p.x - c.x, p.z - c.z)
+	if p.y < c.y - 8.0 or d.length() < float(ISLANDS.E.r) - 4.0:
+		return Vector3.ZERO
+	return -Vector3(d.x, 0, d.y).normalized() * 10.0
 
 func _set_area(a: String) -> void:
 	if a == area:
@@ -886,6 +1069,9 @@ func _rainbow_slide() -> RainbowSlide:
 	if old:
 		return old
 	var sl := RainbowSlide.make(self, SLIDE_TOP, Vector3(22, 92, -88), Vector3(30, 26, 22), SLIDE_BOTTOM, 0.0)
+	var sg := Label3D.new(); sg.text = "RUN UP THE RAINBOW\nto the Thunderhead"; sg.font_size = 64; sg.pixel_size = 0.006
+	sg.outline_size = 14; sg.modulate = Color(1.0, 0.9, 0.6); sg.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	add_child(sg); sg.global_position = SLIDE_BOTTOM + Vector3(-3.2, 2.6, 1.0)
 	sl.finished.connect(func() -> void:
 		if Game.quest_state("mr_bubbles") == "ready":
 			Game.say("Anu is waiting for you. Talk to her for your reward!", Color(1.0, 0.9, 0.5)))

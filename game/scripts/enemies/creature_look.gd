@@ -11,6 +11,7 @@ var _t := 0.0
 var _wings: Array[Node3D] = []
 var _bob: Node3D
 var flap_speed := 9.0
+var _orbit: Node3D
 var wing_amp := 0.6
 
 static func make(k: String, flash: Material) -> CreatureLook:
@@ -130,32 +131,83 @@ func _build(flash: Material) -> void:
 				_ball(_bob, 0.18, ice, Vector3(randf_range(-0.8, 0.8), randf_range(1.0, 2.0), randf_range(-0.5, 0.5)))
 			wing_amp = 0.0
 		"bear":
-			# MR. BUBBLES: a big round fluffy bear with storm-cloud wings
-			var fur := _mat(Color(0.6, 0.42, 0.28), 0.9)
-			var belly := _mat(Color(0.88, 0.75, 0.6), 0.9)
-			var nose := _mat(Color(0.12, 0.08, 0.06), 0.3)
-			var cloud := _mat(Color(0.55, 0.58, 0.7), 0.9)
-			_ball(_bob, 0.9, fur, Vector3(0, 1.2, 0), Vector3(1.0, 1.0, 0.95))
-			_ball(_bob, 0.62, belly, Vector3(0, 1.1, -0.48), Vector3(1.0, 1.0, 0.5))
-			_ball(_bob, 0.6, fur, Vector3(0, 2.25, -0.1))
+			# MR. BUBBLES: a big fluffy bear made of storm cloud, with glowing eyes, a
+			# lightning bolt on his tummy, storm-cloud wings, a crackling crown, a
+			# bubble wand in his paw and rainbow bubbles circling him.
+			var fur := ShaderMaterial.new(); fur.shader = load("res://shaders/cloud.gdshader")
+			fur.set_shader_parameter("tint", Color(0.78, 0.84, 1.0)); fur.set_shader_parameter("shade", Color(0.38, 0.42, 0.62))
+			fur.set_shader_parameter("rim_glow", 0.35); fur.set_shader_parameter("wobble", 0.04)
+			var mane := fur.duplicate() as ShaderMaterial
+			mane.set_shader_parameter("tint", Color(0.5, 0.54, 0.7)); mane.set_shader_parameter("shade", Color(0.22, 0.24, 0.36))
+			var cream := _mat(Color(0.95, 0.9, 0.8), 0.9)
+			var dark := _mat(Color(0.08, 0.07, 0.1), 0.3)
+			var bolt := _mat(Color(1.0, 0.9, 0.25), 0.2, 3.5)
+			var gold := _mat(Color(1.0, 0.8, 0.3), 0.25); gold.metallic = 0.8
+			var film := ShaderMaterial.new(); film.shader = load("res://shaders/bubble.gdshader")
+			# body: a round core wrapped in fluffy puffs
+			_ball(_bob, 0.95, fur, Vector3(0, 1.25, 0), Vector3(1.0, 1.0, 0.95))
+			for k in 12:
+				var a := k * TAU / 12.0
+				_ball(_bob, randf_range(0.36, 0.48), fur, Vector3(cos(a) * 0.82, 1.25 + sin(k * 1.7) * 0.45, sin(a) * 0.7 + 0.08))
+			_ball(_bob, 0.62, cream, Vector3(0, 1.15, -0.5), Vector3(1.0, 1.05, 0.5))
+			# the lightning bolt on his tummy
+			_slab(_bob, Vector3(0.12, 0.42, 0.05), bolt, Vector3(0.06, 1.38, -0.8), Vector3(0, 0, 0.45))
+			_slab(_bob, Vector3(0.26, 0.09, 0.05), bolt, Vector3(0.0, 1.17, -0.81))
+			_slab(_bob, Vector3(0.12, 0.42, 0.05), bolt, Vector3(-0.06, 0.96, -0.8), Vector3(0, 0, 0.45))
+			# head with a stormy mane
+			var head := Node3D.new(); head.position = Vector3(0, 2.3, -0.12); _bob.add_child(head)
+			_ball(head, 0.62, fur, Vector3.ZERO)
+			for k in 9:
+				var a := -PI * 0.15 + k * PI * 1.3 / 8.0
+				_ball(head, randf_range(0.26, 0.34), mane, Vector3(cos(a) * 0.62, 0.15 + sin(a) * 0.5, 0.18))
 			for sx in [-1.0, 1.0]:
-				_ball(_bob, 0.22, fur, Vector3(sx * 0.45, 2.75, -0.05))
-				_ball(_bob, 0.12, belly, Vector3(sx * 0.45, 2.75, -0.15))
-				_ball(_bob, 0.28, fur, Vector3(sx * 0.85, 1.2, -0.3))
-				_ball(_bob, 0.3, fur, Vector3(sx * 0.45, 0.35, -0.1))
-			_ball(_bob, 0.25, belly, Vector3(0, 2.12, -0.6), Vector3(1.1, 0.8, 0.8))
-			_ball(_bob, 0.09, nose, Vector3(0, 2.2, -0.82))
-			_eyes(_bob, Vector3(0, 2.4, -0.5), 0.2, 0.1, Color(0.95, 0.85, 0.15))
+				_ball(head, 0.24, mane, Vector3(sx * 0.48, 0.55, 0.02))
+				_ball(head, 0.12, cream, Vector3(sx * 0.48, 0.55, -0.12))
+				# angry eyebrows
+				_slab(head, Vector3(0.26, 0.06, 0.06), dark, Vector3(sx * 0.2, 0.3, -0.55), Vector3(0, 0, sx * 0.4))
+			_ball(head, 0.28, cream, Vector3(0, -0.13, -0.5), Vector3(1.15, 0.8, 0.8))
+			_ball(head, 0.1, dark, Vector3(0, -0.04, -0.74))
+			_slab(head, Vector3(0.26, 0.04, 0.04), dark, Vector3(0, -0.24, -0.72))
+			for sx in [-1.0, 1.0]:
+				_cone(head, 0.04, 0.12, _mat(Color(1, 1, 1), 0.3), Vector3(sx * 0.08, -0.29, -0.72), Vector3(PI, 0, 0))
+				# glowing yellow eyes
+				var eye := _ball(head, 0.1, _mat(Color(1.0, 0.92, 0.3), 0.2, 4.0), Vector3(sx * 0.2, 0.14, -0.53))
+				eye.scale = Vector3(1.0, 0.8, 0.6)
+			# a crown of crackling sparks
+			for k in 6:
+				var a := k * TAU / 6.0
+				_cone(head, 0.06, 0.32, bolt, Vector3(cos(a) * 0.32, 0.68, sin(a) * 0.32))
+			# arms and legs
+			for sx in [-1.0, 1.0]:
+				_ball(_bob, 0.32, fur, Vector3(sx * 0.98, 1.35, -0.25), Vector3(1.0, 1.25, 1.0))
+				_ball(_bob, 0.26, mane, Vector3(sx * 1.05, 0.95, -0.4))
+				_ball(_bob, 0.34, fur, Vector3(sx * 0.48, 0.35, -0.05))
+				_ball(_bob, 0.2, cream, Vector3(sx * 0.48, 0.22, -0.32), Vector3(1.0, 0.6, 0.6))
+			# the bubble wand in his right paw
+			var wand := Node3D.new(); wand.position = Vector3(1.1, 1.0, -0.6); wand.rotation = Vector3(0.3, 0, -0.35); _bob.add_child(wand)
+			var stick := MeshInstance3D.new(); var scm := CylinderMesh.new(); scm.top_radius = 0.04; scm.bottom_radius = 0.04; scm.height = 0.9
+			stick.mesh = scm; stick.material_override = gold; stick.position.y = 0.35; wand.add_child(stick); meshes.append(stick)
+			var ring := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 0.26; tm.outer_radius = 0.34
+			ring.mesh = tm; ring.material_override = gold; ring.position.y = 1.02; ring.rotation.x = PI * 0.5; wand.add_child(ring); meshes.append(ring)
+			var disc := MeshInstance3D.new(); var dm := SphereMesh.new(); dm.radius = 0.27; dm.height = 0.06
+			disc.mesh = dm; disc.material_override = film; disc.position.y = 1.02; disc.rotation.x = PI * 0.5; wand.add_child(disc)
 			# storm-cloud wings with lightning edges
 			for sd in [-1.0, 1.0]:
-				var w := _wing(_bob, Vector3(sd * 0.6, 1.7, 0.4), sd, Vector3(1.8, 0.1, 1.0), cloud)
-				for k in 3:
-					_ball(w, 0.35, cloud, Vector3(sd * (0.4 + k * 0.5), 0.1, 0.1))
-				_slab(w, Vector3(1.6, 0.05, 0.08), _mat(Color(1.0, 0.95, 0.3), 0.2, 3.0), Vector3(sd * 0.9, -0.05, -0.5))
-			# a crown of crackling sparks
-			for k in 5:
-				var a := k * TAU / 5.0
-				_cone(_bob, 0.06, 0.3, _mat(Color(1.0, 0.95, 0.3), 0.2, 3.0), Vector3(cos(a) * 0.3, 2.9, sin(a) * 0.3 - 0.1))
+				var w := _wing(_bob, Vector3(sd * 0.65, 1.8, 0.45), sd, Vector3(1.9, 0.1, 1.0), mane)
+				for k in 4:
+					_ball(w, 0.36 - k * 0.04, mane, Vector3(sd * (0.35 + k * 0.45), 0.08, 0.1))
+				_slab(w, Vector3(1.7, 0.05, 0.08), bolt, Vector3(sd * 0.95, -0.05, -0.5))
+			# a fluffy tail
+			_ball(_bob, 0.3, fur, Vector3(0, 0.75, 0.85))
+			# rainbow bubbles circling him
+			_orbit = Node3D.new(); _bob.add_child(_orbit); _orbit.position.y = 1.4
+			for k in 7:
+				var bb := MeshInstance3D.new(); var bsm := SphereMesh.new(); bsm.radius = randf_range(0.16, 0.3); bsm.height = bsm.radius * 2.0
+				bsm.radial_segments = 16; bsm.rings = 8
+				bb.mesh = bsm; bb.material_override = film
+				var a := k * TAU / 7.0
+				bb.position = Vector3(cos(a) * 1.75, sin(a * 2.0) * 0.5, sin(a) * 1.75)
+				_orbit.add_child(bb)
 			flap_speed = 4.0
 			wing_amp = 0.45
 		"whale":
@@ -181,3 +233,8 @@ func _process(delta: float) -> void:
 		w.rotation.z = sd * sin(_t * flap_speed) * wing_amp
 	if kind == "mimic":
 		_bob.scale = Vector3.ONE * (1.0 + sin(_t * 3.0) * 0.04)
+	if _orbit:
+		_orbit.rotation.y = _t * 0.9
+		for i in _orbit.get_child_count():
+			var bb := _orbit.get_child(i) as Node3D
+			bb.position.y = sin(_t * 1.6 + i * 1.3) * 0.5

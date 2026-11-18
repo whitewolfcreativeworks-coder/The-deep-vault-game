@@ -2,7 +2,8 @@ extends Node3D
 class_name RainbowSlide
 ## After Mr. Bubbles is calmed, a rainbow appears at the edge of the
 ## thunderhead. Step on and press USE: you whoosh all the way down it and land
-## in front of the sky temple, right next to Anu.
+## in front of the sky temple, right next to Anu. It's solid, too: you can run
+## back UP it from the temple to the thunderhead (or walk down it).
 
 signal finished
 
@@ -15,6 +16,7 @@ var land_yaw := 0.0
 var _player: Player
 var _t := -1.0
 const RIDE_TIME := 7.0
+const WIDTH := 3.6
 const BANDS := [Color(1.0, 0.3, 0.3), Color(1.0, 0.6, 0.2), Color(1.0, 0.92, 0.3),
 	Color(0.4, 0.9, 0.4), Color(0.35, 0.65, 1.0), Color(0.65, 0.45, 1.0)]
 
@@ -38,7 +40,7 @@ func _build() -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var segs := 90
-	var width := 2.6
+	var width := WIDTH
 	for i in segs:
 		var a := point(float(i) / segs) - global_position
 		var b := point(float(i + 1) / segs) - global_position
@@ -57,6 +59,26 @@ func _build() -> void:
 				st.set_color(col)
 				st.set_normal(Vector3.UP)
 				st.add_vertex(v[idx])
+	# solid, so you can run up (and down) it: a chain of thin tilted slabs under the ribbon
+	var sb := StaticBody3D.new(); sb.collision_layer = 1; add_child(sb)
+	var csegs := 70
+	for i in csegs:
+		var a := point(float(i) / csegs) - global_position
+		var b := point(float(i + 1) / csegs) - global_position
+		var mid := (a + b) * 0.5
+		var dir := (b - a)
+		var ln := dir.length()
+		if ln < 0.01:
+			continue
+		dir /= ln
+		var side := dir.cross(Vector3.UP).normalized()
+		if side.length() < 0.1:
+			side = Vector3.RIGHT
+		var up := side.cross(dir).normalized()
+		var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(WIDTH, 0.3, ln + 0.25)
+		cs.shape = bs
+		cs.transform = Transform3D(Basis(side, up, -dir), mid - up * 0.15)
+		sb.add_child(cs)
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	var m := StandardMaterial3D.new()

@@ -2805,7 +2805,14 @@ func _cloud_test() -> bool:
 	check("lightning_bubbles", lbs >= 1, "%d" % lbs)
 	await wait(0.6)
 	await shot("cl_15_lightning_and_bubbles")
-	lord._dive_t = 20.0
+	for bt in get_tree().get_nodes_in_group("damageable").filter(func(n) -> bool: return n is LightningBubble or n is BubbleTrap):
+		bt.queue_free()
+	for bt in get_tree().get_nodes_in_group("bubble_trap"):
+		bt.queue_free()
+	player.float_hold = null; player.lift = -999.0
+	await tp(CloudWorld.ISLANDS.E.c + Vector3(0, 0.3, 6), 0.0)
+	await wait(0.5)
+	lord._dive_t = 20.0; lord._float_cd = 30.0
 	await wait(2.5)
 	check("storm_dive", lord._dive_phase >= 2 or lord._dive_t < 5.0)
 	await shot("cl_16_storm_dive")

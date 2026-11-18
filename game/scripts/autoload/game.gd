@@ -799,6 +799,28 @@ const QUESTS := {
 		"busy": "Crackling yellow bubbles drift around the temple island. Run into them to pop them.",
 		"thanks": "Pop pop pop! Not a single zap on the gardens. Well done!",
 		"reward": {"xp": 900, "gold": 200, "mana_potions": 3, "roll": "armor"}},
+	# Adad the Weather-Keeper's precipitation quests (from the Precipitation Simulator)
+	"hail_rings": {"giver": "adad", "zone": "cloud", "title": "Hailstone Rings", "requires": "bubble_lifts",
+		"goal": {"type": "collect", "item": "hailstone", "count": 1}, "track": "Hailstone made",
+		"locked": "I am Adad, keeper of the weather. Hail, snow, sleet, freezing rain: I make them all!\n\nBut my work is up on the storm layer, and the bubble vents are clogged. Help Utu fix them, then come back.",
+		"offer": "Did you know hail is made by riding a storm? Here's how.\n\nA raindrop gets caught in a powerful updraft and carried up above the freezing line, where it freezes. It falls, gets a new coat of water, and the updraft throws it back up again. Every trip adds a new ring of ice.\n\nOn the storm layer stands my Hail Tower. Step in and let it toss you up and down until your hailstone has THREE rings.",
+		"busy": "The Hail Tower is on the storm layer. Ride it up past the glittering freezing line, sink back below it, and up again. Three rings!",
+		"thanks": "Three rings, just like a tree! Cut a real hailstone in half and you can see them.\n\nThe biggest hailstone ever found in the United States fell in Vivian, South Dakota, in 2010. It was 8 inches across!",
+		"reward": {"xp": 1000, "gold": 240, "potions": 2, "roll": "weapon"}},
+	"six_sides": {"giver": "adad", "zone": "cloud", "title": "Six Sides of Snow", "requires": "bubble_lifts",
+		"goal": {"type": "collect", "item": "snowflake", "count": 6}, "track": "Snowflakes caught",
+		"locked": "The bubble vents are still clogged. Help Utu first.",
+		"offer": "Up on the Snow Cloud, the air stays below freezing all the way down, so the water freezes straight into ice crystals. Water molecules lock together in a six-sided pattern, so almost every snowflake has SIX arms.\n\nMr. Bubbles is blowing fake snowflakes to fool me. Catch six REAL ones. Count the arms!",
+		"busy": "The Snow Cloud is up from the storm layer, on the west side. Catch six snowflakes with six arms. Fakes have four or five!",
+		"thanks": "Six perfect snowflakes! They fall gently, at only 1 to 4 miles per hour.\n\nThey grow by deposition: water vapor freezes straight onto a speck of dust and skips being liquid at all.",
+		"reward": {"xp": 1000, "gold": 240, "mana_potions": 3, "roll": "skin"}},
+	"the_glaze": {"giver": "adad", "zone": "cloud", "title": "The Glaze", "requires": "bubble_lifts",
+		"goal": {"type": "collect", "item": "sunlamp", "count": 4}, "track": "Sun lamps relit",
+		"locked": "The bubble vents are still clogged. Help Utu first.",
+		"offer": "Freezing rain has hit the Ice Cloud! The drops fell through warm air as rain, but the air right at the bottom was below freezing. They stayed liquid until they touched something... and then froze into a coat of clear ice called GLAZE.\n\nNow the whole island is as slippery as glass, and the ice has put out my four sun lamps. Slide over and relight them. Careful near the thin ice!",
+		"busy": "The Ice Cloud is up from the storm layer, on the east side. Touch the four frozen sun lamps. It's VERY slippery: walk slowly!",
+		"thanks": "The Ice Cloud is glowing again! Freezing rain is one of the most dangerous kinds of weather for airplanes, because ice on the wings changes their shape.\n\nOne more trick: sleet bounces when it lands, but freezing rain doesn't. That's how weather spotters tell them apart!",
+		"reward": {"xp": 1050, "gold": 260, "potions": 2, "stamina_potions": 2, "roll": "big"}},
 	"why_clouds": {"giver": "enki", "zone": "cloud", "title": "Why Don't Clouds Fall?",
 		"goal": {"type": "collect", "item": "updraft", "count": 3}, "track": "Updraft crystals found",
 		"offer": "I am Enki, the rainmaker. Tell me, little one: a big cloud weighs as much as a hundred elephants. So why doesn't it fall out of the sky?\n\nFind three updraft crystals and I'll show you the answer. They sit where the warm air rises.",
@@ -937,7 +959,7 @@ func quest_turn_in(id: String) -> Array:
 	return items_got
 
 const NPC_NAMES := {"fenn": "Ranger Fenn", "bram": "Bram the Woodcutter", "maera": "Old Maera", "tobble": "Tobble the Merchant", "aldric": "Captain Aldric", "dunstan": "Digger Dunstan",
-	"elowen": "Sister Elowen", "mott": "Old Mott", "brannoc": "Captain Brannoc", "holt": "Sergeant Holt", "ansel": "Brother Ansel", "pip": "Pip the Stablehand", "wren": "Lady Wren", "gill": "Old Gill the Fisher",
+	"elowen": "Sister Elowen", "mott": "Old Mott", "brannoc": "Captain Brannoc", "holt": "Sergeant Holt", "ansel": "Brother Ansel", "pip": "Pip the Stablehand", "wren": "Lady Wren", "gill": "Old Gill the Fisher", "adad": "Adad the Weather-Keeper",
 	"ninlil": "Ninlil of the Winds", "nanshe": "Nanshe the Keeper", "enki": "Enki the Rainmaker", "utu": "Utu the Gate-Warden", "anu": "Anu, Eldest of the Sky"}
 
 ## Quests listed in the tracker: active and ready ones.

@@ -130,6 +130,12 @@ func quest_target(id: String) -> Variant:
 				spot = _first("quest_item", func(n: Node) -> bool: return n.get("item") == g.item and (n as Node3D).visible)
 				if spot == null:
 					spot = _first("dig_mound", func(n: Node) -> bool: return n.get("item") == g.item and n.can_interact())
+				if spot == null:
+					# Cloud Island's weather quests: the Hail Tower, the Snow Cloud, the frozen sun lamps
+					for grp in ["hail_tower", "snow_field", "sun_lamp"]:
+						spot = _first(grp, func(n: Node) -> bool: return n.get_meta("item", "") == g.item and not n.get_meta("lit", false))
+						if spot:
+							break
 				if g.item == "fish":
 					spot = _first("fishing_spot", func(_n: Node) -> bool: return true)
 				elif g.item == "horse":

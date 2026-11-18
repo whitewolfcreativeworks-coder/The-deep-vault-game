@@ -92,9 +92,9 @@ const TYPES := {
 		"look": {"hero": "Knight", "hat": true, "hair_style": "natural", "hair_color": Color(0.6, 0.7, 0.9), "face": "none", "outfit": Color(0.25, 0.25, 0.45), "build": 1.35, "skin_look": "spectral"}},
 	# --- Level 4: Cloud Island. "creature" = a shape-built look (CreatureLook);
 	# "fly" = hovers this high above the ground / the player.
-	"thunder_bird": {"name": "Thunder Bird", "variant": "minion", "creature": "bird", "hp": 340.0, "dmg": 40.0, "speed": 5.4, "range": 2.4,
-		"windup": 0.5, "cooldown": 1.3, "xp": 230, "weapon": "", "shield": "", "eye": Color(1.0, 0.9, 0.3),
-		"scale": 0.9, "aggro": 20.0, "poise": 20.0, "gold": [18, 34], "leash": 36.0, "fly": 2.6},
+	"thunder_bird": {"name": "Thunder Bird", "variant": "minion", "creature": "bird", "hp": 470.0, "dmg": 48.0, "speed": 6.6, "range": 2.4,
+		"windup": 0.42, "cooldown": 1.0, "xp": 260, "weapon": "", "shield": "", "eye": Color(1.0, 0.9, 0.3),
+		"scale": 0.9, "aggro": 24.0, "poise": 25.0, "gold": [20, 38], "leash": 40.0, "fly": 2.6, "enrage": true},
 	"storm_sprite": {"name": "Storm Sprite", "variant": "minion", "creature": "sprite", "hp": 260.0, "dmg": 36.0, "speed": 3.6, "range": 16.0,
 		"windup": 0.55, "cooldown": 1.6, "xp": 210, "weapon": "", "shield": "", "eye": Color(1.0, 0.95, 0.35),
 		"scale": 0.85, "aggro": 19.0, "poise": 0.0, "gold": [16, 30], "ranged": true, "leash": 30.0, "fly": 1.8},
@@ -108,10 +108,10 @@ const TYPES := {
 		"windup": 0.85, "cooldown": 1.5, "xp": 1600, "weapon": "", "shield": "", "eye": Color(0.6, 0.85, 1.0),
 		"scale": 2.0, "aggro": 20.0, "poise": 160.0, "gold": [200, 300], "heavy": true, "leash": 30.0, "nova": true,
 		"look_size": 2.0, "radius": 1.2, "enrage": true, "moves": ["boulders", "charge"]},
-	"mr_bubbles": {"name": "Mr. Bubbles", "variant": "warrior", "creature": "bear", "hp": 12500.0, "dmg": 70.0, "speed": 4.2, "range": 4.2,
+	"mr_bubbles": {"name": "Mr. Bubbles", "variant": "warrior", "creature": "bear", "hp": 16000.0, "dmg": 78.0, "speed": 4.6, "range": 4.2,
 		"windup": 0.75, "cooldown": 1.1, "xp": 3000, "weapon": "", "shield": "", "eye": Color(1.0, 0.92, 0.3),
 		"scale": 2.0, "aggro": 26.0, "poise": 220.0, "gold": [400, 600], "heavy": true, "leash": 40.0, "nova": true, "summon": true,
-		"fly": 0.4, "dive": true, "look_size": 1.6, "radius": 1.2, "enrage": true, "moves": ["charge"]},
+		"fly": 0.4, "dive": true, "look_size": 1.6, "radius": 1.2, "enrage": true, "moves": ["charge", "leap_slam"]},
 }
 const GOBLIN_SKIN := Color(0.42, 0.62, 0.24)
 
@@ -147,7 +147,7 @@ var _los_t := 0.0
 var _los_ok := true
 ## Skills that grow with the zone: quick foes sidestep your swings, shield
 ## bearers sometimes catch a blow on their shield.
-const AGILE := ["goblin", "fire_goblin", "ghost_knight", "minion", "wraith", "storm_sprite"]
+const AGILE := ["goblin", "fire_goblin", "ghost_knight", "minion", "wraith", "storm_sprite", "thunder_bird"]
 var _side_t := 0.0
 var _side_dir := Vector3.ZERO
 var _dodge_cd := 0.0
@@ -412,6 +412,13 @@ func _physics_process(delta: float) -> void:
 				_go(S.CHASE)
 				Sfx.play_at("skel_attack", global_position, -10.0)
 		S.CHASE:
+			# Mr. Bubbles' signature move: float you away in a big bubble (often!)
+			if type_id == "mr_bubbles" and not pdead and dist < 24.0:
+				_float_cd -= delta
+				if _float_cd <= 0.0 and get_tree().get_nodes_in_group("bubble_trap").is_empty():
+					_float_cd = randf_range(5.0, 6.5) if _enraged else randf_range(7.0, 9.0)
+					_boss_move("bubble_float")
+					return
 			if t.has("moves") and not pdead and dist < 22.0 and _can_engage(delta):
 				_move_cd -= delta
 				if _move_cd <= 0.0:
@@ -659,6 +666,7 @@ func _has_los() -> bool:
 # Boss special moves. Every boss has a few (TYPES[..].moves); each one is shown
 # first (a glowing ring or line on the ground) so you can get out of the way.
 var _move_cd := 4.0
+var _float_cd := 3.0
 var _move_busy := false
 
 func _warn_ring(at: Vector3, radius: float, secs: float, col := Color(1.0, 0.35, 0.1)) -> void:
@@ -702,9 +710,30 @@ func _boss_move(mv: String) -> void:
 		"eye_beam": await _mv_eye_beam()
 		"boulders": await _mv_boulders()
 		"blink": await _mv_blink()
+		"bubble_float": await _mv_bubble_float()
 	if is_inside_tree() and not dead and state != S.WINDUP:
 		_go(S.CHASE)
 	_move_busy = false
+
+## Mr. Bubbles raises his wand and blows a big rainbow bubble at you. If it
+## catches you, it floats you up high: pop it and drop back into the fight. While
+## you're up there he sends lightning bubbles after you.
+func _mv_bubble_float() -> void:
+	Game.say("Mr. Bubbles: \"BUBBLE TIME! Up, up and away!\"", Color(1.0, 0.9, 0.5))
+	body.play_role("cast", 0.9)
+	Sfx.play_at("pop", global_position, -2.0, 0.3)
+	await get_tree().create_timer(0.55, false).timeout
+	if dead or not is_inside_tree() or player == null:
+		return
+	var fwd := -Vector3(sin(facing), 0, cos(facing))
+	var trap := BubbleTrap.blow(get_parent(), global_position + fwd * 2.4 + Vector3(0, 2.2, 0), player, 5 if _enraged else 4)
+	await get_tree().create_timer(1.6, false).timeout
+	if dead or not is_inside_tree() or not is_instance_valid(trap) or not trap.caught():
+		return
+	# you're floating: lightning bubbles drift up after you
+	for k in (2 if _enraged else 1):
+		LightningBubble.blow(get_parent(), global_position + Vector3(randf_range(-1.5, 1.5), 3.0, randf_range(-1.5, 1.5)), float(t.dmg) * 0.4)
+	await get_tree().create_timer(0.8, false).timeout
 
 ## Leap high and crash down where you were standing.
 func _mv_leap_slam() -> void:

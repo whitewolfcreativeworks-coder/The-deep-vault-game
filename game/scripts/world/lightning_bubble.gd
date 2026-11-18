@@ -19,7 +19,7 @@ var dmg := 30.0
 static func blow(parent: Node, at: Vector3, damage: float) -> LightningBubble:
 	var b := LightningBubble.new()
 	b.dmg = damage
-	b.trap = randf() < 0.45
+	b.trap = randf() < 0.2
 	parent.add_child(b)
 	b.global_position = at
 	return b
@@ -53,6 +53,8 @@ func _pop(zap: bool) -> void:
 	remove_from_group("damageable")
 	if _caught and _player:
 		_player.lift = -999.0
+		if _player.get("float_hold") == self:
+			_player.float_hold = null
 	Sfx.play_at("pop", global_position, -2.0, 0.15)
 	FX.burst(global_position, Color(1.0, 0.95, 0.5) if not trap else Color(0.8, 0.95, 1.0), 30, 4.0, 0.12, 0.5, 0.0)
 	if zap and _player and _player.has_method("take_damage"):
@@ -81,6 +83,8 @@ func _process(delta: float) -> void:
 		if trap and _player.get("dead") != true:
 			_caught = true; _t = 0.0
 			_player.lift = 2.2
+			if _player.get("float_hold") == null:
+				_player.float_hold = self
 			Game.say("Trapped in a bubble! Tap ATTACK to pop it!", Color(0.8, 0.95, 1.0))
 			Sfx.play("pop", -8.0, 0.2)
 		else:
