@@ -73,6 +73,7 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 ## What's in it
 
 ### New in the Nov 18 round: Cloud Island redesign and the flight home
+- **Detailed, crisp dungeon walls.** Every dungeon's stone is now chiselled blocks with crisp bevels, faceted faces and deep mortar joints. A carved rosette frieze runs along the walls at about head height, with a stone base course along the floor. Each dungeon keeps its own colours. (The idea came from the designer's playtesting; it's all our own procedural shader, nothing copied.)
 - **The blue square under your feet is fixed.** Costume and armour capes, wings, hats and sunglasses that hang off a bone were dropping to your feet. They now hang where they should.
 - **Clouds you stand on top of.** Your feet stay on the cloud surface instead of sinking in.
 - **Wet = slippery.** The more rain you carry, the further you slide. The ice cloud is slipperiest of all.
