@@ -326,7 +326,9 @@ func _flush_trims() -> void:
 			var done: Array = _trim_lines.get(key, [])
 			for dn in done:
 				pieces = _cut(pieces, dn[0], dn[1])
-			for pc in pieces:
+			for pc0 in pieces:
+				# a hair short at each end, so a trim's end is never flush with a wall's end
+				var pc: Array = [float(pc0[0]) + 0.012, float(pc0[1]) - 0.012]
 				if pc[1] - pc[0] < 0.25:
 					continue
 				done.append(pc)
