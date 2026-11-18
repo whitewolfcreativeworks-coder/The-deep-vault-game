@@ -22,6 +22,7 @@ var _done := false
 var _spook_t := 0.0
 var _bolt := 0.0
 var _picked := 0.0
+var _stuck_t := 0.0
 
 static func make(parent: Node3D, pos: Vector3, id: String, pad: Rect2) -> GhostHorse:
 	var h := GhostHorse.new()
@@ -110,6 +111,20 @@ func _physics_process(delta: float) -> void:
 			global_position = player.global_position + Vector3(2, 0.5, 2)       # never lose your horse
 		elif to.length() > 3.0:
 			dir = to.normalized(); spd = clampf(to.length() * 1.2, 2.0, 7.5)
+			# stuck behind a cart or a tree? it's a ghost: it fades and pops up beside you
+			if Vector2(get_real_velocity().x, get_real_velocity().z).length() < 0.6:
+				_stuck_t += delta
+			else:
+				_stuck_t = maxf(0.0, _stuck_t - delta)
+			if _stuck_t > 1.6:
+				_stuck_t = 0.0
+				FX.burst(global_position + Vector3(0, 1.2, 0), Color(0.75, 0.9, 1.0), 24, 3.0, 0.15, 0.6, 0.0)
+				var behind := -Vector3(sin(player.facing), 0, cos(player.facing)) * -2.5
+				global_position = player.global_position + behind + Vector3(0, 0.5, 0)
+				velocity = Vector3.ZERO
+				FX.burst(global_position + Vector3(0, 1.2, 0), Color(0.75, 0.9, 1.0), 24, 3.0, 0.15, 0.6, 0.0)
+		else:
+			_stuck_t = 0.0
 		# a wraith close by spooks it again: it bolts away and you have to calm it again
 		_spook_t -= delta
 		if _spook_t <= 0.0:
