@@ -86,6 +86,11 @@ func box(a: Vector3, b: Vector3, mat: Material, collide := true, shadows := true
 ## browsers. Nudge every such face but the biggest one inward by a centimetre
 ## or two so exactly one surface wins.
 func fix_coplanar() -> int:
+	var n := _fix_coplanar_boxes()
+	_flush_trims()
+	return n
+
+func _fix_coplanar_boxes() -> int:
 	var buckets := {}
 	for i in boxes.size():
 		var bx: Dictionary = boxes[i]
@@ -255,7 +260,7 @@ func _trim_mats_for(mat: Material) -> Array:
 		_trim_mats[key] = [fr, pl]
 	return _trim_mats[key]
 
-func _wall_trims(along_x: bool, fixed: float, segs: Array, y0: float, h: float, t: float, mat: Material, end_pull: float) -> void:
+func _wall_trims(along_x: bool, fixed: float, segs: Array, y0: float, h: float, t: float, mat: Material, _end_pull: float) -> void:
 	var tm := _trim_mats_for(mat)
 	if tm.is_empty() or h < 3.0:
 		return
@@ -265,41 +270,85 @@ func _wall_trims(along_x: bool, fixed: float, segs: Array, y0: float, h: float, 
 		var a: float = sg[0]
 		var b: float = sg[1]
 		var dh: float = sg[2]
-		# wrap round a doorway's edge; pull back from a corner
-		a += -TRIM_OUT if sg[3] else end_pull
-		b += TRIM_OUT if sg[4] else -end_pull
+		# wrap round a doorway's edge
+		a -= TRIM_OUT if sg[3] else 0.0
+		b += TRIM_OUT if sg[4] else 0.0
 		if dh == 0.0:
-			_trim_line(along_x, fixed, a, b, y0 + 0.005, y0 + PLINTH_H, t, tm[1])
+			_trim_reqs.append([along_x, fixed, t, a, b, y0 + 0.005, y0 + PLINTH_H, tm[1]])
 		if do_frieze and (dh == 0.0 or dh <= fb - 0.02):
-			_trim_line(along_x, fixed, a, b, fb, fb + FRIEZE_H, t, tm[0])
+			_trim_reqs.append([along_x, fixed, t, a, b, fb, fb + FRIEZE_H, tm[0]])
 
-func _trim_line(along_x: bool, fixed: float, a: float, b: float, y_lo: float, y_hi: float, t: float, mat: Material) -> void:
-	if b - a < 0.2:
+var _trim_reqs: Array = []
+
+## Lay the trims once the level's boxes are all in place: each wall face gets its
+## own strip, and any stretch of face that's up against another box (a wall built
+## back to back, a pillar, the rock) is left bare, so no two surfaces ever overlap.
+func _flush_trims() -> void:
+	if _trim_reqs.is_empty():
 		return
-	# skip any stretch another wall has already trimmed on this same line
-	var key := "%s|%d|%d" % ["x" if along_x else "z", int(round(fixed * 50.0)), int(round(y_lo * 50.0))]
-	var done: Array = _trim_lines.get(key, [])
-	var pieces: Array = [[a, b]]
-	for dn in done:
-		var next: Array = []
-		for pc in pieces:
-			if dn[1] <= pc[0] or dn[0] >= pc[1]:
-				next.append(pc)
-				continue
-			if dn[0] > pc[0]:
-				next.append([pc[0], dn[0]])
-			if dn[1] < pc[1]:
-				next.append([dn[1], pc[1]])
-		pieces = next
-	done.append([a, b])
-	_trim_lines[key] = done
-	var half := t * 0.5 + TRIM_OUT
+	# index the boxes by 1 m cells across x and across z, for quick lookups
+	var by_x := {}
+	var by_z := {}
+	for i in boxes.size():
+		var bx: Dictionary = boxes[i]
+		var lo: Vector3 = bx.lo; var hi: Vector3 = bx.hi
+		for cx in range(int(floor(lo.x)), int(floor(hi.x)) + 1):
+			if not by_x.has(cx): by_x[cx] = []
+			by_x[cx].append(i)
+		for cz in range(int(floor(lo.z)), int(floor(hi.z)) + 1):
+			if not by_z.has(cz): by_z[cz] = []
+			by_z[cz].append(i)
+	for rq in _trim_reqs:
+		var along_x: bool = rq[0]
+		var fixed: float = rq[1]
+		var t: float = rq[2]
+		var y_lo: float = rq[5]
+		var y_hi: float = rq[6]
+		var ym := (y_lo + y_hi) * 0.5
+		for sdv in [-1.0, 1.0]:
+			var sd: float = sdv
+			var face: float = fixed + sd * t * 0.5
+			var probe: float = face + sd * 0.035
+			var pieces: Array = [[float(rq[3]), float(rq[4])]]
+			var cands: Array = (by_z if along_x else by_x).get(int(floor(probe)), [])
+			for i in cands:
+				var bx: Dictionary = boxes[i]
+				var lo: Vector3 = bx.lo; var hi: Vector3 = bx.hi
+				var plo := lo.z if along_x else lo.x
+				var phi := hi.z if along_x else hi.x
+				if probe <= plo or probe >= phi or ym <= lo.y or ym >= hi.y:
+					continue
+				var alo := lo.x if along_x else lo.z
+				var ahi := hi.x if along_x else hi.z
+				pieces = _cut(pieces, alo, ahi)
+			# and never twice on the same face line
+			var key := "%s|%d|%d" % ["x" if along_x else "z", int(round(face * 50.0)), int(round(y_lo * 50.0))]
+			var done: Array = _trim_lines.get(key, [])
+			for dn in done:
+				pieces = _cut(pieces, dn[0], dn[1])
+			for pc in pieces:
+				if pc[1] - pc[0] < 0.25:
+					continue
+				done.append(pc)
+				var p0: float = face - sd * 0.02
+				var p1: float = face + sd * TRIM_OUT
+				var lo2 := Vector3(pc[0], y_lo, minf(p0, p1)) if along_x else Vector3(minf(p0, p1), y_lo, pc[0])
+				var hi2 := Vector3(pc[1], y_hi, maxf(p0, p1)) if along_x else Vector3(maxf(p0, p1), y_hi, pc[1])
+				trim(lo2, hi2, rq[7])
+			_trim_lines[key] = done
+	_trim_reqs.clear()
+
+func _cut(pieces: Array, c0: float, c1: float) -> Array:
+	var out: Array = []
 	for pc in pieces:
-		if pc[1] - pc[0] < 0.2:
+		if c1 <= pc[0] or c0 >= pc[1]:
+			out.append(pc)
 			continue
-		var lo := Vector3(pc[0], y_lo, fixed - half) if along_x else Vector3(fixed - half, y_lo, pc[0])
-		var hi := Vector3(pc[1], y_hi, fixed + half) if along_x else Vector3(fixed + half, y_hi, pc[1])
-		trim(lo, hi, mat)
+		if c0 > pc[0]:
+			out.append([pc[0], c0])
+		if c1 < pc[1]:
+			out.append([c1, pc[1]])
+	return out
 
 ## A decorative box (no collision): a unit cube scaled into place, so the shader
 ## knows where its bottom and top are.
