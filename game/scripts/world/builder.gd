@@ -186,27 +186,134 @@ func slab(x0: float, x1: float, z0: float, z1: float, top: float, thick: float, 
 func wall_x(z: float, x0: float, x1: float, y0: float, h: float, t: float, mat: Material, gaps: Array = []) -> void:
 	var cur := x0
 	gaps.sort_custom(func(p, q): return p[0] < q[0])
+	var segs: Array = []      # [a, b, door height (0 = full wall), a is a gap edge, b is a gap edge]
 	for g in gaps:
 		if g[0] > cur:
 			box(Vector3(cur, y0, z - t * 0.5), Vector3(g[0], y0 + h, z + t * 0.5), mat)
+			segs.append([cur, g[0], 0.0, cur != x0, true])
 		var dh: float = g[2] if g.size() > 2 else 3.6
 		box(Vector3(g[0], y0 + dh, z - t * 0.5), Vector3(g[1], y0 + h, z + t * 0.5), mat)
+		segs.append([g[0], g[1], dh, true, true])
 		cur = g[1]
 	if cur < x1:
 		box(Vector3(cur, y0, z - t * 0.5), Vector3(x1, y0 + h, z + t * 0.5), mat)
+		segs.append([cur, x1, 0.0, cur != x0, false])
+	_wall_trims(true, z, segs, y0, h, t, mat, 0.01)
 
 ## Wall along Z (fixed x).
 func wall_z(x: float, z0: float, z1: float, y0: float, h: float, t: float, mat: Material, gaps: Array = []) -> void:
 	var cur := z0
 	gaps.sort_custom(func(p, q): return p[0] < q[0])
+	var segs: Array = []
 	for g in gaps:
 		if g[0] > cur:
 			box(Vector3(x - t * 0.5, y0, cur), Vector3(x + t * 0.5, y0 + h, g[0]), mat)
+			segs.append([cur, g[0], 0.0, cur != z0, true])
 		var dh: float = g[2] if g.size() > 2 else 3.6
 		box(Vector3(x - t * 0.5, y0 + dh, g[0]), Vector3(x + t * 0.5, y0 + h, g[1]), mat)
+		segs.append([g[0], g[1], dh, true, true])
 		cur = g[1]
 	if cur < z1:
 		box(Vector3(x - t * 0.5, y0, cur), Vector3(x + t * 0.5, y0 + h, z1), mat)
+		segs.append([cur, z1, 0.0, cur != z0, false])
+	# (the walls along X run through the corners, so these stop short of them)
+	_wall_trims(false, x, segs, y0, h, t, mat, 0.09)
+
+# --- carved trims ------------------------------------------------------------
+## Dungeon walls get a carved frieze band (rosettes between raised lips) and a
+## stone base course along the floor. Both wrap round door edges and stand out
+## a few centimetres from the wall, so the stone looks hand-worked.
+const TRIM_OUT := 0.07
+const FRIEZE_H := 0.55
+const PLINTH_H := 0.42
+var _trim_mats := {}
+var _trim_lines := {}     # "axis|coord|y" -> [[a, b], ...] already trimmed (no doubled-up faces)
+var _unit_box: BoxMesh
+
+func _trim_mats_for(mat: Material) -> Array:
+	if not (mat is ShaderMaterial) or (mat as ShaderMaterial).shader != (mats.wall as ShaderMaterial).shader:
+		return []
+	var sm := mat as ShaderMaterial
+	var md = sm.get_shader_parameter("mode")
+	if md != null and int(md) != 0:
+		return []
+	var key := sm.get_instance_id()
+	if not _trim_mats.has(key):
+		var bc = sm.get_shader_parameter("base_color")
+		var base: Color = bc if bc is Color else Color(0.34, 0.31, 0.28)
+		var fr := sm.duplicate() as ShaderMaterial
+		fr.set_shader_parameter("mode", 3)
+		fr.set_shader_parameter("band_h", FRIEZE_H)
+		fr.set_shader_parameter("base_color", base.lightened(0.16))
+		fr.set_shader_parameter("moss", 0.0)
+		var pl := sm.duplicate() as ShaderMaterial
+		pl.set_shader_parameter("local_v", true)
+		pl.set_shader_parameter("block_w", 1.7)
+		pl.set_shader_parameter("block_h", PLINTH_H)
+		pl.set_shader_parameter("base_color", base.darkened(0.12))
+		pl.set_shader_parameter("bevel_w", 0.06)
+		_trim_mats[key] = [fr, pl]
+	return _trim_mats[key]
+
+func _wall_trims(along_x: bool, fixed: float, segs: Array, y0: float, h: float, t: float, mat: Material, end_pull: float) -> void:
+	var tm := _trim_mats_for(mat)
+	if tm.is_empty() or h < 3.0:
+		return
+	var fb := y0 + clampf(h - 1.2, 2.3, 3.0)
+	var do_frieze := fb + FRIEZE_H <= y0 + h - 0.05
+	for sg in segs:
+		var a: float = sg[0]
+		var b: float = sg[1]
+		var dh: float = sg[2]
+		# wrap round a doorway's edge; pull back from a corner
+		a += -TRIM_OUT if sg[3] else end_pull
+		b += TRIM_OUT if sg[4] else -end_pull
+		if dh == 0.0:
+			_trim_line(along_x, fixed, a, b, y0 + 0.005, y0 + PLINTH_H, t, tm[1])
+		if do_frieze and (dh == 0.0 or dh <= fb - 0.02):
+			_trim_line(along_x, fixed, a, b, fb, fb + FRIEZE_H, t, tm[0])
+
+func _trim_line(along_x: bool, fixed: float, a: float, b: float, y_lo: float, y_hi: float, t: float, mat: Material) -> void:
+	if b - a < 0.2:
+		return
+	# skip any stretch another wall has already trimmed on this same line
+	var key := "%s|%d|%d" % ["x" if along_x else "z", int(round(fixed * 50.0)), int(round(y_lo * 50.0))]
+	var done: Array = _trim_lines.get(key, [])
+	var pieces: Array = [[a, b]]
+	for dn in done:
+		var next: Array = []
+		for pc in pieces:
+			if dn[1] <= pc[0] or dn[0] >= pc[1]:
+				next.append(pc)
+				continue
+			if dn[0] > pc[0]:
+				next.append([pc[0], dn[0]])
+			if dn[1] < pc[1]:
+				next.append([dn[1], pc[1]])
+		pieces = next
+	done.append([a, b])
+	_trim_lines[key] = done
+	var half := t * 0.5 + TRIM_OUT
+	for pc in pieces:
+		if pc[1] - pc[0] < 0.2:
+			continue
+		var lo := Vector3(pc[0], y_lo, fixed - half) if along_x else Vector3(fixed - half, y_lo, pc[0])
+		var hi := Vector3(pc[1], y_hi, fixed + half) if along_x else Vector3(fixed + half, y_hi, pc[1])
+		trim(lo, hi, mat)
+
+## A decorative box (no collision): a unit cube scaled into place, so the shader
+## knows where its bottom and top are.
+func trim(lo: Vector3, hi: Vector3, mat: Material) -> MeshInstance3D:
+	if _unit_box == null:
+		_unit_box = BoxMesh.new()
+	var mi := MeshInstance3D.new()
+	mi.mesh = _unit_box
+	mi.material_override = mat
+	mi.position = (lo + hi) * 0.5
+	mi.scale = hi - lo
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+	return mi
 
 ## Rectangular room: floor, four walls, ceiling. gaps per side: n (min z), s (max z), w (min x), e (max x).
 func room(x0: float, x1: float, z0: float, z1: float, y: float, h: float, wall_m: Material, floor_m: Material, gaps := {}, ceiling := true, floor_holes: Array = []) -> void:

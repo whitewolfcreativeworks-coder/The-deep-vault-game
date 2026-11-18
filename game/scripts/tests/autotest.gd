@@ -273,6 +273,8 @@ func _run() -> void:
 	elif mode == "homeflight":
 		if await _homeflight_test():
 			return
+	elif mode == "walls":
+		await _walls_test()
 	elif mode == "bluesq":
 		if await _bluesq_test():
 			return
@@ -4286,3 +4288,23 @@ func _homeflight_test() -> bool:
 	await wait(0.5)
 	check("hf_portal_back", Game.flags.get("home_won", false))
 	return false
+
+
+## The chiselled dungeon stone, the carved frieze and the base course.
+func _walls_test() -> void:
+	await _start()
+	await wait(1.0)
+	god = true
+	var Y := VaultWorld.Y
+	for v in [[Vector3(0, Y + 0.3, -16), 0.0, 4.5, -0.05, "w_01_entry_hall"], [Vector3(-6, Y + 0.3, -26), PI * 0.5, 3.5, -0.02, "w_02_wall_close"],
+			[Vector3(0, Y + 0.3, -40), 0.0, 4.0, -0.05, "w_03_corridor"], [Vector3(6, Y + 0.3, -64), -PI * 0.75, 5.0, -0.1, "w_04_armory"]]:
+		await tp(v[0], v[1])
+		player.zoom_target = v[2]; player.zoom = v[2]; player.pitch = v[3]; player.snap_view()
+		await wait(1.2)
+		await shot(v[4])
+	var trims := 0
+	for mi in main.world.find_children("*", "MeshInstance3D", true, false):
+		var sm = (mi as MeshInstance3D).material_override
+		if sm is ShaderMaterial and (sm as ShaderMaterial).get_shader_parameter("mode") == 3:
+			trims += 1
+	check("walls_have_friezes", trims >= 10, "%d" % trims)
