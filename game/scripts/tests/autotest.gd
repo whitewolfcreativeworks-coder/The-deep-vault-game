@@ -3718,7 +3718,10 @@ func _classes_test() -> void:
 	god = true
 	Game.flags["special2"] = true
 	var w = main.world
-	for hero in ["Priest", "Druid", "Necromancer", "Beastmaster"]:
+	var cls_list := ["Priest", "Druid", "Necromancer", "Beastmaster"]
+	if OS.get_environment("CLS_ONLY") != "":
+		cls_list = [OS.get_environment("CLS_ONLY")]
+	for hero in cls_list:
 		Game.profile.hero = hero
 		player.rebuild_body()
 		await tp(Vector3(-4, 0.1, 14), PI)
@@ -3732,7 +3735,10 @@ func _classes_test() -> void:
 		face(foe.global_position); player.view_yaw = player.yaw; player.facing = player.yaw
 		await wait(0.2)
 		await tap("special")
-		await wait(6.0 if hero in ["Necromancer", "Beastmaster"] else 2.0)
+		if hero == "Beastmaster":
+			await wait(6.0)
+		else:
+			await wait(6.0 if hero == "Necromancer" else 2.0)
 		await shot("cls_%s_special" % hero)
 		check("cls_%s_special_hurts" % hero, foe.dead or foe.hp < hp0, "%.0f -> %.0f" % [hp0, foe.hp])
 		if hero == "Necromancer":

@@ -23,6 +23,10 @@ var _tail: Node3D
 var _skel: CharacterModel
 var _offset := Vector3(1.4, 0, 1.6)
 var _dying := false
+var _stuck := 0.0              # how long we've been pushing against something
+var _stuck_total := 0.0
+var _side := 0.0               # >0: stepping round an obstacle
+var _side_dir := Vector3.ZERO
 
 const STATS := {
 	"wolf": {"speed": 6.8, "range": 1.6, "cd": 0.85, "dmg": 0.55, "knock": 2.0},
@@ -141,7 +145,7 @@ func _pick_target() -> void:
 ## Beastmaster's "Sic 'em!": dash at this foe and land a big pounce.
 func pounce(at: Node3D) -> void:
 	target = at
-	pounce_t = 1.2
+	pounce_t = 2.5
 
 func _physics_process(delta: float) -> void:
 	_t += delta
@@ -183,9 +187,42 @@ func _physics_process(delta: float) -> void:
 	elif to.length() > 1.0:
 		dir = to.normalized()
 		spd *= clampf(to.length() / 3.0, 0.4, 1.4)
+	# no pathfinding: when something's in the way, hop and step round it, and if
+	# that keeps failing, leap straight to where we're going
+	var want := dir.length() > 0.1
+	if _side > 0.0:
+		_side -= delta
+		if want:
+			dir = (dir + _side_dir * 1.3).normalized()
+	var jump := false
+	if want and is_on_floor():
+		var real := Vector2(get_real_velocity().x, get_real_velocity().z).length()
+		if real < spd * 0.3:
+			_stuck += delta
+			_stuck_total += delta
+		else:
+			_stuck = maxf(0.0, _stuck - delta)
+			_stuck_total = maxf(0.0, _stuck_total - delta * 0.5)
+		if _stuck > 0.3:
+			_stuck = 0.0
+			jump = true
+			_side = 0.7
+			_side_dir = dir.cross(Vector3.UP) * (1.0 if randf() < 0.5 else -1.0)
+		if _stuck_total > 2.2:
+			_stuck_total = 0.0
+			var land := goal - to.normalized() * (reach * 0.7 if engaged else 1.0)
+			FX.burst(global_position + Vector3(0, 0.6, 0), Color(0.9, 0.85, 0.7), 16, 2.5, 0.15, 0.6, 0.0)
+			global_position = Vector3(land.x, goal.y + 0.2, land.z)
+			velocity = Vector3.ZERO
+			FX.burst(global_position + Vector3(0, 0.6, 0), Color(0.9, 0.85, 0.7), 16, 2.5, 0.15, 0.6, 0.0)
+	elif not want:
+		_stuck = 0.0
+		_stuck_total = 0.0
 	velocity.x = lerpf(velocity.x, dir.x * spd, 1.0 - exp(-10.0 * delta))
 	velocity.z = lerpf(velocity.z, dir.z * spd, 1.0 - exp(-10.0 * delta))
-	if is_on_floor():
+	if jump:
+		velocity.y = 7.0
+	elif is_on_floor():
 		velocity.y = -0.5
 	else:
 		velocity.y -= 22.0 * delta
