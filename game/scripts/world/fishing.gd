@@ -192,7 +192,7 @@ func _physics_process(delta: float) -> void:
 	if d.length() > 0.01:
 		_line.basis = Basis(Quaternion(Vector3.UP, d.normalized())) * Basis.from_scale(Vector3(1, d.length(), 1))
 	# stop fishing: jump or walk away
-	if _state != "caught" and (Input.is_action_just_pressed("jump") or Input.get_vector("move_left", "move_right", "move_forward", "move_back").length() > 0.6):
+	if Input.is_action_just_pressed("jump") or Input.get_vector("move_left", "move_right", "move_forward", "move_back").length() > 0.6:
 		_stop(true)
 
 func _hook_pressed() -> bool:
