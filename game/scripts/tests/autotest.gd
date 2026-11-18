@@ -3886,11 +3886,11 @@ func _castle5_test() -> bool:
 		if fish_n == 0:
 			await shot("c5_08_bite")
 		await tap("attack")
-		for k in 70:
+		for k in 160:
 			if spot._state != "reel":
 				break
-			await tap("attack")
-			await wait(0.05)
+			Input.action_press("attack"); await frames(1)
+			Input.action_release("attack"); await frames(1)
 		await wait(0.6)
 		if fish_n == 0:
 			await shot("c5_09_catch")
@@ -3947,6 +3947,7 @@ func _castle5_test() -> bool:
 	check("c5_locket_collected", Game.quest_progress("lost_lockets") == 1, "%d" % Game.quest_progress("lost_lockets"))
 	_kill_near(["crypt_skeleton"], 20.0, m1.global_position)
 	# the cloud lift shines once the Ghost Lord is gone
+	Game.flags["castle_won"] = true        # skip the "Castle Morwen is free" panel (it pauses the game)
 	Game.quests["ghost_lord"] = {"state": "done", "n": 1}
 	Game.quests_changed.emit()
 	await wait(0.6)
@@ -3954,8 +3955,6 @@ func _castle5_test() -> bool:
 	check("c5_cloud_beacon", lift != null and lift.find_child("SkyBeacon", true, false) != null)
 	await _look(lift.global_position + Vector3(0, 10, 0), w.ground(-30, 90) + Vector3(0, 0.3, 0), 6.0, 0.15)
 	await shot("c5_10_cloud_beacon")
-	main.menus._close_dialogue()          # the "Castle Morwen is free" panel pauses the game
-	await wait(0.3)
 	# a castle boss uses its special moves
 	var gk := Enemy.new(); gk.configure("gatekeeper", "", 0.0)
 	gk.position = w.ground(20, 20) + Vector3(0, 0.3, 0)

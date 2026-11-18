@@ -180,7 +180,7 @@ func _mushroom(parent: Node3D, p: Vector3, col: Color) -> void:
 func _sign(parent: Node3D, at: Vector3, text: String) -> void:
 	var post := MeshInstance3D.new(); var pm := BoxMesh.new(); pm.size = Vector3(0.12, 1.4, 0.12); post.mesh = pm
 	var wood := StandardMaterial3D.new(); wood.albedo_color = Color(0.45, 0.3, 0.16); post.material_override = wood
-	post.position = at + Vector3(0, 0.7, -0.12); parent.add_child(post)     # behind the board, not through it
+	post.position = at + Vector3(0, 0.68, -0.12); parent.add_child(post)     # behind the board, not through it
 	var board := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(1.5, 0.75, 0.08); board.mesh = bm
 	var bw := StandardMaterial3D.new(); bw.albedo_color = Color(0.72, 0.55, 0.32); board.material_override = bw
 	board.position = at + Vector3(0, 1.35, 0); parent.add_child(board)
