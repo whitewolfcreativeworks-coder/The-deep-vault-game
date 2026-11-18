@@ -20,6 +20,7 @@ var lift := -999.0           # a bubble carrying you: target vertical speed (non
 var wind := Vector3.ZERO     # a push from the wind (m/s), already scaled by your weight
 var grip := 1.0              # 1 = normal footing; lower = slippery (wet cloud, ice): you slide
 var float_hold: Node = null  # a bubble that's floating you (it owns `lift` until it pops)
+var free_flight := false     # the flight home: no ceiling, no turning back at the map edge
 const EYE_H := 1.62
 const FP_THRESHOLD := 0.45
 const MAX_ZOOM := 11.0
@@ -182,7 +183,7 @@ func _dragonfly_move(delta: float, target_v: Vector3) -> void:
 		_fly_ground_y = (below.position as Vector3).y
 		_fly_safe = global_position
 		_fly_warned = false
-	elif flying:
+	elif flying and not free_flight:
 		# nothing underneath (off the edge of the map): the dragonfly turns back
 		var back := _fly_safe - global_position
 		back.y = 0.0
@@ -193,7 +194,8 @@ func _dragonfly_move(delta: float, target_v: Vector3) -> void:
 			_fly_warned = true
 			Game.say("Whoa, there's nothing down there! Your dragonfly turns back.", Color(0.5, 1.0, 0.85))
 	var climb := input_enabled and Input.is_action_pressed("jump") and not wings_tired
-	var under_ceiling := global_position.y < _fly_ground_y + FLY_CEILING
+	var under_ceiling := free_flight or global_position.y < _fly_ground_y + FLY_CEILING
+	var dive := input_enabled and Input.is_action_pressed("block") and not climb
 	if mount:
 		mount.climbing = climb
 		mount.tired = wings_tired
@@ -210,6 +212,8 @@ func _dragonfly_move(delta: float, target_v: Vector3) -> void:
 	if climb:
 		velocity.y = lerpf(velocity.y, FLY_CLIMB_V if under_ceiling else 0.0, 1.0 - exp(-6.0 * delta))
 		wing_stamina = maxf(0.0, wing_stamina - delta / 60.0)
+	elif dive:
+		velocity.y = lerpf(velocity.y, -9.0, 1.0 - exp(-4.0 * delta))     # hold BLOCK to dive
 	else:
 		velocity.y = lerpf(velocity.y, FLY_TIRED_V if wings_tired else FLY_GLIDE_V, 1.0 - exp(-3.0 * delta))
 		wing_stamina = maxf(0.0, wing_stamina - delta / 600.0)
@@ -242,6 +246,9 @@ func has_moped() -> bool:
 ## (chicken -> moped -> dragonfly), and after the last one you get off.
 func toggle_mount() -> void:
 	if dead:
+		return
+	if free_flight and flying and mounted:
+		Game.say("Not up here! Land first.", Color(0.6, 1.0, 0.85))
 		return
 	var start := 0
 	if mounted:
@@ -559,7 +566,7 @@ func _physics_process(delta: float) -> void:
 		speed *= _mount_speed()
 	if haste_t > 0.0:
 		speed *= 1.45      # Smoke Bomb dash
-	if blocking:
+	if blocking and not (mounted and flying):      # (on a flying dragonfly, BLOCK is a dive)
 		speed *= 0.45
 	if attacking:
 		speed *= 0.35

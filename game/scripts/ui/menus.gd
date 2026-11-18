@@ -1016,9 +1016,12 @@ func _build_forest_victory() -> void:
 
 func show_forest_victory(which := "forest") -> void:
 	_cloud_btn.visible = which == "castle"
-	if which == "cloud":
+	if which == "home":
+		_forest_title.text = "HOME AT LAST!"
+		_forest_sub.text = "You flew all the way home on your dragonfly. Bobek's first adventure is complete!\nThank you for playing. The family portal in the yard leads back to the Vault... and a whole new world is coming."
+	elif which == "cloud":
 		_forest_title.text = "CLOUD ISLAND IS CALM"
-		_forest_sub.text = "Mr. Bubbles is friendly again and the storm has blown away.\nLevel 4 complete! Fly your dragonfly (G) anywhere you like."
+		_forest_sub.text = "Mr. Bubbles is friendly again and the storm has blown away.\nLevel 4 complete! Talk to Anu: it's time for the long flight home."
 	elif which == "castle":
 		_forest_title.text = "CASTLE MORWEN IS FREE"
 		_forest_sub.text = "The Ghost Lord is beaten and Ashenford can sleep again.\nLevel 3 complete! A cloud is gathering by Sister Elowen..."

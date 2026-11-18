@@ -847,6 +847,13 @@ const QUESTS := {
 		"busy": "The Hail Golem is on the storm layer, by the last bubble vent. Heavy hits: block!",
 		"thanks": "Crunch! The golem is just slush now. The vent to the thunderhead is bubbling.",
 		"reward": {"xp": 1100, "gold": 280, "potions": 3, "roll": "big"}},
+	"flight_home": {"giver": "anu", "zone": "home", "title": "The Flight Home", "requires": "mr_bubbles",
+		"goal": {"type": "collect", "item": "home", "count": 1}, "track": "Home",
+		"locked": "When the storm is calmed, there is one last journey for you.",
+		"offer": "You've done everything we asked, little one, and more. Now it's time to go home.\n\nYour cabin is far, far below, past the storm clouds, the floating rocks and the mountains. I'll open the Sky Gate at the south edge of the temple island. Fly through it on your dragonfly and follow the golden rings all the way home.\n\nHold JUMP to climb, let go to glide, and hold BLOCK to dive. Green rings rest its wings. Fly well!",
+		"busy": "The Sky Gate is at the south edge of the temple island. Fly through it on your dragonfly!",
+		"thanks": "Welcome home.",
+		"reward": {"xp": 3000, "gold": 800, "potions": 5, "roll": "boss"}},
 	"mr_bubbles": {"giver": "anu", "zone": "cloud", "title": "Mr. Bubbles", "requires": "storm_gate",
 		"goal": {"type": "boss", "uid": "mr_bubbles", "count": 1}, "track": "Mr. Bubbles defeated",
 		"locked": "I am Anu, eldest of the sky. When the storm gate is open, come to me.",
@@ -972,6 +979,8 @@ func forest_objective() -> String:
 		return castle_objective()
 	if zone == "cloud":
 		return cloud_objective()
+	if zone == "home":
+		return "Home at last! The family portal in the yard leads back to the Vault." if quest_state("flight_home") == "done" else "Follow the golden rings all the way home."
 	if zone != "forest":
 		return objective
 	if zone_complete("forest"):
@@ -989,6 +998,10 @@ func forest_objective() -> String:
 	return "Help the forest folk: your quests are listed on the left."
 
 func cloud_objective() -> String:
+	if quest_state("flight_home") == "active":
+		return "Fly your dragonfly through the Sky Gate at the south edge of the temple island."
+	if quest_state("mr_bubbles") == "done" and quest_state("flight_home") == "available":
+		return "Cloud Island is calm! Talk to Anu: it's time for the flight home."
 	if quest_state("mr_bubbles") == "done":
 		return "Cloud Island is calm! Fly your dragonfly (G) anywhere you like."
 	if quest_state("mr_bubbles") == "active":

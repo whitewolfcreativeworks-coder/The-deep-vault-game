@@ -333,6 +333,14 @@ func _thin_patch(at: Vector3, r: float) -> void:
 	cs.shape = cy; cs.position = at - Vector3(0, 0.5, 0); sb.add_child(cs)
 	_thin.append(sb)
 	_thin_spots.append([at, r, -100.0])
+	# a see-through blue glimpse of the sky below, so thin cloud reads as thin
+	var below := MeshInstance3D.new(); var dm := CylinderMesh.new(); dm.top_radius = r - 0.2; dm.bottom_radius = r - 0.2; dm.height = 0.02
+	dm.radial_segments = 28
+	var bm := StandardMaterial3D.new(); bm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bm.albedo_color = Color(0.4, 0.58, 0.95, 0.55); bm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	below.mesh = dm; below.material_override = bm; below.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	below.position = at - Vector3(0, 0.35, 0)
+	add_child(below)
 	var k := 0
 	while k < int(r * r * 0.9) + 3:
 		var a := _rng.randf() * TAU; var d := sqrt(_rng.randf()) * (r - 0.6)
@@ -514,7 +522,7 @@ func _vents() -> void:
 		if (VENTS[i] as Array).size() > 3:
 			# a way down: green ring, a sign, and a big bobbing arrow you can see across the island
 			rm.albedo_color = Color(0.45, 0.95, 0.55)
-			var sg := Label3D.new(); sg.text = "WAY DOWN\nto the Sky Temple\n(step in)"; sg.font_size = 64; sg.pixel_size = 0.006
+			var sg := Label3D.new(); sg.text = "WAY DOWN\nto the Sky Temple\n(step in)"; sg.font_size = 64; sg.pixel_size = 0.0042
 			sg.outline_size = 14; sg.modulate = Color(0.7, 1.0, 0.75); sg.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 			sg.position.y = 3.6; v.add_child(sg)
 			var arrow := MeshInstance3D.new(); var am := CylinderMesh.new(); am.top_radius = 0.9; am.bottom_radius = 0.0; am.height = 1.2
@@ -883,6 +891,7 @@ func _process(delta: float) -> void:
 	var isl := island_of(pp)
 	_set_area("storm" if isl in ["D", "E"] else "sky")
 	_haunt(delta)
+	_sky_gate_step()
 	_storm_hazards(delta, isl)
 	if _boss_started and lord and is_instance_valid(lord) and not lord.dead:
 		_boss_hazards(delta)
@@ -1040,6 +1049,9 @@ func _on_quests() -> void:
 	if Game.flags.get("mr_bubbles", false):
 		_boss_chest()
 		_rainbow_slide()
+	# the last quest: Anu opens the Sky Gate for the flight home
+	if Game.quest_state("flight_home") == "active" and get_node_or_null("SkyGate") == null:
+		_sky_gate()
 	# Anu's reward: the dragonfly!
 	if Game.quest_state("mr_bubbles") == "done" and not Game.flags.get("mount_dragonfly", false):
 		if Game.has_method("grant_dragonfly"):
@@ -1047,6 +1059,36 @@ func _on_quests() -> void:
 		else:
 			Game.flags["mount_dragonfly"] = true
 			Game.say("You got the DRAGONFLY! Press G (or RIDE) to fly.", Color(0.5, 1.0, 0.85))
+
+const SKY_GATE := Vector3(0, 27, 39)
+## A huge golden ring off the south edge of the temple island: fly through it
+## on your dragonfly to start the flight home.
+func _sky_gate() -> void:
+	var g := Node3D.new(); g.name = "SkyGate"; add_child(g); g.global_position = SKY_GATE
+	var tor := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 6.3; tm.outer_radius = 7.0
+	tm.rings = 48; tm.ring_segments = 12
+	tor.mesh = tm; tor.material_override = FX.beam_material(Color(1.0, 0.85, 0.45), 2.6, 0.95, false)
+	tor.rotation.x = PI * 0.5; g.add_child(tor)
+	var disc := MeshInstance3D.new(); var q := QuadMesh.new(); q.size = Vector2(12.6, 12.6); disc.mesh = q
+	var pm := ShaderMaterial.new(); pm.shader = load("res://shaders/portal.gdshader"); pm.set_shader_parameter("intensity", 1.6)
+	disc.material_override = pm; g.add_child(disc)
+	var lbl := Label3D.new(); lbl.text = "THE SKY GATE\nfly through on your dragonfly: home!"; lbl.font_size = 72; lbl.pixel_size = 0.008
+	lbl.outline_size = 16; lbl.modulate = Color(1.0, 0.9, 0.6); lbl.position.y = 8.6; lbl.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	g.add_child(lbl)
+	var l := OmniLight3D.new(); l.light_color = Color(1.0, 0.85, 0.5); l.light_energy = 3.0; l.omni_range = 18.0; g.add_child(l)
+	FX.sky_beacon(g, SKY_GATE, Color(1.0, 0.85, 0.45))
+	Game.say("A great golden gate opens at the south edge of the temple island!", Color(1.0, 0.9, 0.6))
+
+var _gate_used := false
+func _sky_gate_step() -> void:
+	if _gate_used or get_node_or_null("SkyGate") == null:
+		return
+	var rel := player.global_position + Vector3(0, 1.0, 0) - SKY_GATE
+	if absf(rel.z) < 1.8 and Vector2(rel.x, rel.y).length() < 6.6:
+		_gate_used = true
+		var sc := get_tree().current_scene
+		if sc.has_method("go_to_home"):
+			sc.go_to_home()
 
 func _vent_look(v: Node3D, on: bool) -> void:
 	for c in v.get_children():

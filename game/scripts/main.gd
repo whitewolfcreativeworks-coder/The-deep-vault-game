@@ -30,6 +30,7 @@ func _ready() -> void:
 		"forest": world = ForestWorld.new()
 		"castle": world = CastleWorld.new()
 		"cloud": world = CloudWorld.new()
+		"home": world = HomeWorld.new()
 		_: world = VaultWorld.new()
 	world.name = "World"
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -46,7 +47,7 @@ func _ready() -> void:
 	if not continue_pending or Game.checkpoint_pos == Vector3.ZERO:
 		Game.checkpoint_pos = world.spawn_point
 		Game.checkpoint_yaw = float(world.get("spawn_yaw")) if world.get("spawn_yaw") != null else 0.0
-		Game.checkpoint_name = {"forest": "the Portal Glade", "castle": "the Moor Portal", "cloud": "the Sky Temple"}.get(Game.zone, "the Outpost")
+		Game.checkpoint_name = {"forest": "the Portal Glade", "castle": "the Moor Portal", "cloud": "the Sky Temple", "home": "the sky"}.get(Game.zone, "the Outpost")
 	hud = HUD.new()
 	add_child(hud)
 	hud.bind_player(player)
@@ -141,7 +142,7 @@ func _continue_game() -> void:
 	player.set_mouse_captured(true)
 	hud.visible = true
 	Game.in_game = true
-	if Game.zone in ["forest", "castle", "cloud"]:
+	if Game.zone in ["forest", "castle", "cloud", "home"]:
 		Game.objective = Game.forest_objective()
 	Game.set_objective(Game.objective if Game.objective != "" else "Enter the Deep Vault beneath the cliffs.")
 	if Game.zone == "cloud" and Game.resume_pos == Vector3.ZERO:
@@ -151,6 +152,8 @@ func _continue_game() -> void:
 			var a2: Dictionary = Game.ability2()
 			get_tree().create_timer(4.0).timeout.connect(func() -> void:
 				Game.say("The sky gives you a NEW POWER! %s: press %s to use it." % [a2.name, "B / 3" if not Game.touch_active else "the new button"], Color(0.6, 1.0, 0.9)))
+	elif Game.zone == "home" and Game.resume_pos == Vector3.ZERO:
+		Game.say("Through the Sky Gate... it's a long way home! Follow the golden rings.", Color(1.0, 0.9, 0.6))
 	elif Game.zone == "castle" and Game.resume_pos == Vector3.ZERO:
 		Game.say("You step out under a cold moon. Somewhere a ghost wails... Welcome to Ghost Knight Castle!", Color(0.7, 0.85, 1.0))
 	elif Game.zone == "forest" and Game.play_time > 0.0 and Game.resume_pos == Vector3.ZERO:
@@ -243,6 +246,8 @@ func _zone_extras() -> void:
 				k += 1
 		"cloud":
 			n_pot = 4
+		"home":
+			n_pot = 0
 		_:
 			areas = [[Vector3(-3.0, 0, 31.0), 6.0, 2], [Vector3(-26.0, 0, 36.0), 5.0, 2]]
 	ZoneExtras.attach(world, n_pot, areas)
@@ -270,6 +275,25 @@ func go_to_cloud() -> void:
 	await menus.fade_to(1.0, 0.6).finished
 	player.lift = -999.0
 	_travel("cloud")
+
+## The last quest: through the Sky Gate on your dragonfly, on the long flight home.
+func go_to_home() -> void:
+	if state != "play" or player.dead:
+		return
+	player.input_enabled = false
+	Sfx.play("portal", -2.0, 0.0)
+	Game.say("Through the Sky Gate! Hold on tight...", Color(1.0, 0.9, 0.6))
+	FX.screen_flash(Color(1.0, 0.95, 0.8), 1.0, 1.2)
+	await menus.fade_to(1.0, 0.8).finished
+	_travel("home")
+
+## Home again: the family portal in the yard leads back to the Vault outpost.
+func go_to_vault() -> void:
+	if state != "play":
+		return
+	player.input_enabled = false
+	await menus.fade_to(1.0, 0.8).finished
+	_travel("vault")
 
 ## Back down from Cloud Island on a rain cloud.
 func go_back_to_castle() -> void:
@@ -324,6 +348,8 @@ func _check_forest_done() -> void:
 		won = "castle"
 	elif Game.zone == "cloud" and Game.quest_state("mr_bubbles") == "done" and not Game.flags.get("cloud_won", false):
 		won = "cloud"
+	elif Game.zone == "home" and Game.quest_state("flight_home") == "done" and not Game.flags.get("home_won", false):
+		won = "home"
 	if won != "":
 		Game.flags[won + "_won"] = true
 		Game.set_objective(Game.forest_objective())

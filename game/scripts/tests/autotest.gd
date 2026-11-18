@@ -267,6 +267,12 @@ func _run() -> void:
 	elif mode == "castle5":
 		if await _castle5_test():
 			return
+	elif mode == "cloud2":
+		if await _cloud2_test():
+			return
+	elif mode == "homeflight":
+		if await _homeflight_test():
+			return
 	elif mode == "bluesq":
 		if await _bluesq_test():
 			return
@@ -4010,4 +4016,273 @@ func _bluesq_test() -> bool:
 				var ab: AABB = (m as MeshInstance3D).global_transform * (m as MeshInstance3D).get_aabb()
 				names.append("%s y%.2f..%.2f" % [m.name, ab.position.y - player.global_position.y, ab.end.y - player.global_position.y])
 		print("BQ %s floor %.2f meshes: %s" % [id, player.global_position.y, ", ".join(names)])
+	return false
+
+
+## Cloud Island rework (Nov 18): feet on the cloud, thin cloud and holes, wet =
+## slippery, ways down, the climbable rainbow, Mr. Bubbles' bubble float, and
+## Adad's weather quests.
+func _cloud2_test() -> bool:
+	if not Game.get_meta("c2_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("c2_phase", true)
+		Game.level = 14
+		for q in ["lost_feathers", "thunder_birds", "sky_whale", "storm_bubbles", "why_clouds", "make_it_rain", "bubble_lifts", "storm_gate"]:
+			Game.quests[q] = {"state": "done", "n": 9}
+		main._travel("cloud")
+		return true
+	await wait(3.0)
+	player = main.player
+	god = true
+	var w: CloudWorld = main.world
+	var A: Vector3 = CloudWorld.ISLANDS.A.c
+	# feet stand on the cloud, not in it
+	await tp(A + Vector3(-6, 0.4, 20), PI * 0.5)
+	await wait(1.0)
+	check("c2_on_the_floor", absf(player.global_position.y - A.y) < 0.15 and player.is_on_floor(), str(player.global_position))
+	player.zoom_target = 3.0; player.zoom = 3.0; player.pitch = -0.02; player.snap_view()
+	await wait(0.4)
+	await shot("c2_01_feet_on_cloud")
+	# thin cloud: holds you while you're light, drops you when you're heavy
+	var thin: Vector3 = Vector3(-14, A.y, 26)
+	w.weight = 0.5
+	await tp(thin + Vector3(0, 0.4, 0), 0.0)
+	await wait(1.2)
+	check("c2_thin_holds_light", player.global_position.y > A.y - 0.5, str(player.global_position))
+	player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.35; player.snap_view()
+	await wait(0.3)
+	await shot("c2_02_thin_cloud")
+	w.weight = 0.95
+	await wait(1.5)
+	check("c2_thin_drops_heavy", player.global_position.y < A.y - 4.0, str(player.global_position))
+	w.weight = 0.5
+	await wait(3.0)
+	# a hole right through the island
+	await tp(A + Vector3(20.5, 0.4, -2), -PI * 0.5)
+	player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.45; player.snap_view()
+	await wait(0.5)
+	await shot("c2_03_hole")
+	await tp(A + Vector3(26, 0.6, -2), 0.0)
+	await wait(1.5)
+	check("c2_hole_drops_you", player.global_position.y < A.y - 4.0, str(player.global_position))
+	await wait(3.0)
+	# wet = slippery: run, let go, and see how far you slide
+	var slides := []
+	for wt in [0.5, 0.95]:
+		w.weight = wt
+		await tp(A + Vector3(-8, 0.3, 14), PI * 0.5)
+		await wait(0.4)
+		w.weight = wt
+		Input.action_press("move_forward")
+		await wait(1.0)
+		Input.action_release("move_forward")
+		var p0 := player.global_position
+		await wait(1.2)
+		slides.append(Vector2(player.global_position.x - p0.x, player.global_position.z - p0.z).length())
+	w.weight = 0.5
+	check("c2_wet_is_slippery", slides[1] > slides[0] * 2.0 + 0.4, "dry %.2f m, wet %.2f m" % [slides[0], slides[1]])
+	# the way down from the storm layer
+	var dv: Vector3 = Vector3(-4, 62, -80)
+	await tp(dv + Vector3(0, 0.3, 2.5), 0.0)
+	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.2; player.snap_view()
+	await wait(0.5)
+	await shot("c2_04_way_down")
+	await tp(dv + Vector3(0, 0.3, 0), 0.0)
+	for k in 60:
+		await wait(0.5)
+		if w._ride.is_empty() and k > 4:
+			break
+	check("c2_way_down_to_temple", w.island_of(player.global_position) == "A", str(player.global_position))
+	# Adad and his weather quests
+	var adad = get_tree().get_nodes_in_group("npc").filter(func(n) -> bool: return n.get("id") == "adad")
+	check("c2_adad_is_here", adad.size() == 1)
+	if adad.size() == 1:
+		await tp((adad[0] as Node3D).global_position + Vector3(-2.5, 0.3, 1.0), -PI * 0.4)
+		player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.1; player.snap_view()
+		await wait(0.6)
+		await shot("c2_05_adad")
+	# Hailstone Rings: ride the Hail Tower up and down through the freezing line
+	Game.quests["hail_rings"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await tp(WeatherWorks.HAIL + Vector3(0, 0.3, 0), 0.0)
+	player.zoom_target = 8.0; player.zoom = 8.0; player.pitch = -0.1; player.snap_view()
+	var shot_taken := false
+	for k in 90:
+		await wait(0.5)
+		if not shot_taken and w.weather.hail_rings >= 1:
+			shot_taken = true
+			await shot("c2_06_hail_tower")
+		if Game.quest_state("hail_rings") == "ready":
+			break
+	check("c2_hailstone_three_rings", Game.quest_state("hail_rings") == "ready", "%d rings" % w.weather.hail_rings)
+	await wait(3.0)
+	# Six Sides of Snow: catch real snowflakes, the fakes don't count
+	Game.quests["six_sides"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	var F: Vector3 = CloudWorld.ISLANDS.F.c
+	await tp(F + Vector3(0, 0.3, 8), 0.0)
+	player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = -0.1; player.snap_view()
+	await wait(3.0)
+	await shot("c2_07_snow_cloud")
+	for k in 120:
+		if Game.quest_state("six_sides") == "ready":
+			break
+		var real := w.weather._flakes.filter(func(fl) -> bool: return fl[1] and is_instance_valid(fl[0]))
+		if real.size() > 0:
+			var fp: Vector3 = (real[0][0] as Node3D).global_position
+			player.global_position = Vector3(fp.x, F.y + 0.05, fp.z)
+			player.velocity = Vector3.ZERO
+			(real[0][0] as Node3D).global_position = Vector3(fp.x, F.y + 1.2, fp.z)
+		await wait(0.3)
+	check("c2_six_snowflakes", Game.quest_state("six_sides") == "ready", "%d" % Game.quest_progress("six_sides"))
+	# The Glaze: the Ice Cloud is slippery; relight the four sun lamps
+	Game.quests["the_glaze"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	var G: Vector3 = CloudWorld.ISLANDS.G.c
+	await tp(G + Vector3(0, 0.3, 6), 0.0)
+	await wait(0.8)
+	check("c2_ice_is_slippery", player.grip <= 0.15, "%.2f" % player.grip)
+	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.2; player.snap_view()
+	await wait(0.3)
+	await shot("c2_08_ice_cloud")
+	for lamp in w.weather._lamps:
+		await tp((lamp as Node3D).global_position + Vector3(0.6, 0.3, 0), 0.0)
+		await wait(0.5)
+	check("c2_four_sun_lamps", Game.quest_state("the_glaze") == "ready", "%d" % Game.quest_progress("the_glaze"))
+	await shot("c2_09_lamps_lit")
+	# Mr. Bubbles: his new look and his bubble float
+	Game.quests["mr_bubbles"] = {"state": "active", "n": 0}
+	Game.quests_changed.emit()
+	await wait(0.5)
+	var E: Vector3 = CloudWorld.ISLANDS.E.c
+	await tp(E + Vector3(0, 0.3, 4), 0.0)
+	await wait(1.0)
+	var lord: Enemy = w.lord
+	check("c2_mr_bubbles_here", lord != null and is_instance_valid(lord))
+	if lord:
+		lord._move_cd = 30.0
+		await _look(lord.global_position + Vector3(0, 3.0, 0), lord.global_position + Vector3(2.0, 0.3, 9.0), 6.0, 0.05)
+		await shot("c2_10_mr_bubbles")
+		lord._float_cd = 0.0
+		var caught := false
+		var top_y := 0.0
+		for k in 30:
+			await wait(0.2)
+			if is_instance_valid(player.float_hold) and player.float_hold is BubbleTrap:
+				caught = true
+				top_y = maxf(top_y, player.global_position.y)
+				if player.global_position.y > E.y + 5.0:
+					break
+		check("c2_bubble_floats_you", caught and top_y > E.y + 3.0, "caught %s, up to %.1f" % [caught, top_y - E.y])
+		player.zoom_target = 8.0; player.zoom = 8.0; player.pitch = -0.3; player.snap_view()
+		await wait(0.3)
+		await shot("c2_11_floating")
+		for k in 6:
+			await tap("attack")
+			await wait(0.1)
+		await wait(2.5)
+		check("c2_pop_and_land", not is_instance_valid(player.float_hold) and absf(player.global_position.y - E.y) < 1.0, str(player.global_position))
+		lord.take_damage(999999.0, player.global_position)
+		await wait(3.0)
+	# the rainbow: solid, and you can run back up it
+	Game.flags["mr_bubbles"] = true
+	Game.quests_changed.emit()
+	await wait(0.5)
+	var rb: RainbowSlide = w.get_node_or_null("RainbowSlide")
+	check("c2_rainbow_there", rb != null)
+	if rb:
+		var on := true
+		for t in [0.2, 0.5, 0.8]:
+			await tp(rb.point(t) + Vector3(0, 0.8, 0), 0.0)
+			await wait(0.8)
+			if player.global_position.distance_to(rb.point(t)) > 1.2:
+				on = false
+				print("RAINBOW off at ", t, " ", player.global_position, " vs ", rb.point(t))
+		check("c2_rainbow_is_solid", on)
+		var a := rb.point(0.7); var b := rb.point(0.66)
+		await tp(a + Vector3(0, 0.6, 0), atan2(-(b.x - a.x), -(b.z - a.z)))
+		await wait(0.4)
+		var y0 := player.global_position.y
+		Input.action_press("move_forward")
+		await wait(1.5)
+		Input.action_release("move_forward")
+		check("c2_run_up_the_rainbow", player.global_position.y > y0 + 2.0, "%.1f -> %.1f" % [y0, player.global_position.y])
+		await _look(rb.point(0.6), rb.point(0.95) + Vector3(-6, 3, 8), 8.0, 0.0)
+		await shot("c2_12_rainbow")
+	return false
+
+
+## The Flight Home: an autopilot flies the dragonfly through the rings, from the
+## Sky Gate all the way down to the cabin, and the base game ends.
+func _homeflight_test() -> bool:
+	if not Game.get_meta("hf_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("hf_phase", true)
+		Game.level = 16
+		Game.flags["mount_dragonfly"] = true
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "active", "n": 0}
+		main._travel("home")
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	check("hf_home_world", w is HomeWorld)
+	check("hf_on_the_dragonfly", player.mounted and player.mount_kind == "dragonfly", "%s %s" % [player.mounted, player.mount_kind])
+	check("hf_rings", w.rings.size() >= 30, "%d" % w.rings.size())
+	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.12; player.snap_view()
+	await wait(0.5)
+	await shot("hf_01_start")
+	var shots := {"THE STORM GATE": "hf_02_storm", "THUNDER BIRD ROCKS": "hf_03_birds", "THE FLOATING LAKE": "hf_04_lake", "HOME VALLEY": "hf_05_valley"}
+	var shot_done := {}
+	var t0 := Time.get_ticks_msec()
+	var lowest := 9999.0
+	var next_i := 0
+	while Time.get_ticks_msec() - t0 < 900000 and not w.landed:
+		# aim for the next ring we haven't flown through
+		while next_i < w.rings.size() and w.rings[next_i][4]:
+			next_i += 1
+		var target: Vector3 = w.rings[next_i][1] if next_i < w.rings.size() else w.ground(HomeWorld.LAND.x, HomeWorld.LAND.z)
+		var pp := player.global_position + Vector3(0, 1.0, 0)
+		var d := target - pp
+		if next_i < w.rings.size() and Vector2(d.x, d.z).length() < 1.5 and absf(d.y) > 4.0:
+			w.rings[next_i][4] = true          # (can't get the height right: count it as missed and go on)
+			continue
+		player.yaw = atan2(-d.x, -d.z); player.view_yaw = player.yaw
+		Input.action_press("move_forward")
+		if next_i >= w.rings.size():
+			Input.action_release("jump")
+			Input.action_press("block") if d.y < -2.0 else Input.action_release("block")
+		elif d.y > 0.8:
+			Input.action_release("block"); Input.action_press("jump")
+		elif d.y < -2.5 and Vector2(d.x, d.z).length() < 30.0:
+			Input.action_release("jump"); Input.action_press("block")
+		else:
+			Input.action_release("jump"); Input.action_release("block")
+		lowest = minf(lowest, player.global_position.y)
+		if shots.has(w.area) and not shot_done.has(w.area):
+			shot_done[w.area] = true
+			player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.15
+			await shot(shots[w.area])
+		await wait(0.1)
+	for a in ["move_forward", "jump", "block"]:
+		Input.action_release(a)
+	print("HF rings %d / %d, lowest %.1f, landed %s, at %s" % [w.rings_passed, w.rings.size(), lowest, w.landed, player.global_position])
+	check("hf_flew_the_rings", w.rings_passed >= int(w.rings.size() * 0.7), "%d / %d" % [w.rings_passed, w.rings.size()])
+	check("hf_landed_home", w.landed, str(player.global_position))
+	await wait(1.0)
+	check("hf_quest_done", Game.quest_state("flight_home") == "done", Game.quest_state("flight_home"))
+	player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = -0.15; player.snap_view()
+	await wait(2.5)
+	await shot("hf_06_home")
+	check("hf_the_end_screen", main.menus.current == "forest_victory", main.menus.current)
+	await shot("hf_07_the_end")
+	main.menus._close_dialogue()
+	await wait(0.5)
+	check("hf_portal_back", Game.flags.get("home_won", false))
 	return false

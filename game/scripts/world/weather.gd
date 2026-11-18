@@ -134,9 +134,12 @@ func _hail_step(delta: float) -> void:
 				p.lift = -999.0
 		return
 	_hail_t += delta
-	# a 7-second storm cycle: big push up, then a lull you sink through
+	# a 7-second storm cycle: big push up (never past the top of the tower), then
+	# a lull you sink through, back below the freezing line
 	var cyc := fmod(_hail_t, 7.0)
-	p.lift = lerpf(9.0, 4.0, w.weight) if cyc < 4.0 else -3.5
+	p.lift = lerpf(9.0, 4.0, w.weight) if cyc < 4.0 else -5.0
+	if pp.y > HAIL.y + HAIL_TOP - 3.0:
+		p.lift = minf(p.lift, 0.0)
 	# keep you in the column
 	var to_c := Vector3(HAIL.x - pp.x, 0, HAIL.z - pp.z)
 	p.wind = to_c * 1.5
@@ -211,9 +214,9 @@ func _snow_island() -> void:
 	var om := StandardMaterial3D.new(); om.albedo_color = Color(1.0, 0.5, 0.1)
 	carrot.mesh = ccm; carrot.material_override = om; add_child(carrot)
 	carrot.global_position = man + Vector3(0, 2.05, -0.4); carrot.rotation.x = -PI * 0.5
-	var sign := Label3D.new(); sign.text = "THE SNOW CLOUD\nReal snowflakes have SIX sides"; sign.font_size = 48; sign.pixel_size = 0.006
+	var sign := Label3D.new(); sign.text = "THE SNOW CLOUD\nReal snowflakes have SIX sides"; sign.font_size = 48; sign.pixel_size = 0.0045
 	sign.outline_size = 12; sign.modulate = Color(0.85, 0.95, 1.0); sign.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-	add_child(sign); sign.global_position = c + Vector3(-1, 3.2, 11)
+	add_child(sign); sign.global_position = c + Vector3(-9, 3.0, 4)
 	var mk := Marker3D.new(); mk.add_to_group("snow_field"); mk.set_meta("item", "snowflake"); add_child(mk); mk.global_position = c
 
 ## A snowflake you can catch: six arms (real), or four or five (one of Mr. Bubbles' fakes).
@@ -339,9 +342,9 @@ func _ice_island() -> void:
 		lamp.add_child(ll)
 		_lamps.append(lamp)
 		_lamp_look(lamp, Game.flags.get("cl_sunlamp_%d" % i, false))
-	var sign := Label3D.new(); sign.text = "THE ICE CLOUD\nFreezing rain: SLIPPERY!"; sign.font_size = 48; sign.pixel_size = 0.006
+	var sign := Label3D.new(); sign.text = "THE ICE CLOUD\nFreezing rain: SLIPPERY!"; sign.font_size = 48; sign.pixel_size = 0.0045
 	sign.outline_size = 12; sign.modulate = Color(0.8, 0.92, 1.0); sign.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-	add_child(sign); sign.global_position = c + Vector3(1, 3.2, 13)
+	add_child(sign); sign.global_position = c + Vector3(9, 3.0, 4)
 
 func _lamp_look(lamp: Node3D, lit: bool) -> void:
 	lamp.set_meta("lit", lit)
