@@ -267,6 +267,9 @@ func _run() -> void:
 	elif mode == "castle5":
 		if await _castle5_test():
 			return
+	elif mode == "bluesq":
+		if await _bluesq_test():
+			return
 	elif mode == "polish1":
 		if await _polish1_test():
 			return
@@ -3965,4 +3968,39 @@ func _castle5_test() -> bool:
 	await wait(3.5)
 	await shot("c5_11_boss_move")
 	check("c5_gatekeeper_moves", gk.moves_done.size() >= 1, str(gk.moves_done))
+	return false
+
+
+## The "blue square under your feet": every costume and dark skin, seen from
+## behind on Cloud Island (where the designer spotted it).
+func _bluesq_test() -> bool:
+	if not Game.get_meta("bq_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("bq_phase", true)
+		main._travel("cloud")
+		return true
+	await wait(3.0)
+	player = main.player
+	god = true
+	var w = main.world
+	var at: Vector3 = CloudWorld.ISLANDS.A.c + Vector3(6, 0.3, 24)
+	var ids: Array = OS.get_environment("BQ_IDS").split(",", false) if OS.get_environment("BQ_IDS") != "" else Loot.COSTUMES.keys()
+	for id in ids:
+		Game.wear_costume(id)
+		player.rebuild_body()
+		await tp(at, 0.0)
+		player.zoom_target = 4.2; player.zoom = 4.2; player.pitch = -0.32; player.snap_view()
+		await wait(0.8)
+		await shot("bq_%s" % id)
+		player.yaw = PI * 0.5; player.pitch = -0.02; player.zoom_target = 3.0; player.zoom = 3.0; player.snap_view()
+		await wait(0.5)
+		await shot("bq_%s_side" % id)
+		var names := []
+		for m in player.body.find_children("*", "MeshInstance3D", true, false):
+			if (m as MeshInstance3D).is_visible_in_tree():
+				var ab: AABB = (m as MeshInstance3D).global_transform * (m as MeshInstance3D).get_aabb()
+				names.append("%s y%.2f..%.2f" % [m.name, ab.position.y - player.global_position.y, ab.end.y - player.global_position.y])
+		print("BQ %s floor %.2f meshes: %s" % [id, player.global_position.y, ", ".join(names)])
 	return false

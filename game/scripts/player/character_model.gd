@@ -626,8 +626,31 @@ func _borrow_meshes(path: String, accept: Callable) -> Array[MeshInstance3D]:
 		for i in o.get_surface_override_material_count():
 			if o.get_surface_override_material(i):
 				m.set_surface_override_material(i, o.get_surface_override_material(i))
-		skel.add_child(m)
-		m.skeleton = NodePath("..")
+		# Capes, wings, hats and sunglasses aren't skinned: in the model they hang off a
+		# bone (a BoneAttachment3D on "chest" or "head"). Borrowed straight onto the
+		# skeleton they'd lose that bone and drop to the feet (the "blue square under
+		# your feet" on the Ghost Knight's cape), so hang them off the same bone here.
+		var bone := ""
+		var rel := o.transform
+		var par := o.get_parent()
+		while par and par != src:
+			if par is BoneAttachment3D:
+				bone = String((par as BoneAttachment3D).bone_name)
+				break
+			if par is Node3D:
+				rel = (par as Node3D).transform * rel
+			par = par.get_parent()
+		if o.skin == null and bone != "" and skel.find_bone(bone) >= 0:
+			var att := skel.get_node_or_null("Att_" + bone) as BoneAttachment3D
+			if att == null:
+				att = BoneAttachment3D.new(); att.name = "Att_" + bone
+				skel.add_child(att)
+				att.bone_name = bone
+			m.transform = rel
+			att.add_child(m)
+		else:
+			skel.add_child(m)
+			m.skeleton = NodePath("..")
 		m.material_overlay = flash_mat
 		all_meshes.append(m)
 		out.append(m)
