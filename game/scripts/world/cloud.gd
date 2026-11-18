@@ -1,6 +1,6 @@
 extends Node3D
 class_name CloudWorld
-## Level 4: CLOUD ISLAND (designed by Orion). Islands of cloud in a sunny sky,
+## Level 4: CLOUD ISLAND (designed by Jason's son). Islands of cloud in a sunny sky,
 ## reached by a cloud lift from Ghost Knight Castle.
 ##
 ##   The sea of clouds (y = 0): soft and safe. Fall off an island and you land

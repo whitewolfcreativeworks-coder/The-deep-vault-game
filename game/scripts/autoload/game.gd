@@ -747,7 +747,7 @@ const QUESTS := {
 		"busy": "The throne room is at the far end of the great hall. When he raises his sword, a ring of frost spreads out: get away from it!",
 		"thanks": "It's over! The ghosts are going home at last. The whole of Ashenford owes you everything.\n\nAnd... there's something in the old stable you should see. Pip's been fixing it up for you. It goes VROOM.",
 		"reward": {"xp": 1200, "gold": 400, "potions": 3, "roll": "boss"}},
-	# --- Level 4: Cloud Island (designed by Orion). The angels need help with
+	# --- Level 4: Cloud Island (designed by Jason's son). The angels need help with
 	# Mr. Bubbles the flying bear and the flying animals his storms stir up.
 	"lost_feathers": {"giver": "ninlil", "zone": "cloud", "title": "Lost Feathers",
 		"goal": {"type": "collect", "item": "feather", "count": 6}, "track": "Feathers found",

@@ -226,7 +226,8 @@ func setup(cfg: Dictionary) -> void:
 		if DARK_LOOKS.has(costume_fx):
 			var dl: Dictionary = DARK_LOOKS[costume_fx]
 			for m in all_meshes:
-				_skin_mat(m, dl, false)
+				var mn := String(m.name)
+				_skin_mat(m, dl, mn.contains("Cape") or mn.contains("Cloak"))
 			_add_aura(dl.aura, 2, costume_fx == "infernal")
 		return
 	if cfg.has("outfit_model") and kind == "hero":
@@ -304,7 +305,7 @@ func setup(cfg: Dictionary) -> void:
 			_cloud_extras(_cloud_kind, hero)
 	_play(anims.idle, 0.0)
 
-# --- Cloud Island skins (designed by Orion): the hero, recoloured, plus pieces
+# --- Cloud Island skins (designed by Jason's son): the hero, recoloured, plus pieces
 # made from shapes (wings, snouts, balloons, a bubble...). Each one also sets
 # how floaty you are on Cloud Island (Loot.COSTUMES[...].float).
 var _cloud_kind := ""
@@ -699,12 +700,16 @@ func _skin_mat(m: MeshInstance3D, look: Dictionary, is_cape: bool) -> void:
 		var d := (base as StandardMaterial3D).duplicate() as StandardMaterial3D
 		var c: Color = look.albedo
 		d.albedo_color = Color(d.albedo_color.r * c.r, d.albedo_color.g * c.g, d.albedo_color.b * c.b, c.a)
+		if is_cape:
+			# capes stay cloth-like: darker and only faintly glowing, or the
+			# trailing hem reads as a bright slab on the ground behind your feet
+			d.albedo_color = d.albedo_color.darkened(0.35)
 		d.roughness = look.get("rough", d.roughness)
 		d.metallic = look.get("metal", d.metallic)
 		var e: Color = look.get("emit", Color.BLACK)
 		if e.get_luminance() > 0.0:
 			d.emission_enabled = true
-			d.emission = e * (0.6 if is_cape else 1.0)
+			d.emission = e * (0.2 if is_cape else 1.0)
 			d.emission_energy_multiplier = 1.2
 		if look.get("alpha", false):
 			d.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

@@ -93,7 +93,7 @@ const COSTUMES := {
 	"zombie": {"name": "Zombie Farmer", "file": "Farmer_B", "fx": "rot", "line": "Braaains... you're a zombie farmer!"},
 	"lich": {"name": "Lich", "file": "Lorekeeper", "fx": "deathly", "line": "A cold, ghostly lich. Your breath freezes the air."},
 	"demon": {"name": "Demon", "file": "Tiefling", "fx": "infernal", "line": "Horns of fire! You're a demon from the Sinkhole!"},
-	# Cloud Island (designed by Orion): "float" is your starting weight up there (0 floaty .. 1 heavy)
+	# Cloud Island (designed by Jason's son): "float" is your starting weight up there (0 floaty .. 1 heavy)
 	"angel": {"name": "Angel", "cloud": "angel", "float": 0.2, "line": "Wings and a halo! You float down as gently as a feather."},
 	"flying_pig": {"name": "Flying Pig", "cloud": "flying_pig", "float": 0.25, "line": "Oink oink! Pigs CAN fly. You're floaty now!"},
 	"balloon_man": {"name": "Balloon Man", "cloud": "balloon_man", "float": 0.08, "line": "Squeak squeak! So floaty, the wind blows you around."},
