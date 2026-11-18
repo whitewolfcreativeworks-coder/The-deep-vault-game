@@ -15,9 +15,18 @@ static func m(c: Color, rough := 0.7, metal := 0.0) -> StandardMaterial3D:
 	var mt := StandardMaterial3D.new(); mt.albedo_color = c; mt.roughness = rough; mt.metallic = metal
 	return mt
 
+static var _jit := 0
+
 static func box(parent: Node3D, size: Vector3, mat: Material, pos: Vector3, rot := Vector3.ZERO, collide := false) -> MeshInstance3D:
-	var mi := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = size
-	mi.mesh = bm; mi.material_override = mat; mi.position = pos; mi.rotation = rot
+	# every box is a few millimetres different in size and height, so no two faces
+	# ever sit exactly on top of each other (that makes them flicker)
+	# (steps of whole millimetres chosen so every bottom, top and side lands on its own value)
+	_jit += 1
+	var j := 0.012 * float(_jit % 4)
+	var grow := Vector3(j if size.x >= 0.25 else j * 0.25, j if size.y >= 0.25 else j * 0.25, j if size.z >= 0.25 else j * 0.25)
+	var mi := MeshInstance3D.new(); var bm := BoxMesh.new()
+	bm.size = size + grow
+	mi.mesh = bm; mi.material_override = mat; mi.position = pos + Vector3(0, 0.004 + 0.008 * float(_jit % 5) + (grow.y - j) * 0.5, 0); mi.rotation = rot
 	parent.add_child(mi)
 	if collide:
 		var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = size
@@ -164,7 +173,7 @@ class MerryGoRound extends AnimatableBody3D:
 		for k in 6:
 			var a := k * TAU / 6.0
 			# coloured wedges painted on the deck
-			var wedge := Playground.box(_top, Vector3(0.9, 0.02, 2.0), Playground.m(cols[k], 0.5), Vector3(sin(a) * 1.15, 0.42, cos(a) * 1.15), Vector3(0, a, 0))
+			var wedge := Playground.box(_top, Vector3(0.9, 0.02, 2.0), Playground.m(cols[k], 0.5), Vector3(sin(a) * 1.15, 0.42 + k * 0.006, cos(a) * 1.15), Vector3(0, a, 0))
 			wedge.name = "Wedge%d" % k
 			# a bent handlebar
 			var hb := Node3D.new(); _top.add_child(hb); hb.rotation.y = a + TAU / 12.0

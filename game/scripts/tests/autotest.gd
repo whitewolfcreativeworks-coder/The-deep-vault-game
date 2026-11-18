@@ -2188,7 +2188,7 @@ func _sinkhole_test() -> bool:
 	check("lava_burns", Game.hp < hp0, "%.0f -> %.0f" % [hp0, Game.hp])
 	god = true
 	Game.hp = Game.max_hp()
-	_kill_near(Enemy.TYPES.keys(), 140.0, Vector3(-32, SY, -124))
+	_kill_near(Enemy.TYPES.keys().filter(func(k) -> bool: return k != "cyclops"), 140.0, Vector3(-32, SY, -124))
 	# hop the stepping stones over the lava channel to the west ledge
 	await tp(Vector3(-64.5, SY + 0.3, -95.5), 0.0)
 	var stones: Array = SinkholeOfDeath.STONES
@@ -3811,7 +3811,7 @@ func _castle5_test() -> bool:
 		await wait(2.0)
 		await shot("c5_02_skeleton_rises")
 		check("c5_skeleton_claws_out", d0.state != Enemy.S.DORMANT)
-	_kill_near(Enemy.TYPES.keys(), 80.0, Vector3(-62, CY, -26))
+	_kill_near(Enemy.TYPES.keys().filter(func(k) -> bool: return k != "bone_colossus"), 40.0, Vector3(-62, CY, -26))
 	# the Bone Bridge
 	await tp(BoneCrypt.BRIDGE_START + Vector3(0, 0.3, 0), 0.0)
 	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.3; player.snap_view()

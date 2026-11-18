@@ -303,7 +303,7 @@ class BridgeSlab extends Node3D:
 		var p := get_tree().get_first_node_in_group("player") as Node3D
 		if _t < 0.0 and p and _body.process_mode != Node.PROCESS_MODE_DISABLED:
 			var d := p.global_position - global_position
-			if absf(d.x) < 1.3 and absf(d.z) < 1.0 and d.y > -0.2 and d.y < 0.6:
+			if absf(d.x) < 1.5 and absf(d.z) < 1.3 and d.y > -0.2 and d.y < 0.6:     # the seam between two slabs counts for both
 				_t = 0.0
 				Sfx.play_at("bone_break", global_position, -10.0, 0.3)
 		if _t >= 0.0:
