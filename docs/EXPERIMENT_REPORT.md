@@ -668,3 +668,31 @@ The designer sent about thirty notes in two messages, covering every level. We w
 - **Run tests one at a time.** Two Godot test runs on the same machine share the same saved games and fight over the CPU. Tests were run in sequence, each on a frozen copy of the code with its own save folder.
 - **Keep private details out of the repository.** The designer's name had slipped into two code comments. It was replaced with "Jason's son", and the private name now lives only in the private project notes.
 
+## Follow-up 18: Cloud Island redesign and the flight home (Nov 18)
+
+**The blue square, for real this time.** On Nov 17 we toned down the ghostly capes. That hid the symptom but missed the cause, and the designer saw it again on Cloud Island.
+
+This time we measured every costume piece against the hero's feet. The Paladin cape sat from 0.7 m **below** the ground up to the ankles.
+
+The cause: in the KayKit models, capes, wings, hats and sunglasses aren't skinned. They hang off a bone through a `BoneAttachment3D`, and the code that borrows a costume onto our skeleton copied the mesh but not that bone. The plate armours share the Paladin look, which is why it seemed random.
+
+The fix re-creates the bone attachment, and the new `bluesq` test checks every affected costume.
+
+**Lesson:** when a fix only makes a bug harder to see, it isn't fixed. Measure where the geometry actually is.
+
+**Cloud floors.** Each island used to be one solid cylinder, so holes were impossible, and the cloud puffs stood 0.3 to 1.5 m above the walking surface, so feet sank into them.
+
+- **Floors:** each island is now a grid of 1 m cells with holes cut out. Thin-cloud patches are separate floors that switch off when you're heavy.
+- **Puffs:** they're placed so their tops sit on the floor.
+- **Grip:** weight now sets a `grip` value on the player, which scales floor acceleration. A wet hero slid 1.24 m after letting go of the stick, against 0.28 m dry.
+
+**What the tests caught.**
+- The Hail Tower first threw you out of its top and restarted the cycle, so you never sank back below the freezing line.
+- Mr. Bubbles' charge could knock you off the thunderhead (a long fall to the sea). The arena now has storm winds at its edge during the fight.
+
+**The flight home** is a new zone that reuses the opening movie's valley and cabin (with collision added). The course is a Catmull-Rom path; rings are dropped every 30 m along it.
+
+The `homeflight` test flies the whole course with an autopilot that steers at the next ring and climbs or dives, then checks the landing, the quest and the ending screen.
+
+**Precipitation Simulator.** The designer's 6th-grade simulator (17 kinds of precipitation, each with steps and a fact) gave us the science for three quests, and its facts are what Adad says when you turn them in.
+

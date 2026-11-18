@@ -72,6 +72,31 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### New in the Nov 18 round: Cloud Island redesign and the flight home
+- **The blue square under your feet is fixed.** Costume and armour capes, wings, hats and sunglasses that hang off a bone were dropping to your feet. They now hang where they should.
+- **Clouds you stand on top of.** Your feet stay on the cloud surface instead of sinking in.
+- **Wet = slippery.** The more rain you carry, the further you slide. The ice cloud is slipperiest of all.
+- **Holes and thin cloud.** Holes go right through the islands. Patches of thin, see-through cloud only hold you while you're light, so a heavy, rain-soaked hero falls through.
+- **Ways down.** Green WAY DOWN bubble vents float you back to the sky temple from the higher islands.
+- **The rainbow is solid.** Run back up it after Mr. Bubbles is calmed.
+- **Tougher thunder birds.** They're faster and harder to hit, and there are more of them up high.
+- **Mr. Bubbles, redesigned.**
+  - He's a fluffy storm-cloud bear with a bubble wand, storm-cloud wings and rainbow bubbles circling him.
+  - His new move floats you up in a big bubble: tap ATTACK to pop it and land.
+  - During the fight, storm winds keep you from being knocked off the thunderhead.
+- **Adad the Weather-Keeper and two new islands.** Three quests are built on the Precipitation Simulator, a 6th-grade science project:
+  - **Hailstone Rings:** a Hail Tower tosses you up past the freezing line again and again.
+  - **Six Sides of Snow:** catch six real snowflakes on the Snow Cloud.
+  - **The Glaze:** relight four sun lamps on the freezing-rain Ice Cloud.
+- **The Flight Home, the last quest of the base game.** Anu opens the Sky Gate and you fly your dragonfly home at sunset:
+  - through golden rings (green ones rest its wings)
+  - past lightning in the Storm Gate
+  - by the rocks where thunder birds nest
+  - straight through the Floating Lake's waterfall
+  - over the mountains and down to your cabin
+
+  Land for the ending. Hold BLOCK to dive on the dragonfly.
+
 ### New in the Nov 17 playtest round
 - **Four new classes (nine in all), each with two powers and its own outfit:**
   - **Priest:** Holy Smite and Prayer of Light (a big heal).
