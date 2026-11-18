@@ -298,6 +298,7 @@ func _flush_trims() -> void:
 		for cz in range(int(floor(lo.z)), int(floor(hi.z)) + 1):
 			if not by_z.has(cz): by_z[cz] = []
 			by_z[cz].append(i)
+	var laid: Array = []
 	for rq in _trim_reqs:
 		var along_x: bool = rq[0]
 		var fixed: float = rq[1]
@@ -311,8 +312,11 @@ func _flush_trims() -> void:
 			var probe: float = face + sd * 0.035
 			var pieces: Array = [[float(rq[3]), float(rq[4])]]
 			var cands: Array = (by_z if along_x else by_x).get(int(floor(probe)), [])
+			var others: Array = []
 			for i in cands:
-				var bx: Dictionary = boxes[i]
+				others.append(boxes[i])
+			others.append_array(laid)          # and the trims already laid (corners meet cleanly)
+			for bx in others:
 				var lo: Vector3 = bx.lo; var hi: Vector3 = bx.hi
 				var plo := lo.z if along_x else lo.x
 				var phi := hi.z if along_x else hi.x
@@ -328,7 +332,7 @@ func _flush_trims() -> void:
 				pieces = _cut(pieces, dn[0], dn[1])
 			for pc0 in pieces:
 				# a hair short at each end, so a trim's end is never flush with a wall's end
-				var pc: Array = [float(pc0[0]) + 0.012, float(pc0[1]) - 0.012]
+				var pc: Array = [float(pc0[0]) + 0.017, float(pc0[1]) - 0.017]
 				if pc[1] - pc[0] < 0.25:
 					continue
 				done.append(pc)
@@ -337,6 +341,7 @@ func _flush_trims() -> void:
 				var lo2 := Vector3(pc[0], y_lo, minf(p0, p1)) if along_x else Vector3(minf(p0, p1), y_lo, pc[0])
 				var hi2 := Vector3(pc[1], y_hi, maxf(p0, p1)) if along_x else Vector3(maxf(p0, p1), y_hi, pc[1])
 				trim(lo2, hi2, rq[7])
+				laid.append({"lo": lo2, "hi": hi2})
 			_trim_lines[key] = done
 	_trim_reqs.clear()
 

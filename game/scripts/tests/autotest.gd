@@ -1532,7 +1532,7 @@ func _forest_test() -> bool:
 		check("mine_gate_bars_the_way", player.global_position.x < 37.0, str(player.global_position))
 		var lev: Interactable = null
 		for n3 in get_tree().get_nodes_in_group("interactable"):
-			if n3 is Interactable and (n3 as Interactable).kind == "lever" and (n3 as Node3D).global_position.x > 20.0:
+			if n3 is Interactable and (n3 as Interactable).kind == "lever" and (n3 as Node3D).global_position.x > 20.0 and absf((n3 as Node3D).global_position.y - Y) < 3.0:
 				lev = n3
 		check("mine_lever_exists", lev != null)
 		await tp(lev.global_position + Vector3(0, 0.3, 1.5), 0.0)
