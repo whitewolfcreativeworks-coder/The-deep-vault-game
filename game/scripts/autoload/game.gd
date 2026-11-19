@@ -23,7 +23,15 @@ var profile := {
 	"face": "none",
 	"build": 1.0,           # 0.82 skinny .. 1.3 big
 	"height": 1.0,          # 0.86 short .. 1.14 tall
+	"sex": "",              # "male" / "female" ("" = the class's own)
 }
+
+## Is the hero a man or a woman? (The class's own unless chosen in the creator.)
+func hero_sex() -> String:
+	var sx := String(profile.get("sex", ""))
+	if sx == "male" or sx == "female":
+		return sx
+	return String(CharacterModel.HEROES.get(profile.get("hero", "Knight"), {}).get("sex", "male"))
 const SKIN_COLORS := [Color(0.97, 0.8, 0.67), Color(1.0, 0.86, 0.76), Color(0.93, 0.72, 0.55), Color(0.82, 0.6, 0.42),
 	Color(0.66, 0.45, 0.3), Color(0.47, 0.31, 0.21), Color(0.33, 0.21, 0.15), Color(0.55, 0.8, 0.5), Color(0.6, 0.7, 0.95)]
 const SKIN_NAMES := ["Hero's own", "Pale", "Fair", "Tan", "Olive", "Brown", "Deep", "Goblin green", "Frost blue"]
@@ -164,6 +172,8 @@ var mana := 60.0
 var stamina := 100.0
 var inventory: Array[String] = ["rusty_sword", "traveler_garb"]
 var equipped := {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
+var stash: Array[String] = []   # the gear chest in the cabin at home
+const STASH_SIZE := 60
 var kills := 0
 var play_time := 0.0
 var flags := {}  # world state that survives respawn: "chest_x_opened", "enemy_x_dead", "gate_x_open"...
@@ -187,6 +197,12 @@ const BASE_MANA := 60.0
 func _init() -> void:
 	_register_inputs()
 	_reset_items()
+
+func _ready() -> void:
+	# every 3D label (signs, name tags, damage numbers) uses the friendly sign font
+	get_tree().node_added.connect(func(n: Node) -> void:
+		if n is Label3D and (n as Label3D).font == null:
+			(n as Label3D).font = SignText.font())
 
 func _process(delta: float) -> void:
 	if in_game and not get_tree().paused:
@@ -287,10 +303,37 @@ func max_stamina() -> float:
 	return 100.0 + (level - 1) * 5.0
 
 func attack_damage() -> float:
-	return BASE_DAMAGE + (level - 1) * 3.5 + gear("damage")
+	return (BASE_DAMAGE + (level - 1) * 3.5 + gear("damage")) * (1.25 if has_buff("strong") else 1.0)
 
 func spell_damage() -> float:
-	return (24.0 + (level - 1) * 6.5) * (1.0 + gear("spell") / 100.0)
+	return (24.0 + (level - 1) * 6.5) * (1.0 + gear("spell") / 100.0) * (1.25 if has_buff("strong") else 1.0)
+
+## Short buffs from food (see scripts/world/food.gd): name -> seconds left. Not saved.
+var buffs := {}
+## Rainbow vision from glowing mushrooms: about one point per mushroom (0..5.99),
+## wearing off over time. See RainbowShroom and RainbowVision.
+var shroom := 0.0
+const BUFF_NAMES := {"strong": "Strong", "tough": "Tough", "quick": "Quick", "fed": "Well fed"}
+
+func add_buff(n: String, secs: float) -> void:
+	buffs[n] = maxf(float(buffs.get(n, 0.0)), secs)
+
+func has_buff(n: String) -> bool:
+	return float(buffs.get(n, 0.0)) > 0.0
+
+func tick_buffs(delta: float) -> void:
+	for k in buffs.keys():
+		buffs[k] = float(buffs[k]) - delta
+		if float(buffs[k]) <= 0.0:
+			buffs.erase(k)
+
+func buffs_text() -> String:
+	var parts: Array[String] = []
+	for k in buffs:
+		parts.append("%s %ds" % [BUFF_NAMES.get(k, k), ceili(float(buffs[k]))])
+	if shroom >= 1.0:
+		parts.append("Rainbow vision x%d" % mini(int(shroom), 5))
+	return "   ".join(parts)
 
 func spell_power() -> float:
 	return gear("spell")
@@ -315,14 +358,17 @@ func xp_to_next() -> int:
 
 func mitigate(raw: float) -> float:
 	var d := defense()
-	return raw * (1.0 - d / (d + 45.0))
+	return raw * (1.0 - d / (d + 45.0)) * (0.75 if has_buff("tough") else 1.0)
 
 # ---------------------------------------------------------------------------
 func reset_run() -> void:
+	buffs.clear()
+	shroom = 0.0
 	level = 1; xp = 0; gold = 0; potions = 3; mana_potions = 2; stamina_potions = 2; kills = 0; play_time = 0.0
 	_reset_items()
 	inventory = ["rusty_sword", "traveler_garb"]
 	equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
+	stash = []
 	flags = {}
 	quests = {}
 	tracked_quest = ""
@@ -419,6 +465,34 @@ func salvage(id: String) -> void:
 	gold += g
 	message.emit("Salvaged %s for %d gold" % [it.name, g], Color(1.0, 0.82, 0.3))
 	inventory_changed.emit(); stats_changed.emit()
+
+## The gear chest at home: put things in, take them out. (What you're wearing
+## and quest items stay with you.)
+func can_stash(id: String) -> bool:
+	var it := item(id)
+	return not it.is_empty() and inventory.has(id) and not equipped.values().has(id) and it.get("slot", "") != "quest"
+
+func stash_put(id: String) -> bool:
+	if not can_stash(id):
+		return false
+	if stash.size() >= STASH_SIZE:
+		message.emit("The gear chest is full!", Color(1.0, 0.6, 0.4))
+		return false
+	inventory.erase(id)
+	stash.append(id)
+	inventory_changed.emit()
+	return true
+
+func stash_take(id: String) -> bool:
+	if not stash.has(id):
+		return false
+	if inventory.size() >= BAG_SIZE:
+		message.emit("Your bag is full! Put something in the chest first.", Color(1.0, 0.6, 0.4))
+		return false
+	stash.erase(id)
+	inventory.append(id)
+	inventory_changed.emit()
+	return true
 
 ## Keep the bag tidy: when full, the least valuable unequipped item becomes gold.
 func _trim_bag() -> void:
@@ -547,6 +621,7 @@ func save_slot(i := -1) -> bool:
 		"items": items.duplicate(true),
 		"inventory": Array(inventory),
 		"equipped": equipped.duplicate(),
+		"stash": Array(stash),
 		"kills": kills, "play_time": play_time,
 		"flags": flags.duplicate(true),
 		"checkpoint_pos": checkpoint_pos, "checkpoint_yaw": checkpoint_yaw, "checkpoint_name": checkpoint_name,
@@ -582,6 +657,8 @@ func load_slot(i: int) -> bool:
 	reset_run()
 	active_slot = i
 	var p: Dictionary = d.get("profile", {})
+	if not p.has("sex"):
+		profile.sex = ""      # saves from before you could choose man or woman
 	for k in p:
 		profile[k] = p[k]
 	# retired face options (Nov 17): scar -> glowing eyes, rosy cheeks -> plain
@@ -595,6 +672,7 @@ func load_slot(i: int) -> bool:
 	for k in its:
 		items[k] = its[k]
 	inventory.assign(d.get("inventory", ["rusty_sword", "traveler_garb"]))
+	stash.assign(d.get("stash", []))
 	var eq: Dictionary = d.get("equipped", {})
 	for k in eq:
 		equipped[k] = eq[k]

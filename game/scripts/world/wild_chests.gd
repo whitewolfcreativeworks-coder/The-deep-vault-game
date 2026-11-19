@@ -170,12 +170,7 @@ func _kit(name: String, parent: Node3D, at: Vector3, yaw: float, scl: float) -> 
 	n.position = at; n.rotation_degrees.y = yaw; n.scale = Vector3.ONE * scl
 
 func _mushroom(parent: Node3D, p: Vector3, col: Color) -> void:
-	var cap := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.3; sm.height = 0.3; sm.is_hemisphere = true
-	cap.mesh = sm; cap.material_override = FX.glow_material(col, 1.5); cap.position = p + Vector3(0, 0.38, 0)
-	parent.add_child(cap)
-	var stem := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.06; cm.bottom_radius = 0.09; cm.height = 0.4
-	var st := StandardMaterial3D.new(); st.albedo_color = Color(0.9, 0.86, 0.75); stem.mesh = cm; stem.material_override = st
-	stem.position = p + Vector3(0, 0.2, 0); parent.add_child(stem)
+	RainbowShroom.make(parent, p, col, 0.86, false)      # edible: rainbow vision!
 
 func _sign(parent: Node3D, at: Vector3, text: String) -> void:
 	var post := MeshInstance3D.new(); var pm := BoxMesh.new(); pm.size = Vector3(0.12, 1.4, 0.12); post.mesh = pm
@@ -185,8 +180,9 @@ func _sign(parent: Node3D, at: Vector3, text: String) -> void:
 	var bw := StandardMaterial3D.new(); bw.albedo_color = Color(0.72, 0.55, 0.32); board.material_override = bw
 	board.position = at + Vector3(0, 1.35, 0); parent.add_child(board)
 	for side in [1.0, -1.0]:
-		var l := Label3D.new(); l.text = text; l.font_size = 40; l.pixel_size = 0.0045; l.outline_size = 0
-		l.modulate = Color(0.18, 0.1, 0.04); l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var l := Label3D.new(); l.text = text; l.font_size = 48; l.outline_size = 0
+		l.modulate = Color(0.18, 0.1, 0.04)
+		SignText.fit(l, 1.4, 0.68)
 		l.position = at + Vector3(0, 1.35, 0.05 * side)
 		if side < 0:
 			l.rotation.y = PI

@@ -9,8 +9,15 @@ class_name ForestDiscoveries
 ##   snails        a snail race: cheer and the snails race to the finish
 ##   bunnies       a bunny family by their burrow: share a carrot
 ##   bottle        a message in a bottle on the stream bank
+##   wishing_well  toss in a coin and make a wish (a random blessing)
+##   fairy_ring    a ring of toadstools where fairies dance (magic and speed)
+##   picnic        someone's picnic, left on a blanket (food you can eat)
+##   bee_hive      a hive in a stump: the bees share their honey
+##   bounce_shroom a giant mushroom: jump on it to bounce sky high
+## There are four gnome houses, and each gnome has a different special gift.
 
-const KINDS := ["gnome_house", "teddy", "frog", "snails", "bunnies", "bottle"]
+const KINDS := ["gnome_house", "teddy", "frog", "snails", "bunnies", "bottle",
+	"gnome_house", "wishing_well", "fairy_ring", "gnome_house", "picnic", "bee_hive", "gnome_house", "bounce_shroom"]
 var forest: ForestWorld
 var _rng := RandomNumberGenerator.new()
 
@@ -25,6 +32,7 @@ static func build_in(f: ForestWorld) -> ForestDiscoveries:
 func _place_all() -> void:
 	_rng.randomize()
 	var used: Array[Vector2] = []
+	var gnome := 0
 	for k in KINDS:
 		var spot := Vector2.INF
 		for attempt in 60:
@@ -35,7 +43,7 @@ func _place_all() -> void:
 					continue
 			elif not forest._wild_spot_ok(p):
 				continue
-			if p.distance_to(Vector2(0, 92)) < 18.0 or used.any(func(u: Vector2) -> bool: return u.distance_to(p) < 30.0):
+			if p.distance_to(Vector2(0, 92)) < 18.0 or used.any(func(u: Vector2) -> bool: return u.distance_to(p) < 24.0):
 				continue
 			spot = p
 			break
@@ -44,6 +52,9 @@ func _place_all() -> void:
 		used.append(spot)
 		var spot_node := Spot.new()
 		spot_node.kind = k
+		if k == "gnome_house":
+			spot_node.variant = gnome
+			gnome += 1
 		add_child(spot_node)
 		spot_node.global_position = forest.ground(spot.x, spot.y)
 		spot_node.rotation.y = _rng.randf() * TAU
@@ -63,6 +74,7 @@ static func ball(parent: Node3D, r: float, m: Material, at: Vector3, scl := Vect
 
 class Spot extends Node3D:
 	var kind := ""
+	var variant := 0          # which gnome lives here (each has a different gift)
 	var _actors: Array[Node3D] = []
 	var _busy := 0.0
 	var _t := 0.0
@@ -77,6 +89,11 @@ class Spot extends Node3D:
 			"snails": _snails()
 			"bunnies": _bunnies()
 			"bottle": _bottle()
+			"wishing_well": _wishing_well()
+			"fairy_ring": _fairy_ring()
+			"picnic": _picnic()
+			"bee_hive": _bee_hive()
+			"bounce_shroom": _bounce_shroom()
 		# a soft twinkle so you notice it from a little way off
 		var sp := CPUParticles3D.new(); sp.amount = 10; sp.lifetime = 2.2; sp.preprocess = 2.0
 		sp.mesh = FX.quad(0.09); sp.material_override = FX.glow_material(Color(1.0, 0.95, 0.7), 2.5)
@@ -97,6 +114,11 @@ class Spot extends Node3D:
 			"snails": return "[E] Cheer for the snails!"
 			"bunnies": return "[E] Share a carrot"
 			"bottle": return "[E] Read the message in the bottle"
+			"wishing_well": return "[E] Toss a coin in the well and make a wish (5 gold)"
+			"fairy_ring": return "[E] Step in and dance with the fairies"
+			"picnic": return "[E] Peek in the picnic basket"
+			"bee_hive": return "[E] Ask the bees for some honey"
+			"bounce_shroom": return "[E] Poke the giant mushroom (then jump on it!)"
 		return "[E] Look"
 
 	func can_interact() -> bool:
@@ -110,7 +132,7 @@ class Spot extends Node3D:
 				_bubble.visible = false)
 
 	func _first() -> bool:
-		var f := "disc_" + kind
+		var f := "disc_" + kind + ("_%d" % variant if kind == "gnome_house" and variant > 0 else "")
 		if Game.flags.get(f, false):
 			return false
 		Game.flags[f] = true
@@ -130,10 +152,7 @@ class Spot extends Node3D:
 				tw.tween_property(g, "position:z", -0.2, 0.4)
 				tw.tween_callback(func() -> void: g.visible = false)
 				Sfx.play_at("door", global_position, -6.0, 0.1)
-				_say("Oh! A visitor! Have a cookie!" if first else "Back again? Sorry, all out of cookies!")
-				if first:
-					Pickup.spawn(at + Vector3(0, 0, -1.5), "stamina")
-					Game.add_gold(25)
+				_gnome_gift(first, at)
 			"teddy":
 				FX.burst(at + Vector3(0, 0.3, 0), Color(1.0, 0.45, 0.65), 40, 2.5, 0.15, 1.2, 1.5)
 				Sfx.play("levelup", -12.0, 0.2)
@@ -184,6 +203,43 @@ class Spot extends Node3D:
 				if first:
 					Pickup.spawn(at, "stamina")
 					Pickup.spawn(at, "stamina")
+			"wishing_well":
+				_busy = 2.0
+				_wish()
+				if first:
+					Pickup.spawn(at + Vector3(0, 0, -1.6).rotated(Vector3.UP, rotation.y), "potion")
+			"fairy_ring":
+				FX.burst(at + Vector3(0, 0.4, 0), Color(1.0, 0.6, 1.0), 60, 3.0, 0.12, 1.4, 1.5)
+				FX.burst(at + Vector3(0, 0.4, 0), Color(0.6, 1.0, 1.0), 40, 2.5, 0.1, 1.4, 1.5)
+				Sfx.play("levelup", -10.0, 0.3)
+				Game.mana = Game.max_mana(); Game.stats_changed.emit()
+				Game.add_buff("quick", 60.0)
+				_say("The fairies dance round you. You feel light as a feather!" if first else "Twirl, twirl! The fairies giggle.")
+				if first:
+					Pickup.spawn(at, "mana")
+					Pickup.spawn(at, "mana")
+			"picnic":
+				_say("Someone left their picnic! Help yourself to a bite." if not first else "A picnic! And a little coin purse in the basket!")
+				if first:
+					Game.add_gold(35)
+					Sfx.play("coins", -6.0)
+			"bee_hive":
+				FX.burst(at + Vector3(0, 0.3, 0), Color(1.0, 0.85, 0.2), 30, 2.0, 0.06, 1.2, 0.5)
+				Sfx.play_at("chirp", global_position, -6.0, 0.4)
+				var hp_add := Game.max_hp() * 0.4
+				Game.hp = minf(Game.max_hp(), Game.hp + hp_add); Game.stats_changed.emit()
+				_say("Bzzz! The bees share their honey. Sweet!" if first else "Bzz bzz. (A little more honey!)")
+				if first:
+					Pickup.spawn(at, "potion")
+			"bounce_shroom":
+				var cap := _actors[0]
+				var tw6 := cap.create_tween()
+				tw6.tween_property(cap, "scale", Vector3(1.15, 0.8, 1.15), 0.12)
+				tw6.tween_property(cap, "scale", Vector3.ONE, 0.5).set_trans(Tween.TRANS_ELASTIC)
+				Sfx.play_at("pop", global_position, -4.0, 0.2)
+				_say("Boing! It's bouncy... jump on top!" if not first else "Boing! It's bouncy! (Jump on top!) And there's a coin in the moss.")
+				if first:
+					Game.add_gold(30)
 			"bottle":
 				var sc := get_tree().current_scene
 				if sc.has_method("show_lore"):
@@ -192,9 +248,64 @@ class Spot extends Node3D:
 					Game.add_gold(60)
 					Sfx.play("coins", -4.0)
 
+	## Each gnome gives something different, once; after that, a friendly hello.
+	func _gnome_gift(first: bool, at: Vector3) -> void:
+		var front := at + Vector3(0, 0, -1.5).rotated(Vector3.UP, rotation.y)
+		match variant:
+			0:
+				_say("Oh! A visitor! Have a cookie!" if first else "Back again? Sorry, all out of cookies!")
+				if first:
+					Pickup.spawn(front, "stamina")
+					Game.add_gold(25)
+			1:
+				_say("A hero! Take my lucky gem, it's ever so shiny!" if first else "Still shiny? Good, good!")
+				if first:
+					Game.add_gold(150)
+					Sfx.play("coins", -2.0)
+					FX.burst(front + Vector3(0, 0.6, 0), Color(0.4, 1.0, 0.9), 50, 3.0, 0.15, 1.0, 1.0)
+			2:
+				_say("I made this in my workshop. It's MAGIC!" if first else "Take care of my magic thing!")
+				if first:
+					var id := Loot.make_random(maxi(Game.level, 3), 0.6, 2)
+					Game.add_item(id, false)
+					var it: Dictionary = Game.item(id)
+					Game.say("The gnome gives you: %s!" % String(it.get("name", "a magic item")), Loot.rarity_color(int(it.get("rarity", 2))))
+					Sfx.play("levelup", -8.0, 0.1)
+					FX.burst(front + Vector3(0, 0.8, 0), Loot.rarity_color(int(it.get("rarity", 2))), 60, 3.5, 0.15, 1.0, 1.0)
+			_:
+				_say("Mushroom tea! Gnome recipe. Drink up!" if first else "More tea? The kettle's still warm!")
+				Game.hp = Game.max_hp(); Game.mana = Game.max_mana(); Game.stamina = Game.max_stamina()
+				Game.stats_changed.emit()
+				if first:
+					Game.add_buff("strong", 90.0)
+					Game.add_buff("quick", 90.0)
+					Game.say("Gnome tea: Strong and Quick for a minute and a half!", Color(1.0, 0.85, 0.5))
+				Sfx.play("sip", -3.0)
+
+	func _wish() -> void:
+		if Game.gold < 5:
+			_say("You need a coin to make a wish!")
+			return
+		Game.gold -= 5
+		Game.stats_changed.emit()
+		Sfx.play("coins", -6.0)
+		var wishes := [["strong", "You wish to be strong... and you are!"], ["quick", "You wish to be quick... and you are!"],
+			["tough", "You wish to be tough... and you are!"], ["fed", "You wish for a full tummy... and you get one!"]]
+		var w: Array = wishes[randi() % wishes.size()]
+		Game.add_buff(String(w[0]), 75.0)
+		_say(String(w[1]))
+		FX.burst(global_position + Vector3(0, 1.2, 0), Color(0.6, 0.8, 1.0), 40, 2.5, 0.12, 1.2, 1.0)
+		FX.burst(global_position + Vector3(0, 0.5, 0), Color(1.0, 0.85, 0.3), 12, 1.5, 0.06, 0.6, -6.0)
+
 	func _physics_process(delta: float) -> void:
 		_t += delta
 		_busy -= delta
+		if kind == "bounce_shroom":
+			_bounce_step()
+		elif kind == "fairy_ring" and _actors.size() > 0:
+			for i in _actors.size():
+				var a := _t * 1.2 + i * TAU / _actors.size()
+				_actors[i].position = Vector3(cos(a) * 1.6, 1.1 + sin(_t * 3.0 + i) * 0.25, sin(a) * 1.6)
 		match kind:
 			"bunnies":
 				for i in _actors.size():
@@ -206,6 +317,114 @@ class Spot extends Node3D:
 					_actors[0].scale.y = 1.0 + sin(_t * 3.0) * 0.06
 
 	# --- the little scenes ---------------------------------------------------
+	func _wishing_well() -> void:
+		var stone := ForestDiscoveries.mt(Color(0.55, 0.53, 0.5), 0.9)
+		var wood := ForestDiscoveries.mt(Color(0.5, 0.32, 0.18), 0.85)
+		var roof := ForestDiscoveries.mt(Color(0.7, 0.2, 0.15), 0.7)
+		for k in 10:
+			var a := k * TAU / 10.0
+			var b := Playground.box(self, Vector3(0.5, 0.75, 0.3), stone, Vector3(cos(a) * 0.95, 0.38, sin(a) * 0.95), Vector3(0, -a + PI / 2, 0))
+			b.name = "Stone%d" % k
+		var water := StandardMaterial3D.new(); water.albedo_color = Color(0.15, 0.35, 0.6); water.metallic = 0.4; water.roughness = 0.1
+		water.emission_enabled = true; water.emission = Color(0.2, 0.45, 0.9); water.emission_energy_multiplier = 0.6
+		Playground.cyl(self, 0.8, 0.8, 0.04, water, Vector3(0, 0.45, 0), Vector3.ZERO, 24)
+		for sx in [-1.0, 1.0]:
+			Playground.box(self, Vector3(0.12, 1.9, 0.12), wood, Vector3(sx * 0.95, 1.1, 0))
+		var rf := MeshInstance3D.new(); var pm := PrismMesh.new(); pm.size = Vector3(2.4, 0.7, 1.4)
+		rf.mesh = pm; rf.material_override = roof; rf.position = Vector3(0, 2.35, 0); add_child(rf)
+		Playground.cyl(self, 0.04, 0.04, 1.9, wood, Vector3(0, 1.75, 0), Vector3(0, 0, PI / 2))
+		Playground.cyl(self, 0.16, 0.13, 0.22, wood, Vector3(0.35, 1.2, 0))
+		var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var cy := CylinderShape3D.new(); cy.radius = 1.15; cy.height = 0.8
+		cs.shape = cy; cs.position.y = 0.4; sb.add_child(cs); add_child(sb)
+
+	func _fairy_ring() -> void:
+		var stem := ForestDiscoveries.mt(Color(0.95, 0.92, 0.85))
+		for k in 12:
+			var a := k * TAU / 12.0
+			var cc := Color.from_hsv(float(k) / 12.0, 0.45, 1.0)
+			Playground.cyl(self, 0.04, 0.05, 0.22, stem, Vector3(cos(a) * 2.2, 0.11, sin(a) * 2.2))
+			var cap := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.14; sm.height = 0.14; sm.is_hemisphere = true
+			cap.mesh = sm; cap.material_override = FX.glow_material(cc, 1.2); cap.position = Vector3(cos(a) * 2.2, 0.22, sin(a) * 2.2)
+			add_child(cap)
+		for i in 3:
+			var f := Node3D.new(); add_child(f)
+			var body := MeshInstance3D.new(); var bs := SphereMesh.new(); bs.radius = 0.07; bs.height = 0.14
+			body.mesh = bs; body.material_override = FX.glow_material(Color.from_hsv(0.8 + i * 0.12, 0.4, 1.0), 3.0); f.add_child(body)
+			for sx in [-1.0, 1.0]:
+				var wing := MeshInstance3D.new(); var wq := QuadMesh.new(); wq.size = Vector2(0.18, 0.12)
+				wing.mesh = wq; wing.material_override = FX.glow_material(Color(0.85, 0.95, 1.0), 1.0)
+				wing.position = Vector3(sx * 0.1, 0.04, 0); wing.rotation.y = sx * 0.6; f.add_child(wing)
+			_actors.append(f)
+		var l := OmniLight3D.new(); l.light_color = Color(0.9, 0.7, 1.0); l.light_energy = 1.2; l.omni_range = 5.0; l.position.y = 1.0; add_child(l)
+
+	func _picnic() -> void:
+		# a red and white checked blanket
+		for i in 6:
+			for j in 6:
+				var c := Color(0.85, 0.15, 0.15) if (i + j) % 2 == 0 else Color(0.97, 0.95, 0.9)
+				Playground.box(self, Vector3(0.4, 0.02, 0.4), ForestDiscoveries.mt(c, 0.95), Vector3(-1.0 + i * 0.4, 0.01, -1.0 + j * 0.4))
+		var wicker := ForestDiscoveries.mt(Color(0.75, 0.55, 0.3), 0.9)
+		Playground.box(self, Vector3(0.6, 0.35, 0.4), wicker, Vector3(0.6, 0.2, 0.55))
+		Playground.cyl(self, 0.03, 0.03, 0.62, wicker, Vector3(0.6, 0.5, 0.55), Vector3(0, 0, PI / 2))
+		for k in 3:
+			var kind_f: String = ["bun", "apple", "cider", "pie", "cheese"][(k + randi()) % 5]
+			Food.make(self, global_position + Vector3(-0.55 + k * 0.5, 0.03, -0.4).rotated(Vector3.UP, rotation.y), kind_f, randf() * TAU)
+		# a line of ants marching off with a crumb
+		var ant := ForestDiscoveries.mt(Color(0.08, 0.05, 0.04), 0.4)
+		for k in 7:
+			ForestDiscoveries.ball(self, 0.03, ant, Vector3(1.3 + k * 0.12, 0.03, -0.2 + sin(k * 0.8) * 0.08), Vector3(1.4, 0.7, 1))
+
+	func _bee_hive() -> void:
+		var wood := ForestDiscoveries.mt(Color(0.5, 0.33, 0.18), 0.9)
+		Playground.cyl(self, 0.55, 0.6, 0.7, wood, Vector3(0, 0.35, 0))
+		var hive := ForestDiscoveries.mt(Color(0.95, 0.75, 0.25), 0.6)
+		for k in 4:
+			ForestDiscoveries.ball(self, 0.42 - k * 0.07, hive, Vector3(0, 0.95 + k * 0.2, 0), Vector3(1, 0.55, 1))
+		ForestDiscoveries.ball(self, 0.07, ForestDiscoveries.mt(Color(0.15, 0.08, 0.02)), Vector3(0, 0.95, -0.36), Vector3(1, 1, 0.4))
+		var honey := ForestDiscoveries.mt(Color(1.0, 0.65, 0.1), 0.2)
+		Playground.cyl(self, 0.13, 0.11, 0.2, ForestDiscoveries.mt(Color(0.85, 0.5, 0.25), 0.8), Vector3(0.45, 0.8, -0.35))
+		Playground.cyl(self, 0.12, 0.12, 0.02, honey, Vector3(0.45, 0.9, -0.35))
+		var bees := CPUParticles3D.new(); bees.amount = 12; bees.lifetime = 2.5; bees.preprocess = 2.0
+		bees.mesh = FX.quad(0.06); bees.material_override = FX.glow_material(Color(1.0, 0.85, 0.1), 1.5)
+		bees.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; bees.emission_sphere_radius = 0.6
+		bees.direction = Vector3(1, 0.3, 0); bees.spread = 180; bees.gravity = Vector3.ZERO
+		bees.initial_velocity_min = 0.3; bees.initial_velocity_max = 0.8; bees.orbit_velocity_min = 0.3; bees.orbit_velocity_max = 0.6
+		bees.position.y = 1.2; add_child(bees)
+
+	func _bounce_shroom() -> void:
+		var stem := ForestDiscoveries.mt(Color(0.95, 0.9, 0.8))
+		Playground.cyl(self, 0.45, 0.6, 1.3, stem, Vector3(0, 0.65, 0))
+		var cap := Node3D.new(); cap.position = Vector3(0, 1.3, 0); add_child(cap)
+		ForestDiscoveries.ball(cap, 1.8, ForestDiscoveries.mt(Color(0.3, 0.55, 1.0), 0.5), Vector3(0, 0.0, 0), Vector3(1.0, 0.35, 1.0))
+		for d in [Vector3(0.9, 0.42, 0.7), Vector3(-0.8, 0.45, 0.5), Vector3(0.1, 0.58, -0.9), Vector3(-1.1, 0.35, -0.6), Vector3(1.2, 0.33, -0.5), Vector3(0, 0.62, 0)]:
+			ForestDiscoveries.ball(cap, 0.22, ForestDiscoveries.mt(Color(1, 1, 1)), d, Vector3(1, 0.4, 1))
+		_actors.append(cap)
+		var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var cy := CylinderShape3D.new(); cy.radius = 1.7; cy.height = 0.5
+		cs.shape = cy; cs.position.y = 1.6; sb.add_child(cs); add_child(sb)
+		process_physics_priority = 100        # after the player moves, like the trampoline
+		var sb2 := StaticBody3D.new(); var cs2 := CollisionShape3D.new(); var cy2 := CylinderShape3D.new(); cy2.radius = 0.55; cy2.height = 1.3
+		cs2.shape = cy2; cs2.position.y = 0.65; sb2.add_child(cs2); add_child(sb2)
+
+	var _boing := 0.0
+	## Land on the giant mushroom's cap and it throws you high into the air.
+	func _bounce_step() -> void:
+		_boing -= get_physics_process_delta_time()
+		var p := get_tree().get_first_node_in_group("player") as Player
+		if p == null or p.dead or p.vehicle != null or _boing > 0.0:
+			return
+		var top := global_position.y + 1.85
+		var d := Vector2(p.global_position.x - global_position.x, p.global_position.z - global_position.z).length()
+		if d < 1.7 and absf(p.global_position.y - top) < 0.3 and p.is_on_floor():
+			p.velocity.y = 19.0 if Input.is_action_pressed("jump") else 14.0
+			_boing = 0.3
+			Sfx.play_at("pop", global_position + Vector3(0, 1.7, 0), -4.0, 0.3)
+			FX.burst(global_position + Vector3(0, 1.8, 0), Color(0.5, 0.75, 1.0), 16, 2.5, 0.1, 0.5, 0.0)
+			if _actors.size() > 0:
+				var cap := _actors[0]
+				var tw := cap.create_tween()
+				tw.tween_property(cap, "scale", Vector3(1.12, 0.75, 1.12), 0.08)
+				tw.tween_property(cap, "scale", Vector3.ONE, 0.45).set_trans(Tween.TRANS_ELASTIC)
+
 	func _gnome_house() -> void:
 		var stem := ForestDiscoveries.mt(Color(0.95, 0.9, 0.8))
 		var cap := ForestDiscoveries.mt(Color(0.85, 0.12, 0.1), 0.6)
@@ -255,8 +474,9 @@ class Spot extends Node3D:
 		for sx in [-1.0, 1.0]:
 			ForestDiscoveries.ball(t, 0.06, bow, Vector3(sx * 0.07, 0.43, -0.12), Vector3(1.2, 0.8, 0.5))
 		_actors.append(t)
-		var note := Label3D.new(); note.text = "If found,\nplease hug."; note.font_size = 40; note.pixel_size = 0.004
+		var note := Label3D.new(); note.text = "If found,\nplease hug."; note.font_size = 40
 		note.modulate = Color(0.25, 0.2, 0.15); note.outline_size = 0
+		SignText.fit(note, 0.46, 0.27)
 		note.position = Vector3(0.0, 0.35, -0.56); add_child(note)
 		Playground.box(self, Vector3(0.5, 0.3, 0.01), ForestDiscoveries.mt(Color(0.98, 0.96, 0.88)), Vector3(0, 0.35, -0.555))
 
@@ -295,8 +515,9 @@ class Spot extends Node3D:
 		for x in [-1.3, 1.3]:
 			Playground.cyl(self, 0.03, 0.03, 1.2, ForestDiscoveries.mt(Color(0.3, 0.3, 0.3)), Vector3(x, 0.6, -2.5))
 		Playground.box(self, Vector3(2.6, 0.3, 0.02), flag_c, Vector3(0, 1.1, -2.5))
-		var fl := Label3D.new(); fl.text = "FINISH"; fl.font_size = 48; fl.pixel_size = 0.005; fl.modulate = Color(0.1, 0.1, 0.1)
-		fl.outline_size = 0; fl.position = Vector3(0, 1.1, -2.52); fl.rotation.y = PI; add_child(fl)
+		var fl := Label3D.new(); fl.text = "FINISH"; fl.font_size = 48; fl.modulate = Color(0.1, 0.1, 0.1)
+		fl.outline_size = 0; fl.position = Vector3(0, 1.1, -2.52); fl.rotation.y = PI
+		SignText.fit(fl, 2.4, 0.28); add_child(fl)
 		var sl := Label3D.new(); sl.text = "THE GREAT\nSNAIL RACE"; sl.font_size = 56; sl.pixel_size = 0.005
 		sl.modulate = Color(1.0, 0.85, 0.3); sl.outline_size = 10; sl.position = Vector3(1.9, 1.3, 2.4)
 		sl.billboard = BaseMaterial3D.BILLBOARD_ENABLED; add_child(sl)

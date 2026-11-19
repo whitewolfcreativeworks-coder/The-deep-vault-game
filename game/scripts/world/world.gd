@@ -241,10 +241,11 @@ func _outpost() -> void:
 	add_child(sigil)
 	Props.torch(self, Vector3(-4.2, 2.6, -1.9), 0.0, true, true)
 	Props.torch(self, Vector3(4.2, 2.6, -1.9), 0.0, true, false)
+	_danger_sign(Vector3(-1.75, 0, 0.6), 18.0)
 	# ruined walls and an abandoned camp
 	for p in [[Vector3(-14, 0, 12), 90.0, "wall_broken"], [Vector3(-14, 0, 16), 90.0, "wall_cracked"], [Vector3(-14, 0, 20), 90.0, "wall_half"],
 			[Vector3(14, 0, 10), -90.0, "wall_broken"], [Vector3(14, 0, 14), -90.0, "wall"], [Vector3(14, 0, 22), -90.0, "wall_half"],
-			[Vector3(-10, 0, 34), 180.0, "wall_broken"], [Vector3(10, 0, 34), 180.0, "wall_half"], [Vector3(-6, 0, 34), 180.0, "wall_cracked"]]:
+			[Vector3(-10, 0, 34), 180.0, "wall_broken"], [Vector3(6, 0, 34), 180.0, "wall_half"], [Vector3(-6, 0, 34), 180.0, "wall_cracked"]]:
 		Props.place(self, p[2], p[0], p[1], 1.0, true)
 	for p in [Vector3(-12, 0, 4), Vector3(12, 0, 4), Vector3(-12, 0, 28), Vector3(12, 0, 28)]:
 		Props.place(self, "pillar", p, 0.0, 1.0, true)
@@ -274,6 +275,9 @@ func _outpost() -> void:
 
 	# the playground and street lamps on the dark east side, and the Rogue statue
 	Playground.build(self)
+	# huge fire bowls on the two high points of the walls either side of the statue
+	for bx in [-5.0, 5.0]:
+		Playground.giant_brazier(self, Vector3(bx, 4.0, 33.75))
 	# the climbing walls, lookout deck and zipline in the dark corner left of the portal
 	climb = ClimbWall.build(self)
 
@@ -283,6 +287,46 @@ func _outpost() -> void:
 			and not Rect2(-35, -2, 23, 21).has_point(p), 2, 1, false)
 	wc.max_chests = 3
 	wc.respawn_every = 300.0
+
+## A warning sign at the top of the stairs down into the vault: yellow and black
+## danger stripes, a skull and crossbones, and fair warning.
+func _danger_sign(pos: Vector3, yaw_deg: float) -> void:
+	var n := Node3D.new(); n.name = "DangerSign"; add_child(n); n.position = pos; n.rotation_degrees.y = yaw_deg
+	var wood := Playground.m(Color(0.42, 0.28, 0.16), 0.9)
+	var yellow := Playground.m(Color(1.0, 0.82, 0.1), 0.6)
+	yellow.emission_enabled = true; yellow.emission = Color(1.0, 0.8, 0.1); yellow.emission_energy_multiplier = 0.2
+	var black := Playground.m(Color(0.08, 0.08, 0.08), 0.6)
+	var bone := Playground.m(Color(0.95, 0.93, 0.86), 0.5)
+	for sx in [-0.7, 0.7]:
+		Playground.box(n, Vector3(0.12, 2.3, 0.12), wood, Vector3(sx, 1.15, -0.03))
+	Playground.box(n, Vector3(1.7, 1.2, 0.08), yellow, Vector3(0, 1.55, 0.03))
+	# black and yellow hazard stripes along the top and bottom
+	for row in [2.07, 1.03]:
+		Playground.box(n, Vector3(1.76, 0.16, 0.06), yellow, Vector3(0, row, 0.06))
+		for k in 7:
+			Playground.box(n, Vector3(0.12, 0.16, 0.02), black, Vector3(-0.75 + k * 0.25, row, 0.1), Vector3(0, 0, 0.6))
+	var lb := Label3D.new(); lb.text = "DANGER!\nSkeletons below.\nEnter if you dare!"
+	lb.font_size = 64; lb.modulate = Color(0.75, 0.05, 0.05); lb.outline_size = 0
+	lb.position = Vector3(0, 1.55, 0.085)
+	SignText.fit(lb, 1.55, 0.82)
+	n.add_child(lb)
+	# a skull and crossbones on top
+	var sk := Node3D.new(); sk.position = Vector3(0, 2.55, 0.05); n.add_child(sk)
+	for d in [-1.0, 1.0]:
+		Playground.cyl(sk, 0.04, 0.04, 0.75, bone, Vector3.ZERO, Vector3(0, 0, d * 0.75))
+		for e in [-1.0, 1.0]:
+			var tip := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.055; sm.height = 0.11
+			tip.mesh = sm; tip.material_override = bone
+			tip.position = Vector3(e * sin(d * 0.75) * -0.37, e * cos(d * 0.75) * 0.37, 0)
+			sk.add_child(tip)
+	var head := MeshInstance3D.new(); var hs := SphereMesh.new(); hs.radius = 0.2; hs.height = 0.38
+	head.mesh = hs; head.material_override = bone; head.position = Vector3(0, 0.05, 0.06); sk.add_child(head)
+	Playground.box(sk, Vector3(0.22, 0.12, 0.16), bone, Vector3(0, -0.13, 0.08))
+	for ex in [-0.075, 0.075]:
+		var eye := MeshInstance3D.new(); var es := SphereMesh.new(); es.radius = 0.05; es.height = 0.08
+		eye.mesh = es; eye.material_override = black; eye.position = Vector3(ex, 0.07, 0.22); sk.add_child(eye)
+	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(1.7, 2.6, 0.2)
+	cs.shape = bs; cs.position = Vector3(0, 1.3, 0); sb.add_child(cs); n.add_child(sb)
 
 func _tent(pos: Vector3, yaw: float, col: Color) -> void:
 	var n := Node3D.new(); add_child(n); n.position = pos; n.rotation_degrees.y = yaw

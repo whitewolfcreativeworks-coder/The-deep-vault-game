@@ -51,7 +51,7 @@ const HEROES := {
 		"sex": "male", "head": ["Barbarian_Head", "Barbarian_BearHat"], "hat": "Barbarian_BearHat", "cape": ""},
 	"Rogue": {"path": "res://assets/kaykit/adventurers/Rogue.glb", "sex": "female", "head": ["Rogue_Head"], "hat": "", "cape": "Rogue_Cape"},
 	"Ranger": {"path": "res://assets/kaykit/adventurers/Rogue.glb", "body": "res://assets/kaykit/adv2/Ranger.glb",
-		"sex": "female", "head": ["Ranger_Head"], "hat": "", "cape": "Ranger_Cape"},
+		"sex": "male", "head": ["Ranger_Head"], "hat": "", "cape": "Ranger_Cape"},
 	"Mage": {"path": "res://assets/kaykit/adventurers/Mage.glb", "sex": "male", "head": ["Mage_Head", "Mage_Hat"], "hat": "Mage_Hat", "cape": "Mage_Cape"},
 	# Classes with their own body: the rig and animations come from "path", the
 	# whole body (head, clothes, gear) is swapped for the "body" model's pieces.
@@ -84,6 +84,13 @@ const HAIR_HEADS := {
 	"bald": ["res://assets/kaykit/adv2/Barbarian.glb", "Barbarian_Head"],
 }
 const HAIR_HEAD_BEARDED := ["wild", "bald"]       # these heads already have a beard
+## Man or woman: the other version's hair (when you haven't picked a style), and
+## each class's own hair colour so they still look like that class.
+const FEMALE_HAIR := {"Mage": "shoulder"}         # (the Mage man already has long hair)
+const MALE_HAIR := {}
+const FEMALE_KEEPS_HEAD := ["Druid"]
+const CLASS_HAIR := {"Knight": Color(0.86, 0.68, 0.38), "Rogue": Color(0.78, 0.4, 0.2), "Ranger": Color(0.72, 0.36, 0.16),
+	"Necromancer": Color(0.9, 0.9, 0.93), "Priest": Color(0.78, 0.8, 0.86), "Mage": Color(0.24, 0.14, 0.09)}
 ## The head that buns and spikes are built on, per hero.
 const BUN_SPIKE_BASE := {"Knight": "short", "Barbarian": "short", "Mage": "long", "Rogue": "shoulder"}
 ## Old saved styles -> the closest current one.
@@ -309,22 +316,54 @@ func setup(cfg: Dictionary) -> void:
 	_base_scale = float(cfg.get("scale", 0.84))
 	scale = Vector3.ONE * _base_scale
 	if kind == "hero":
-		var bw := float(cfg.get("build", 1.0))
-		var bh := float(cfg.get("height", 1.0))
-		model.scale = Vector3(bw, bh, lerpf(1.0, bw, 0.85))
 		var hat_on: bool = hero.hat != "" and cfg.get("show_hat", true)
 		var hooded: bool = String(hero.get("path", "")).contains("Hooded")
+		# Male or female: every class can be either. The other version gets a head
+		# that's clearly a man's or a woman's (short hair / long hair), and the body
+		# is broader or slimmer, so the two look very different.
+		var base_sex := String(hero.get("sex", "male"))
+		var want_sex := String(cfg.get("sex", base_sex))
+		# (a full knight's helm stays on: the hair would poke through it, so a
+		# heroine in a helm shows a long braid hanging out the back instead)
+		var full_helm: bool = hat_on and String(hero.hat) == "Knight_Helmet"
+		var swap_sex := cfg.has("sex") and want_sex != base_sex and not hooded and not full_helm
 		var hs := String(cfg.get("hair_style", ""))
+		# the Druid's antlered hood is the Druid: a heroine keeps it (and gets a braid)
+		# unless she picks a hair style
+		var keep_hood := swap_sex and hs in ["", "natural"] and FEMALE_KEEPS_HEAD.has(hero_name) and want_sex == "female"
+		if keep_hood:
+			swap_sex = false
+		if swap_sex or (cfg.has("sex") and want_sex == "female" and hs in HAIR_HEAD_BEARDED):
+			cfg = cfg.duplicate()
+			if swap_sex and hs in ["", "natural"]:
+				hs = String((FEMALE_HAIR if want_sex == "female" else MALE_HAIR).get(hero_name, "long" if want_sex == "female" else "short"))
+			if want_sex == "female" and hs in HAIR_HEAD_BEARDED:
+				hs = "long" if hs == "wild" else "shoulder"   # those heads come with beards
+			cfg["hair_style"] = hs
+			# the class's own hair colour, unless you picked one
+			if Color(cfg.get("hair_color", Game.HAIR_COLORS2[0])) == Game.HAIR_COLORS2[0] and CLASS_HAIR.has(hero_name):
+				cfg["hair_color"] = CLASS_HAIR[hero_name]
+		var bw := float(cfg.get("build", 1.0))
+		var bh := float(cfg.get("height", 1.0))
+		if cfg.has("sex"):
+			bw *= 0.9 if want_sex == "female" else 1.07
+			bh *= 0.97 if want_sex == "female" else 1.02
+		model.scale = Vector3(bw, bh, lerpf(1.0, bw, 0.85))
 		if _custom_head:
 			pass   # a designer head replaces the hero's own head, hair and face
-		elif not (hat_on or hooded):
+		elif swap_sex or not (hat_on or hooded):
 			if HAIR_HEADS.has(hs):
 				_swap_head(hero, cfg, skin, hs)
 			elif hs in ["buns", "spiky"]:
 				# buns and spikes sit on a modelled head too, so the colour always takes
-				_swap_head(hero, cfg, skin, BUN_SPIKE_BASE.get(String(cfg.get("hero", "Knight")), "short"))
+				var base_head: String = BUN_SPIKE_BASE.get(String(cfg.get("hero", "Knight")), "short")
+				if swap_sex:
+					base_head = "long" if want_sex == "female" else "short"
+				_swap_head(hero, cfg, skin, base_head)
 		if not _custom_head:
-			_add_head_looks(hero, cfg, hat_on or hooded)
+			_add_head_looks(hero, cfg, hat_on or hooded or keep_hood)
+		if cfg.has("sex") and want_sex == "female" and hero_name == "Barbarian" and costume_file == "":
+			_fur_top()
 		if _cloud_kind != "":
 			_cloud_extras(_cloud_kind, hero)
 	_play(anims.idle, 0.0)
@@ -671,6 +710,7 @@ func _wear_costume(path: String, cfg: Dictionary) -> void:
 	for m in all_meshes:
 		m.visible = false
 		_never_show.append(m)
+		m.name = String(m.name) + "_base"
 	all_meshes.clear(); head_meshes.clear()
 	for m in _borrow_meshes(path, func(_n: String) -> bool: return true):
 		for k in _HEADGEAR:
@@ -691,6 +731,7 @@ func _wear_class_body(hero: Dictionary, cfg: Dictionary) -> void:
 	for m in all_meshes:
 		m.visible = false
 		_never_show.append(m)
+		m.name = String(m.name) + "_base"     # so the class body's pieces keep their own names
 	all_meshes.clear(); head_meshes.clear()
 	for m in _borrow_meshes(String(hero.body), func(n: String) -> bool: return not n.contains("Weapon")):
 		if String(m.name) in hero.head:
@@ -1266,6 +1307,98 @@ func _head_hit(from: Vector3, dir: Vector3) -> Variant:
 		return null
 	return _head_xf * (hit.position as Vector3)
 
+## A woman's face: lashes, rosy lips and cheeks; under a helm, a long braid.
+func _female_face(c: Vector3, rx: float, ry: float, rz: float, _eye_x: float, _eye_y: float, fz: Callable, covered: bool, cfg: Dictionary) -> void:
+	# Every KayKit head shares one face: find the nose (the face's frontmost point
+	# down the middle) and lay the eyes, mouth and cheeks out from it.
+	var nose_y := c.y - ry * 0.45
+	var best := -INF
+	var yy := c.y - ry * 0.1
+	while yy > c.y - ry * 0.7:
+		var z: float = fz.call(0.0, yy)
+		if z > best:
+			best = z; nose_y = yy
+		yy -= 0.01
+	var eye_c := nose_y + 0.105
+	var eye_x := 0.24
+	# lashes: three little flicks round the top outer edge of each eye
+	var lash := _look_mat(Color(0.05, 0.035, 0.03), 0.6)
+	for sd in [-1.0, 1.0]:
+		for k in 3:
+			var a: float = deg_to_rad(20.0 + k * 28.0)
+			var d := Vector2(sd * cos(a), sin(a))
+			var p2 := Vector2(sd * eye_x, eye_c) + Vector2(sd * cos(a) * 0.088, sin(a) * 0.064) + d * 0.022
+			var lz: float = fz.call(p2.x, p2.y) + 0.006
+			_piece(_boxm(0.014, 0.05, 0.012), lash, Vector3(p2.x, p2.y, lz), Vector3.ONE, Vector3(0, 0, -atan2(d.x, d.y)))
+	# rosy lips
+	var lip_y := nose_y - 0.165
+	_piece(_sphere(), _look_mat(Color(0.88, 0.3, 0.42), 0.35), Vector3(0, lip_y, float(fz.call(0.0, lip_y)) - 0.004), Vector3(0.075, 0.026, 0.03))
+	# and pink cheeks
+	var pink := StandardMaterial3D.new()
+	pink.albedo_color = Color(1.0, 0.45, 0.5, 0.45)
+	pink.albedo_texture = FX.soft_texture()
+	pink.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pink.cull_mode = BaseMaterial3D.CULL_DISABLED
+	for sd in [-1.0, 1.0]:
+		var cy := nose_y - 0.01
+		var cx: float = sd * 0.31
+		var qd := QuadMesh.new(); qd.size = Vector2(0.16, 0.09)
+		_piece(qd, pink, Vector3(cx, cy, float(fz.call(cx, cy)) + 0.006), Vector3.ONE, Vector3(0, sd * 0.5, 0))
+	var own_hair := false
+	for m in all_meshes:
+		if m.name == "Hair_Head":
+			own_hair = true
+	if covered and not own_hair:
+		# a long braid hanging down from under the helm
+		var hair_c: Color = cfg.get("hair_color", Color(0.32, 0.19, 0.1))
+		if hair_c == Game.HAIR_COLORS2[0]:
+			hair_c = CLASS_HAIR.get(hero_name, Color(0.55, 0.32, 0.15))
+		var hm := _look_mat(hair_c, 0.7)
+		for k in 6:
+			var r := rx * (0.2 - k * 0.018)
+			_piece(_sphere(), hm, Vector3(0, c.y - ry * (0.15 + k * 0.28), c.z - rz * (1.02 + k * 0.08)), Vector3(r, r * 1.3, r))
+		_piece(_sphere(), _look_mat(Color(0.9, 0.2, 0.35), 0.5), Vector3(0, c.y - ry * 1.75, c.z - rz * 1.45), Vector3(rx * 0.16, rx * 0.09, rx * 0.06))
+		# and long locks falling down either side of her face, so you can tell from the front too
+		for sd in [-1.0, 1.0]:
+			for k in 5:
+				var r2 := rx * (0.15 - k * 0.012)
+				_piece(_sphere(), hm, Vector3(sd * rx * (0.9 - k * 0.02), c.y - ry * (0.42 + k * 0.2), c.z + rz * (0.12 - k * 0.03)), Vector3(r2, r2 * 1.35, r2 * 0.9))
+
+## A heroine Barbarian wears a fur wrap across her chest.
+func _fur_top() -> void:
+	var body: MeshInstance3D = null
+	for m in all_meshes:
+		if String(m.name) == "Barbarian_Body" and m.visible:
+			body = m
+	if body == null or body.mesh == null or skel == null or skel.find_bone("chest") < 0:
+		return
+	var tm := body.mesh.generate_triangle_mesh()
+	var y := 1.1
+	var lo := Vector3(-0.3, y, -0.25); var hi := Vector3(0.3, y, 0.25)
+	for dir in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
+		var hit: Dictionary = tm.intersect_ray(Vector3(0, y, 0) + dir * 2.0, -dir)
+		if not hit.is_empty():
+			var hp: Vector3 = hit.position
+			lo = Vector3(minf(lo.x, hp.x), y, minf(lo.z, hp.z)); hi = Vector3(maxf(hi.x, hp.x), y, maxf(hi.z, hp.z))
+	var ba := _attach("chest")
+	var root := Node3D.new()
+	root.transform = skel.get_bone_global_rest(skel.find_bone("chest")).affine_inverse()
+	ba.add_child(root)
+	var fur := _look_mat(Color(0.5, 0.33, 0.2), 0.95)
+	var trim := _look_mat(Color(0.82, 0.72, 0.55), 0.95)
+	var mid := (lo + hi) * 0.5
+	var r := (hi - lo) * 0.5 + Vector3(0.025, 0, 0.025)
+	for band in [[0.0, 0.2, fur, 1.0], [0.1, 0.035, trim, 1.03], [-0.1, 0.035, trim, 1.03]]:
+		var mi := MeshInstance3D.new(); var cm := CylinderMesh.new()
+		cm.top_radius = 1.0; cm.bottom_radius = 1.0; cm.height = band[1]; cm.radial_segments = 20
+		mi.mesh = cm; mi.material_override = band[2]
+		mi.position = Vector3(mid.x, y + float(band[0]), mid.z)
+		mi.scale = Vector3(r.x * float(band[3]), 1.0, r.z * float(band[3]))
+		mi.material_overlay = flash_mat
+		root.add_child(mi)
+		all_meshes.append(mi)
+
 func _look_mat(c: Color, rough := 0.75) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
@@ -1298,7 +1431,9 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 	var style: String = cfg.get("hair_style", "natural")
 	var face: String = cfg.get("face", "none")
 	var ears: bool = cfg.get("ears", false)
-	if (style == "natural" or covered) and face == "none" and not ears:
+	# (only heroes made in the creator say male or female; NPCs built on hero rigs don't)
+	var fem := String(cfg.get("sex", "")) == "female"
+	if (style == "natural" or covered) and face == "none" and not ears and not fem:
 		return
 	if skel == null or skel.find_bone("head") < 0:
 		return
@@ -1370,6 +1505,8 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 	var eye_x := rx * 0.36
 	if style in HAIR_HEAD_BEARDED and not covered and face in ["beard", "mustache"]:
 		face = "none"          # this head already has a fine beard
+	if fem:
+		_female_face(c, rx, ry, rz, eye_x, eye_y, fz, covered, cfg)
 	match face:
 		"beard":
 			_piece(_sphere(), hair, Vector3(0, c.y - ry * 0.62, fz.call(0.0, c.y - ry * 0.62) - rz * 0.25), Vector3(rx * 0.62, ry * 0.4, rz * 0.32))

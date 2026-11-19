@@ -156,6 +156,8 @@ func _run() -> void:
 		await _ui_test()
 	elif mode == "looks":
 		await _looks_test()
+	elif mode == "sexes":
+		await _sexes_test()
 	elif mode == "special":
 		await _special_test()
 	elif mode == "combat2":
@@ -212,6 +214,7 @@ func _run() -> void:
 			check("skip_goes_to_vault", main.state == "play" and main.intro == null and main.world.is_inside_tree(), main.state)
 		else:
 			var seen := {}
+			var fi := 0
 			var t := 0.0
 			var t_start := Time.get_ticks_msec()
 			while main.state == "intro" and t < 150.0:
@@ -222,8 +225,10 @@ func _run() -> void:
 					await shot("in_" + sh)
 				await wait(0.25)
 				t += 0.25
-				if OS.get_environment("INTRO_FRAMES") != "" and int(t * 4.0) % (4 if OS.get_environment("INTRO_FRAMES") == "1" else 2) == 0:
-					await shot("f_%03d" % int(t))
+				if OS.get_environment("INTRO_FRAMES") != "" and sh in ["teeth", "kettle", "tea"]:
+					fi += 1
+					if fi % 2 == 0:
+						await shot("f_%s_%03d" % [sh, fi])
 			var secs := (Time.get_ticks_msec() - t_start) / 1000.0
 			print("INTRO_LENGTH ", secs)
 			check("intro_short", secs < 60.0, "%.1f s" % secs)
@@ -273,10 +278,65 @@ func _run() -> void:
 	elif mode == "homeflight":
 		if await _homeflight_test():
 			return
+	elif mode == "cabin":
+		if await _cabin_test():
+			return
 	elif mode == "walls":
 		await _walls_test()
 	elif mode == "nov18b":
 		await _nov18b_test()
+	elif mode == "nov18c":
+		await _nov18c_test()
+	elif mode == "forest18":
+		if await _forest18_test():
+			return
+	elif mode == "foodcheck":
+		var ph: int = Game.get_meta("fc_phase", 0)
+		if ph == 0:
+			for i in Game.SAVE_SLOTS:
+				Game.delete_slot(i)
+			await _start()
+			Game.set_meta("fc_phase", 1)
+			main._travel("forest")
+			return
+		await wait(2.5)
+		player = main.player
+		var foods := get_tree().get_nodes_in_group("food")
+		var spots := []
+		for f in foods:
+			spots.append("%s@%s" % [f.kind, str((f as Node3D).global_position.snapped(Vector3.ONE * 0.1))])
+		print("FOODS ", Game.zone, " ", spots)
+		check("food_in_" + Game.zone, foods.size() >= 2, "%d" % foods.size())
+		if foods.size() > 0:
+			var f0: Node3D = foods[0]
+			await _look(f0.global_position + Vector3(0, 0.2, 0), f0.global_position + Vector3(1.2, 0.2, 1.2), 2.4, -0.35)
+			await shot("fc_" + Game.zone)
+		if ph == 1:
+			Game.set_meta("fc_phase", 2)
+			main._travel("castle")
+			return
+	elif mode == "probe":
+		await _start()
+		await wait(1.0)
+		for mi in main.world.find_children("*", "MeshInstance3D", true, false):
+			var m3 := mi as MeshInstance3D
+			var gp := m3.global_position
+			if Vector2(gp.x - 0.5, gp.z + 1.5).length() < 4.0 and gp.y > -1.0 and gp.y < 4.0:
+				print("PROBE ", m3.get_path(), " ", gp, " ", m3.mesh.get_aabb().size if m3.mesh else "")
+		for lb in main.world.find_children("*", "Label3D", true, false):
+			print("LABEL ", lb.get_path(), " ", (lb as Label3D).global_position, " ", (lb as Label3D).text.replace("\n", " | "))
+		for n in ["arch_gate", "wall_broken", "wall_cracked", "wall_half", "wall"]:
+			pass
+		for nd in main.world.get_children():
+			if nd is Node3D and (nd as Node3D).global_position.z > 30.0 and (nd as Node3D).global_position.z < 38.0:
+				var ab := AABB()
+				var first := true
+				for m in (nd as Node3D).find_children("*", "MeshInstance3D", true, false):
+					var a2: AABB = (m as MeshInstance3D).global_transform * (m as MeshInstance3D).get_aabb()
+					ab = a2 if first else ab.merge(a2)
+					first = false
+				print("BACK ", nd.name, " ", (nd as Node3D).global_position, " ", ab)
+		check("probe", true)
 	elif mode == "bluesq":
 		if await _bluesq_test():
 			return
@@ -1950,6 +2010,50 @@ func _looks_test() -> void:
 	await wait(0.6)
 	await shot("k_creator_random")
 	check("looks_rendered", true)
+
+## Every class as a man and as a woman, helm on and off, body and face.
+func _sexes_test() -> void:
+	var m = main.menus
+	m.show_panel("creator")
+	await wait(0.5)
+	m._set_tab("hero")
+	m.current = "looks"   # stop the turntable
+	var cam: Camera3D = m._preview_vp.find_children("*", "Camera3D", true, false)[0]
+	Game.profile.merge({"hair_style": "natural", "face": "none", "skin": 0, "hair_color": 0, "cape": 0, "build": 1.0, "height": 1.0}, true)
+	var sex_heroes: Array = Array(OS.get_environment("SEX_HEROES").split(",")) if OS.get_environment("SEX_HEROES") != "" else Game.HERO_ORDER
+	for hero in sex_heroes:
+		for sx in ["male", "female"]:
+			Game.profile.hero = hero
+			for hat in [true, false]:
+				Game.profile.show_hat = hat
+				m._set_sex(sx)
+				m.current = "looks"
+				m._preview.rotation.y = PI
+				cam.position = Vector3(0, 1.4, 6.6); cam.look_at(Vector3(0, 1.1, 0))
+				await frames(4)
+				await RenderingServer.frame_post_draw
+				m._preview_vp.get_texture().get_image().save_png(out_dir.path_join("x_%s_%s_%s_b.png" % [hero, sx, "hat" if hat else "bare"]))
+				for side in [PI, PI + 0.9, PI + PI]:
+					m._preview.rotation.y = side
+					cam.position = Vector3(0, 1.8, 5.2); cam.look_at(Vector3(0, 1.62, 0))
+					await frames(3)
+					await RenderingServer.frame_post_draw
+					m._preview_vp.get_texture().get_image().save_png(out_dir.path_join("x_%s_%s_%s_%d.png" % [hero, sx, "hat" if hat else "bare", int(side * 10)]))
+			var nm: String = m._name_edit.text
+			check("name_%s_%s" % [hero, sx], (nm in m.FEMALE_NAMES) == (sx == "female"), nm)
+	# female + a bearded hair pick falls back to flowing hair; buttons disabled
+	Game.profile.hero = "Knight"; Game.profile.show_hat = false
+	m._set_sex("female")
+	Game.profile.hair_style = "bald"
+	m._refresh_preview()
+	await frames(3)
+	check("bald_disabled_for_women", (m._hair_btns["bald"] as Button).disabled)
+	var hh: Array = m._preview.find_children("Hair_Head", "", true, false)
+	check("bald_woman_gets_hair", hh.size() > 0)
+	m._set_sex("male")
+	check("bald_enabled_for_men", not (m._hair_btns["bald"] as Button).disabled)
+	Game.profile.hair_style = "natural"
+	check("sexes_rendered", true)
 
 # --- small UI checks -----------------------------------------------------------
 func _ui_test() -> void:
@@ -3699,7 +3803,8 @@ func _polish2_test() -> bool:
 			await wait(1.5)
 			if main.menus.current != "":
 				main._resume()
-			if Game.flags.get("disc_" + sp.kind, false):
+			var flag: String = "disc_" + sp.kind + ("_%d" % sp.variant if sp.kind == "gnome_house" and sp.variant > 0 else "")
+			if Game.flags.get(flag, false):
 				found += 1
 			await _look(sp.global_position + Vector3(0, 0.6, 0), sp.global_position + Vector3(2.2, 0.4, 2.2), 2.8, -0.2)
 			await shot("p2_06_disc_" + sp.kind)
@@ -4292,6 +4397,181 @@ func _homeflight_test() -> bool:
 	return false
 
 
+## Home after the flight: in through the cabin door, the desk (name and looks,
+## the on-screen keyboard), the gear chest, a nap, and out again.
+func _cabin_test() -> bool:
+	if Game.get_meta("cab_phase2", false):
+		await _cabin_test_2()
+		return false
+	if not Game.get_meta("cab_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		Game.profile.hero = "Mage"
+		await _start()
+		Game.set_meta("cab_phase", true)
+		Game.level = 16
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		for k in 5:
+			Game.add_item(Loot.make_random(12, 0.5, 1), false)
+		main._travel("home")
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	var m = main.menus
+	var cab: HomeCabin = w.cabin
+	# through the Sky Gate again (the flight already done): you fly again, then land
+	check("cab_flies_again", not w.landed and player.mounted, "%s %s" % [w.landed, player.mounted])
+	await tp(w.ground(HomeWorld.LAND.x, HomeWorld.LAND.z) + Vector3(0, 1.0, 0), 0.0, -0.1)
+	await wait(2.0)
+	check("cab_landed", w.landed and not player.mounted, "%s %s" % [w.landed, player.mounted])
+	check("cab_built", cab != null)
+	# outside, at the front door
+	await tp(w.ground(IntroMovie.DOOR.x, 5.6) + Vector3(0, 0.3, 0), 0.0, -0.1)
+	player.zoom_target = 6.0; player.zoom = 6.0; player.snap_view()
+	await wait(0.8)
+	await shot("cab_01_front_door")
+	var it = player.interact_target
+	check("cab_door_prompt", it != null and String(it.get_prompt()).contains("inside"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(2.5)
+	check("cab_went_inside", cab.is_inside(player.global_position), str(player.global_position))
+	check("cab_floor_solid", player.is_on_floor() and player.global_position.y > HomeCabin.AT.y - 0.3, str(player.global_position))
+	check("cab_no_sun_inside", not w.sun.visible)
+	player.zoom_target = 4.5; player.zoom = 4.5; player.pitch = -0.2; player.snap_view()
+	await wait(0.6)
+	await shot("cab_02_inside_door")
+	player.zoom_target = 0.05; player.zoom = 0.05; player.pitch = -0.1; player.snap_view()
+	await wait(0.6)
+	await shot("cab_03_inside_first_person")
+	# walk into the room and check the walls hold
+	Input.action_press("move_forward")
+	await wait(3.0)
+	Input.action_release("move_forward")
+	await wait(0.3)
+	check("cab_walls_hold", cab.is_inside(player.global_position) and player.global_position.y > HomeCabin.AT.y - 0.3, str(player.global_position))
+	# the desk
+	await tp(cab.w(HomeCabin.DESK + Vector3(0.0, 0.05, 1.5)), 0.0, -0.25)
+	player.zoom_target = 3.5; player.zoom = 3.5; player.snap_view()
+	await wait(0.8)
+	await shot("cab_04_desk")
+	it = player.interact_target
+	check("cab_desk_prompt", it != null and String(it.get_prompt()).contains("desk"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(1.0)
+	check("cab_desk_opens_creator", m.current == "creator" and m._desk_mode and get_tree().paused, m.current)
+	check("cab_class_locked", (m._hero_btns["Knight"] as Button).disabled and not (m._hero_btns["Mage"] as Button).disabled)
+	await shot("cab_05_desk_panel")
+	m._set_sex("female")
+	m._name_edit.text = "Bobekita"
+	await wait(0.8)
+	await shot("cab_06_desk_female")
+	m._creator_go.pressed.emit()
+	await wait(1.0)
+	check("cab_desk_renamed", Game.profile.name == "Bobekita" and Game.profile.sex == "female", "%s %s" % [Game.profile.name, Game.profile.sex])
+	check("cab_desk_closed", m.current == "" and not get_tree().paused, m.current)
+	check("cab_new_look_on_player", player.body.find_children("Hair_Head", "", true, false).size() > 0)
+	# cancel keeps the old name
+	m.open_desk()
+	m._name_edit.text = "Nope"
+	m._set_sex("male")
+	m._creator_back.pressed.emit()
+	await wait(0.5)
+	check("cab_desk_cancel", Game.profile.name == "Bobekita" and Game.profile.sex == "female" and m.current == "", "%s %s %s" % [Game.profile.name, Game.profile.sex, m.current])
+	main._resume()
+	# the on-screen keyboard (iPad)
+	m.open_desk()
+	m._show_keys()
+	await wait(0.3)
+	var keys := {}
+	for b in m._keys.find_children("*", "Button", true, false):
+		keys[(b as Button).text.to_upper()] = b
+	if keys.has("CLEAR"):
+		keys["CLEAR"].pressed.emit()
+	for ch in ["B", "O", "B", "E", "K", "A"]:
+		if keys.has(ch):
+			keys[ch].pressed.emit()
+	check("cab_keyboard_types", m._name_edit.text == "Bobeka", m._name_edit.text)
+	await shot("cab_07_keyboard")
+	m._creator_go.pressed.emit()
+	await wait(0.6)
+	check("cab_keyboard_name_kept", Game.profile.name == "Bobeka", Game.profile.name)
+	# the gear chest
+	await tp(cab.w(HomeCabin.CHEST + Vector3(1.4, 0.05, 0)), PI * 0.5, -0.25)
+	player.zoom_target = 3.5; player.zoom = 3.5; player.snap_view()
+	await wait(0.8)
+	await shot("cab_08_chest")
+	it = player.interact_target
+	check("cab_chest_prompt", it != null and String(it.get_prompt()).contains("chest"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(0.6)
+	check("cab_chest_opens", m.current == "stash", m.current)
+	var bag0 := Game.inventory.size()
+	for b in m._panels["stash"].find_children("*", "Button", true, false):
+		if (b as Button).text.begins_with("Put everything"):
+			(b as Button).pressed.emit()
+	await wait(0.3)
+	await shot("cab_09_chest_panel")
+	check("cab_chest_stores", Game.stash.size() >= 5 and Game.inventory.size() == bag0 - Game.stash.size(), "bag %d -> %d, chest %d" % [bag0, Game.inventory.size(), Game.stash.size()])
+	var keep: String = Game.stash[0]
+	Game.stash_take(keep)
+	check("cab_chest_takes_back", Game.inventory.has(keep) and not Game.stash.has(keep))
+	main.autosave()
+	var d: Dictionary = Game.read_slot(Game.active_slot)
+	check("cab_chest_saved", (d.get("stash", []) as Array).size() == Game.stash.size(), str((d.get("stash", []) as Array).size()))
+	main._resume()
+	# save in the cabin and continue the game: still at home, still in the cabin
+	await tp(cab.w(HomeCabin.CHEST + Vector3(1.4, 0.05, 0)), PI * 0.5, -0.25)
+	await wait(1.0)
+	main.autosave()
+	Game.set_meta("cab_stash_n", Game.stash.size())
+	Game.set_meta("cab_phase2", true)
+	main._continue_slot(Game.active_slot)
+	return true
+
+func _cabin_test_2() -> void:
+	await wait(3.0)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	var cab: HomeCabin = w.cabin
+	var it
+	check("cab_continue_at_home", w.landed and not player.mounted and cab.is_inside(player.global_position), "%s %s %s" % [w.landed, player.mounted, player.global_position])
+	check("cab_continue_keeps_name_sex_chest", Game.profile.name == "Bobeka" and Game.profile.sex == "female" and Game.stash.size() == int(Game.get_meta("cab_stash_n", -1)),
+		"%s %s %d" % [Game.profile.name, Game.profile.sex, Game.stash.size()])
+	player.zoom_target = 4.0; player.zoom = 4.0; player.pitch = -0.15; player.snap_view()
+	await wait(0.6)
+	await shot("cab_09b_continued_inside")
+	# a nap
+	Game.hp = 10.0
+	await tp(cab.w(cab.room._bed + Vector3(1.6, 0.05, 0.2)), PI * 0.5, -0.2)
+	await wait(0.5)
+	it = player.interact_target
+	check("cab_bed_prompt", it != null and String(it.get_prompt()).contains("nap"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(3.5)
+	check("cab_nap_heals", Game.hp >= Game.max_hp() - 0.5, "%.0f" % Game.hp)
+	# and out again
+	await tp(cab.w(HomeCabin.IN_DOOR + Vector3(0, 0.05, -1.0)), PI, -0.2)
+	await wait(0.5)
+	it = player.interact_target
+	check("cab_exit_prompt", it != null and String(it.get_prompt()).contains("yard"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(2.5)
+	check("cab_back_outside", not cab.is_inside(player.global_position) and w.sun.visible, str(player.global_position))
+	player.zoom_target = 6.0; player.zoom = 6.0; player.snap_view()
+	await wait(0.5)
+	await shot("cab_10_back_outside")
+
+
 ## The chiselled dungeon stone, the carved frieze and the base course.
 func _walls_test() -> void:
 	await _start()
@@ -4437,3 +4717,204 @@ func _nov18b_test() -> void:
 	check("n18_three_skeletons_rise", sk.size() == 3, "%d" % sk.size())
 	await wait(4.0)
 	check("n18_skeletons_fight", foe.dead or foe.hp < hp0, "%.0f -> %.0f" % [hp0, foe.hp])
+
+
+## Nov 18 evening notes: statue straight + giant fire bowls, signs that fit, a
+## danger sign, edible food, hotter fire vents.
+func _nov18c_test() -> void:
+	await _start()
+	await wait(1.0)
+	god = true
+	var w = main.world
+	var st: Node3D = w.get_node("Playground/RogueStatue")
+	var sf := -st.global_transform.basis.z
+	check("n18c_statue_faces_entrance", sf.z < -0.99, str(sf))
+	var braz: Array = get_tree().get_nodes_in_group("giant_brazier")
+	check("n18c_two_giant_braziers", braz.size() == 2 and absf((braz[0] as Node3D).global_position.y - 4.0) < 0.1)
+	await _look(st.global_position + Vector3(0, 4.5, 0), Vector3(0.5, 0.1, 22.0), 3.5, 0.12)
+	await shot("n18c_01_statue_from_camp")
+	# the signs, close up
+	await _look(Vector3(18.0, 1.6, 9.0), Vector3(15.9, 0.1, 10.8), 0.05, -0.05)
+	await shot("n18c_02_playground_sign")
+	await _look(st.global_position + Vector3(0, 1.9, -1.9), st.global_position + Vector3(0.0, 0.1, -5.0), 1.6, 0.0)
+	await shot("n18c_03_statue_plate")
+	await _look(Vector3(-19.0, 1.7, 9.5), Vector3(-18.2, 0.1, 12.2), 0.05, -0.05)
+	await shot("n18c_04_climb_sign")
+	await _look(Vector3(-1.75, 1.7, 0.6), Vector3(-1.2, 0.1, 4.0), 0.05, 0.0)
+	await shot("n18c_05_danger_sign")
+	var stray := 0
+	for mi in w.get_node("ClimbWall").find_children("*", "MeshInstance3D", true, false):
+		if (mi as Node3D).global_position.distance_to(Vector3(0, 1.0, 0)) < 2.0:
+			stray += 1
+	check("n18c_no_blank_board_at_stairs", stray == 0, "%d" % stray)
+	check("n18c_danger_sign", w.get_node_or_null("DangerSign") != null)
+	# every label in the outpost uses the sign font
+	var plain := 0
+	for lb in w.find_children("*", "Label3D", true, false):
+		if (lb as Label3D).font == null:
+			plain += 1
+	check("n18c_labels_use_sign_font", plain == 0, "%d without" % plain)
+	# food on the tables
+	var foods := get_tree().get_nodes_in_group("food")
+	check("n18c_food_on_tables", foods.size() >= 4, "%d" % foods.size())
+	var pick: Node3D = null
+	for f in foods:
+		if f.kind == "drumstick" or pick == null:
+			pick = f
+	var info := []
+	for f in foods:
+		info.append("%s@%s" % [f.kind, str((f as Node3D).global_position.snapped(Vector3.ONE * 0.1))])
+	print("FOODS ", info)
+	if pick:
+		await _look(pick.global_position + Vector3(0, 0.2, 0), pick.global_position + Vector3(0.9, 0.0, 0.9), 2.2, -0.35)
+		await shot("n18c_06_food")
+		var tgt := pick.global_position + Vector3(0.7, 0, 0.7)
+		tgt.y = pick.global_position.y - 1.0
+		var space := player.get_world_3d().direct_space_state
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(tgt + Vector3(0, 3, 0), tgt - Vector3(0, 5, 0), 1))
+		await tp((hit.position as Vector3) + Vector3(0, 0.1, 0) if not hit.is_empty() else tgt, 0.0)
+		face(pick.global_position); player.facing = player.yaw
+		await wait(0.4)
+		if player.interact_target is Food:
+			pick = player.interact_target     # whichever dish is right in front of you
+		var dmg0 := Game.attack_damage()
+		Game.stamina = 10.0
+		await tap("interact")
+		await wait(0.3)
+		var k: Dictionary = Food.KINDS[pick.kind]
+		var ok: bool = pick.eaten
+		if k.has("buff"):
+			ok = ok and Game.has_buff(String(k.buff))
+		check("n18c_eat_food", ok, "%s eaten=%s buffs=%s" % [pick.kind, str(pick.eaten), str(Game.buffs)])
+		if pick.kind == "drumstick":
+			check("n18c_strong_hits_harder", Game.attack_damage() > dmg0 * 1.2, "%.1f -> %.1f" % [dmg0, Game.attack_damage()])
+		await shot("n18c_07_ate")
+	# the fire vents burn harder
+	god = false
+	Game.hp = Game.max_hp()
+	var trap: Node3D = w.corridor_traps[0]
+	await tp(trap.global_position + Vector3(0, 0.2, 0), 0.0)
+	var t0 := Time.get_ticks_msec()
+	while not trap.is_burning() and Time.get_ticks_msec() - t0 < 6000:
+		await frames(1)
+		player.global_position = trap.global_position + Vector3(0, 0.2, 0)
+	var hp0 := Game.hp
+	for k in 10:
+		await wait(0.1)
+		player.global_position = trap.global_position + Vector3(0, 0.2, 0)
+	await shot("n18c_08_fire")
+	var lost := hp0 - Game.hp
+	check("n18c_fire_burns_hard", lost > Game.max_hp() * 0.25, "lost %.0f of %.0f in 1 s" % [lost, Game.max_hp()])
+	god = true
+
+
+## Nov 18 forest notes: rainbow mushrooms, more discoveries and gnome houses,
+## a tougher Chief Gruk with new moves, and floating torches snapped to walls.
+func _forest18_test() -> bool:
+	if not Game.get_meta("f18_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("f18_phase", true)
+		main._travel("forest")
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var fw: ForestWorld = main.world
+	var shrooms := get_tree().get_nodes_in_group("rainbow_shroom")
+	var under := shrooms.filter(func(n) -> bool: return (n as Node3D).global_position.y < -20.0)
+	check("f18_mushrooms_edible", shrooms.size() >= 40 and under.size() >= 20, "%d in all, %d in the mine" % [shrooms.size(), under.size()])
+	var snapped := get_tree().get_nodes_in_group("snapped_torch")
+	var tinfo := []
+	for t2 in snapped:
+		tinfo.append(str((t2 as Node3D).global_position.snapped(Vector3.ONE * 0.1)))
+	print("SNAPPED TORCHES ", tinfo)
+	# eat mushrooms one by one: rainbow vision builds up
+	var sh: Node3D = under[0]
+	var levels := []
+	for k in 5:
+		var m2: Node3D = under[k]
+		await tp(m2.global_position + Vector3(0, 0.3, 1.2), 0.0)
+		face(m2.global_position); player.facing = player.yaw
+		await wait(0.3)
+		if player.interact_target != m2:
+			m2.interact(player)
+		else:
+			await tap("interact")
+		await wait(0.4)
+		levels.append(snappedf(Game.shroom, 0.1))
+		if k == 0 or k == 2 or k == 4:
+			player.zoom_target = 4.5; player.zoom = 4.5; player.snap_view()
+			await wait(0.8)
+			await shot("f18_rainbow_%d" % (k + 1))
+	check("f18_rainbow_builds_up", levels.size() == 5 and float(levels[4]) >= 5.0 and float(levels[0]) >= 1.0, str(levels))
+	var sw0 := player.swings
+	var wf0 := player.whiffs
+	for k in 6:
+		await tap("attack")
+		await wait(0.3)
+	check("f18_too_dizzy_to_fight", player.whiffs - wf0 >= 1, "%d of %d swings missed" % [player.whiffs - wf0, player.swings - sw0])
+	Game.shroom = 0.0
+	await wait(0.5)
+	# discoveries: the new ones and four gnome houses
+	var spots := fw.discoveries.get_children().filter(func(n) -> bool: return n.get("kind") != null)
+	var kinds := {}
+	for sp in spots:
+		kinds[sp.kind] = int(kinds.get(sp.kind, 0)) + 1
+	print("DISCOVERIES ", kinds)
+	check("f18_more_discoveries", spots.size() >= 12 and int(kinds.get("gnome_house", 0)) >= 3, str(kinds))
+	var worked := 0
+	var g0 := Game.gold
+	for sp in spots:
+		await tp(sp.global_position + Vector3(0, 0.4, 2.8), 0.0)
+		face(sp.global_position)
+		await wait(0.4)
+		if player.interact_target != sp:
+			var itg = player.interact_target
+			print("DISC NOT TARGETED ", sp.kind, " at ", sp.global_position.snapped(Vector3.ONE * 0.1), " target: ",
+				(str(itg.get_script().get_global_name()) + " " + str(itg.global_position.snapped(Vector3.ONE * 0.1))) if itg else "none",
+				" player ", player.global_position.snapped(Vector3.ONE * 0.1))
+		if player.interact_target == sp or (sp.kind == "picnic" and player.interact_target is Food):
+			await tap("interact")
+			await wait(1.2)
+			if main.menus.current != "":
+				main._resume()
+			worked += 1
+			if sp.kind in ["wishing_well", "fairy_ring", "picnic", "bee_hive", "bounce_shroom"] or (sp.kind == "gnome_house" and sp.variant == 2):
+				await _look(sp.global_position + Vector3(0, 0.8, 0), sp.global_position + Vector3(2.6, 0.4, 2.6), 3.2, -0.2)
+				await shot("f18_disc_%s_%d" % [sp.kind, sp.variant])
+	check("f18_discoveries_respond", worked >= spots.size() - 1, "%d of %d" % [worked, spots.size()])
+	# the giant bouncy mushroom
+	var bs: Array = spots.filter(func(n) -> bool: return n.kind == "bounce_shroom")
+	if bs.size() > 0:
+		var b0: Node3D = bs[0]
+		await tp(b0.global_position + Vector3(0.3, 2.6, 0.2), 0.0)
+		var top := 0.0
+		for k in 40:
+			await wait(0.05)
+			top = maxf(top, player.global_position.y - b0.global_position.y)
+		check("f18_bounce_mushroom", top > 5.0, "peak %.1f m above its foot" % top)
+	# Chief Gruk: tougher, with the spore bomb and the war horn
+	var gk: Enemy = fw.gruk
+	check("f18_gruk_tougher", gk != null and gk.max_hp >= 5000.0, "%.0f" % (gk.max_hp if gk else 0.0))
+	if gk:
+		await tp(gk.global_position + Vector3(0, 0.3, 7.0), PI)
+		face(gk.global_position)
+		await wait(0.5)
+		gk.player = player
+		gk._boss_move("spore_bomb")
+		await wait(2.0)
+		var hp0 := Game.hp
+		await wait(2.5)
+		await shot("f18_gruk_spores")
+		check("f18_spore_bomb", Game.shroom > 0.5, "rainbow %.1f" % Game.shroom)
+		Game.shroom = 0.0
+		var n0 := get_tree().get_nodes_in_group("enemy").size()
+		gk._move_busy = false
+		gk._boss_move("war_horn")
+		await wait(1.6)
+		await shot("f18_gruk_horn")
+		var n1 := get_tree().get_nodes_in_group("enemy").size()
+		check("f18_war_horn_calls_goblins", n1 > n0, "%d -> %d" % [n0, n1])
+	return false

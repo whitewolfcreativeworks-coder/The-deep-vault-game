@@ -132,9 +132,10 @@ func _process(delta: float) -> void:
 					continue
 				if b.is_in_group("player"):
 					# a real burn: a big hit that grows with your level, and you keep burning a moment
+					# (Nov 18: hotter again: a harder hit, and you keep burning for 3 s)
 					if b.has_method("burn"):
-						b.burn(18.0 + Game.max_hp() * 0.07, 2.0, 4.0 + Game.max_hp() * 0.015)
+						b.burn(20.0 + Game.max_hp() * 0.085, 3.0, 5.0 + Game.max_hp() * 0.02)
 					else:
-						b.take_damage(18.0 + Game.max_hp() * 0.07, global_position + Vector3(0, 0, 3.0), 2.0)
+						b.take_damage(20.0 + Game.max_hp() * 0.085, global_position + Vector3(0, 0, 3.0), 2.0)
 				elif b.is_in_group("enemy"):
 					b.take_damage(14.0, global_position, 1.0, false)

@@ -84,6 +84,7 @@ var melee_mana_gained := 0.0
 var potions_used := 0
 var mana_potions_used := 0
 var swings := 0
+var whiffs := 0             # swings that missed because of too many mushrooms
 var _last_prompt := ""
 var bolt_scene_script := preload("res://scripts/player/projectile.gd")
 
@@ -333,6 +334,7 @@ static func _apply_profile_looks(cfg: Dictionary) -> void:
 	cfg["face"] = p.get("face", "none")
 	cfg["build"] = float(p.get("build", 1.0))
 	cfg["height"] = float(p.get("height", 1.0))
+	cfg["sex"] = Game.hero_sex()
 
 var _equipped_sig := ""
 func _equip_signature() -> String:
@@ -531,6 +533,7 @@ func _physics_process(delta: float) -> void:
 					iv = Vector2(iv.x * 0.6, -1.0).limit_length(1.0)
 			_move_input = iv
 			dir = Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, view_yaw)
+			dir = _shroom_wobble(dir)
 			if Input.is_action_just_pressed("jump"):
 				_jump_buffer = 0.18
 		if Input.is_action_just_pressed("pose") and not dead:
@@ -561,7 +564,7 @@ func _physics_process(delta: float) -> void:
 			elif _air_jumps == 1:
 				_double_jump()
 	var sprinting := input_enabled and Input.is_action_pressed("sprint") and dir.length() > 0.1 and Game.stamina > 1 and not blocking
-	var speed := SPRINT if sprinting else WALK
+	var speed := (SPRINT if sprinting else WALK) * (1.15 if Game.has_buff("quick") else 1.0)
 	if mounted:
 		speed *= _mount_speed()
 	if haste_t > 0.0:
@@ -696,7 +699,15 @@ func _update_timers(delta: float) -> void:
 	_attack_buffer -= delta
 	stamina_delay -= delta
 	if stamina_delay <= 0.0 and not blocking:
-		Game.stamina = minf(Game.max_stamina(), Game.stamina + 30.0 * delta)
+		Game.stamina = minf(Game.max_stamina(), Game.stamina + 30.0 * delta * (1.7 if Game.has_buff("fed") else 1.0))
+	Game.tick_buffs(delta)
+	if Game.shroom > 0.0:
+		Game.shroom = maxf(0.0, Game.shroom - delta / 16.0)     # each mushroom wears off in about 16 s
+		_shroom_t += delta
+		if Game.shroom >= 5.0 and is_on_floor() and not mounted and vehicle == null:
+			# far too many mushrooms: you wobble about on your own
+			velocity.x += sin(_shroom_t * 1.9) * 9.0 * delta
+			velocity.z += cos(_shroom_t * 1.3) * 9.0 * delta
 	Game.mana = minf(Game.max_mana(), Game.mana + Game.mana_regen() * delta)
 	if attacking:
 		attack_time += delta
@@ -801,6 +812,25 @@ func _use_stamina(v: float) -> void:
 	Game.stamina = maxf(0.0, Game.stamina - v)
 	stamina_delay = 0.7
 
+# --- rainbow vision (glowing mushrooms, see RainbowShroom) -------------------------
+var _shroom_t := 0.0
+var _dizzy_msg_t := 0.0
+
+## From three mushrooms on, your steering drifts; at five it barely does what you ask.
+func _shroom_wobble(dir: Vector3) -> Vector3:
+	if Game.shroom <= 2.0 or dir.length() < 0.1:
+		return dir
+	var wob := (minf(Game.shroom, 5.0) - 2.0) * 0.3
+	var d := dir.rotated(Vector3.UP, sin(_shroom_t * 1.7) * wob)
+	if Game.shroom >= 5.0:
+		d = d.rotated(Vector3.UP, sin(_shroom_t * 0.6) * 1.6) * 0.6
+	return d
+
+func _dizzy_say(text: String) -> void:
+	if Time.get_ticks_msec() / 1000.0 - _dizzy_msg_t > 2.5:
+		_dizzy_msg_t = Time.get_ticks_msec() / 1000.0
+		Game.say(text, Color.from_hsv(randf(), 0.5, 1.0))
+
 func _start_attack(kind: int) -> void:
 	swings += 1
 	combo = kind
@@ -808,6 +838,12 @@ func _start_attack(kind: int) -> void:
 	attack_time = 0.0
 	attack_dur = 0.72 if kind == 2 else 0.52
 	hit_done = false
+	# far too many mushrooms: most swings go wide (decided once per swing, so
+	# holding the button doesn't just try again every frame)
+	if Game.shroom >= 5.0 and randf() < 0.7:
+		hit_done = true
+		whiffs += 1
+		_dizzy_say("You swing at a rainbow... and miss!")
 	_use_stamina(6 if kind < 2 else 10)
 	Sfx.play("swing", -7.0, 0.12)
 
@@ -1085,6 +1121,10 @@ func burn(amount: float, secs: float, dps: float) -> void:
 	blocking = false
 	take_damage(amount, global_position, 0.0)
 	blocking = was
+	# it should feel like fire: an orange flash, a jolt, a yelp
+	FX.screen_flash(Color(1.0, 0.45, 0.1), 0.45, 0.45)
+	add_trauma(0.3)
+	Sfx.play("fire_burst", -8.0, 0.15)
 	_burn_t = maxf(_burn_t, secs)
 	_burn_dps = dps
 	if _burn_fx == null or not is_instance_valid(_burn_fx):
@@ -1588,6 +1628,9 @@ func _slowmo(scale: float, real_t: float) -> void:
 
 func use_special() -> void:
 	if dead or mantling or not input_enabled:
+		return
+	if Game.shroom >= 5.0:
+		_dizzy_say("You're far too dizzy to concentrate!")
 		return
 	var ab := Game.ability()
 	if special_kind != "":

@@ -77,7 +77,59 @@ static func torch(parent: Node, pos: Vector3, yaw_deg := 0.0, mounted := true, s
 	holder.add_child(l)
 	l.set_script(load("res://scripts/world/flicker.gd"))
 	fire_particles(holder, 0.6, color)
+	if mounted:
+		t.add_to_group("wall_torch")
+		t.set_meta("flame", holder)
 	return t
+
+## Wall torches placed by hand can end up on a corner or a gap with no wall behind
+## them, floating in the air. After a level is built, each one feels behind itself;
+## if there's no wall there, it moves onto the nearest wall within 2 m (turned to
+## face out of it), and if there's none at all it becomes a standing torch.
+static func snap_torches(world: Node3D) -> int:
+	var space := world.get_world_3d().direct_space_state
+	var moved := 0
+	for t in world.get_tree().get_nodes_in_group("wall_torch"):
+		var tn := t as Node3D
+		if not world.is_ancestor_of(tn):
+			continue
+		var p := tn.global_position + Vector3(0, 0.45, 0)
+		var back := -tn.global_transform.basis.z.normalized()
+		var q := PhysicsRayQueryParameters3D.create(p + back * -0.15, p + back * 0.45, 1)
+		if not space.intersect_ray(q).is_empty():
+			continue
+		var best := {}
+		var bd := 2.0
+		for k in 8:
+			var d := Vector3(cos(k * TAU / 8.0), 0, sin(k * TAU / 8.0))
+			var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(p, p + d * 2.0, 1))
+			if hit.is_empty() or absf((hit.normal as Vector3).y) > 0.3:
+				continue
+			var dist := p.distance_to(hit.position)
+			if dist < bd:
+				bd = dist; best = hit
+		var flame: Node3D = tn.get_meta("flame") if tn.has_meta("flame") else null
+		if best.is_empty():
+			# nothing to hang on: stand it on the floor instead
+			tn.visible = false
+			var floor_hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(p, p - Vector3(0, 8, 0), 1))
+			if not floor_hit.is_empty():
+				var st := torch(tn.get_parent(), floor_hit.position, 0.0, false)
+				st.add_to_group("snapped_torch")
+			if flame:
+				flame.queue_free()
+			moved += 1
+			continue
+		var n: Vector3 = best.normal; n.y = 0; n = n.normalized()
+		var at: Vector3 = (best.position as Vector3) + n * 0.02
+		at.y = tn.global_position.y
+		tn.global_position = at
+		tn.global_rotation.y = atan2(n.x, n.z)
+		if flame:
+			flame.global_position = at + Vector3(0, 0.62, 0) + n * 0.32
+		tn.add_to_group("snapped_torch")
+		moved += 1
+	return moved
 
 static func fire_particles(parent: Node3D, size := 1.0, color := Color(1.0, 0.6, 0.25), embers := true) -> void:
 	var f := CPUParticles3D.new()

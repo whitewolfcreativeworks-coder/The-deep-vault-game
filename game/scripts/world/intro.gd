@@ -193,6 +193,7 @@ var _stove: Vector3 = Vector3(4.2, 0, 1.6)
 var _table: Vector3 = Vector3(0.6, 0, -0.2)
 var _stool: Vector3 = Vector3(0.6, 0, 0.75)
 var _kettle_steam: CPUParticles3D
+var _lid_steam: CPUParticles3D
 var _teapot: Node3D
 var _teapot_home: Transform3D
 var _cup: Node3D
@@ -202,6 +203,11 @@ var _cup_steam: CPUParticles3D
 var _stream: MeshInstance3D
 var _teabag: Node3D
 var _spoon: MeshInstance3D
+var _spoon_grip: Marker3D
+var _saucer: Node3D
+var _stool_node: Node3D
+var _cup_grip: Marker3D
+var _ik: SkeletonIK3D
 
 func _box(a: Vector3, b2: Vector3, m: Material, parent: Node3D = null) -> MeshInstance3D:
 	var mi := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = (b2 - a).abs()
@@ -265,11 +271,20 @@ func _cabin_interior() -> void:
 	_teapot = _make_teapot()
 	_teapot.position = ROOM + _stove + Vector3(-0.2, 1.0, 0)
 	_teapot.rotation.y = 0.35                      # spout side-on to the camera
-	_kettle_steam = _steam(Vector3.ZERO, 0.14, 40, _teapot)
-	_kettle_steam.position = SPOUT_TIP + Vector3(0, 0.02, 0.01)
-	_kettle_steam.direction = Vector3(0, 1, 0.5)
-	_kettle_steam.initial_velocity_min = 0.6; _kettle_steam.initial_velocity_max = 1.0
+	# soft wisps from the spout, like the cup's steam: small puffs that leave the
+	# spout quickly, slow down and curl upward as they spread and fade
+	_kettle_steam = _steam(Vector3.ZERO, 0.06, 36, _teapot)
+	_kettle_steam.position = SPOUT_TIP + Vector3(0, 0.01, 0.01)
+	_kettle_steam.direction = Vector3(0, 0.5, 1)
+	_kettle_steam.spread = 12
+	_kettle_steam.initial_velocity_min = 0.25; _kettle_steam.initial_velocity_max = 0.4
+	_kettle_steam.damping_min = 0.3; _kettle_steam.damping_max = 0.5
+	_kettle_steam.gravity = Vector3(0.0, 0.3, 0.0)
+	_kettle_steam.lifetime = 1.5
 	_kettle_steam.emitting = false
+	_lid_steam = _steam(Vector3(0, 0.3, 0), 0.05, 10, _teapot)
+	_lid_steam.initial_velocity_min = 0.06; _lid_steam.initial_velocity_max = 0.14
+	_lid_steam.emitting = false
 	_kit("pan_A", ROOM + _stove + Vector3(0.0, 1.0, -0.38), 90.0, 0.32)
 	# kitchen shelf by the stove: jars, plates and a cutting board (KayKit Restaurant Bits)
 	_box(Vector3(2.3, 1.35, -3.98), Vector3(4.4, 1.41, -3.6), dark)
@@ -285,13 +300,13 @@ func _cabin_interior() -> void:
 	_kit("crate_potatoes", ROOM + Vector3(3.6, 0.0, 3.3), -10.0, 0.45)
 	# a round table set for breakfast
 	_kit("table_round_A_small", ROOM + _table, 0.0, 0.8)
-	Props.place(self, "stool", ROOM + _stool, 0.0, 1.0)
+	_stool_node = Props.place(self, "stool", ROOM + _stool, 0.0, 1.0)
 	Props.place(self, "candle_triple", ROOM + _table + Vector3(-0.32, 0.8, -0.32), 0.0, 0.45)
 	_kit("plate", ROOM + _table + Vector3(0.3, 0.8, -0.05), 0.0, 0.28)
 	_kit("food_ingredient_bun", ROOM + _table + Vector3(0.27, 0.83, -0.08), 30.0, 0.3)
 	_kit("food_ingredient_cheese", ROOM + _table + Vector3(0.36, 0.83, 0.0), 0.0, 0.25)
 	# the cup on its saucer
-	_kit("plate_small", ROOM + _table + Vector3(-0.02, 0.8, 0.14), 0.0, 0.3)
+	_saucer = _kit("plate_small", ROOM + _table + Vector3(-0.02, 0.8, 0.14), 0.0, 0.3)
 	_cup = Node3D.new(); add_child(_cup); _cup.position = ROOM + _table + Vector3(-0.02, 0.815, 0.14)
 	var china := _mat(Color(0.97, 0.96, 0.93), 0.15)
 	china.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -301,6 +316,7 @@ func _cabin_interior() -> void:
 		Vector2(0.062, 0.07), Vector2(0.052, 0.03), Vector2(0.0, 0.02)], china))
 	_cup.add_child(_lathe([Vector2(0.0768, 0.093), Vector2(0.0775, 0.1), Vector2(0.0768, 0.106)], blue))
 	_cup.add_child(_tube(Vector3(0.062, 0.088, 0), Vector3(0.125, 0.085, 0), Vector3(0.06, 0.035, 0), 0.009, 0.008, china))
+	_cup_grip = Marker3D.new(); _cup_grip.position = Vector3(0.115, 0.062, 0); _cup.add_child(_cup_grip)
 	_tea = MeshInstance3D.new(); var tc := CylinderMesh.new(); tc.top_radius = 0.066; tc.bottom_radius = 0.066; tc.height = 0.004
 	_tea.mesh = tc; _tea_mat = _mat(Color(0.72, 0.8, 0.84), 0.05); _tea.material_override = _tea_mat
 	_tea.position.y = 0.03; _tea.scale = Vector3(0.8, 1, 0.8); _tea.visible = false; _cup.add_child(_tea)
@@ -323,6 +339,7 @@ func _cabin_interior() -> void:
 	var bowl2 := MeshInstance3D.new(); var bsm := SphereMesh.new(); bsm.radius = 0.014; bsm.height = 0.012
 	bowl2.mesh = bsm; bowl2.material_override = shaft.material_override; bowl2.scale = Vector3(1, 1, 1.5); sp.add_child(bowl2)
 	_spoon.add_child(sp)
+	_spoon_grip = Marker3D.new(); _spoon_grip.position = Vector3(0, 0.125, 0); _spoon.add_child(_spoon_grip)
 	add_child(_spoon); _spoon.position = ROOM + _table + Vector3(-0.17, 0.805, 0.22); _spoon.rotation = Vector3(PI / 2, 0, 0.5)
 	# the pouring water
 	_stream = MeshInstance3D.new(); var sc := CylinderMesh.new(); sc.top_radius = 0.013; sc.bottom_radius = 0.017; sc.height = 1.0
@@ -335,6 +352,7 @@ func _cabin_interior() -> void:
 	Props.place(self, "shelves", ROOM + Vector3(1.6, 0, 3.8), 180.0, 1.0)
 
 const SPOUT_TIP := Vector3(0, 0.27, 0.33)      # teapot-local, the spout points along +Z
+const STIR_TILT := Vector3(0.45, 0, -0.3)       # the spoon while stirring: handle toward him and his right
 
 ## A smooth shape turned on a lathe: `profile` is (radius, height) pairs.
 func _lathe(profile: Array, mat: Material, segs := 28) -> MeshInstance3D:
@@ -554,6 +572,84 @@ func _yaw_to(p: Vector3) -> float:
 	var d := p - actor.position
 	return atan2(-d.x, -d.z)
 
+# --- his right hand really holds things: an IK chain from the shoulder pulls the
+# hand onto a target (the spoon's handle, the cup's handle, the toothbrush) on top
+# of whatever the body animation is doing.
+func _bone_world(bone: String) -> Vector3:
+	var sk := actor.skel
+	return sk.global_transform * sk.get_bone_global_pose(sk.find_bone(bone)).origin
+
+func _arm_reach() -> float:
+	var a := _bone_world("upperarm.r"); var b := _bone_world("lowerarm.r")
+	var c := _bone_world("wrist.r"); var d := _bone_world("hand.r")
+	return a.distance_to(b) + b.distance_to(c) + c.distance_to(d)
+
+func _hand_to(target: Node3D, blend := 0.25) -> void:
+	_hand_free(0.0)
+	if actor == null or actor.skel == null or actor.skel.find_bone("hand.r") < 0:
+		return
+	var ik := SkeletonIK3D.new()
+	ik.root_bone = "upperarm.r"; ik.tip_bone = "hand.r"
+	ik.interpolation = 0.0
+	ik.max_iterations = 12
+	actor.skel.add_child(ik)
+	ik.target_node = ik.get_path_to(target)
+	ik.start()
+	_ik = ik
+	create_tween().tween_property(ik, "interpolation", 1.0, maxf(blend, 0.01))
+
+func _hand_free(blend := 0.25) -> void:
+	if _ik == null or not is_instance_valid(_ik):
+		_ik = null
+		return
+	var ik := _ik
+	_ik = null
+	if blend <= 0.0:
+		ik.stop(); ik.queue_free()
+		return
+	var tw := create_tween(); tw.tween_property(ik, "interpolation", 0.0, blend)
+	tw.tween_callback(func() -> void:
+		if is_instance_valid(ik):
+			ik.stop(); ik.queue_free())
+
+## Where his mouth is (from the visible head), for the cup and the toothbrush.
+func _mouth(fwd: Vector3) -> Vector3:
+	var head: MeshInstance3D = null
+	for m in actor.find_children("*", "MeshInstance3D", true, false):
+		if String(m.name).ends_with("_Head") and (m as MeshInstance3D).visible:
+			head = m
+	if head == null:
+		return _bone_world("head") + Vector3(0, 0.15, 0) + fwd * 0.15
+	var ab: AABB = head.global_transform * head.get_aabb()
+	var c := ab.get_center()
+	var half := absf(fwd.x) * ab.size.x * 0.5 + absf(fwd.z) * ab.size.z * 0.5
+	return Vector3(c.x, ab.position.y + ab.size.y * 0.22, c.z) + fwd * half * 0.9
+
+## Seated at the table, he must be able to reach the cup: slide the cup and its
+## saucer toward him (and his stool toward the table, if that's not enough).
+func _cup_in_reach() -> void:
+	var sh := _bone_world("upperarm.r")
+	var reach := _arm_reach() * 0.85
+	var grip := _cup.position + Vector3(0, 0.11, 0) + Basis.from_euler(STIR_TILT) * Vector3(0, 0.125, 0)
+	var dist := sh.distance_to(grip)
+	if dist <= reach:
+		return
+	var flat := Vector3(sh.x - _cup.position.x, 0, sh.z - _cup.position.z)
+	var dy := grip.y - sh.y
+	var need_flat := sqrt(maxf(0.0, reach * reach - dy * dy))
+	var move := maxf(0.0, flat.length() - need_flat)
+	# the cup may come at most 0.24 m across the table; he leans in for the rest
+	var cup_move := minf(move, 0.24)
+	var shift := flat.normalized() * cup_move
+	_cup.position += shift
+	if _saucer:
+		_saucer.position += shift
+	var rest := move - cup_move
+	if rest > 0.0:
+		actor.position -= flat.normalized() * rest
+		if _stool_node:
+			_stool_node.position -= flat.normalized() * rest      # he pulls his stool in
+
 ## A toothbrush held at the mouth (it follows the head as he brushes), with foam.
 func _toothbrush(foam: Array) -> Node3D:
 	var head: MeshInstance3D = null
@@ -584,6 +680,8 @@ func _toothbrush(foam: Array) -> Node3D:
 	bristle.mesh = bb; bristle.material_override = _mat(Color(1, 1, 1), 0.6); bristle.position = Vector3(-0.005, 0.0, 0.0); scrub.add_child(bristle)
 	var tipm := MeshInstance3D.new(); var tb2 := BoxMesh.new(); tb2.size = Vector3(0.05, 0.012, 0.032)
 	tipm.mesh = tb2; tipm.material_override = _mat(Color(0.3, 0.85, 0.9), 0.6); tipm.position = Vector3(-0.005, 0.018, 0.0); scrub.add_child(tipm)
+	var grip := Marker3D.new(); grip.name = "Grip"; grip.position = Vector3(0.2, -0.02, 0.0); scrub.add_child(grip)
+	scrub.position.x = 0.16          # starts down in his hand; brushing lifts it to the mouth
 	# toothpaste foam round the mouth
 	var fm := _mat(Color(1, 1, 1), 0.5)
 	for k in 7:
@@ -684,17 +782,29 @@ func play() -> void:
 	bubbles.gravity = Vector3(0, -0.8, 0)
 	add_child(bubbles); bubbles.global_position = brush.global_position if brush else actor.position + Vector3(-0.3, 1.1, 0)
 	_say("Brush, brush, brush...")
-	Sfx.play("brush", -4.0)
-	actor.oneshot("Use_Item", 2.4)
 	if scrub:
-		var sw := create_tween().set_loops(12)
+		_hand_to(scrub.get_node("Grip"), 0.2)
+		bubbles.emitting = false
+		# up to the mouth, then scrub side to side
+		var lift := create_tween()
+		lift.tween_property(scrub, "position:x", 0.0, 0.45).set_trans(Tween.TRANS_SINE)
+		await lift.finished
+		bubbles.emitting = true
+	Sfx.play("brush", -4.0)
+	if scrub:
+		var sw := create_tween().set_loops(10)
 		sw.tween_property(scrub, "position:x", 0.03, 0.1)
 		sw.tween_property(scrub, "position:x", -0.03, 0.1)
 	for f in foam:
 		create_tween().tween_property(f, "scale", Vector3.ONE, 1.4).set_delay(randf() * 0.6)
-	await _wait(2.4)
+	await _wait(2.1)
 	if skipped: return
 	bubbles.emitting = false
+	if scrub:
+		var down := create_tween()
+		down.tween_property(scrub, "position:x", 0.16, 0.3)
+		await down.finished
+	_hand_free(0.15)
 	if brush:
 		brush.queue_free()
 	FX.burst(actor.position + Vector3(-0.35, 1.18, 0), Color(1, 1, 1), 12, 1.2, 0.04, 0.5, 0.0)
@@ -712,13 +822,14 @@ func play() -> void:
 	Sfx.play("kettle", -3.0, 0.0)
 	_say("Bubble, bubble...")
 	_kettle_steam.emitting = true
-	_kettle_steam.amount = 16
+	_lid_steam.emitting = true
 	var rattle := create_tween().set_loops(10)
 	rattle.tween_property(_lid, "position:y", 0.258, 0.07)
 	rattle.tween_property(_lid, "position:y", 0.245, 0.07)
 	await _wait(1.0)
-	_kettle_steam.amount = 60
-	_kettle_steam.initial_velocity_max = 1.6
+	# boiling hard: the wisps shoot further out of the spout (no restart, no pop)
+	create_tween().tween_property(_kettle_steam, "initial_velocity_max", 0.75, 0.5)
+	create_tween().tween_property(_kettle_steam, "initial_velocity_min", 0.5, 0.5)
 	_say("Tweeeeee! The water's ready.")
 	await _wait(1.8)
 	if skipped: return
@@ -728,6 +839,8 @@ func play() -> void:
 	await _cut()
 	_kettle_steam.emitting = false
 	_kettle_steam.visible = false
+	_lid_steam.emitting = false
+	_lid_steam.visible = false
 	actor.visible = true
 	actor.position = R + _stool
 	actor.rotation.y = 0.0                        # facing the table (-z)
@@ -735,6 +848,8 @@ func play() -> void:
 	_teapot.scale = Vector3.ONE * 0.7
 	_teapot.position = R + _table + Vector3(-0.32, 0.8, 0.05)
 	_teapot.rotation = Vector3(0, PI / 2 + 0.3, 0)
+	await _wait(0.4)                # let the sitting pose settle, then slide the cup within his reach
+	_cup_in_reach()
 	var cup_top := _cup.position + Vector3(0, 0.11, 0)
 	# close on the cup: teapot tips, water runs from the spout
 	_cam(cup_top + Vector3(0.12, 0.42, -0.62), cup_top + Vector3(0.08, 0.38, -0.55), cup_top + Vector3(-0.08, 0.04, 0), cup_top + Vector3(-0.03, 0.0, 0), 4.5, 42.0)
@@ -783,24 +898,44 @@ func play() -> void:
 	create_tween().tween_property(_teabag, "position", _cup.position + Vector3(0.16, 0.0, 0.08), 0.4)
 	_say("Stir, stir...")
 	_spoon.position = cup_top + Vector3(0.0, 0.0, 0)
-	_spoon.rotation = Vector3(0, 0, 0.3)
+	_spoon.rotation = STIR_TILT        # the handle leans toward his right hand
+	_hand_to(_spoon_grip, 0.2)
+	await _wait(0.2)
 	Sfx.play("stir", -6.0, 0.0)
-	var stir := create_tween().set_loops(4)
-	for k in 4:
-		var ang := TAU * k / 4.0
-		stir.tween_property(_spoon, "position", cup_top + Vector3(cos(ang) * 0.03, -0.01, sin(ang) * 0.03), 0.07)
-	await _wait(1.15)
+	var stir := create_tween().set_loops(5)
+	for k in 6:
+		var ang := TAU * k / 6.0
+		stir.tween_property(_spoon, "position", cup_top + Vector3(cos(ang) * 0.028, -0.01, sin(ang) * 0.028), 0.07)
+	await _wait(2.1)
 	if skipped: return
-	_spoon.position = _cup.position + Vector3(0.0, 0.0, 0.115)
-	_spoon.rotation = Vector3(PI / 2, PI / 2, 0)
+	# tap it on the rim, put it down on the saucer
+	var put := create_tween()
+	put.tween_property(_spoon, "position", cup_top + Vector3(0, 0.03, 0), 0.12)
+	put.tween_property(_spoon, "position", _cup.position + Vector3(0.0, 0.03, 0.115), 0.3)
+	put.parallel().tween_property(_spoon, "rotation", Vector3(PI / 2, PI / 2, 0), 0.3)
+	await put.finished
+	_hand_free(0.2)
 	# sip, seen from across the table
 	var front := R + _table + Vector3(0.25, 1.3, -1.7)
 	_cam(front + Vector3(0.2, 0, 0), front + Vector3(0.1, -0.05, 0.2), R + _stool + Vector3(0, 1.15, 0), R + _stool + Vector3(0, 1.2, 0), 2.4, 40.0)
-	actor.hold_clip = ""
-	actor.oneshot("Use_Item", 0.9)
+	var cup_home := _cup.position
+	var fwd := -actor.global_transform.basis.z.normalized()
+	fwd = Vector3(fwd.x, 0, fwd.z).normalized()
+	var lip := _mouth(fwd)
+	_hand_to(_cup_grip, 0.25)
+	await _wait(0.3)
+	var sip := create_tween()
+	sip.tween_property(_cup, "position", lip - fwd * 0.06 - Vector3(0, 0.1, 0), 0.6).set_trans(Tween.TRANS_SINE)
+	sip.parallel().tween_property(_cup, "rotation:x", 0.0, 0.6)
+	sip.tween_property(_cup, "rotation", Vector3(-fwd.z, 0, fwd.x) * 0.55, 0.35)
+	await sip.finished
 	Sfx.play("sip", -3.0)
-	await _wait(0.9)
-	actor.hold_clip = "Sit_Chair_Idle"
+	await _wait(0.6)
+	var lower := create_tween()
+	lower.tween_property(_cup, "rotation", Vector3.ZERO, 0.3)
+	lower.tween_property(_cup, "position", cup_home, 0.55).set_trans(Tween.TRANS_SINE)
+	await lower.finished
+	_hand_free(0.25)
 	_say("Ahh... perfect.")
 	await _wait(1.3)
 	if skipped: return

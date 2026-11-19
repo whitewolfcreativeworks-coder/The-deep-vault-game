@@ -13,6 +13,7 @@ var hud: HUD
 var menus: Menus
 var menu_cam: Camera3D
 var touch: TouchControls
+var rainbow: RainbowVision
 var state := "title"
 var _orbit := 0.0
 var _death_timer := -1.0
@@ -37,6 +38,12 @@ func _ready() -> void:
 	add_child(world)
 	world.build()
 	_zone_extras()
+	Food.stock_world(world)      # food on the tables (and some barrels and crates) to eat
+	# once the physics world knows the walls: put any floating wall torch on a wall
+	var w: Node3D = world
+	get_tree().create_timer(0.15).timeout.connect(func() -> void:
+		if is_instance_valid(w) and w.is_inside_tree():
+			Props.snap_torches(w))
 	player = Player.new()
 	player.name = "Player"
 	player.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -51,6 +58,9 @@ func _ready() -> void:
 	hud = HUD.new()
 	add_child(hud)
 	hud.bind_player(player)
+	rainbow = RainbowVision.new()
+	add_child(rainbow)
+	rainbow.player = player
 	hud.visible = false
 	menus = Menus.new()
 	add_child(menus)
@@ -61,6 +71,7 @@ func _ready() -> void:
 	menus.exit_to_title_requested.connect(_save_and_exit)
 	Game.leveled_up.connect(func(_l: int) -> void: autosave())
 	menus.resume_requested.connect(_resume)
+	menus.desk_closed.connect(_on_desk_closed)
 	menus.respawn_requested.connect(_respawn)
 	menus.restart_requested.connect(_restart)
 	menus.quit_requested.connect(func() -> void: get_tree().quit())
@@ -409,7 +420,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		if menus.current == "designer":
 			menus.designer.close(false)      # Esc steps back out of the Skin Designer
-		elif menus.current in ["pause", "inventory", "lore"]:
+		elif menus.current in ["pause", "inventory", "lore", "stash"]:
 			_resume()
 		elif menus.current == "" and state == "play":
 			_open("pause")
@@ -462,6 +473,27 @@ func show_boss_bar(w: Warden) -> void:
 
 func hide_boss_bar() -> void:
 	hud.hide_boss()
+
+## The desk in the cabin at home: change your name and looks.
+func open_desk() -> void:
+	if state != "play" or menus.current != "":
+		return
+	menus.open_desk()
+	get_tree().paused = true
+	player.set_mouse_captured(false)
+
+func _on_desk_closed(changed: bool) -> void:
+	if changed:
+		player.rebuild_body()
+		Game.say("Looking good, %s!" % Game.profile.name, Color(1.0, 0.9, 0.6))
+		autosave()
+	_resume()
+
+## The gear chest in the cabin at home.
+func open_stash() -> void:
+	if state != "play" or menus.current != "":
+		return
+	_open("stash")
 
 func show_lore(t: String, body: String) -> void:
 	menus.show_lore(t, body)

@@ -93,6 +93,7 @@ func build() -> void:
 	_quest_items()
 	sinkhole = SinkholeOfDeath.build_in(self)
 	discoveries = ForestDiscoveries.build_in(self)
+	_mushroom_patches()
 	# treasure chests in random spots out in the woods (new ones keep popping up)
 	wild_chests = WildChests.create(self, Rect2(-PLAY + 8, -86, (PLAY - 8) * 2, 86 + PLAY - 8), ground, _wild_spot_ok, 7, 5)
 	if Game.is_compat():
@@ -1031,15 +1032,22 @@ func _check_gruk_gate(instant: bool) -> void:
 	tw.tween_property(_gruk_gate, "position:y", _gruk_gate.position.y + 5.2, 2.5).set_trans(Tween.TRANS_SINE)
 	Game.say("Both totems are smashed! Gruk's gate rumbles open...", Color(1.0, 0.75, 0.4))
 
+## A glowing mushroom you can eat for rainbow vision (see RainbowShroom).
 func _mushroom(p: Vector3) -> void:
 	var col := Color(0.35, 0.9, 0.75) if _rng.randf() < 0.6 else Color(0.75, 0.45, 1.0)
-	var cap := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.35; sm.height = 0.35; sm.is_hemisphere = true
-	cap.mesh = sm; cap.material_override = FX.glow_material(col, 1.6)
-	cap.position = p + Vector3(0, 0.4, 0)
-	add_child(cap)
-	var stem := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.07; cm.bottom_radius = 0.1; cm.height = 0.42
-	stem.mesh = cm; var st := StandardMaterial3D.new(); st.albedo_color = Color(0.85, 0.82, 0.7); stem.material_override = st
-	stem.position = p + Vector3(0, 0.21, 0)
-	add_child(stem)
-	var l := OmniLight3D.new(); l.light_color = col; l.light_energy = 0.8; l.omni_range = 4.0
-	l.position = p + Vector3(0, 0.8, 0); add_child(l)
+	RainbowShroom.make(self, p, col)
+
+## Little patches of glowing mushrooms in shady spots all over the forest.
+func _mushroom_patches() -> void:
+	var made := 0
+	for attempt in 200:
+		if made >= 9:
+			break
+		var c := Vector2(_rng.randf_range(-105, 105), _rng.randf_range(-85, 105))
+		if not _wild_spot_ok(c) or c.distance_to(Vector2(0, 92)) < 16.0:
+			continue
+		made += 1
+		var col := Color.from_hsv(_rng.randf(), 0.55, 1.0)
+		for k in 3:
+			var o := Vector2(_rng.randf_range(-1.6, 1.6), _rng.randf_range(-1.6, 1.6))
+			RainbowShroom.make(self, ground(c.x + o.x, c.y + o.y), col, _rng.randf_range(0.8, 1.3), k == 0)

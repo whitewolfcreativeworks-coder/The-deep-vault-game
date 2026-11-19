@@ -84,8 +84,7 @@ func _build() -> void:
 	_sandbox(Vector3(28.5, 0, 33.5))
 	_bench(Vector3(31.2, 0, 17.0), -90.0)
 	_sign(Vector3(18.0, 0, 9.0), -60.0, "BOBEK'S\nPLAYGROUND\nno goblins!")
-	# facing into the clearing, turned a little toward the portal you arrive through
-	_statue(Vector3(0, 0, 37.6), 0.42)
+	_statue(Vector3(0, 0, 37.6), 0.0)      # facing straight down the clearing to the dungeon entrance
 
 func _sandbox(at: Vector3) -> void:
 	var n := Node3D.new(); add_child(n); n.position = at + Vector3(0, 0.08, 0)     # sits on top of the rubber mat
@@ -112,14 +111,25 @@ func _bench(at: Vector3, yaw_deg: float) -> void:
 	for x in [-0.85, 0.85]:
 		box(n, Vector3(0.08, 0.48, 0.45), iron, Vector3(x, 0.24, 0))
 
+## A cheerful painted sign: a sunny board in a blue frame on two posts, the words
+## sized to fit the board.
 func _sign(at: Vector3, yaw_deg: float, text: String) -> void:
 	var n := Node3D.new(); add_child(n); n.position = at; n.rotation_degrees.y = yaw_deg
 	var wood := m(Color(0.6, 0.4, 0.22), 0.9)
-	box(n, Vector3(0.12, 1.6, 0.12), wood, Vector3(0, 0.8, 0))
-	box(n, Vector3(1.6, 0.95, 0.08), m(Color(0.95, 0.9, 0.75), 0.8), Vector3(0, 1.55, 0.05))
-	var lb := Label3D.new(); lb.text = text; lb.font_size = 60; lb.pixel_size = 0.0045
-	lb.modulate = Color(0.75, 0.15, 0.1); lb.outline_size = 0
-	lb.position = Vector3(0, 1.55, 0.1)
+	var frame := m(BLUE, 0.5)
+	for sx in [-0.85, 0.85]:
+		box(n, Vector3(0.12, 1.9, 0.12), wood, Vector3(sx, 0.95, -0.02))
+	var face := m(Color(1.0, 0.93, 0.6), 0.8)
+	face.emission_enabled = true; face.emission = Color(1.0, 0.9, 0.6); face.emission_energy_multiplier = 0.25   # readable at night
+	box(n, Vector3(1.9, 1.15, 0.08), face, Vector3(0, 1.62, 0.05))
+	box(n, Vector3(2.02, 0.1, 0.12), frame, Vector3(0, 2.22, 0.05))
+	box(n, Vector3(2.02, 0.1, 0.12), frame, Vector3(0, 1.02, 0.05))
+	for sx in [-1.0, 1.0]:
+		box(n, Vector3(0.1, 1.08, 0.12), frame, Vector3(sx * 0.95, 1.62, 0.05))      # ends tucked inside the top and bottom bars
+	var lb := Label3D.new(); lb.text = text; lb.font_size = 64
+	lb.modulate = Color(0.85, 0.15, 0.12); lb.outline_size = 10; lb.outline_modulate = Color(1, 1, 1)
+	lb.position = Vector3(0, 1.62, 0.1)
+	SignText.fit(lb, 1.75, 1.0)
 	n.add_child(lb)
 
 ## The hooded Rogue (Bobek's hero), carved in pale stone on a tall plinth. It
@@ -138,12 +148,13 @@ func _statue(at: Vector3, yaw: float) -> void:
 	# the name plate on the front (the figure faces -Z)
 	box(n, Vector3(2.7, 0.95, 0.08), gold, Vector3(0, 1.95, -1.83))
 	var plate := Label3D.new(); plate.text = "THE HOODED ROGUE\nwho first braved the Deep Vault"
-	plate.font_size = 64; plate.pixel_size = 0.0052; plate.modulate = Color(0.25, 0.15, 0.05); plate.outline_size = 0
+	plate.font_size = 64; plate.modulate = Color(0.25, 0.15, 0.05); plate.outline_size = 0
 	plate.position = Vector3(0, 1.95, -1.9); plate.rotation.y = PI
+	SignText.fit(plate, 2.6, 0.88)
 	n.add_child(plate)
 	var fig := CharacterModel.new()
 	n.add_child(fig)
-	fig.setup({"kind": "hero", "hero": "HoodedRogue", "show_hat": true, "weapon": "rusty_sword", "shield": "", "scale": 3.8})
+	fig.setup({"kind": "hero", "hero": "HoodedRogue", "show_hat": true, "weapon": "rusty_sword", "shield": "", "scale": 4.6})
 	fig.position = Vector3(0, 3.5, 0)
 	fig.set_process(false)
 	if fig.anim and fig.anim.has_animation("Cheer"):
@@ -153,17 +164,6 @@ func _statue(at: Vector3, yaw: float) -> void:
 	for mi in fig.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_override = stone
 		(mi as MeshInstance3D).material_overlay = null
-	# fire bowls on stone posts either side
-	for sx in [-1.0, 1.0]:
-		var bp := Vector3(sx * 3.7, 0, -1.4)
-		cyl(n, 0.32, 0.4, 1.6, dark, bp + Vector3(0, 0.8, 0))
-		cyl(n, 0.62, 0.3, 0.42, gold, bp + Vector3(0, 1.8, 0))
-		var fire := Node3D.new(); fire.position = bp + Vector3(0, 2.0, 0); n.add_child(fire)
-		Props.fire_particles(fire, 1.6, Color(1.0, 0.6, 0.25), true)
-		var fl := OmniLight3D.new(); fl.light_color = Color(1.0, 0.62, 0.3); fl.light_energy = 2.2; fl.omni_range = 9.0
-		fl.position = bp + Vector3(0, 2.6, 0); n.add_child(fl)
-		var pst := StaticBody3D.new(); var pcs := CollisionShape3D.new(); var pcy := CylinderShape3D.new(); pcy.radius = 0.45; pcy.height = 2.0
-		pcs.shape = pcy; pcs.position = bp + Vector3(0, 1.0, 0); pst.add_child(pcs); n.add_child(pst)
 	# lit from below like a monument
 	for sx in [-1.0, 1.0]:
 		var sl := SpotLight3D.new(); sl.light_color = Color(1.0, 0.9, 0.75); sl.light_energy = 9.0
@@ -171,8 +171,63 @@ func _statue(at: Vector3, yaw: float) -> void:
 		n.add_child(sl)
 		sl.position = Vector3(sx * 3.2, 0.5, -5.5)
 		sl.look_at(n.global_position + Vector3(0, 6.5, 0))
-	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(2.4, 6.6, 2.4)
-	cs.shape = bs; cs.position = Vector3(0, 6.8, 0); sb.add_child(cs); n.add_child(sb)
+	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(2.8, 8.0, 2.8)
+	cs.shape = bs; cs.position = Vector3(0, 7.5, 0); sb.add_child(cs); n.add_child(sb)
+
+## A huge fire bowl on a stone cap, for the tops of the walls either side of the
+## statue: a wide bowl of coals with roaring flames, embers and a warm light
+## that reaches across the clearing.
+static func giant_brazier(parent: Node3D, at: Vector3) -> Node3D:
+	var n := Node3D.new(); n.name = "GiantBrazier"; n.add_to_group("giant_brazier"); parent.add_child(n); n.position = at
+	var dark := m(Color(0.28, 0.26, 0.25), 0.85)
+	var iron := m(Color(0.16, 0.14, 0.13), 0.45, 0.7)
+	var gold := m(Color(0.85, 0.62, 0.25), 0.35, 0.8)
+	box(n, Vector3(2.0, 0.5, 1.6), dark, Vector3(0, 0.25, 0))
+	cyl(n, 0.55, 0.75, 0.5, iron, Vector3(0, 0.75, 0), Vector3.ZERO, 20)
+	cyl(n, 1.45, 0.75, 0.95, iron, Vector3(0, 1.45, 0), Vector3.ZERO, 24)
+	var rim := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 1.38; tm.outer_radius = 1.56; tm.rings = 32
+	rim.mesh = tm; rim.material_override = gold; rim.position = Vector3(0, 1.92, 0); n.add_child(rim)
+	var coals := StandardMaterial3D.new(); coals.albedo_color = Color(0.25, 0.05, 0.0); coals.emission_enabled = true
+	coals.emission = Color(1.0, 0.35, 0.05); coals.emission_energy_multiplier = 2.5
+	cyl(n, 1.3, 1.3, 0.1, coals, Vector3(0, 1.82, 0), Vector3.ZERO, 24)
+	# the flames: a wide body of big soft flames and a hot bright core
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1.0, 0.95, 0.7, 1)); ramp.set_color(1, Color(0.7, 0.1, 0.02, 0))
+	ramp.add_point(0.35, Color(1.0, 0.55, 0.15, 0.95))
+	var curve := Curve.new(); curve.add_point(Vector2(0, 0.5)); curve.add_point(Vector2(0.25, 1.0)); curve.add_point(Vector2(1, 0.0))
+	for layer in 2:
+		var f := CPUParticles3D.new()
+		f.amount = 70 if layer == 0 else 40
+		f.lifetime = 1.1 if layer == 0 else 0.7
+		f.mesh = FX.quad(1.1 if layer == 0 else 0.6)
+		f.material_override = FX.glow_material(Color(1.0, 0.55, 0.2) if layer == 0 else Color(1.0, 0.85, 0.45), 2.4)
+		f.direction = Vector3.UP; f.spread = 10.0
+		f.initial_velocity_min = 2.0; f.initial_velocity_max = 3.8 if layer == 0 else 3.0
+		f.gravity = Vector3(0, 1.5, 0)
+		f.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		f.emission_sphere_radius = 0.95 if layer == 0 else 0.5
+		f.scale_amount_min = 0.6; f.scale_amount_max = 1.1
+		f.scale_amount_curve = curve
+		f.color_ramp = ramp
+		f.position = Vector3(0, 1.95, 0)
+		f.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		n.add_child(f)
+	var e := CPUParticles3D.new(); e.amount = 40; e.lifetime = 3.0
+	e.mesh = FX.quad(0.06); e.material_override = FX.glow_material(Color(1.0, 0.6, 0.2), 3.0)
+	e.direction = Vector3.UP; e.spread = 30.0; e.initial_velocity_min = 1.5; e.initial_velocity_max = 3.5
+	e.gravity = Vector3(0, 0.3, 0); e.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; e.emission_sphere_radius = 1.0
+	e.color_ramp = FX._fade_ramp(Color(1.0, 0.6, 0.2)); e.position = Vector3(0, 2.2, 0); n.add_child(e)
+	var smoke := CPUParticles3D.new(); smoke.amount = 16; smoke.lifetime = 4.0
+	smoke.mesh = FX.quad(1.6); smoke.material_override = FX.beam_material(Color(0.12, 0.1, 0.1), 1.0, 0.25, false)
+	smoke.direction = Vector3.UP; smoke.spread = 15.0; smoke.initial_velocity_min = 1.0; smoke.initial_velocity_max = 1.8
+	smoke.gravity = Vector3(0.2, 0.2, 0); smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; smoke.emission_sphere_radius = 0.6
+	smoke.color_ramp = FX._fade_ramp(Color(0.2, 0.18, 0.18)); smoke.position = Vector3(0, 4.2, 0); n.add_child(smoke)
+	var l := OmniLight3D.new(); l.light_color = Color(1.0, 0.6, 0.28); l.light_energy = 4.5; l.omni_range = 22.0
+	l.omni_attenuation = 1.1; l.position = Vector3(0, 3.0, 0)
+	l.set_script(load("res://scripts/world/flicker.gd"))
+	n.add_child(l)
+	Sfx.loop_on(n, "loop_fire", -4.0, 6.0, 28.0)
+	return n
 
 
 ## Spin it with USE; stand on it and it carries you round.

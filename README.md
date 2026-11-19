@@ -72,6 +72,52 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### New in the Nov 18 night notes
+- **Man or woman, for every class.** The Hero tab of the character creator has **Man** and **Woman** buttons. The two versions look clearly different:
+  - **Women:** long or shoulder-length hair, eyelashes, rosy lips and cheeks, and a slimmer build. A woman in a knight's helm has a long braid hanging out the back.
+  - **Men:** short hair and a broader build.
+  - The Wild and Bald hair styles come with beards, so they're for men only.
+- **Funny names for heroines.** "Random name" and "Surprise me!" pick from about fifty Bobek names for women (Bobekita, Queen Bobekah, Bobekunzel, Lady Bobs-a-Lot...).
+- **The cabin at home is open.** After the flight home, USE the front door to go inside. It's the room from the opening movie.
+  - **The desk:** change your name and your looks. Your class stays the same. Pick a name all your own for when the open-world portal opens.
+  - **The gear chest:** keep gear you don't want to carry (up to 60 things). Take it back any time.
+  - **The bed:** have a nap for full health, magic and energy.
+- **An on-screen keyboard for names.** On an iPad, tap the name box and big letter keys appear.
+
+### New in the Nov 18 Goblin Forest notes
+- **Rainbow mushrooms.** Every glowing mushroom in the Goblin Warren (the mine) and around the forest can be eaten. Each one gives a little magic (mana) and a dose of rainbow vision: the screen shimmers, swims and turns rainbow, with rainbow sparkles all around you.
+  - **Three mushrooms:** your steering starts to drift.
+  - **Five:** you wobble about on your own and miss most of your swings.
+  - It wears off over about a minute. (The lesson: don't eat so many mushrooms!)
+- **Chief Gruk is twice as tough, bigger, and has two new moves:**
+  - **Spore Bomb:** he hurls a giant mushroom that bursts into a stinging cloud of rainbow spores.
+  - **War Horn:** a blast that throws you back and calls goblins in from the dark.
+- **More forest discoveries:**
+  - **Gnome houses:** four in all, and each gnome has a different gift: a cookie, a lucky gem, a magic item from his workshop, or mushroom tea.
+  - **A wishing well:** toss in a coin for a random blessing.
+  - **A fairy ring:** magic and speed.
+  - **A picnic:** with food you can eat.
+  - **A beehive:** honey heals.
+  - **A giant bouncy mushroom:** jump on it.
+- **Floating torches fixed.** After each level loads, any wall torch with no wall behind it moves onto the nearest wall.
+
+### New in the Nov 18 evening playtest
+- **The morning routine looks real.** He holds the toothbrush in his hand and lifts it to his mouth. While stirring his tea, his hand is on the spoon, and he picks the cup up by its handle to sip. The kettle's steam is soft wisps, like the steam over the cup. (His right arm follows each object using inverse kinematics, applied on top of the animation.)
+- **The Rogue statue stands straight,** facing the dungeon entrance. It's bigger again. Two huge fire bowls roar on top of the walls either side of it.
+- **Signs fit and look friendly.** Every sign and floating label now uses Lilita One, a round, chunky font. Words are sized to fit their board, and boards glow a little so you can read them at night.
+- **A DANGER sign** (skull and crossbones) at the top of the stairs down into the vault. The blank board that stood there was the climbing-wall sign built in the wrong place; it's now back at the climbing wall.
+- **Hotter fire vents.** They hit harder and keep you burning for 3 seconds, with an orange flash and a jolt.
+- **Food you can eat.** USE the food on dungeon tables and on some barrels and crates. Eaten food comes back after five minutes.
+  - **Bread:** well fed (energy comes back faster).
+  - **Cheese:** health.
+  - **Apple:** quick (run faster).
+  - **Chicken leg:** strong (hit 25% harder).
+  - **Pie:** tough (take less damage).
+  - **Cider:** mana.
+  - **Sticky bun:** energy.
+
+  Active food buffs show under your powers on the HUD.
+
 ### New in the Nov 18 afternoon playtest
 - **Face details sit on the face.** Moustaches, beards, eyepatches, glowing eyes, war paint and masks used to float in front of the face. They were laid out from the head's bounding box, which pokes out past the real face on most heads. Each piece now finds the real face by casting a ray at the head you actually see.
 - **The Rogue statue faces you.** It now faces into the Outpost clearing, turned toward the portal you arrive through. It's half as big again, on a taller gold-trimmed plinth with two fire bowls.

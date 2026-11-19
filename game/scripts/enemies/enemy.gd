@@ -31,10 +31,12 @@ const TYPES := {
 		"windup": 0.75, "cooldown": 1.55, "xp": 120, "weapon": "skel_axe", "shield": "", "eye": Color(1.0, 0.45, 0.15),
 		"scale": 0.95, "aggro": 14.0, "poise": 25.0, "gold": [12, 24], "heavy": true, "leash": 26.0,
 		"look": {"hero": "Barbarian", "hair_style": "bald", "hair_color": Color(0.1, 0.1, 0.1), "face": "warpaint", "outfit": Color(0.35, 0.22, 0.14), "build": 1.25}},
-	"goblin_chief": {"name": "Chief Gruk", "hp": 2800.0, "dmg": 42.0, "speed": 3.6, "range": 2.9,
-		"windup": 0.7, "cooldown": 1.2, "xp": 600, "weapon": "skel_axe", "shield": "Skeleton_Shield_Large_A", "eye": Color(1.0, 0.3, 0.1),
-		"scale": 1.35, "aggro": 16.0, "poise": 110.0, "gold": [70, 110], "heavy": true, "leash": 40.0, "summon": true, "nova": true, "enrage": true,
-		"moves": ["leap_slam", "whirl"],
+	# (Nov 18: much tougher, bigger, and with two signature moves: the Spore Bomb
+	# and the War Horn)
+	"goblin_chief": {"name": "Chief Gruk", "hp": 5600.0, "dmg": 56.0, "speed": 4.3, "range": 3.1,
+		"windup": 0.62, "cooldown": 1.0, "xp": 900, "weapon": "skel_axe", "shield": "Skeleton_Shield_Large_A", "eye": Color(1.0, 0.3, 0.1),
+		"scale": 1.6, "aggro": 18.0, "poise": 170.0, "gold": [110, 160], "heavy": true, "leash": 40.0, "summon": true, "nova": true, "enrage": true,
+		"moves": ["spore_bomb", "war_horn", "leap_slam", "spore_bomb", "whirl"],
 		"look": {"hero": "Barbarian", "hair_style": "mohawk", "hair_color": Color(0.85, 0.12, 0.08), "face": "warpaint", "outfit": Color(0.5, 0.12, 0.1), "build": 1.3, "hat": true}},
 	# --- the Sinkhole of Death: fire goblins and the Cyclops Goblin
 	"fire_goblin": {"name": "Ember Goblin", "hp": 110.0, "dmg": 17.0, "speed": 4.5, "range": 1.8,
@@ -711,9 +713,101 @@ func _boss_move(mv: String) -> void:
 		"boulders": await _mv_boulders()
 		"blink": await _mv_blink()
 		"bubble_float": await _mv_bubble_float()
+		"spore_bomb": await _mv_spore_bomb()
+		"war_horn": await _mv_war_horn()
 	if is_inside_tree() and not dead and state != S.WINDUP:
 		_go(S.CHASE)
 	_move_busy = false
+
+## Chief Gruk hurls a giant glowing mushroom at you. Where it lands it bursts into
+## a big cloud of rainbow spores: it stings while you stand in it, and breathing
+## it in gives you rainbow vision (like eating a glowing mushroom).
+func _mv_spore_bomb() -> void:
+	Game.say("Gruk: \"EAT MUSHROOM, TINY HERO!\"", Color(0.75, 1.0, 0.45))
+	Sfx.play_at("roar", global_position, -4.0, 0.2)
+	body.play_role("cast", 0.7)
+	await get_tree().create_timer(0.45, false).timeout
+	if dead or not is_inside_tree() or player == null:
+		return
+	for k in (2 if _enraged else 1):
+		var land: Vector3 = player.global_position + (Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5)) if k > 0 else Vector3.ZERO)
+		_warn_ring(land, 3.4, 1.1, Color(0.7, 1.0, 0.4))
+		var shroom := Node3D.new()
+		get_tree().current_scene.add_child(shroom)
+		var cap := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.7; sm.height = 0.7; sm.is_hemisphere = true
+		cap.mesh = sm; cap.material_override = FX.glow_material(Color(0.8, 0.4, 1.0), 2.0); cap.position.y = 0.3; shroom.add_child(cap)
+		var stem := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.18; cm.bottom_radius = 0.24; cm.height = 0.6
+		stem.mesh = cm; var stm := StandardMaterial3D.new(); stm.albedo_color = Color(0.9, 0.86, 0.75); stem.material_override = stm
+		shroom.add_child(stem)
+		var from := global_position + Vector3(0, 3.2, 0)
+		shroom.global_position = from
+		var tw := shroom.create_tween()
+		tw.tween_method(func(f: float) -> void:
+			if is_instance_valid(shroom):
+				shroom.global_position = from.lerp(land, f) + Vector3(0, sin(f * PI) * 6.0, 0)
+				shroom.rotation += Vector3(0.15, 0.25, 0.1), 0.0, 1.0, 1.1)
+		tw.tween_callback(func() -> void:
+			if is_instance_valid(shroom):
+				shroom.queue_free()
+			_spore_cloud(land))
+		await get_tree().create_timer(0.5, false).timeout
+	await get_tree().create_timer(1.2, false).timeout
+
+func _spore_cloud(at: Vector3) -> void:
+	Sfx.play_at("pop", at, 0.0, 0.2)
+	Sfx.play_at("collapse", at, -10.0, 0.3)
+	FX.shockwave(at + Vector3(0, 0.2, 0), Color(0.8, 0.5, 1.0), 3.6, 0.4)
+	_player_hit(at, 3.4, float(t.dmg) * 0.7, 5.0, false)
+	var cloud := CPUParticles3D.new(); cloud.amount = 70; cloud.lifetime = 2.2
+	cloud.mesh = FX.quad(1.2); cloud.material_override = FX.glow_material(Color(1, 1, 1), 1.2)
+	cloud.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; cloud.emission_sphere_radius = 3.0
+	cloud.direction = Vector3.UP; cloud.spread = 60; cloud.initial_velocity_min = 0.2; cloud.initial_velocity_max = 0.8
+	cloud.gravity = Vector3(0, 0.15, 0); cloud.hue_variation_min = -1.0; cloud.hue_variation_max = 1.0
+	cloud.color = Color(1.0, 0.5, 0.5, 0.55)
+	cloud.color_ramp = FX._fade_ramp(Color(1, 1, 1))
+	get_tree().current_scene.add_child(cloud); cloud.global_position = at + Vector3(0, 1.0, 0)
+	var dmg_tick := float(t.dmg) * 0.12
+	for k in 10:
+		await get_tree().create_timer(0.5, false).timeout
+		if not is_instance_valid(cloud):
+			return
+		if player and player.get("dead") != true:
+			var d := Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length()
+			if d < 3.4 and absf(player.global_position.y - at.y) < 3.0:
+				player.take_damage(dmg_tick, at, 0.0)
+				if k % 3 == 0:
+					Game.shroom = minf(4.6, maxf(Game.shroom, floor(Game.shroom) + 1.0))   # spores: rainbow vision (never the full five)
+	cloud.emitting = false
+	get_tree().create_timer(2.5).timeout.connect(cloud.queue_free)
+
+## Chief Gruk blows his war horn: a blast that throws you back, and goblins come
+## running from the dark to help him.
+func _mv_war_horn() -> void:
+	Game.say("Gruk blows his WAR HORN! \"BOYS! BOYS! GET IN HERE!\"", Color(1.0, 0.6, 0.3))
+	body.play_role("cheer", 1.0)
+	Sfx.play_at("roar_big", global_position, 0.0, 0.3)
+	await get_tree().create_timer(0.5, false).timeout
+	if dead or not is_inside_tree():
+		return
+	FX.shockwave(global_position + Vector3(0, 0.3, 0), Color(1.0, 0.6, 0.25), 8.0, 0.6)
+	FX.shockwave(global_position + Vector3(0, 1.5, 0), Color(1.0, 0.8, 0.4), 6.0, 0.45)
+	_player_hit(global_position, 6.5, float(t.dmg) * 0.5, 12.0, false)
+	if player and player.has_method("add_trauma"):
+		player.add_trauma(0.5)
+	var allies := 0
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e != self and is_instance_valid(e) and not e.dead and (e as Node3D).global_position.distance_to(global_position) < 22.0:
+			allies += 1
+	if allies < 4:
+		for k in 3:
+			var a := randf() * TAU
+			var p := global_position + Vector3(cos(a) * 7.0, 0.3, sin(a) * 7.0)
+			FX.burst(p + Vector3(0, 1, 0), Color(0.6, 0.9, 0.3), 30, 3.0, 0.3, 0.8, 0.5)
+			var g := Enemy.new()
+			g.configure(["goblin", "goblin_archer", "goblin"][k], "", 0.0)
+			g.position = p
+			get_parent().add_child(g)
+	await get_tree().create_timer(0.8, false).timeout
 
 ## Mr. Bubbles raises his wand and blows a big rainbow bubble at you. If it
 ## catches you, it floats you up high: pop it and drop back into the fight. While

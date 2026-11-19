@@ -42,12 +42,12 @@ static func mat(c: Color, rough := 0.7, metal := 0.0, glow := 0.0) -> StandardMa
 	return m
 
 ## A plain box (no jitter: these are things you stand on, so their tops are exact).
-func block(size: Vector3, m: Material, center: Vector3, collide := true, shadows := true) -> MeshInstance3D:
+func block(size: Vector3, m: Material, center: Vector3, collide := true, shadows := true, parent: Node3D = null) -> MeshInstance3D:
 	var mi := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = size
 	mi.mesh = bm; mi.material_override = m; mi.position = center
 	if not shadows:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mi)
+	(parent if parent else self).add_child(mi)
 	if collide:
 		var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = size
 		cs.shape = bs; sb.add_child(cs); mi.add_child(sb)
@@ -189,8 +189,9 @@ func _badge(at: Vector3, yaw: float, c: Color, text: String) -> void:
 	var n := Node3D.new(); add_child(n); n.position = at; n.rotation.y = yaw
 	var d := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.55; cm.bottom_radius = 0.55; cm.height = 0.05
 	d.mesh = cm; d.material_override = mat(c, 0.5, 0.0, 0.8); d.rotation.x = PI / 2; n.add_child(d)
-	var lb := Label3D.new(); lb.text = text; lb.font_size = 54; lb.pixel_size = 0.0045; lb.outline_size = 10
+	var lb := Label3D.new(); lb.text = text; lb.font_size = 54; lb.outline_size = 10
 	lb.modulate = Color(1, 1, 1); lb.outline_modulate = Color(0, 0, 0, 0.8); lb.position = Vector3(0, 0, 0.04)
+	SignText.fit(lb, 0.85, 0.62)
 	n.add_child(lb)
 
 func _uplight(at: Vector3, target: Vector3, c: Color) -> void:
@@ -225,13 +226,24 @@ func _party_lights(a: Vector3, b: Vector3) -> void:
 func _sign(at: Vector3, yaw_deg: float) -> void:
 	var n := Node3D.new(); add_child(n); n.position = at; n.rotation_degrees.y = yaw_deg
 	var wood := mat(Color(0.6, 0.4, 0.22), 0.9)
-	block(Vector3(0.12, 1.7, 0.12), wood, Vector3(-0.8, 0.83, 0), true)
-	block(Vector3(0.12, 1.7, 0.12), wood, Vector3(0.8, 0.83, 0), false)
-	block(Vector3(2.0, 1.2, 0.08), mat(Color(0.95, 0.9, 0.75), 0.8), Vector3(0, 1.6, 0.05), false)
+	var frame := mat(Color(0.9, 0.25, 0.2), 0.5)
+	block(Vector3(0.12, 2.1, 0.12), wood, Vector3(-0.95, 1.03, -0.07), true, true, n)
+	block(Vector3(0.12, 2.1, 0.12), wood, Vector3(0.95, 1.03, -0.07), false, true, n)
+	block(Vector3(2.2, 1.4, 0.08), mat(Color(1.0, 0.93, 0.6), 0.8, 0.0, 0.25), Vector3(0, 1.75, 0.05), false, true, n)
+	block(Vector3(2.32, 0.1, 0.12), frame, Vector3(0, 2.47, 0.05), false, true, n)
+	block(Vector3(2.32, 0.1, 0.12), frame, Vector3(0, 1.03, 0.05), false, true, n)
+	for sx in [-1.0, 1.0]:
+		block(Vector3(0.1, 1.36, 0.12), frame, Vector3(sx * 1.1, 1.75, 0.05), false, true, n)
+	var title := Label3D.new(); title.text = "CLIMBING WALL!"; title.font_size = 64
+	title.modulate = Color(0.85, 0.15, 0.12); title.outline_size = 10; title.outline_modulate = Color(1, 1, 1)
+	title.position = Vector3(0, 2.18, 0.1)
+	SignText.fit(title, 2.0, 0.4)
+	n.add_child(title)
 	var lb := Label3D.new()
-	lb.text = "CLIMBING WALL\nGREEN: easy · RED: tricky, jump!\nRing the bell at the top,\nthen ride the zipline down!"
-	lb.font_size = 44; lb.pixel_size = 0.0042; lb.modulate = Color(0.15, 0.25, 0.55); lb.outline_size = 0
-	lb.position = Vector3(0, 1.6, 0.1)
+	lb.text = "GREEN = easy     RED = tricky (jump!)\nRing the bell at the top,\nthen ride the zipline down!"
+	lb.font_size = 48; lb.modulate = Color(0.15, 0.25, 0.55); lb.outline_size = 0
+	lb.position = Vector3(0, 1.58, 0.1)
+	SignText.fit(lb, 2.0, 0.78)
 	n.add_child(lb)
 
 func _physics_process(delta: float) -> void:

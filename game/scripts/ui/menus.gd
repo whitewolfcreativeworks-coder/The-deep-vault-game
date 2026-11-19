@@ -19,6 +19,7 @@ var _panels := {}
 var _preview: CharacterModel
 var _preview_vp: SubViewport
 var _hero_btns := {}
+var _sex_btns := {}
 var _cape_btns: Array[Button] = []
 var _name_edit: LineEdit
 var _hero_desc: Label
@@ -33,7 +34,9 @@ var _mute_btn: Button
 
 const PREVIEW_COMPAT_EXPOSURE := 0.68
 const PREVIEW_COMPAT_KEY := 0.45
-const NAMES := ["Bobek", "Sir Bobek", "Lady Bobeka", "Bobek the Bold", "Bobek the Brave", "Bobekus Maximus", "Little Bobek", "Big Bobek", "Bobek Jr.", "Bobekovich", "Bobekson", "Bobekina", "Bo'Bek", "Bobbek", "Archmage Bobek", "Bobek the Unkillable", "Bobek of the Deep", "Grandmaster Bobek", "Bobekzilla", "Bobek Bobekington", "Bobek the Snack-Sized", "Bobek McBobface", "Bobek the Sneaky", "Captain Bobek", "Bobek the Tea-Drinker", "Bobek Sparklepants", "Baron von Bobek", "Bobek the Unbonked", "Bobek Supreme", "Teeny Tiny Bobek", "Bobek the Magnificent", "Bobekachu", "Bobek of the Forest", "Bob-Ek", "Bobek the Goblin Bonker", "Bobek Prime", "Bobeky Boo", "Bobek the Brushed (Teeth)", "Sir Bobs-a-Lot", "Bobek the Untrippable", "Bobek Danger", "Professor Bobek", "Bobek the Wise-ish", "B. O. Bek", "Bobek the Snorer", "Bobek Thunderpants", "Dr. Bobek", "Bobek the Bouncy", "Kingbobek", "Bobek the Legend", "Bobek Quickfingers", "Bobek the Pancake Lover", "Bobekasaurus Rex", "Bobek 3000", "Bobek the Unstoppable", "Mega Bobek", "Bobek Shadowstep", "Bobek of the Seven Snacks", "Bobek the Kettle Master", "Bobek von Sneakypants"]
+const NAMES := ["Bobek", "Sir Bobek", "Bobek the Bold", "Bobek the Brave", "Bobekus Maximus", "Little Bobek", "Big Bobek", "Bobek Jr.", "Bobekovich", "Bobekson", "Bo'Bek", "Bobbek", "Archmage Bobek", "Bobek the Unkillable", "Bobek of the Deep", "Grandmaster Bobek", "Bobekzilla", "Bobek Bobekington", "Bobek the Snack-Sized", "Bobek McBobface", "Bobek the Sneaky", "Captain Bobek", "Bobek the Tea-Drinker", "Bobek Sparklepants", "Baron von Bobek", "Bobek the Unbonked", "Bobek Supreme", "Teeny Tiny Bobek", "Bobek the Magnificent", "Bobekachu", "Bobek of the Forest", "Bob-Ek", "Bobek the Goblin Bonker", "Bobek Prime", "Bobeky Boo", "Bobek the Brushed (Teeth)", "Sir Bobs-a-Lot", "Bobek the Untrippable", "Bobek Danger", "Professor Bobek", "Bobek the Wise-ish", "B. O. Bek", "Bobek the Snorer", "Bobek Thunderpants", "Dr. Bobek", "Bobek the Bouncy", "Kingbobek", "Bobek the Legend", "Bobek Quickfingers", "Bobek the Pancake Lover", "Bobekasaurus Rex", "Bobek 3000", "Bobek the Unstoppable", "Mega Bobek", "Bobek Shadowstep", "Bobek of the Seven Snacks", "Bobek the Kettle Master", "Bobek von Sneakypants"]
+## Funny Bobek names for heroines.
+const FEMALE_NAMES := ["Bobeka", "Lady Bobeka", "Bobekina", "Bobette", "Princess Bobek", "Queen Bobekah", "Bobekella", "Dame Bobek", "Bobekarina", "Bobekita", "Bobekhilda", "Bobekunzel", "Bobekleopatra", "Bobeka McBobface", "Lady Bobs-a-Lot", "Miss Bobek", "Bobekalicious", "Bobbi Bek", "Bobekazoo", "Bobekabella", "Bobekalina Sparkletoes", "Duchess von Bobek", "Bobekanna", "Bobekiwi", "Granny Bobek", "Auntie Bobek", "Bobeka the Unbonkable", "Bobekette", "Bobeka Thunderboots", "Lady Bobek of the Deep", "Bobekarella", "Bobekalotta", "Bobeka the Snack Queen", "Professor Bobeka", "Captain Bobeka", "Bobekaroo", "Bobekalinda", "Bobeka-Boo", "Bobeka Supreme", "Teeny Tiny Bobeka", "Bobekina Ballerina", "Bobekamina", "Bobekatrix", "Bobekaria the Wise-ish", "Bobeka 3000", "Mega Bobeka", "Bobeka Shadowstep", "Bobeka the Kettle Queen", "Bobekasaurus Regina"]
 
 func _ready() -> void:
 	layer = 10
@@ -48,6 +51,7 @@ func _ready() -> void:
 	_build_slots()
 	_build_pause()
 	_build_inventory()
+	_build_stash()
 	_build_lore()
 	_build_death()
 	_build_victory()
@@ -79,6 +83,8 @@ func show_panel(n: String) -> void:
 		_continue_btn.visible = Game.any_save()
 	if n == "inventory":
 		_refresh_inventory(); _refresh_stats()
+	if n == "stash":
+		_refresh_stash()
 	if n == "designer" and designer:
 		designer.open()
 	if n == "pause" and _arrange_btn:
@@ -378,7 +384,8 @@ func _build_creator() -> void:
 	var col := VBoxContainer.new(); col.add_theme_constant_override("separation", 14)
 	col.custom_minimum_size.x = 900
 	h.add_child(col)
-	col.add_child(UIKit.label("Create Your Adventurer", 34, UIKit.GOLD, true))
+	_creator_title = UIKit.label("Create Your Adventurer", 34, UIKit.GOLD, true)
+	col.add_child(_creator_title)
 	var tabs := HBoxContainer.new(); tabs.add_theme_constant_override("separation", 8); col.add_child(tabs)
 	for t in CREATOR_TABS:
 		var id: String = t[0]
@@ -405,6 +412,16 @@ func _build_creator() -> void:
 		hb.add_theme_font_size_override("font_size", 22)
 		hg.add_child(hb)
 		_hero_btns[hero] = hb
+	# man or woman (every class can be either)
+	var sxr := HBoxContainer.new(); sxr.add_theme_constant_override("separation", 10)
+	ph.add_child(sxr)
+	for sx in [["male", "Man"], ["female", "Woman"]]:
+		var sid: String = sx[0]
+		var sb := _choice(sx[1], func() -> void: _set_sex(sid), 200)
+		sb.custom_minimum_size.y = 56
+		sb.add_theme_font_size_override("font_size", 22)
+		sxr.add_child(sb)
+		_sex_btns[sid] = sb
 	_hero_desc = UIKit.label("", 19, UIKit.PARCH)
 	_hero_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_hero_desc.custom_minimum_size = Vector2(840, 120)
@@ -478,12 +495,21 @@ func _build_creator() -> void:
 	# ---- name and buttons
 	var nr := HBoxContainer.new(); nr.add_theme_constant_override("separation", 10); col.add_child(nr)
 	nr.add_child(UIKit.label("Name", 20, UIKit.DIM, true))
-	_name_edit = LineEdit.new(); _name_edit.custom_minimum_size = Vector2(420, 50); _name_edit.max_length = 22
+	_name_edit = LineEdit.new(); _name_edit.custom_minimum_size = Vector2(420, 50); _name_edit.max_length = 26
 	_name_edit.text = Game.profile.name
+	# iPads don't pop up their keyboard for the game, so a tap brings up our own
+	_name_edit.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventScreenTouch and (ev as InputEventScreenTouch).pressed:
+			_show_keys())
 	nr.add_child(_name_edit)
-	nr.add_child(_button("Random name", func() -> void: _name_edit.text = NAMES.pick_random(), 200))
+	nr.add_child(_button("Random name", func() -> void: _name_edit.text = random_name(Game.hero_sex()), 200))
 	var br := HBoxContainer.new(); br.add_theme_constant_override("separation", 12); col.add_child(br)
-	br.add_child(_button("Back", func() -> void: show_panel("title"), 150))
+	_creator_back = _button("Back", func() -> void:
+		if _desk_mode:
+			_finish_desk(false)
+		else:
+			show_panel("title"), 150)
+	br.add_child(_creator_back)
 	var dice := _button("Surprise me!", func() -> void: _randomize_look(), 300)
 	dice.custom_minimum_size.y = 64
 	dice.add_theme_font_size_override("font_size", 26)
@@ -496,14 +522,164 @@ func _build_creator() -> void:
 	dice.tooltip_text = "Random look, colours and a silly Bobek name"
 	br.add_child(dice)
 	var spc := Control.new(); spc.size_flags_horizontal = Control.SIZE_EXPAND_FILL; br.add_child(spc)
-	br.add_child(_button("Enter the Vault", func() -> void:
+	_creator_go = _button("Enter the Vault", func() -> void:
 		var nm := _name_edit.text.strip_edges()
 		Game.profile.name = nm if nm != "" else "Nameless"
-		start_requested.emit(), 320))
+		if _desk_mode:
+			_finish_desk(true)
+		else:
+			start_requested.emit(), 320)
+	br.add_child(_creator_go)
+	_build_keys(p)
 	_set_tab("hero")
+
+# --- the desk at home: the same creator, to change your name and looks --------
+signal desk_closed(changed: bool)
+var _desk_mode := false
+var _desk_backup := {}
+var _creator_title: Label
+var _creator_back: Button
+var _creator_go: Button
+
+func open_desk() -> void:
+	_desk_mode = true
+	_desk_backup = Game.profile.duplicate(true)
+	_creator_title.text = "Your Desk: Name & Looks"
+	_creator_go.text = "Done"
+	_creator_back.text = "Cancel"
+	_name_edit.text = Game.profile.name
+	for k in _hero_btns:
+		(_hero_btns[k] as Button).disabled = k != Game.profile.hero     # your class stays the same
+	show_panel("creator")
+	_set_tab("hero")
+	_hero_desc.text = "Pick a name that's all your own: one day the open world portal will open, and other heroes will see it!\n\nYou can also be a man or a woman, and change your hair, face, colours and build. (Your class stays the same.)"
+
+func _finish_desk(keep: bool) -> void:
+	_hide_keys()
+	if not keep:
+		Game.profile = _desk_backup
+	_desk_mode = false
+	_creator_title.text = "Create Your Adventurer"
+	_creator_go.text = "Enter the Vault"
+	_creator_back.text = "Back"
+	for k in _hero_btns:
+		(_hero_btns[k] as Button).disabled = false
+	desk_closed.emit(keep)
+
+# --- an on-screen keyboard for the name (touch screens) ---------------------------
+var _keys: PanelContainer
+var _keys_caps := true
+
+func _build_keys(parent: Control) -> void:
+	_keys = PanelContainer.new()
+	_keys.add_theme_stylebox_override("panel", UIKit.panel_style(0.96, UIKit.GOLD, 3))
+	_keys.visible = false
+	_keys.top_level = true
+	parent.add_child(_keys)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 8); _keys.add_child(v)
+	var shown := UIKit.label("", 26, UIKit.GOLD, true)
+	shown.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(shown)
+	var rows := ["QWERTYUIOP", "ASDFGHJKL'", "ZXCVBNM-.!"]
+	var letter_btns: Array = []
+	for r in rows:
+		var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 6)
+		h.alignment = BoxContainer.ALIGNMENT_CENTER
+		v.add_child(h)
+		for ch in r:
+			var c: String = ch
+			var b := Button.new(); b.text = c; b.custom_minimum_size = Vector2(82, 72)
+			b.add_theme_font_size_override("font_size", 30)
+			b.pressed.connect(func() -> void:
+				if _name_edit.text.length() < _name_edit.max_length:
+					var t := c if _keys_caps else c.to_lower()
+					_name_edit.text += t
+					_keys_caps = false
+					_keys_refresh.call()
+					Sfx.play("footstep", -12.0, 0.2))
+			h.add_child(b)
+			letter_btns.append(b)
+	var h2 := HBoxContainer.new(); h2.add_theme_constant_override("separation", 8)
+	h2.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(h2)
+	var caps := Button.new(); caps.text = "⇧ Caps"; caps.custom_minimum_size = Vector2(170, 72); caps.toggle_mode = true
+	caps.add_theme_font_size_override("font_size", 24)
+	caps.pressed.connect(func() -> void:
+		_keys_caps = not _keys_caps
+		_keys_refresh.call())
+	h2.add_child(caps)
+	var sp := Button.new(); sp.text = "Space"; sp.custom_minimum_size = Vector2(300, 72)
+	sp.add_theme_font_size_override("font_size", 24)
+	sp.pressed.connect(func() -> void:
+		if _name_edit.text.length() < _name_edit.max_length:
+			_name_edit.text += " "
+			_keys_caps = true
+			_keys_refresh.call())
+	h2.add_child(sp)
+	var bk := Button.new(); bk.text = "⌫ Back"; bk.custom_minimum_size = Vector2(170, 72)
+	bk.add_theme_font_size_override("font_size", 24)
+	bk.pressed.connect(func() -> void:
+		_name_edit.text = _name_edit.text.left(-1)
+		_keys_caps = _name_edit.text == "" or _name_edit.text.ends_with(" ")
+		_keys_refresh.call())
+	h2.add_child(bk)
+	var clr := Button.new(); clr.text = "Clear"; clr.custom_minimum_size = Vector2(140, 72)
+	clr.add_theme_font_size_override("font_size", 24)
+	clr.pressed.connect(func() -> void:
+		_name_edit.text = ""
+		_keys_caps = true
+		_keys_refresh.call())
+	h2.add_child(clr)
+	var ok := Button.new(); ok.text = "✓ Done"; ok.custom_minimum_size = Vector2(190, 72)
+	ok.add_theme_font_size_override("font_size", 26)
+	ok.pressed.connect(func() -> void: _hide_keys())
+	h2.add_child(ok)
+	_keys_refresh = func() -> void:
+		shown.text = (_name_edit.text if _name_edit.text != "" else " ") + "_"
+		caps.set_pressed_no_signal(_keys_caps)
+		for b in letter_btns:
+			var lb := b as Button
+			lb.text = lb.text.to_upper() if _keys_caps else lb.text.to_lower()
+
+var _keys_refresh: Callable
+
+func _show_keys() -> void:
+	if _keys == null:
+		return
+	_name_edit.release_focus()
+	_keys_caps = _name_edit.text == "" or _name_edit.text.ends_with(" ")
+	_keys_refresh.call()
+	_keys.visible = true
+	_keys.reset_size()
+	var vs := root.get_viewport_rect().size
+	_keys.position = Vector2((vs.x - _keys.size.x) * 0.5, vs.y - _keys.size.y - 20.0)
+
+func _hide_keys() -> void:
+	if _keys:
+		_keys.visible = false
+
+## A silly Bobek name for a hero or a heroine.
+static func random_name(sex: String) -> String:
+	return FEMALE_NAMES.pick_random() if sex == "female" else NAMES.pick_random()
+
+## One of the game's own random names (not one the player typed)?
+func _is_silly_name(t: String) -> bool:
+	for n in NAMES + FEMALE_NAMES:
+		if String(n).left(_name_edit.max_length) == t:
+			return true
+	return false
+
+## Switch between man and woman; a name from the other list swaps too.
+func _set_sex(sex: String) -> void:
+	var was := Game.hero_sex()
+	Game.profile.sex = sex
+	if was != sex and (_is_silly_name(_name_edit.text) or _name_edit.text.strip_edges() == ""):
+		_name_edit.text = random_name(sex)
+	_refresh_preview(true)
 
 func _randomize_look() -> void:
 	var p := Game.profile
+	p.sex = ["male", "female"].pick_random()
 	p.skin = randi() % Game.SKIN_COLORS.size()
 	p.hair_style = Game.HAIR_STYLES2.pick_random()
 	p.hair_color = randi() % Game.HAIR_COLORS2.size()
@@ -512,7 +688,7 @@ func _randomize_look() -> void:
 	p.build = snappedf(randf_range(0.85, 1.25), 0.01)
 	p.height = snappedf(randf_range(0.88, 1.12), 0.01)
 	p.show_hat = false
-	_name_edit.text = NAMES.pick_random()
+	_name_edit.text = random_name(p.sex)
 	_build_sl.set_value_no_signal(p.build)
 	_height_sl.set_value_no_signal(p.height)
 	_refresh_preview(true)
@@ -533,6 +709,13 @@ func _refresh_preview(cheer := false) -> void:
 		(_hair_btns[k] as Button).set_pressed_no_signal(k == CharacterModel.hair_style_of(String(p.hair_style)))
 	for k in _face_btns:
 		(_face_btns[k] as Button).set_pressed_no_signal(k == p.face)
+	var sex := Game.hero_sex()
+	for k in _sex_btns:
+		(_sex_btns[k] as Button).set_pressed_no_signal(k == sex)
+	# the Wild and Bald heads come with beards, so they're for men
+	for k in CharacterModel.HAIR_HEAD_BEARDED:
+		if _hair_btns.has(k):
+			(_hair_btns[k] as Button).disabled = sex == "female"
 	var ab := Game.ability()
 	_hero_desc.text = "%s\n\nSpecial move: %s\n%s" % [Game.HERO_BLURB.get(p.hero, ""), ab.name, ab.desc]
 	var hero: Dictionary = CharacterModel.HEROES[p.hero]
@@ -854,6 +1037,98 @@ func _refresh_inventory() -> void:
 		_inv_list.add_child(UIKit.label("Nothing else yet. Open chests and defeat monsters to find gear!", 16, UIKit.DIM))
 	for id in bag:
 		_inv_list.add_child(_item_row(id, false))
+
+# --- the gear chest at home ---------------------------------------------------------
+var _stash_bag: VBoxContainer
+var _stash_box: VBoxContainer
+var _stash_head: Label
+var _stash_bag_head: Label
+
+func _build_stash() -> void:
+	var p := _center_panel("stash", 1400, 780)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); p.add_child(v)
+	var head := HBoxContainer.new(); v.add_child(head)
+	head.add_child(UIKit.label("Your Gear Chest", 34, UIKit.GOLD, true))
+	var sp := Control.new(); sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; head.add_child(sp)
+	var x := Button.new(); x.text = "✕  Close"; x.custom_minimum_size = Vector2(160, 54)
+	x.pressed.connect(func() -> void: resume_requested.emit())
+	head.add_child(x)
+	v.add_child(UIKit.label("Keep gear here that you don't want to carry. It stays safe at home, and you can take it back any time.", 18, UIKit.DIM))
+	var cols := HBoxContainer.new(); cols.add_theme_constant_override("separation", 24); v.add_child(cols)
+	for which in ["bag", "chest"]:
+		var c := VBoxContainer.new(); c.add_theme_constant_override("separation", 8); c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		cols.add_child(c)
+		var hl := UIKit.label("", 26, UIKit.GOLD, true); c.add_child(hl)
+		var sc := ScrollContainer.new(); sc.custom_minimum_size = Vector2(660, 520)
+		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		c.add_child(sc)
+		var list := VBoxContainer.new(); list.add_theme_constant_override("separation", 6); list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sc.add_child(list)
+		if which == "bag":
+			_stash_bag = list; _stash_bag_head = hl
+			c.add_child(_button("Put everything from my bag in the chest", func() -> void:
+				for id in Game.inventory.duplicate():
+					if Game.can_stash(id):
+						Game.stash_put(id)
+				_refresh_stash(), 520))
+		else:
+			_stash_box = list; _stash_head = hl
+
+func _stash_row(id: String, in_chest: bool) -> Control:
+	var it: Dictionary = Game.item(id)
+	var r: int = it.get("rarity", 0)
+	var row := PanelContainer.new()
+	row.add_theme_stylebox_override("panel", UIKit.panel_style(0.6, it.get("color", UIKit.GOLD), 4))
+	var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 10); row.add_child(hb)
+	var vb := VBoxContainer.new(); vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hb.add_child(vb)
+	var slot: String = it.get("slot", "")
+	vb.add_child(UIKit.label(String(it.get("name", id)), 18, it.get("color", UIKit.PARCH), true))
+	var lines := Game.item_lines(id)
+	var st := UIKit.label("%s %s   %s" % [Loot.RARITY_NAMES[r], Game.SLOT_NAMES.get(slot, slot), ", ".join(lines)], 14, UIKit.DIM)
+	st.autowrap_mode = TextServer.AUTOWRAP_WORD; st.custom_minimum_size.x = 420
+	vb.add_child(st)
+	var b := Button.new(); b.custom_minimum_size = Vector2(150, 54)
+	b.add_theme_font_size_override("font_size", 20)
+	if in_chest:
+		b.text = "Take  ⇦"
+		b.pressed.connect(func() -> void:
+			Game.stash_take(id)
+			_refresh_stash())
+	else:
+		b.text = "Store  ⇨"
+		b.pressed.connect(func() -> void:
+			Game.stash_put(id)
+			_refresh_stash())
+	hb.add_child(b)
+	return row
+
+func _refresh_stash() -> void:
+	if _stash_bag == null:
+		return
+	for c in _stash_bag.get_children():
+		c.queue_free()
+	for c in _stash_box.get_children():
+		c.queue_free()
+	var bag: Array = []
+	for id in Game.inventory:
+		if Game.can_stash(id):
+			bag.append(id)
+	var by_worth := func(a, b) -> bool:
+		var ra: int = Game.item(a).get("rarity", 0); var rb: int = Game.item(b).get("rarity", 0)
+		return ra > rb if ra != rb else Game.score(a) > Game.score(b)
+	bag.sort_custom(by_worth)
+	var box: Array = Game.stash.duplicate()
+	box.sort_custom(by_worth)
+	_stash_bag_head.text = "In your bag  (%d / %d)" % [Game.inventory.size(), Game.BAG_SIZE]
+	_stash_head.text = "In the chest  (%d / %d)" % [Game.stash.size(), Game.STASH_SIZE]
+	if bag.is_empty():
+		_stash_bag.add_child(UIKit.label("Nothing to put away. (What you're wearing stays on you.)", 16, UIKit.DIM))
+	for id in bag:
+		_stash_bag.add_child(_stash_row(id, false))
+	if box.is_empty():
+		_stash_box.add_child(UIKit.label("The chest is empty.", 16, UIKit.DIM))
+	for id in box:
+		_stash_box.add_child(_stash_row(id, true))
 
 func _build_lore() -> void:
 	var p := _center_panel("lore", 760, 460)

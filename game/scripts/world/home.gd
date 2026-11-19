@@ -35,6 +35,7 @@ var _banner: Label
 var _rng := RandomNumberGenerator.new()
 var _waterfall_x := Vector3.ZERO
 var _splashed := false
+var cabin: HomeCabin
 
 const CABIN := Vector3(0, 0, 0)
 const LAND := Vector3(4, 0, 10)
@@ -57,6 +58,7 @@ func build() -> void:
 	_cloud_mat.set_shader_parameter("rim_glow", 0.4)
 	_environment()
 	_valley()
+	cabin = HomeCabin.build_in(self)
 	_cloud_sea()
 	_cloud_island_behind()
 	_course()
@@ -69,6 +71,12 @@ func build() -> void:
 		for l in find_children("*", "Light3D", true, false):
 			if l is OmniLight3D or l is SpotLight3D:
 				(l as Light3D).shadow_enabled = false
+	# already home (a saved game after the flight, continuing by the cabin or in it):
+	# no flying, the portal is awake. (Through the Sky Gate again, you fly again.)
+	var rp := Game.resume_pos
+	if Game.quest_state("flight_home") == "done" and rp != Vector3.ZERO and Vector2(rp.x, rp.z).length() < 70.0:
+		landed = true
+		_portal_awake()
 
 func ground(x: float, z: float) -> Vector3:
 	return Vector3(x, _scen.height(x, z) if _scen else 0.0, z)

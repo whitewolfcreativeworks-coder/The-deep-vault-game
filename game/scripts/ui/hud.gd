@@ -297,6 +297,8 @@ func _process(delta: float) -> void:
 		var ab2 := Game.ability2()
 		var st2 := "ready" if player.special2_cd <= 0.0 else "%ds" % ceili(player.special2_cd)
 		special_label.text += ("\n%s: %s" if Game.touch_active else "\n%s [B]: %s") % [ab2.name, st2]
+	if not Game.buffs.is_empty() or Game.shroom >= 1.0:
+		special_label.text += "\n" + Game.buffs_text()
 	var cid := Game.costume_id()
 	costume_label.visible = cid != ""
 	if cid != "":

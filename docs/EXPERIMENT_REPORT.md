@@ -711,3 +711,56 @@ Each detail now casts a ray at the head you actually see (Godot's `TriangleMesh.
 
 **Coplanar faces, again.** The stair tunnel's walls were flush with the cliff face they were cut into. The coplanar fixer pushes the smaller face back, so the cliff's rock texture showed instead of the masonry. The tunnel walls now stand 4 cm proud of the cliff.
 
+## Follow-up 20: evening playtest notes (Nov 18)
+
+**Hands that hold things.** The opening movie's toothbrush and teaspoon moved on their own because no animation clip puts a hand on them. Godot's `SkeletonIK3D` now pulls the right arm (upper arm to hand) onto a marker on the object, blended in and out over a fraction of a second. In Godot 4.5 it runs as a skeleton modifier after the animation.
+- The cup and spoon are tweened as before, and the hand follows them.
+- The seated pose puts his shoulders well behind the stool, so the cup had to slide toward him and he leans in. That's measured from the bones at run time, not hard-coded.
+
+**A sign built in the wrong place.** The climbing-wall sign's posts and board were added to the wall node (at the world origin) instead of to the sign node. They stood, blank, at the top of the dungeon stairs; the words floated by the climbing wall with nothing behind them. The designer read it as "a sign begging for a warning", so there is now a real DANGER sign there.
+
+**Signs.** `SignText.fit` measures the text with the font's own metrics and picks the pixel size so it fits the board. A `node_added` hook gives every Label3D the new font.
+
+**Food.** Food is laid out by casting rays down onto each table's own mesh. The most common hit height is taken as the tabletop, so decorations and broken corners are skipped. Barrels and crates whose top is out of reach (or which are giant scenery) get none.
+
+
+## Follow-up 21: Goblin Forest notes (Nov 18)
+
+**Rainbow vision.** Eating a glowing mushroom raises a single number, which wears off at one unit every 16 seconds. A full-screen `canvas_item` shader reads the screen texture and wobbles, swirls, splits and rainbow-tints it by that amount. `hint_screen_texture` works in the compatibility renderer, so the iPad build gets the same effect. From three mushrooms your steering drifts. At five you wobble about on your own and miss 70% of your swings.
+
+**One line, 596 errors.** `CPUParticles3D` has no `amount_ratio` (only `GPUParticles3D` does). One line setting it printed an error every frame. The test runner's script-error count caught it, though every check had passed.
+
+**Floating torches.** One of the Warren's wall torches stood in mid-air because the cave wall it was placed against curves away. After a level loads (once the physics world knows the walls), every wall torch casts a ray behind it. A torch with no wall there searches 2 m around in eight directions and moves onto the nearest wall, facing out. A torch with no wall in reach becomes a standing torch.
+
+**Chief Gruk** has twice the health and two new moves (Spore Bomb and War Horn). The forest has 14 discoveries; the four gnome houses each give a different gift.
+
+## Follow-up 22: man or woman, and the cabin at home (Nov 18, night)
+
+**Man or woman, for every class.** Each class has a default sex. Choosing the other one changes four things:
+- **Head:** the default head is swapped for a modelled one from KayKit Adventurers 2.0 (long or shoulder-length hair for women, short for men).
+- **Hair colour:** tinted to the class's own colour, so a heroine Knight is blonde and a Necromancer's hair is white.
+- **Build:** slimmer for women, broader for men.
+- **Face (women only):** lashes, lips and rosy cheeks.
+
+Exceptions:
+- A woman in a full knight's helm keeps the helm and gets a long braid out the back.
+- The Druid's antlered hood is the class's look, so a heroine Druid keeps it, with a braid.
+- The Barbarian's bare-chested body gets a fur wrap for a woman.
+- The Wild and Bald heads come with beards, so those buttons are disabled for women.
+
+**Every KayKit head shares one face.** The first lashes sat above the eyebrows on the long-hair head. The layout box changes with the hair, but a depth scan down the middle of the face found the nose tip at the same height on every head (about 1.51 in skeleton space). Lashes, lips and cheeks are now placed from the nose.
+
+**A bug from Godot's duplicate names.** Classes with their own body model hide the base rig's meshes and borrow the class's meshes onto the same skeleton. The Barbarian's base and class models both have a mesh called `Barbarian_Head`, so Godot silently renamed the borrowed one (`@Barbarian_Head@…`). Code that finds the head by name found the hidden one instead. A swapped Barbarian head left the old bearded face showing, and first-person view never hid the Barbarian's head. The hidden base meshes are now renamed before borrowing.
+
+**Names and the iPad keyboard.**
+- There are 49 funny Bobek names for heroines.
+- The name box held 22 letters, which cut "Bobek the Goblin Bonker" short. A cut-off name no longer matched the list, so switching to Woman kept a man's name. It now holds 26.
+- The web build's `experimental_virtual_keyboard` is off, so tapping the name box on an iPad brings up no keyboard. The game now has its own on-screen keyboard (letters, caps, space, backspace, clear).
+
+**The cabin.** The opening movie's cabin set is reused as the room: an `IntroMovie` node is built 30 m under the valley and scaled by 1/0.72, because the set was sized for a hero shrunk to 72%.
+- Collision boxes are generated from the set's own boxes and from every model standing on the floor.
+- The doors move you in and out with the usual fade.
+- The sun is switched off while you're inside, because it lit the floor through the roof.
+- The desk opens the character creator in "desk mode": the class is locked, Cancel restores your old look, and Done rebuilds your hero.
+- The gear chest is a new `stash` list in the save file (60 items).
+- A game saved in the cabin continues in the cabin with the flight already done. Taking the Sky Gate again means flying the course again.
