@@ -137,7 +137,13 @@ const WEAPON_SCENES := {
 	"skel_staff": "res://assets/kaykit/items/Skeleton_Staff.gltf",
 	"sword_1handed": "res://assets/kaykit/items/sword_1handed.gltf",
 	"sword_2handed_color": "res://assets/kaykit/items/sword_2handed_color.gltf",
+	"necro_staff": "res://assets/kaykit/items/Skeleton_Staff.gltf",
 }
+## Classes that always carry their own kind of weapon, whatever blade you equip
+## (its stats and rarity glow still count): the Necromancer's long bone staff.
+const CLASS_WEAPON := {"Necromancer": "necro_staff"}
+const TWO_HANDED := ["necro_staff"]
+var hero_name := ""
 ## How each skin changes the body: albedo multiply, metal/rough, emission, alpha.
 const SKIN_LOOKS := {
 	"lizard": {"albedo": Color(0.55, 1.0, 0.45), "rough": 0.45, "emit": Color(0.03, 0.14, 0.02)},
@@ -160,6 +166,7 @@ const DARK_LOOKS := {
 func setup(cfg: Dictionary) -> void:
 	for c in get_children():
 		c.queue_free()
+	hero_name = String(cfg.get("hero", "")) if String(cfg.get("kind", "hero")) == "hero" else ""
 	_aura = null
 	_cloud_kind = ""
 	head_meshes.clear(); all_meshes.clear(); _never_show.clear(); _own_colors.clear()
@@ -294,7 +301,7 @@ func setup(cfg: Dictionary) -> void:
 	_style_custom_parts()
 	var weapon = cfg.get("weapon", "")
 	set_weapon(weapon)
-	set_offhand(cfg.get("shield", ""))
+	set_offhand(_offhand_for(cfg))
 	if cfg.has("aura"):
 		_add_aura(cfg.aura, int(cfg.get("aura_level", 3)), skin == "ember")
 	elif skin == "ember":
@@ -671,7 +678,7 @@ func _wear_costume(path: String, cfg: Dictionary) -> void:
 				head_meshes.append(m)
 				break
 	set_weapon(cfg.get("weapon", ""))
-	set_offhand(cfg.get("shield", ""))
+	set_offhand(_offhand_for(cfg))
 	if cfg.has("aura"):
 		_add_aura(cfg.aura, int(cfg.get("aura_level", 3)))
 	_base_scale = float(cfg.get("scale", 0.84))
@@ -952,12 +959,23 @@ func set_weapon(id: String) -> void:
 		if r >= 2 and id != "vault_blade":
 			glow = Loot.rarity_color(r)
 		id = it.get("model", id) if id != "vault_blade" else id
+	if kind == "hero" and id != "" and CLASS_WEAPON.has(hero_name):
+		id = CLASS_WEAPON[hero_name]
 	if id == "" or not WEAPON_SCENES.has(id):
 		return
 	weapon_root = _attach("handslot.r")
 	var w: Node3D = (load(WEAPON_SCENES[id]) as PackedScene).instantiate()
 	weapon_root.add_child(w)
-	if kind == "hero":
+	var tip := Vector3(0, 0.9 * (HERO_WEAPON_LENGTH if kind == "hero" else 1.0), 0)
+	if id == "necro_staff":
+		# tilted 45 degrees in the hand: it stands up as you walk and run, and leans
+		# forward like a wizard's staff when you stand still (a sword's angle would
+		# point it straight ahead like a lance)
+		w.scale = Vector3.ONE * 1.05
+		w.rotation.z = PI / 4.0
+		_staff_glow(w, Vector3(0, 1.3, 0))
+		tip = w.transform * Vector3(0, 1.3, 0)
+	elif kind == "hero":
 		w.scale = Vector3(1.12, HERO_WEAPON_LENGTH, 1.12)   # longer blades: easier to see what you hit
 	for mi in w.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = flash_mat
@@ -980,7 +998,46 @@ func set_weapon(id: String) -> void:
 			pass
 	weapon_tip = Node3D.new()
 	weapon_root.add_child(weapon_tip)
-	weapon_tip.position = Vector3(0, 0.9 * (HERO_WEAPON_LENGTH if kind == "hero" else 1.0), 0)
+	weapon_tip.position = tip
+
+func _offhand_for(cfg: Dictionary) -> String:
+	if kind == "hero" and CLASS_WEAPON.has(hero_name) and CLASS_WEAPON[hero_name] in TWO_HANDED:
+		return ""          # a staff takes both hands
+	return String(cfg.get("shield", ""))
+
+## A ghostly green flame on top of the Necromancer's staff.
+func _staff_glow(parent: Node3D, at: Vector3) -> void:
+	var g := Color(0.45, 1.0, 0.5)
+	var orb := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.09; sm.height = 0.18; sm.radial_segments = 10; sm.rings = 5
+	orb.mesh = sm
+	var om := StandardMaterial3D.new(); om.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	om.albedo_color = g; om.emission_enabled = true; om.emission = g; om.emission_energy_multiplier = 4.0
+	orb.material_override = om; orb.position = at; orb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(orb)
+	var halo := MeshInstance3D.new(); var q := QuadMesh.new(); q.size = Vector2(0.55, 0.55); halo.mesh = q
+	var hm := StandardMaterial3D.new(); hm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	hm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; hm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	hm.albedo_texture = FX.soft_texture(); hm.albedo_color = Color(g.r, g.g, g.b, 0.7)
+	hm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	halo.material_override = hm; halo.position = at; halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(halo)
+	var wisps := CPUParticles3D.new()
+	wisps.amount = 10; wisps.lifetime = 0.9; wisps.local_coords = false
+	wisps.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; wisps.emission_sphere_radius = 0.08
+	wisps.direction = Vector3.UP; wisps.spread = 25.0; wisps.gravity = Vector3(0, 0.6, 0)
+	wisps.initial_velocity_min = 0.1; wisps.initial_velocity_max = 0.35
+	wisps.scale_amount_min = 0.5; wisps.scale_amount_max = 1.0
+	var curve := Curve.new(); curve.add_point(Vector2(0, 1)); curve.add_point(Vector2(1, 0)); wisps.scale_amount_curve = curve
+	var wm := QuadMesh.new(); wm.size = Vector2(0.09, 0.09); wisps.mesh = wm
+	var pm := StandardMaterial3D.new(); pm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; pm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	pm.albedo_texture = FX.soft_texture(); pm.albedo_color = g; pm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	pm.vertex_color_use_as_albedo = true
+	wisps.material_override = pm
+	wisps.position = at
+	parent.add_child(wisps)
+	var l := OmniLight3D.new(); l.light_color = g; l.light_energy = 0.7; l.omni_range = 2.5; l.position = at
+	parent.add_child(l)
 
 func set_offhand(id: String) -> void:
 	if offhand_root:
@@ -1159,6 +1216,56 @@ func _head_bounds(hero: Dictionary) -> AABB:
 			return (mi as MeshInstance3D).get_aabb()
 	return AABB(Vector3(-0.54, 1.2, -0.5), Vector3(1.08, 1.1, 1.02))
 
+static var _face_tm_cache := {}
+
+## The head you actually see: a swapped-in modelled head, or the hero's own.
+func _visible_head(hero: Dictionary) -> MeshInstance3D:
+	for m in all_meshes:
+		if is_instance_valid(m) and m.name == "Hair_Head":
+			return m
+	for m in all_meshes:
+		if is_instance_valid(m) and m.name == hero.head[0]:
+			return m
+	return null
+
+## Face details (moustaches, eyepatches, glowing eyes...) were laid on an ellipsoid
+## fitted round the head's bounding box, and on most heads that box pokes out well
+## past the real face, so they floated in front of it. Now each detail finds the
+## real face by shooting a ray at the visible head mesh. Returns a callable
+## (x, y) -> z of the face surface in skeleton space, or NAN if the ray misses.
+func _face_ray(hero: Dictionary) -> Callable:
+	var fm := _visible_head(hero)
+	if fm == null or fm.mesh == null:
+		return func(_x: float, _y: float) -> float: return NAN
+	if not _face_tm_cache.has(fm.mesh):
+		_face_tm_cache[fm.mesh] = fm.mesh.generate_triangle_mesh()
+	var tm: TriangleMesh = _face_tm_cache[fm.mesh]
+	# a hair head hangs off the head bone with the inverse rest, so it is already in
+	# skeleton space; the hero's own (skinned) head sits on the skeleton itself
+	var xf: Transform3D = fm.transform if fm.get_parent() == skel else Transform3D.IDENTITY
+	var inv := xf.affine_inverse()
+	_head_tm = tm; _head_xf = xf
+	return func(x: float, y: float) -> float:
+		if tm == null:
+			return NAN
+		var hit: Dictionary = tm.intersect_ray(inv * Vector3(x, y, 6.0), (inv.basis * Vector3(0, 0, -1)).normalized())
+		if hit.is_empty():
+			return NAN
+		return (xf * (hit.position as Vector3)).z
+
+var _head_tm: TriangleMesh
+var _head_xf := Transform3D.IDENTITY
+
+## Where a ray from `from` toward `dir` (skeleton space) first meets the visible head.
+func _head_hit(from: Vector3, dir: Vector3) -> Variant:
+	if _head_tm == null:
+		return null
+	var inv := _head_xf.affine_inverse()
+	var hit: Dictionary = _head_tm.intersect_ray(inv * from, (inv.basis * dir).normalized())
+	if hit.is_empty():
+		return null
+	return _head_xf * (hit.position as Vector3)
+
 func _look_mat(c: Color, rough := 0.75) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
@@ -1201,6 +1308,11 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 	looks_root.transform = skel.get_bone_global_rest(hb).affine_inverse()   # author in skeleton space
 	ba.add_child(looks_root)
 	var box := _head_bounds(hero)
+	# some heads' bounds take in antlers (Druid), a jaw piece (Necromancer) or a long
+	# beard; lay the details out on the head itself, which is the same size on them all
+	var core := box.intersection(AABB(Vector3(-0.58, 1.0, -0.6), Vector3(1.16, 1.32, 1.18)))
+	if core.has_volume():
+		box = core
 	var c := box.get_center()
 	var sz := box.size
 	var rx := sz.x * 0.5; var ry := sz.y * 0.5; var rz := sz.z * 0.5
@@ -1245,8 +1357,13 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 			cone.radial_segments = 8
 			var pe := _piece(cone, ear_m, c + Vector3(sd * rx * 1.25, ry * 0.12, -rz * 0.05), Vector3(1.0, 1.0, 0.45))
 			pe.rotation = Vector3(0, 0, -sd * 1.2)
-	# face details sit on the front of the head (+Z in skeleton space)
+	# face details sit on the front of the head (+Z in skeleton space): on the real
+	# face where the ray finds it, else on the fitted ellipsoid
+	var ray := _face_ray(hero)
 	var fz := func(x: float, y: float) -> float:
+		var z: float = ray.call(x, y)
+		if not is_nan(z):
+			return z
 		var k := 1.0 - pow(x / rx, 2.0) - pow((y - c.y) / ry, 2.0)
 		return c.z + rz * sqrt(maxf(k, 0.05))
 	var eye_y := c.y - ry * 0.08
@@ -1265,7 +1382,18 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 			_piece(d, _look_mat(Color(0.05, 0.05, 0.05), 0.5), Vector3(eye_x, eye_y, fz.call(eye_x, eye_y) + 0.01), Vector3.ONE, Vector3(PI / 2, 0, 0))
 			var band := TorusMesh.new(); band.inner_radius = 0.97; band.outer_radius = 1.03; band.rings = 32; band.ring_segments = 6
 			if not covered:
-				_piece(band, _look_mat(Color(0.08, 0.06, 0.05)), Vector3(0, eye_y + ry * 0.18, c.z), Vector3(rx * 1.0, ry * 0.5, rz * 1.0), Vector3(0, 0, -0.3))
+				# the strap hugs the real head (or hair) all the way round
+				var by := eye_y + ry * 0.18
+				var bc := Vector3(0, by, c.z)
+				var brad := Vector3(rx, 1.0, rz)
+				var h_f = _head_hit(Vector3(0, by, c.z + 6.0), Vector3(0, 0, -1))
+				var h_b = _head_hit(Vector3(0, by, c.z - 6.0), Vector3(0, 0, 1))
+				var h_l = _head_hit(Vector3(-6.0, by, c.z), Vector3(1, 0, 0))
+				var h_r = _head_hit(Vector3(6.0, by, c.z), Vector3(-1, 0, 0))
+				if h_f != null and h_b != null and h_l != null and h_r != null:
+					bc = Vector3(((h_l as Vector3).x + (h_r as Vector3).x) * 0.5, by, ((h_f as Vector3).z + (h_b as Vector3).z) * 0.5)
+					brad = Vector3(((h_r as Vector3).x - (h_l as Vector3).x) * 0.5 + 0.012, 1.0, ((h_f as Vector3).z - (h_b as Vector3).z) * 0.5 + 0.012)
+				_piece(band, _look_mat(Color(0.08, 0.06, 0.05)), bc, Vector3(brad.x, ry * 0.5, brad.z), Vector3(0, 0, -0.3))
 		"scar":
 			# a jagged slash from the brow, across the eye, down the cheek, with stitches
 			var red := _look_mat(Color(0.55, 0.1, 0.12), 0.55)
@@ -1315,12 +1443,15 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 				var ex: float = sd * eye_x
 				var ez: float = fz.call(ex, eye_y)
 				_piece(_sphere(), glow, Vector3(ex, eye_y, ez + 0.004), Vector3(rx * 0.11, ry * 0.1, rx * 0.05))
-				var hq := QuadMesh.new(); hq.size = Vector2(rx * 0.75, rx * 0.75)
-				_piece(hq, halo, Vector3(ex, eye_y, ez + 0.03))
+				var hq := QuadMesh.new(); hq.size = Vector2(rx * 0.45, rx * 0.45)
+				_piece(hq, halo, Vector3(ex, eye_y, ez + 0.006))
 		"mask":
 			# a ninja mask: cloth wrapped over the nose and mouth, knotted at the back
 			var cloth := _look_mat(Color(0.1, 0.12, 0.22), 0.7)
-			_piece(_sphere(), cloth, Vector3(c.x, c.y - ry * 0.64, c.z + rz * 0.05), Vector3(rx * 1.03, ry * 0.36, rz * 1.02))
+			var my := c.y - ry * 0.64
+			var mz := c.z + rz * 0.05
+			var front: float = maxf(fz.call(0.0, my), fz.call(0.0, my + ry * 0.2))
+			_piece(_sphere(), cloth, Vector3(c.x, my, mz), Vector3(rx * 1.03, ry * 0.36, clampf(front + 0.025 - mz, rz * 0.5, rz * 1.02)))
 			var knot := _piece(_sphere(), cloth, Vector3(c.x, c.y - ry * 0.4, c.z - rz * 1.0), Vector3(rx * 0.16, ry * 0.12, rz * 0.12))
 			for sd in [-1.0, 1.0]:
 				var tail := _piece(_boxm(rx * 0.12, ry * 0.5, 0.02), cloth, knot.position + Vector3(sd * rx * 0.12, -ry * 0.25, -rz * 0.05))

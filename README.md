@@ -72,6 +72,17 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### New in the Nov 18 afternoon playtest
+- **Face details sit on the face.** Moustaches, beards, eyepatches, glowing eyes, war paint and masks used to float in front of the face. They were laid out from the head's bounding box, which pokes out past the real face on most heads. Each piece now finds the real face by casting a ray at the head you actually see.
+- **The Rogue statue faces you.** It now faces into the Outpost clearing, turned toward the portal you arrive through. It's half as big again, on a taller gold-trimmed plinth with two fire bowls.
+- **A climbing corner left of the arrival portal.** Two climbing walls meet at a lookout deck eight and a half metres up:
+  - **Green route:** big holds, one step at a time. Walk at the next hold and press JUMP to pull yourself up.
+  - **Red route:** small holds with gaps you have to jump.
+  - Ring the bell at the top for a reward (a bigger one the first time you make it up the red route), then ride the zipline back down.
+  - Street lamps, coloured uplights and strings of party lights keep the corner bright.
+- **The stair tunnel matches.** The tunnel down into the vault showed the cliff's rock texture on its walls under a masonry ceiling. Its walls are now the same chiselled stone.
+- **The Necromancer carries a long bone staff** with a ghostly green flame on top, in both hands (no shield). Raise Dead is a much bigger moment: the ground cracks with green fire and three skeleton warriors claw their way up out of it.
+
 ### New in the Nov 18 round: Cloud Island redesign and the flight home
 - **Detailed, crisp dungeon walls.** Every dungeon's stone is now chiselled blocks with crisp bevels, faceted faces and deep mortar joints. A carved rosette frieze runs along the walls at about head height, with a stone base course along the floor. Each dungeon keeps its own colours. (The idea came from the designer's playtesting; it's all our own procedural shader, nothing copied.)
 - **The blue square under your feet is fixed.** Costume and armour capes, wings, hats and sunglasses that hang off a bone were dropping to your feet. They now hang where they should.

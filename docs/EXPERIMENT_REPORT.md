@@ -696,3 +696,18 @@ The `homeflight` test flies the whole course with an autopilot that steers at th
 
 **Precipitation Simulator.** The designer's 6th-grade simulator (17 kinds of precipitation, each with steps and a fact) gave us the science for three quests, and its facts are what Adad says when you turn them in.
 
+## Follow-up 19: afternoon playtest notes (Nov 18)
+
+The designer started a new Necromancer and sent notes from the Outpost and the first dungeon.
+
+**Floating face details.** Moustaches, eyepatches and the rest were placed on an ellipsoid fitted to the head mesh's bounding box. Measuring the heads showed why that failed:
+- The Necromancer's head box reaches 0.25 units in front of the face (a jaw piece).
+- The Druid's is twice as wide and half again as tall (antlers).
+- Hair styles swap in a different modelled head, but the layout still used the hidden original head's box.
+
+Each detail now casts a ray at the head you actually see (Godot's `TriangleMesh.intersect_ray` on the head mesh, cached per mesh) to find the real face surface. The layout box is clipped to the size every KayKit head shares. The eyepatch strap is fitted with four rays around the head. The `looks` test now also shoots every hero in profile.
+
+**Mid-air ledge grab.** The new climbing wall's red route showed that a jump across a gap toward a higher hold almost never landed: air control is deliberately weak. Pressing JUMP again in the air now grabs any ledge in front of you, from a little below your feet to 2 m above them, before a double jump is tried. On the ground the mantle rule is unchanged.
+
+**Coplanar faces, again.** The stair tunnel's walls were flush with the cliff face they were cut into. The coplanar fixer pushes the smaller face back, so the cliff's rock texture showed instead of the masonry. The tunnel walls now stand 4 cm proud of the cliff.
+

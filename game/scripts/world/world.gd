@@ -33,6 +33,7 @@ var rivers: Array[GlowRiver] = []
 var spawn_point := Vector3(-21.0, 0.1, 25.0)   # just out of the arrival portal (west side area)
 var spawn_yaw := -1.15                          # facing out of the portal toward the vault gate
 const ARRIVAL := Vector3(-24.0, 0, 25.0)
+var climb: ClimbWall
 var hall_woken := false
 
 func build() -> void:
@@ -230,8 +231,8 @@ func _outpost() -> void:
 		b.box(Vector3(x2 - 4, 0, 42 - fmod(i * 1.7, 3.0)), Vector3(x2 + 3, 4 + fmod(i * 2.3, 4.0), 46), b.mats.rock)
 	# carved entrance arch
 	var brick: Material = b.wall_mat(Color(0.38, 0.35, 0.32), 0.3, 0.0)
-	b.box(Vector3(-3.6, 0, -2.6), Vector3(-2.5, 5.4, -1.2), brick)
-	b.box(Vector3(2.5, 0, -2.6), Vector3(3.6, 5.4, -1.2), brick)
+	b.box(Vector3(-3.6, 0, -2.6), Vector3(-2.46, 5.4, -1.2), brick)
+	b.box(Vector3(2.46, 0, -2.6), Vector3(3.6, 5.4, -1.2), brick)
 	b.box(Vector3(-3.9, 5.0, -2.8), Vector3(3.9, 6.2, -1.0), brick)
 	var sigil := MeshInstance3D.new(); var sq := QuadMesh.new(); sq.size = Vector2(1.6, 1.6); sigil.mesh = sq
 	var sm := ShaderMaterial.new(); sm.shader = load("res://shaders/rune.gdshader")
@@ -273,10 +274,13 @@ func _outpost() -> void:
 
 	# the playground and street lamps on the dark east side, and the Rogue statue
 	Playground.build(self)
+	# the climbing walls, lookout deck and zipline in the dark corner left of the portal
+	climb = ClimbWall.build(self)
 
 	# a couple of treasure chests in random spots around the outpost's edges
 	var wc := WildChests.create(self, Rect2(-31, 2, 62, 40), func(x: float, z: float) -> Vector3: return Vector3(x, 0.0, z),
-		func(p: Vector2) -> bool: return p.x < -16.0 and p.distance_to(Vector2(ARRIVAL.x, ARRIVAL.z)) > 7.0 and p.y < 40.0, 2, 1, false)
+		func(p: Vector2) -> bool: return p.x < -16.0 and p.distance_to(Vector2(ARRIVAL.x, ARRIVAL.z)) > 7.0 and p.y < 40.0 \
+			and not Rect2(-35, -2, 23, 21).has_point(p), 2, 1, false)
 	wc.max_chests = 3
 	wc.respawn_every = 300.0
 
@@ -345,8 +349,11 @@ func _tunnel() -> void:
 	var wm: Material = b.wall_mat(Color(0.33, 0.31, 0.29), 0.3, Y)
 	b.stairs(-2.5, 2.5, -2.0, -12.0, 0.0, Y, b.mats.floor)
 	b.box(Vector3(-2.5, Y - 1, -12.5), Vector3(2.5, Y, -11.0), b.mats.floor)
-	b.box(Vector3(-3.5, Y - 1, -12.5), Vector3(-2.5, 5, -2), wm)
-	b.box(Vector3(2.5, Y - 1, -12.5), Vector3(3.5, 5, -2), wm)
+	# the side walls stand 4 cm proud of the cliff face they're cut into, so the
+	# masonry shows (flush, the cliff's rock texture won and the tunnel walls
+	# didn't match the stone ceiling)
+	b.box(Vector3(-3.5, Y - 1, -12.5), Vector3(-2.46, 5, -1.96), wm)
+	b.box(Vector3(2.46, Y - 1, -12.5), Vector3(3.5, 5, -1.96), wm)
 	# stepped tunnel ceiling following the stairs
 	for i in 5:
 		var z0 := -2.0 - i * 2.0

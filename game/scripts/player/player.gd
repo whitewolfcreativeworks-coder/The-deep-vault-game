@@ -1178,19 +1178,27 @@ func _try_mantle(fwd: Vector3) -> bool:
 	fwd = Vector3(fwd.x, 0, fwd.z).normalized()
 	var space := get_world_3d().direct_space_state
 	var feet := global_position
-	var q := PhysicsRayQueryParameters3D.create(feet + Vector3(0, 0.35, 0), feet + Vector3(0, 0.35, 0) + fwd * 0.95, 1)
-	q.exclude = [get_rid()]
-	var wall := space.intersect_ray(q)
+	# on the ground, feel for a ledge at knee height. In the air (pressing JUMP again
+	# as you reach a ledge) feel from just below your feet up to chest height, and
+	# grab any ledge from a little below your feet to 2 m above them.
+	var airborne := not is_on_floor()
+	var wall := {}
+	for hr in ([-0.25, 0.15, 0.35, 0.9] if airborne else [0.35]):
+		var q := PhysicsRayQueryParameters3D.create(feet + Vector3(0, hr, 0), feet + Vector3(0, hr, 0) + fwd * 0.95, 1)
+		q.exclude = [get_rid()]
+		wall = space.intersect_ray(q)
+		if not wall.is_empty():
+			break
 	if wall.is_empty():
 		return false
 	var probe_xz: Vector3 = wall.position + fwd * 0.5
-	var q2 := PhysicsRayQueryParameters3D.create(Vector3(probe_xz.x, feet.y + 2.2, probe_xz.z), Vector3(probe_xz.x, feet.y + 0.2, probe_xz.z), 1)
+	var q2 := PhysicsRayQueryParameters3D.create(Vector3(probe_xz.x, feet.y + 2.2, probe_xz.z), Vector3(probe_xz.x, feet.y - 0.35, probe_xz.z), 1)
 	q2.exclude = [get_rid()]
 	var top := space.intersect_ray(q2)
 	if top.is_empty() or (top.normal as Vector3).y < 0.7:
 		return false
 	var h: float = top.position.y - feet.y
-	if h < 0.45 or h > 2.0:
+	if h < (-0.3 if airborne else 0.45) or h > 2.0:
 		return false
 	var target: Vector3 = top.position + Vector3(0, 0.03, 0)
 	var sq := PhysicsShapeQueryParameters3D.new()
@@ -1872,21 +1880,59 @@ func _wild_growth() -> void:
 	tw.tween_property(ring, "scale", Vector3(1, 0.01, 1), 0.5)
 	tw.tween_callback(ring.queue_free)
 
-## Necromancer: two skeletons claw out of the ground to fight for you.
+## Necromancer: the ground cracks with green fire and three skeleton warriors
+## claw their way up out of it to fight for you.
+var _raises := 0
 func _raise_dead() -> bool:
 	var fwd := -Vector3(sin(view_yaw), 0, cos(view_yaw))
 	var side := fwd.cross(Vector3.UP)
-	casting = true; cast_time = 0.25
-	Sfx.play("bone_break", -2.0, 0.1)
-	for sd in [-1.0, 1.0]:
-		var at: Vector3 = global_position + fwd * 1.8 + side * sd * 1.4
+	var green := Color(0.45, 1.0, 0.5)
+	casting = true; cast_time = 0.45
+	body._last_cast_t = 1.0           # (so the usual quick cast pose doesn't replace this one)
+	body.play_role("Spellcast_Raise", 0.9)
+	Sfx.play("spell", -4.0, 0.1)
+	Sfx.play("rumble", -6.0, 0.1)
+	add_trauma(0.25)
+	FX.shockwave(global_position + Vector3(0, 0.1, 0), green, 5.0, 0.6)
+	FX.flash_light(global_position + Vector3(0, 1.5, 0), green, 6.0, 10.0, 0.6)
+	_raises += 1
+	if _raises <= 3:
+		Game.say("Rise, my servants!", green)
+	for k in 3:
+		var at: Vector3 = global_position + fwd * (1.9 if k != 1 else 2.6) + side * float(k - 1) * 1.6
 		var fl = _floor_at(at)
 		if fl != null:
 			at = fl
-		FX.pillar(at, Color(0.45, 1.0, 0.5), 0.8, 4.0, 0.7)
-		FX.burst(at + Vector3(0, 0.3, 0), Color(0.35, 0.3, 0.25), 30, 3.0, 0.3, 0.8, -6.0)
-		Ally.spawn(self, "skeleton", at + Vector3(0, 0.1, 0), 20.0)
+		_grave_crack(at, green)
+		var a := Ally.spawn(self, "skeleton", at + Vector3(0, 0.1, 0), 24.0)
+		a.rise_t = Ally.RISE_TIME + k * 0.18
+		a._facing = facing
+		get_tree().create_timer(0.15 + k * 0.18, false).timeout.connect(func() -> void:
+			Sfx.play_at("bone_break", at, -4.0, 0.2)
+			FX.burst(at + Vector3(0, 0.3, 0), Color(0.35, 0.3, 0.25), 30, 3.5, 0.3, 0.8, -6.0))
 	return true
+
+## A glowing green crack in the ground that fades away.
+func _grave_crack(at: Vector3, col: Color) -> void:
+	var root := Node3D.new(); get_tree().current_scene.add_child(root); root.global_position = at + Vector3(0, 0.03, 0)
+	var m := FX.beam_material(col, 2.5, 0.9)
+	for k in 5:
+		var mi := MeshInstance3D.new(); var bm := BoxMesh.new()
+		bm.size = Vector3(randf_range(0.6, 1.3), 0.02, 0.07)
+		mi.mesh = bm; mi.material_override = m
+		mi.rotation.y = k * TAU / 5.0 + randf_range(-0.3, 0.3)
+		mi.position = Vector3(cos(-mi.rotation.y), 0, sin(-mi.rotation.y)) * bm.size.x * 0.4
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(mi)
+	var disc := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.55; cm.bottom_radius = 0.55; cm.height = 0.02
+	disc.mesh = cm; disc.material_override = FX.beam_material(Color(0.1, 0.35, 0.12), 1.0, 0.7); root.add_child(disc)
+	var l := OmniLight3D.new(); l.light_color = col; l.light_energy = 2.0; l.omni_range = 3.5; l.position.y = 0.4; root.add_child(l)
+	FX.burst(at + Vector3(0, 0.2, 0), col, 16, 1.5, 0.1, 1.2, 1.5)
+	var tw := root.create_tween()
+	tw.tween_interval(1.6)
+	tw.tween_property(root, "scale", Vector3(0.01, 1, 0.01), 0.8)
+	tw.parallel().tween_property(l, "light_energy", 0.0, 0.8)
+	tw.tween_callback(root.queue_free)
 
 ## Necromancer: green beams drain the life from every foe around you.
 func _soul_drain() -> void:

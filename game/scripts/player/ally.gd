@@ -27,6 +27,9 @@ var _stuck := 0.0              # how long we've been pushing against something
 var _stuck_total := 0.0
 var _side := 0.0               # >0: stepping round an obstacle
 var _side_dir := Vector3.ZERO
+var rise_t := 0.0              # >0: still clawing up out of the ground
+var _rise_anim := false
+const RISE_TIME := 1.4
 
 const STATS := {
 	"wolf": {"speed": 6.8, "range": 1.6, "cd": 0.85, "dmg": 0.55, "knock": 2.0},
@@ -158,6 +161,23 @@ func _physics_process(delta: float) -> void:
 			_vanish()
 			return
 	if _dying:
+		return
+	if rise_t > 0.0:
+		# a risen skeleton digs itself out of the ground before it fights
+		rise_t -= delta
+		var k := 1.0 - clampf(rise_t / RISE_TIME, 0.0, 1.0)
+		if _skel and not _rise_anim:
+			_rise_anim = true
+			_skel.play_role("Spawn_Ground_Skeletons", rise_t)
+		if _vis:
+			_vis.position.y = -0.5 * pow(1.0 - k, 2.0)
+		if fmod(_t, 0.18) < delta:
+			FX.burst(global_position + Vector3(randf_range(-0.3, 0.3), 0.1, randf_range(-0.3, 0.3)), Color(0.32, 0.26, 0.2), 6, 2.5, 0.12, 0.5, -8.0)
+		if rise_t <= 0.0 and _vis:
+			_vis.position.y = 0.0
+			FX.burst(global_position + Vector3(0, 1.0, 0), Color(0.45, 1.0, 0.5), 18, 2.0, 0.12, 0.6, 0.5)
+		velocity = Vector3(0, -2.0, 0)
+		move_and_slide()
 		return
 	var st: Dictionary = STATS[kind]
 	_cd -= delta

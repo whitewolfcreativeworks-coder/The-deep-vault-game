@@ -38,7 +38,7 @@ Courtesy credits: *KayKit by Kay Lousberg (kaylousberg.com)* · *Textures from P
 - All 26 sound effects, ambience loops and music in `game/assets/audio/`, synthesized by `tools/make_audio.py`.
 - The Vault Warden boss model and its animation (procedural, `scripts/player/humanoid.gd`).
 - All level geometry, lighting, particles and UI (built in code).
-- Procedural models built in code: Mr. Bubbles (storm-cloud bear), the bubble trap and soap-bubble shader (`shaders/bubble.gdshader`), the Hail Tower, snowflakes, the Ice Cloud's glazed trees and sun lamps, Adad's weather station, the Sky Gate, the flight-home rings, floating rocks and waterfall; and the playground (merry-go-round, swings, trampoline, street lights), the hot air balloon, chickens and turkeys, the wolf and bear pets, the ghost horses and Pip's paddock, the Bone Crypt (bone bridge, bells, ossuary), the fishing rod, bobber and fish, the forest discoveries, and the Heart of the Vault.
+- Procedural models built in code: Mr. Bubbles (storm-cloud bear), the bubble trap and soap-bubble shader (`shaders/bubble.gdshader`), the Hail Tower, snowflakes, the Ice Cloud's glazed trees and sun lamps, Adad's weather station, the Sky Gate, the flight-home rings, floating rocks and waterfall; the playground (merry-go-round, swings, trampoline, street lights), the climbing walls, lookout deck, bell and zipline, the Necromancer staff's green flame (on the CC0 KayKit skeleton staff), the hot air balloon, chickens and turkeys, the wolf and bear pets, the ghost horses and Pip's paddock, the Bone Crypt (bone bridge, bells, ossuary), the fishing rod, bobber and fish, the forest discoveries, and the Heart of the Vault.
 
 ## Code
 

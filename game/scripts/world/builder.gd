@@ -312,6 +312,15 @@ func _flush_trims() -> void:
 			var probe: float = face + sd * 0.035
 			var pieces: Array = [[float(rq[3]), float(rq[4])]]
 			var cands: Array = (by_z if along_x else by_x).get(int(floor(probe)), [])
+			# the ends of every box near this face line (the wall itself included): a trim
+			# end must not land within a few millimetres of one of them
+			var ends: Array = []
+			for cell in [int(floor(probe)), int(floor(face - sd * 0.02))]:
+				for i in (by_z if along_x else by_x).get(cell, []):
+					var eb: Dictionary = boxes[i]
+					if (eb.hi as Vector3).y > y_lo and (eb.lo as Vector3).y < y_hi:
+						ends.append((eb.lo as Vector3).x if along_x else (eb.lo as Vector3).z)
+						ends.append((eb.hi as Vector3).x if along_x else (eb.hi as Vector3).z)
 			var others: Array = []
 			for i in cands:
 				others.append(boxes[i])
@@ -333,6 +342,11 @@ func _flush_trims() -> void:
 			for pc0 in pieces:
 				# a hair short at each end, so a trim's end is never flush with a wall's end
 				var pc: Array = [float(pc0[0]) + 0.017, float(pc0[1]) - 0.017]
+				for e in ends:
+					if absf(pc[0] - float(e)) < 0.006:
+						pc[0] = float(pc[0]) + 0.012
+					if absf(pc[1] - float(e)) < 0.006:
+						pc[1] = float(pc[1]) - 0.012
 				if pc[1] - pc[0] < 0.25:
 					continue
 				done.append(pc)

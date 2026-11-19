@@ -275,6 +275,8 @@ func _run() -> void:
 			return
 	elif mode == "walls":
 		await _walls_test()
+	elif mode == "nov18b":
+		await _nov18b_test()
 	elif mode == "bluesq":
 		if await _bluesq_test():
 			return
@@ -1926,12 +1928,12 @@ func _looks_test() -> void:
 			for k in c:
 				Game.profile[k] = c[k]
 			m._refresh_preview()
-			for side in [PI, PI + 0.9]:
+			for side in [PI, PI + 0.9, PI + PI / 2.0]:
 				m._preview.rotation.y = side
 				cam.position = Vector3(0, 1.8, 5.2); cam.look_at(Vector3(0, 1.62, 0))
 				await frames(4)
 				await RenderingServer.frame_post_draw
-				m._preview_vp.get_texture().get_image().save_png(out_dir.path_join("k_%s_%d_%s.png" % [hero, i, "f" if side == PI else "s"]))
+				m._preview_vp.get_texture().get_image().save_png(out_dir.path_join("k_%s_%d_%s.png" % [hero, i, "f" if side == PI else ("s" if side < PI + 1.0 else "p")]))
 	# body shapes
 	cam.position = Vector3(0, 1.4, 6.6); cam.look_at(Vector3(0, 1.1, 0))
 	Game.profile.hero = "Rogue"; Game.profile.hair_style = "natural"; Game.profile.face = "none"; Game.profile.skin = 0
@@ -4308,3 +4310,130 @@ func _walls_test() -> void:
 		if sm is ShaderMaterial and (sm as ShaderMaterial).get_shader_parameter("mode") == 3:
 			trims += 1
 	check("walls_have_friezes", trims >= 10, "%d" % trims)
+
+
+## Nov 18 playtest notes (afternoon): the Rogue statue, the climbing corner by the
+## portal, the stair tunnel's walls, and the Necromancer's staff and Raise Dead.
+func _nov18b_test() -> void:
+	Game.profile.hero = "Necromancer"
+	Game.profile.face = "mustache"
+	Game.profile.hair_style = "spiky"
+	await _start()
+	await wait(1.0)
+	god = true
+	var w = main.world
+	# --- the statue faces into the clearing, toward the portal ---
+	var st: Node3D = w.get_node("Playground/RogueStatue")
+	var sf := -st.global_transform.basis.z
+	var tp_dir := Vector3(-21, 0, 25) - st.global_position; tp_dir.y = 0
+	check("n18_statue_faces_clearing", sf.z < -0.7 and sf.dot(tp_dir.normalized()) > 0.6, "fwd %s" % str(sf))
+	await tp(w.spawn_point, w.spawn_yaw)
+	player.zoom_target = 4.5; player.zoom = 4.5; player.snap_view()
+	await wait(1.0)
+	await shot("n18_01_arrival")
+	await tp(w.spawn_point, w.spawn_yaw + 1.2, -0.12)
+	await wait(1.0)
+	await shot("n18_02_left_of_portal")
+	await _look(st.global_position + Vector3(0, 5.5, 0), Vector3(-3.0, 0.1, 20.0), 3.0, 0.1)
+	await shot("n18_03_statue")
+	# --- the green route: walk at each hold and press JUMP to pull yourself up ---
+	var cw: ClimbWall = w.climb
+	check("n18_climb_wall_built", cw != null and cw.green_holds.size() == 8 and cw.red_holds.size() == 8)
+	await tp(Vector3(-17.0, 0.1, 2.45), 0.0)
+	await wait(0.5)
+	var tops: Array = []
+	player.facing = 0.0
+	await tap("jump")
+	await wait(0.7)
+	tops.append(snappedf(player.global_position.y, 0.01))
+	for i in 8:
+		player.yaw = PI / 2; player.facing = PI / 2
+		await tap("jump")
+		await wait(0.7)
+		tops.append(snappedf(player.global_position.y, 0.01))
+	check("n18_green_route_climbs_to_deck", player.global_position.y > ClimbWall.DECK_TOP - 0.2, str(tops))
+	await tp(player.global_position, -2.3, -0.25)
+	player.zoom_target = 6.0; player.zoom = 6.0; player.snap_view()
+	await wait(0.8)
+	await shot("n18_04_top_of_wall")
+	# --- ring the bell ---
+	var g0: int = Game.gold
+	await tp(cw.bell.global_position + Vector3(1.0, 0.1, 0.6), 0.0)
+	face(cw.bell.global_position); player.facing = player.yaw
+	await wait(0.4)
+	await tap("interact")
+	await wait(0.5)
+	check("n18_bell_rings_reward", Game.flags.get("climb_top", false) and Game.gold > g0, "gold %d -> %d" % [g0, Game.gold])
+	# --- the zipline down ---
+	await tp(ClimbWall.ZIP_A - Vector3(0, ClimbWall.HANG - 0.1, 0) + Vector3(-0.6, 0, -0.6), 0.0)
+	face(ClimbWall.ZIP_B); player.facing = player.yaw
+	await wait(0.4)
+	await tap("interact")
+	await wait(0.2)
+	check("n18_zipline_grab", player.vehicle == cw.zipline)
+	await wait(1.1)
+	await shot("n18_05_zipline")
+	for k in 40:
+		if player.vehicle == null:
+			break
+		await wait(0.1)
+	await wait(1.5)
+	var land := Vector2(player.global_position.x - ClimbWall.ZIP_B.x, player.global_position.z - ClimbWall.ZIP_B.z).length()
+	check("n18_zipline_lands", player.vehicle == null and player.is_on_floor() and land < 4.0 and player.global_position.y < 0.5, "%.1f m from the end pole, y %.2f" % [land, player.global_position.y])
+	# --- the red route: jump across each gap ---
+	var made := 0
+	var log := []
+	for i in 7:
+		var h: Node3D = cw.red_holds[i]
+		var nxt: Node3D = cw.red_holds[i + 1]
+		await tp(Vector3(h.global_position.x, float(h.get_meta("top")) + 0.05, h.global_position.z - 0.15), 0.0)
+		await wait(0.3)
+		await tap("jump")
+		await wait(0.07 + 0.08 * (i % 3))     # a quick, a normal and a late second press
+		await tap("jump")
+		await wait(1.0)
+		var ok := absf(player.global_position.y - float(nxt.get_meta("top"))) < 0.15
+		log.append("%d:%s" % [i, "ok" if ok else "%.2f" % player.global_position.y])
+		if ok:
+			made += 1
+	check("n18_red_route_jumpable", made >= 6, str(log))
+	# --- the stair tunnel down into the vault: walls match the stone ceiling ---
+	await tp(Vector3(0, 2.4, -3.0), 0.0, -0.3)
+	player.zoom_target = 3.5; player.zoom = 3.5; player.snap_view()
+	await wait(1.0)
+	await shot("n18_06_tunnel")
+	var space := player.get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(Vector3(0, 1.5, -6.0), Vector3(-5, 1.5, -6.0), 1)
+	var hit := space.intersect_ray(q)
+	var wall_mat = (hit.collider as Node).get_parent().get("material_override") if not hit.is_empty() else null
+	check("n18_tunnel_walls_masonry", wall_mat is ShaderMaterial and absf(hit.position.x + 2.46) < 0.05, str(hit.get("position", "miss")))
+	# --- the Necromancer: a long staff, no shield, and Raise Dead ---
+	var wr: Node = player.body.weapon_root
+	var staff := wr != null and wr.get_child_count() > 0 and String(wr.get_child(0).scene_file_path).contains("Skeleton_Staff")
+	check("n18_necro_has_staff", staff and player.body.offhand_root == null)
+	await tp(Vector3(-4, 0.1, 14), PI)
+	player.posing = true
+	player.facing = 0.0
+	player.zoom_target = 2.6; player.zoom = 2.6; player.pitch = -0.05; player.snap_view()
+	await wait(1.0)
+	await shot("n18_07_necro_front")
+	player.posing = false
+	player.facing = PI
+	var foe := Enemy.new(); foe.configure("revenant", "", 0.0)
+	foe.position = Vector3(-4, 0.2, 19.5)
+	w.add_child(foe)
+	await wait(0.3)
+	player.special_cd = 0.0
+	face(foe.global_position); player.view_yaw = player.yaw; player.facing = player.yaw
+	player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = -0.25; player.snap_view()
+	await wait(0.3)
+	var hp0: float = foe.hp
+	await tap("special")
+	await wait(0.6)
+	await shot("n18_08_skeletons_rising")
+	await wait(1.4)
+	await shot("n18_09_skeletons_risen")
+	var sk := get_tree().get_nodes_in_group("ally").filter(func(a) -> bool: return a.kind == "skeleton")
+	check("n18_three_skeletons_rise", sk.size() == 3, "%d" % sk.size())
+	await wait(4.0)
+	check("n18_skeletons_fight", foe.dead or foe.hp < hp0, "%.0f -> %.0f" % [hp0, foe.hp])

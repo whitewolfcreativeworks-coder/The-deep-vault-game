@@ -67,7 +67,7 @@ const ABILITIES := {
 	"Druid": {"name": "Entangling Roots", "short": "ROOTS", "cd": 8.0, "color": Color(0.45, 0.85, 0.3),
 		"desc": "Thorny roots burst from the ground ahead of you: enemies there are stuck fast and torn by thorns."},
 	"Necromancer": {"name": "Raise Dead", "short": "RAISE", "cd": 14.0, "color": Color(0.45, 1.0, 0.5),
-		"desc": "Two skeleton warriors claw out of the ground and fight for you for a while."},
+		"desc": "The ground cracks with green fire and three skeleton warriors claw their way out to fight for you for a while."},
 	"Beastmaster": {"name": "Sic 'Em!", "short": "SIC 'EM", "cd": 6.0, "color": Color(1.0, 0.65, 0.3),
 		"desc": "Point at an enemy: your wolf pounces on it for a huge stunning bite, and a second wolf joins the hunt."},
 }
