@@ -218,7 +218,46 @@ var _fly_ground_y := 0.0
 var _fly_safe := Vector3.ZERO     # the last spot with ground underneath
 var _fly_warned := false
 
+## The Sky Ride (the flight home): the course sets ride_dir and ride_speed and
+## your dragonfly flies itself forward along it. You steer left and right with
+## the stick, hold FLY to climb and BLOCK to dive (let go and you sink gently),
+## and the camera looks where you're going.
+var ride_dir := Vector3.ZERO
+var ride_speed := 0.0
+var ride_boost := 0.0           # extra speed from a boost ring (fades away)
+
+func _ride_move(delta: float) -> void:
+	flying = true
+	var h := Vector3(ride_dir.x, 0, ride_dir.z)
+	if h.length() < 0.01:
+		h = -Vector3(sin(yaw), 0, cos(yaw))
+	h = h.normalized()
+	var right := Vector3(-h.z, 0, h.x)
+	ride_boost = maxf(0.0, ride_boost - delta * 0.55)
+	var stick := Input.get_vector("move_left", "move_right", "move_forward", "move_back") if input_enabled else Vector2.ZERO
+	var spd := ride_speed * (1.0 + ride_boost) * (1.0 - clampf(stick.y, -1.0, 1.0) * 0.15)
+	var tv := h * spd + right * stick.x * 13.0
+	var k := 1.0 - exp(-6.0 * delta)
+	velocity.x = lerpf(velocity.x, tv.x, k)
+	velocity.z = lerpf(velocity.z, tv.z, k)
+	var climb := input_enabled and Input.is_action_pressed("jump")
+	var dive := input_enabled and Input.is_action_pressed("block") and not climb
+	var follow := ride_dir.y / maxf(Vector2(ride_dir.x, ride_dir.z).length(), 0.25) * spd      # up and down with the course
+	var vy := follow + (9.5 if climb else (-11.0 if dive else -2.8))
+	velocity.y = lerpf(velocity.y, vy, 1.0 - exp(-7.0 * delta))
+	wing_stamina = 1.0
+	wings_tired = false
+	if mount:
+		mount.climbing = climb
+		mount.tired = false
+	var heading := atan2(-h.x, -h.z)
+	yaw = lerp_angle(yaw, heading - stick.x * 0.1, 1.0 - exp(-3.5 * delta))
+	pitch = lerpf(pitch, -0.1 + (0.08 if climb else (-0.14 if dive else 0.0)), 1.0 - exp(-2.0 * delta))
+
 func _dragonfly_move(delta: float, target_v: Vector3) -> void:
+	if ride_dir != Vector3.ZERO:
+		_ride_move(delta)
+		return
 	# snappy steering in the air (the normal air control is for jumps)
 	velocity.x = lerpf(velocity.x, target_v.x, 1.0 - exp(-ACCEL * 0.7 * delta))
 	velocity.z = lerpf(velocity.z, target_v.z, 1.0 - exp(-ACCEL * 0.7 * delta))

@@ -13,6 +13,9 @@ var _bob: Node3D
 var flap_speed := 9.0
 var _orbit: Node3D
 var wing_amp := 0.6
+var _roll: Node3D             # the Hail Golem's body, which rolls as he moves
+var _fists: Array[Node3D] = []
+var _last_pos := Vector3.ZERO
 
 static func make(k: String, flash: Material) -> CreatureLook:
 	var c := CreatureLook.new()
@@ -117,18 +120,79 @@ func _build(flash: Material) -> void:
 			_eyes(_bob, Vector3(0, 1.45, -0.7), 0.25, 0.14, Color(0.6, 0.1, 0.6))
 			wing_amp = 0.0
 		"golem":
-			# a hulking golem of hailstones
-			var ice := _mat(Color(0.8, 0.9, 1.0), 0.25, 0.15)
-			var dark_ice := _mat(Color(0.55, 0.7, 0.9), 0.3)
-			_ball(_bob, 0.8, ice, Vector3(0, 1.4, 0), Vector3(1.2, 1.0, 0.9))
-			_ball(_bob, 0.5, ice, Vector3(0, 2.3, -0.1))
+			# THE HAIL GOLEM: a giant living hailstone. A frosty white core inside
+			# a clear icy shell (real hail grows in layers like an onion), knobbly
+			# lumps and ice crystals sticking out all over, an angry frozen face,
+			# two floating hailstone fists and a swirl of little hailstones. He
+			# rolls when he moves.
+			var core := _mat(Color(0.86, 0.94, 1.0), 0.35, 0.2)
+			var shell := _see(Color(0.4, 0.72, 1.0), 0.38, 0.5)
+			var crystal := _mat(Color(0.35, 0.8, 1.0), 0.15, 1.3)
+			crystal.metallic = 0.3
+			var frost := _mat(Color(0.8, 0.9, 1.0), 0.6, 0.2)
+			_roll = Node3D.new(); _roll.position = Vector3(0, 1.1, 0); _bob.add_child(_roll)
+			_ball(_roll, 1.0, core, Vector3.ZERO)
+			# rings of growth showing through the clear outer layer
+			_ball(_roll, 1.16, shell, Vector3.ZERO)
+			for k in 3:
+				var band := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 1.03; tm.outer_radius = 1.09
+				band.mesh = tm; band.material_override = frost; band.rotation = Vector3(k * 1.1, k * 0.7, k * 0.4)
+				_roll.add_child(band); meshes.append(band)
+			# knobbly lumps all over (seeded, so he looks the same every time)
+			var rng := RandomNumberGenerator.new(); rng.seed = 41
+			for k in 16:
+				var dir := Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1), rng.randf_range(-1, 1)).normalized()
+				if dir.z < -0.55 and absf(dir.y) < 0.6:
+					continue          # (keep his face clear)
+				_ball(_roll, rng.randf_range(0.2, 0.36), core, dir * 1.02)
+			# ice crystals poking out
+			for k in 12:
+				var dir2 := Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.4, 1), rng.randf_range(-1, 1)).normalized()
+				if dir2.z < -0.5 and absf(dir2.y) < 0.6:
+					continue
+				var cr := _cone(_roll, 0.13, rng.randf_range(0.5, 0.9), crystal, dir2 * 1.15)
+				cr.basis = Basis(Quaternion(Vector3.UP, dir2)) * Basis.from_scale(Vector3.ONE)
+				cr.position = dir2 * (1.15 + 0.2)
+			# the face stays at the front while the body rolls
+			var face := Node3D.new(); face.position = Vector3(0, 1.2, -1.0); _bob.add_child(face)
+			var glow := _mat(Color(0.35, 0.75, 1.0), 0.2, 4.0)
 			for sx in [-1.0, 1.0]:
-				_ball(_bob, 0.45, dark_ice, Vector3(sx * 1.05, 1.6, 0))
-				_ball(_bob, 0.42, ice, Vector3(sx * 1.2, 0.9, -0.1))
-				_ball(_bob, 0.4, dark_ice, Vector3(sx * 0.45, 0.4, 0))
-			_eyes(_bob, Vector3(0, 2.35, -0.42), 0.18, 0.1, Color(0.2, 0.5, 1.0))
-			for k in 6:
-				_ball(_bob, 0.18, ice, Vector3(randf_range(-0.8, 0.8), randf_range(1.0, 2.0), randf_range(-0.5, 0.5)))
+				var eye := _ball(face, 0.17, glow, Vector3(sx * 0.33, 0.12, 0.0))
+				eye.scale = Vector3(1.0, 0.7, 0.5)
+				_ball(face, 0.07, _mat(Color(1, 1, 1), 0.2, 2.0), Vector3(sx * 0.3, 0.16, -0.06))
+				# frozen angry brows
+				_slab(face, Vector3(0.42, 0.11, 0.12), crystal, Vector3(sx * 0.32, 0.36, 0.0), Vector3(0, 0, sx * 0.45))
+			# a jagged frown full of icicle teeth
+			_slab(face, Vector3(0.8, 0.2, 0.08), _mat(Color(0.08, 0.15, 0.3), 0.3), Vector3(0, -0.32, 0.02))
+			for k in 5:
+				_cone(face, 0.06, 0.18, _mat(Color(0.95, 0.98, 1.0), 0.2, 0.6), Vector3(-0.3 + k * 0.15, -0.26, -0.02), Vector3(PI, 0, 0))
+			# floating hailstone fists
+			for sx in [-1.0, 1.0]:
+				var fist := Node3D.new(); fist.position = Vector3(sx * 1.55, 1.05, -0.3); _bob.add_child(fist)
+				fist.set_meta("side", sx)
+				_fists.append(fist)
+				_ball(fist, 0.42, core, Vector3.ZERO)
+				_ball(fist, 0.48, shell, Vector3.ZERO)
+				for k in 4:
+					var d3 := Vector3(cos(k * 1.6), sin(k * 2.3), sin(k * 1.6)).normalized()
+					var fc := _cone(fist, 0.07, 0.35, crystal, d3 * 0.55)
+					fc.basis = Basis(Quaternion(Vector3.UP, d3))
+			# a swirl of little hailstones
+			_orbit = Node3D.new(); _bob.add_child(_orbit); _orbit.position.y = 1.1
+			for k in 9:
+				var a := k * TAU / 9.0
+				var hs := _ball(_orbit, rng.randf_range(0.1, 0.18), core, Vector3(cos(a) * 1.9, sin(a * 3.0) * 0.4, sin(a) * 1.9))
+				hs.set_meta("base", hs.position)
+			# frosty snow drifting off him
+			var snow := CPUParticles3D.new(); snow.amount = 40; snow.lifetime = 2.2
+			snow.mesh = FX.quad(0.1); snow.material_override = FX.glow_material(Color(0.9, 0.97, 1.0), 1.0)
+			snow.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; snow.emission_sphere_radius = 1.4
+			snow.direction = Vector3.DOWN; snow.spread = 60; snow.gravity = Vector3(0, -1.0, 0)
+			snow.initial_velocity_min = 0.2; snow.initial_velocity_max = 0.6
+			snow.position.y = 1.3
+			_bob.add_child(snow)
+			var l := OmniLight3D.new(); l.light_color = Color(0.6, 0.85, 1.0); l.light_energy = 1.2; l.omni_range = 7.0
+			l.position.y = 1.4; _bob.add_child(l)
 			wing_amp = 0.0
 		"bear":
 			# MR. BUBBLES: a big fluffy bear made of storm cloud, with glowing eyes, a
@@ -233,6 +297,20 @@ func _process(delta: float) -> void:
 		w.rotation.z = sd * sin(_t * flap_speed) * wing_amp
 	if kind == "mimic":
 		_bob.scale = Vector3.ONE * (1.0 + sin(_t * 3.0) * 0.04)
+	if _roll:
+		# roll along the ground the way he's going (in his own frame)
+		var gp := global_position
+		var mv := gp - _last_pos
+		_last_pos = gp
+		if mv.length() < 2.0:
+			var local := global_transform.basis.inverse() * mv
+			_roll.rotate_x(-local.z / maxf(1.2 * global_transform.basis.get_scale().x, 0.1))
+			_roll.rotate_z(local.x / maxf(1.2 * global_transform.basis.get_scale().x, 0.1))
+		_roll.rotate_y(delta * 0.3)
+		for f in _fists:
+			var sd: float = f.get_meta("side")
+			f.position.y = 1.05 + sin(_t * 2.6 + sd) * 0.18
+			f.rotation.y += delta * 1.5
 	if _orbit:
 		_orbit.rotation.y = _t * 0.9
 		for i in _orbit.get_child_count():

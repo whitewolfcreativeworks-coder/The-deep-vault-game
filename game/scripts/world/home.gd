@@ -1,16 +1,11 @@
 extends Node3D
 class_name HomeWorld
 ## THE FLIGHT HOME: the last quest of the base game. After Mr. Bubbles is calmed,
-## Anu opens the Sky Gate and you ride your dragonfly all the way home, through
-## a flying course at sunset, to the cabin where the adventure began.
-##
-##   1. Sky School: golden rings teach you to fly (JUMP climbs, let go to glide,
-##      BLOCK dives). Green rings rest your dragonfly's wings.
-##   2. The Storm Gate: lightning strikes the rings; watch for the glowing columns.
-##   3. Thunder Bird Rocks: floating rocks where thunder birds nest. They chase
-##      you into the sky: fight them from your dragonfly, or outfly them.
-##   4. The Floating Lake: fly straight through its waterfall.
-##   5. Home Valley: over the mountains and spiral down to the cabin.
+## Anu opens the Sky Gate and you ride your dragonfly all the way home on the
+## SKY RIDE (see SkyRide): an arcade course at sunset, through rings, past
+## lightning, round floating rocks, through a waterfall and under a rainbow, and
+## down into the valley to the cabin where the adventure began. Then the cabin,
+## the yard and the family portal (and Port Home brings you back here later).
 ## Fall into the sea of clouds and your dragonfly catches you at the last ring.
 
 signal area_changed(area: String)
@@ -21,21 +16,20 @@ var spawn_yaw := PI                   # facing +z: towards home
 var env: Environment
 var sun: DirectionalLight3D
 var area := ""
-var rings: Array = []                 # [Node3D, centre, normal, kind ("gold"/"rest"/"home"), passed]
+var rings: Array = []                 # the Sky Ride's rings: [Node3D, centre, normal, kind, passed, radius, missed, s]
 var rings_passed := 0
 var checkpoint := Vector3(0, 200, -1120)
 var landed := false
 var _cloud_mat: ShaderMaterial
 var _puffs: Array = []
 var _scen: IntroMovie
-var _bolts: Array = []                # [centre, timer, column node]
 var _hud: CanvasLayer
-var _ring_label: Label
 var _banner: Label
 var _rng := RandomNumberGenerator.new()
 var _waterfall_x := Vector3.ZERO
 var _splashed := false
 var cabin: HomeCabin
+var ride: SkyRide
 
 const CABIN := Vector3(0, 0, 0)
 const LAND := Vector3(4, 0, 10)
@@ -48,7 +42,6 @@ const PATH := [
 	Vector3(-34, 76, -75), Vector3(-58, 62, -10), Vector3(-42, 48, 46), Vector3(0, 36, 66),
 	Vector3(44, 26, 44), Vector3(52, 16, -2), Vector3(30, 8, -18), Vector3(12, 4, 2),
 ]
-const SECTIONS := [[-1200.0, "SKY SCHOOL"], [-850.0, "THE STORM GATE"], [-640.0, "THUNDER BIRD ROCKS"], [-470.0, "THE FLOATING LAKE"], [-200.0, "HOME VALLEY"]]
 const SEA_Y := 40.0
 
 func build() -> void:
@@ -61,10 +54,7 @@ func build() -> void:
 	cabin = HomeCabin.build_in(self)
 	_cloud_sea()
 	_cloud_island_behind()
-	_course()
-	_storm_gate()
-	_bird_rocks()
-	_floating_lake()
+	ride = SkyRide.build_in(self)
 	_flush_puffs()
 	_make_hud()
 	if Game.is_compat():
@@ -77,6 +67,10 @@ func build() -> void:
 	if Game.quest_state("flight_home") == "done" and rp != Vector3.ZERO and Vector2(rp.x, rp.z).length() < 70.0:
 		landed = true
 		_portal_awake()
+		if ride:
+			ride.finished = true
+			for rg in rings:
+				(rg[0] as Node3D).visible = false
 
 func ground(x: float, z: float) -> Vector3:
 	return Vector3(x, _scen.height(x, z) if _scen else 0.0, z)
@@ -237,129 +231,6 @@ func path_point(t: float) -> Vector3:
 	var p3: Vector3 = PATH[mini(i + 2, n)]
 	return 0.5 * ((2.0 * p1) + (-p0 + p2) * u + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * u * u + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * u * u * u)
 
-func _course() -> void:
-	# rings roughly every 30 m along the path; every fifth one is a green rest ring
-	var samples := 900
-	var acc := 0.0
-	var prev := path_point(0.0)
-	var k := 0
-	for i in range(1, samples):
-		var t := float(i) / samples
-		var p := path_point(t)
-		acc += p.distance_to(prev)
-		prev = p
-		if acc >= 30.0 and t < 0.985:
-			acc = 0.0
-			var ahead := path_point(minf(t + 0.004, 1.0))
-			var nrm := (ahead - p).normalized()
-			var kind := "rest" if k % 5 == 4 else "gold"
-			_ring(p, nrm, kind)
-			k += 1
-	# the last ring: a big welcome-home arch over the yard
-	var home := ground(LAND.x, LAND.z) + Vector3(0, 4.0, 0)
-	_ring(home, (home - path_point(0.97)).normalized() * Vector3(1, 0, 1), "home")
-
-func _ring(at: Vector3, nrm: Vector3, kind: String) -> void:
-	var n := Node3D.new(); add_child(n); n.global_position = at
-	var r := 4.6 if kind != "home" else 6.0
-	var tor := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = r - 0.35; tm.outer_radius = r
-	tm.rings = 32; tm.ring_segments = 10
-	tor.mesh = tm
-	var col := {"gold": Color(1.0, 0.82, 0.35), "rest": Color(0.45, 1.0, 0.6), "home": Color(1.0, 0.6, 0.8)}[kind] as Color
-	tor.material_override = FX.beam_material(col, 2.2, 0.9, false)
-	tor.rotation.x = PI * 0.5                  # the torus lies flat; stand it up to face along +z
-	n.add_child(tor)
-	var nn := nrm.normalized() if nrm.length() > 0.01 else Vector3.BACK
-	n.look_at(at + nn, Vector3.UP if absf(nn.y) < 0.95 else Vector3.RIGHT)
-	var sp := CPUParticles3D.new(); sp.amount = 16; sp.lifetime = 1.4
-	sp.mesh = FX.quad(0.14); sp.material_override = FX.glow_material(col, 2.0)
-	sp.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING; sp.emission_ring_axis = Vector3(0, 0, 1)
-	sp.emission_ring_radius = r; sp.emission_ring_inner_radius = r - 0.4; sp.emission_ring_height = 0.1
-	sp.gravity = Vector3.ZERO; sp.spread = 180; sp.initial_velocity_max = 0.4; sp.color_ramp = FX._fade_ramp(col)
-	n.add_child(sp)
-	if kind == "home":
-		var lbl := Label3D.new(); lbl.text = "WELCOME HOME"; lbl.font_size = 96; lbl.pixel_size = 0.01; lbl.outline_size = 18
-		lbl.modulate = Color(1.0, 0.85, 0.9); lbl.position.y = r + 1.2; lbl.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-		n.add_child(lbl)
-	rings.append([n, at, nn, kind, false, r])
-
-func _ring_step() -> void:
-	var pp := player.global_position + Vector3(0, 1.0, 0)
-	for rg in rings:
-		if rg[4]:
-			continue
-		var c: Vector3 = rg[1]
-		var rel := pp - c
-		var along: float = rel.dot(rg[2])
-		var side := (rel - (rg[2] as Vector3) * along).length()
-		if absf(along) < 1.6 and side < float(rg[5]):
-			rg[4] = true
-			rings_passed += 1
-			var n: Node3D = rg[0]
-			if rg[3] != "home":
-				checkpoint = c
-			match String(rg[3]):
-				"rest":
-					player.wing_stamina = minf(1.0, player.wing_stamina + 0.6)
-					player.wings_tired = false
-					Game.say("A rest ring! Your dragonfly's wings feel fresh again.", Color(0.5, 1.0, 0.65))
-				"home":
-					Game.say("WELCOME HOME! Now land in the yard.", Color(1.0, 0.85, 0.9))
-			Sfx.play("pickup", -4.0, 0.0)
-			FX.burst(c, (Color(1.0, 0.9, 0.5) if rg[3] == "gold" else Color(0.5, 1.0, 0.65)), 40, 6.0, 0.15, 0.6, 0.0)
-			var tw := n.create_tween()
-			tw.tween_property(n, "scale", Vector3.ONE * 1.6, 0.35)
-			tw.tween_property(n, "scale", Vector3.ONE * 0.05, 0.25)
-			tw.tween_callback(n.queue_free)
-			Game.add_gold(3)
-			if rings_passed in [1, 3, 6, 9]:
-				_tutorial(rings_passed)
-
-func _tutorial(n: int) -> void:
-	match n:
-		1: Game.say("Fly through the golden rings! Hold JUMP to climb, let go to glide.", Color(1.0, 0.92, 0.6))
-		3: Game.say("Too high? Hold BLOCK to dive down faster.", Color(1.0, 0.92, 0.6))
-		6: Game.say("Green rings rest your dragonfly's wings. Don't climb too much, or it gets tired!", Color(0.6, 1.0, 0.7))
-		9: Game.say("You're a natural! Follow the rings home.", Color(1.0, 0.92, 0.6))
-
-# ---------------------------------------------------------------------------
-# 2. The Storm Gate: storm clouds and lightning
-func _storm_gate() -> void:
-	for k in 40:
-		var t := _rng.randf_range(0.27, 0.42)
-		var p := path_point(t) + Vector3(_rng.randf_range(-45, 45), _rng.randf_range(8, 24), _rng.randf_range(-10, 10))
-		var r := _rng.randf_range(5.0, 9.0)
-		_puff(p, Vector3(r, r * 0.6, r), Color(0.45, 0.42, 0.55))
-	for k in 6:
-		var t := 0.28 + k * 0.024
-		var c := path_point(t) + Vector3(_rng.randf_range(-6, 6), 0, 0)
-		var col := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 2.6; cm.bottom_radius = 2.6; cm.height = 40.0
-		cm.cap_top = false; cm.cap_bottom = false
-		col.mesh = cm; col.material_override = FX.beam_material(Color(1.0, 0.95, 0.4), 1.5, 0.5, true)
-		col.visible = false; col.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(col); col.global_position = c
-		_bolts.append([c, _rng.randf_range(0.5, 3.0), col])
-
-func _bolt_step(delta: float) -> void:
-	for b in _bolts:
-		b[1] -= delta
-		var col: MeshInstance3D = b[2]
-		if b[1] <= 0.0:
-			if not col.visible:
-				col.visible = true                 # warning: the column glows
-				b[1] = 1.0
-			else:
-				col.visible = false
-				b[1] = _rng.randf_range(2.0, 3.5)
-				var c: Vector3 = b[0]
-				FX.beam(c + Vector3(0, 22, 0), c - Vector3(0, 18, 0), Color(1.0, 0.97, 0.6), 0.5, 0.35)
-				FX.flash_light(c, Color(1.0, 0.95, 0.6), 10.0, 30.0, 0.3)
-				Sfx.play_at("thunder", c, -2.0, 0.1)
-				var pp := player.global_position
-				if Vector2(pp.x - c.x, pp.z - c.z).length() < 3.2 and absf(pp.y - c.y) < 20.0:
-					player.take_damage(Game.max_hp() * 0.12, c, 3.0)
-					Game.say("ZAP! Watch for the glowing columns: lightning strikes there next!", Color(1.0, 0.9, 0.4))
-
 # ---------------------------------------------------------------------------
 # 3. Thunder Bird Rocks
 func _rock(at: Vector3, r: float) -> void:
@@ -375,62 +246,9 @@ func _rock(at: Vector3, r: float) -> void:
 	var cs := CollisionShape3D.new(); var cy := CylinderShape3D.new(); cy.radius = r; cy.height = 1.2
 	cs.shape = cy; sb.add_child(cs); sb.global_position = at - Vector3(0, 0.6, 0)
 
-func _bird_rocks() -> void:
-	for k in 5:
-		var t := 0.46 + k * 0.03
-		var side := -1.0 if k % 2 == 0 else 1.0
-		var at := path_point(t) + Vector3(side * _rng.randf_range(14.0, 20.0), -_rng.randf_range(6.0, 10.0), 0)
-		_rock(at, _rng.randf_range(5.0, 7.0))
-		# a straw nest, and a thunder bird that lives there
-		var nest := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 0.7; tm.outer_radius = 1.2
-		var straw := StandardMaterial3D.new(); straw.albedo_color = Color(0.8, 0.65, 0.35)
-		nest.mesh = tm; nest.material_override = straw; add_child(nest); nest.global_position = at + Vector3(0, 0.15, 0)
-		var e := Enemy.new()
-		e.configure("thunder_bird", "", 0.0)
-		e.position = at + Vector3(0, 0.4, 0)
-		add_child(e)
-
-# ---------------------------------------------------------------------------
-# 4. The Floating Lake and its waterfall
-func _floating_lake() -> void:
-	var t := 0.62
-	var p := path_point(t)
-	var at := p + Vector3(-26.0, 10.0, 0)
-	_rock(at, 16.0)
-	var water := MeshInstance3D.new(); var wc := CylinderMesh.new(); wc.top_radius = 12.0; wc.bottom_radius = 12.0; wc.height = 0.1
-	wc.radial_segments = 32
-	var wm := StandardMaterial3D.new(); wm.albedo_color = Color(0.3, 0.6, 0.9, 0.8); wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	wm.roughness = 0.05; wm.metallic = 0.3; wm.emission_enabled = true; wm.emission = Color(0.1, 0.3, 0.5); wm.emission_energy_multiplier = 0.4
-	water.mesh = wc; water.material_override = wm; add_child(water); water.global_position = at + Vector3(0, 0.05, 0)
-	# the waterfall pours off the east edge, right across the flight path
-	_waterfall_x = Vector3(p.x, at.y, p.z)
-	var fall := CPUParticles3D.new(); fall.amount = 260; fall.lifetime = 2.2
-	fall.mesh = FX.quad(0.3); fall.material_override = FX.glow_material(Color(0.75, 0.88, 1.0), 0.7)
-	fall.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX; fall.emission_box_extents = Vector3(0.6, 0.2, 3.0)
-	fall.direction = Vector3(0.6, -1, 0); fall.spread = 6; fall.initial_velocity_min = 3.0; fall.initial_velocity_max = 5.0
-	fall.gravity = Vector3(0, -14, 0); fall.scale_amount_min = 1.0; fall.scale_amount_max = 2.5
-	add_child(fall); fall.global_position = Vector3(at.x + 16.0, at.y, p.z)
-	var sheet := MeshInstance3D.new(); var qm := QuadMesh.new(); qm.size = Vector2(6.0, 40.0)
-	var sm := StandardMaterial3D.new(); sm.albedo_color = Color(0.7, 0.85, 1.0, 0.35); sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	sm.cull_mode = BaseMaterial3D.CULL_DISABLED; sm.emission_enabled = true; sm.emission = Color(0.5, 0.7, 0.9); sm.emission_energy_multiplier = 0.4
-	sheet.mesh = qm; sheet.material_override = sm; add_child(sheet)
-	sheet.global_position = Vector3(p.x, at.y - 20.0, p.z); sheet.rotation.y = PI * 0.5
-	var mist := CPUParticles3D.new(); mist.amount = 30; mist.lifetime = 3.0
-	mist.mesh = FX.quad(3.0); mist.material_override = FX.glow_material(Color(0.9, 0.95, 1.0), 0.3)
-	mist.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; mist.emission_sphere_radius = 4.0
-	mist.gravity = Vector3(0, 0.5, 0); mist.spread = 180; mist.initial_velocity_max = 1.0
-	add_child(mist); mist.global_position = Vector3(p.x, at.y - 30.0, p.z)
-
 # ---------------------------------------------------------------------------
 func _make_hud() -> void:
 	_hud = CanvasLayer.new(); _hud.layer = 5; add_child(_hud)
-	_ring_label = Label.new()
-	_ring_label.add_theme_font_size_override("font_size", 26)
-	_ring_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.6))
-	_ring_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
-	_ring_label.add_theme_constant_override("outline_size", 8)
-	_ring_label.position = Vector2(24, 300)
-	_hud.add_child(_ring_label)
 	_banner = Label.new()
 	_banner.add_theme_font_size_override("font_size", 54)
 	_banner.add_theme_color_override("font_color", Color(1.0, 0.88, 0.5))
@@ -457,16 +275,7 @@ func _process(_delta: float) -> void:
 		return
 	player.free_flight = true
 	player.kill_y = -60.0
-	var pp := player.global_position
-	var here := ""
-	for sec in SECTIONS:
-		if pp.z > float(sec[0]):
-			here = String(sec[1])
-	if here != area and player.input_enabled and not landed:
-		area = here
-		area_changed.emit(area)
-		_show_banner(area)
-	_ring_label.text = "" if landed else "RINGS  %d / %d" % [rings_passed, rings.size()]
+	# (the Sky Ride shows the score, rings and the names of the parts of the course)
 
 func _physics_process(delta: float) -> void:
 	if player == null or player.dead:
@@ -475,8 +284,9 @@ func _physics_process(delta: float) -> void:
 	# always on your dragonfly while you're up in the sky
 	if not landed and not player.mounted and not player.is_on_floor() and player.input_enabled and pp.z < -10.0:
 		player.mount_up("dragonfly")
-	_ring_step()
-	_bolt_step(delta)
+	# the Sky Ride starts as soon as you're up and away on your dragonfly
+	if ride and not ride.riding and not ride.finished and not landed and player.mounted and player.mount_kind == "dragonfly" and player.input_enabled:
+		ride.start()
 	# through the waterfall
 	if not _splashed and Vector2(pp.x - _waterfall_x.x, pp.z - _waterfall_x.z).length() < 4.0 and pp.y < _waterfall_x.y and pp.y > _waterfall_x.y - 40.0:
 		_splashed = true
@@ -484,7 +294,7 @@ func _physics_process(delta: float) -> void:
 		FX.burst(pp + Vector3(0, 1, 0), Color(0.75, 0.9, 1.0), 60, 6.0, 0.2, 0.6, -4.0)
 		Game.say("SPLASH! Right through the waterfall!", Color(0.7, 0.9, 1.0))
 	# fell into the sea of clouds: your dragonfly swoops you back to the last ring
-	if pp.y < SEA_Y - 6.0 and pp.z < -150.0:
+	if pp.y < SEA_Y - 6.0 and pp.z < -150.0 and pp.y > -20.0:
 		player.global_position = checkpoint + Vector3(0, 1.0, 0)
 		player.velocity = Vector3.ZERO
 		player.wing_stamina = maxf(player.wing_stamina, 0.6)
@@ -497,6 +307,8 @@ func _physics_process(delta: float) -> void:
 
 func _land() -> void:
 	landed = true
+	if ride and ride.riding:
+		ride._finish()
 	player.free_flight = false
 	if player.mounted:
 		player.dismount()
@@ -509,7 +321,7 @@ func _land() -> void:
 			FX.burst(at, Color.from_hsv(randf(), 0.7, 1.0), 70, 9.0, 0.25, 1.2, -2.0)
 			Sfx.play_at("pop", at, -2.0, 0.3))
 	Game.say("You're HOME! %d of %d rings. What an adventure!" % [rings_passed, rings.size()], Color(1.0, 0.88, 0.5))
-	if rings_passed >= rings.size() - 2:
+	if ride and ride.missed <= 2:
 		Game.say("A perfect flight! The sky leaves a gift by the door.", Color(1.0, 0.9, 0.6))
 		Interactable.create(self, "chest", ground(2.5, 6.5), 180.0, "home_chest", [{"roll": "boss", "ilvl": 14}])
 	Game.on_quest_item("home")

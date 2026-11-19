@@ -73,6 +73,16 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### New in the Nov 19 afternoon notes
+- **The Sky Ride: the flight home is its own arcade game.** Your dragonfly now flies itself along the course, about a minute and a half home.
+  - **Controls:** steer left and right with the stick, hold **FLY** (JUMP) to climb and **BLOCK** to dive. Let go and you sink gently, so you time your climbs into the high rings.
+  - **Rings:** gold rings for points, blue **BOOST** rings for a burst of speed, and rainbow **STAR** rings worth five gold ones.
+  - **Streaks:** every ring in a row raises your **streak**, which multiplies your points (up to x3); miss one and it starts again. The chime climbs higher the longer your streak.
+  - **The course:** weave past the lightning at the Storm Gate, corkscrew round Thunder Bird Rocks, fly through the waterfall and under a giant rainbow, then spiral down Home Valley past paper lanterns and hot air balloons.
+  - **Looks:** a rainbow trail behind you, wind streaking past, and fireworks at the end.
+  - **The end:** your score and a **medal** (bronze, silver, gold, or rainbow for every ring), and your best score is kept.
+- **The Hail Golem is a giant hailstone**: a frosty ball in a clear icy shell, bristling with ice crystals, with an angry frozen face, icicle teeth, two floating hailstone fists and a swirl of little hailstones. He rolls when he moves.
+
 ### New in the Nov 19 notes
 - **Weapons away when you're not fighting.**
   - Your weapon and shield ride on your back: a staff stands over your shoulder, a sword hangs hilt-up across your back, and a shield lies flat under it.

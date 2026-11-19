@@ -162,6 +162,34 @@ func _run() -> void:
 		await _faces2_test()
 	elif mode == "sheath":
 		await _sheath_test()
+	elif mode == "bosslook":
+		await _start()
+		player = main.player
+		god = true
+		await tp(Vector3(0, 0.2, 24), 0.0, -0.05)
+		var bosses := []
+		for b in [["hail_golem", Vector3(-4, 0.2, 14)], ["mr_bubbles", Vector3(5, 0.2, 13)]]:
+			var e := Enemy.new()
+			e.configure(b[0], "", 0.0)
+			e.position = b[1]
+			main.world.add_child(e)
+			bosses.append(e)
+		await wait(1.0)
+		for e in bosses:
+			e.set_physics_process(false)
+		player.zoom_target = 7.0; player.zoom = 7.0; player.snap_view()
+		await wait(0.8)
+		await shot("bl_bosses")
+		await tp(Vector3(-4, 0.2, 19.5), 0.0, 0.05)
+		player.zoom_target = 2.5; player.zoom = 2.5; player.snap_view()
+		await wait(0.6)
+		await shot("bl_hail_close")
+		# rolling: walk him forward a bit
+		var g: Enemy = bosses[0]
+		g.set_physics_process(true)
+		await wait(1.5)
+		await shot("bl_hail_moving")
+		check("bl_hail_built", g.look != null and g.look._roll != null)
 	elif mode == "special":
 		await _special_test()
 	elif mode == "combat2":
@@ -4476,37 +4504,60 @@ func _homeflight_test() -> bool:
 	var shot_done := {}
 	var t0 := Time.get_ticks_msec()
 	var lowest := 9999.0
-	var next_i := 0
+	var boost_shot := false
+	var ride: SkyRide = w.ride
+	await wait(2.0)
+	check("hf_sky_ride_started", ride.riding, str(ride.riding))
 	while Time.get_ticks_msec() - t0 < 900000 and not w.landed:
-		# aim for the next ring we haven't flown through
-		while next_i < w.rings.size() and w.rings[next_i][4]:
-			next_i += 1
-		var target: Vector3 = w.rings[next_i][1] if next_i < w.rings.size() else w.ground(HomeWorld.LAND.x, HomeWorld.LAND.z)
+		var target := w.ground(HomeWorld.LAND.x, HomeWorld.LAND.z)
+		var next_i := -1
+		for i in w.rings.size():
+			if not w.rings[i][4] and not w.rings[i][6]:
+				next_i = i
+				break
+		if next_i >= 0:
+			target = w.rings[next_i][1]
 		var pp := player.global_position + Vector3(0, 1.0, 0)
 		var d := target - pp
-		if next_i < w.rings.size() and Vector2(d.x, d.z).length() < 1.5 and absf(d.y) > 4.0:
-			w.rings[next_i][4] = true          # (can't get the height right: count it as missed and go on)
-			continue
-		player.yaw = atan2(-d.x, -d.z); player.view_yaw = player.yaw
-		Input.action_press("move_forward")
-		if next_i >= w.rings.size():
-			Input.action_release("jump")
-			Input.action_press("block") if d.y < -2.0 else Input.action_release("block")
-		elif d.y > 0.8:
-			Input.action_release("block"); Input.action_press("jump")
-		elif d.y < -2.5 and Vector2(d.x, d.z).length() < 30.0:
-			Input.action_release("jump"); Input.action_press("block")
+		if ride.riding:
+			# steer like a player: left/right with the stick, FLY to climb, BLOCK to dive
+			var f := ride.forward(ride.ride_s + 10.0)
+			var lat := d.dot(ride.right_of(f))
+			if lat > 0.6:
+				Input.action_release("move_left"); Input.action_press("move_right")
+			elif lat < -0.6:
+				Input.action_release("move_right"); Input.action_press("move_left")
+			else:
+				Input.action_release("move_left"); Input.action_release("move_right")
+			if d.y > 0.5:
+				Input.action_release("block"); Input.action_press("jump")
+			elif d.y < -1.0:
+				Input.action_release("jump"); Input.action_press("block")
+			else:
+				Input.action_release("jump"); Input.action_release("block")
 		else:
-			Input.action_release("jump"); Input.action_release("block")
+			# the ride's over: glide down and land in the yard
+			for a in ["move_left", "move_right", "jump"]:
+				Input.action_release(a)
+			player.yaw = atan2(-d.x, -d.z); player.view_yaw = player.yaw
+			Input.action_press("move_forward")
+			Input.action_press("block") if d.y < -2.0 else Input.action_release("block")
 		lowest = minf(lowest, player.global_position.y)
 		if shots.has(w.area) and not shot_done.has(w.area):
 			shot_done[w.area] = true
-			player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.15
 			await shot(shots[w.area])
-		await wait(0.1)
-	for a in ["move_forward", "jump", "block"]:
+		if not boost_shot and player.ride_boost > 0.5:
+			boost_shot = true
+			await shot("hf_04b_boost")
+		if ride.finished and not shot_done.has("results"):
+			shot_done["results"] = true
+			await wait(0.6)
+			await shot("hf_05b_results")
+		await wait(0.05)
+	for a in ["move_forward", "move_left", "move_right", "jump", "block"]:
 		Input.action_release(a)
-	print("HF rings %d / %d, lowest %.1f, landed %s, at %s" % [w.rings_passed, w.rings.size(), lowest, w.landed, player.global_position])
+	print("HF rings %d / %d, missed %d, score %d of %d, best streak %d, lowest %.1f, landed %s, at %s" % [w.rings_passed, w.rings.size(), ride.missed, ride.score, ride.max_score, ride.best_streak, lowest, w.landed, player.global_position])
+	check("hf_score_and_medal", ride.score > 0 and int(Game.flags.get("sky_ride_best", 0)) == ride.score, "%d %s" % [ride.score, Game.flags.get("sky_ride_medal", "")])
 	check("hf_flew_the_rings", w.rings_passed >= int(w.rings.size() * 0.7), "%d / %d" % [w.rings_passed, w.rings.size()])
 	check("hf_landed_home", w.landed, str(player.global_position))
 	await wait(1.0)

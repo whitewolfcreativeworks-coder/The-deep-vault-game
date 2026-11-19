@@ -48,6 +48,19 @@ func play(name: String, vol_db := 0.0, pitch_var := 0.06) -> void:
 			p.play()
 			return
 
+## Play at an exact pitch (the Sky Ride's ring chime climbs with your streak).
+func play_pitched(name: String, vol_db := 0.0, pitch := 1.0) -> void:
+	var st := get_stream(name)
+	if st == null:
+		return
+	for p in _pool:
+		if not p.playing:
+			p.stream = st
+			p.volume_db = vol_db
+			p.pitch_scale = pitch
+			p.play()
+			return
+
 func play_at(name: String, pos: Vector3, vol_db := 0.0, pitch_var := 0.08, size := 6.0) -> void:
 	var s := get_stream(name)
 	var tree := get_tree()

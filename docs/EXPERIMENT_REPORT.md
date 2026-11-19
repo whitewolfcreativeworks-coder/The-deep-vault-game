@@ -812,3 +812,26 @@ The `castle5` bot now plays it by watching the tension. It also checks both ways
 - The food placed on barrels and crates used the engine's global random shuffle, so it changed from run to run, and could land right beside the dungeon lever. It now uses the level's own seeded generator, and never goes within 3.5 m of a lever, door or chest (where it would steal USE).
 - Since the fire vents were made hotter, the `flow` test's 3.6-second stand in the fire could kill a level 2 hero. Everything after that failed, which looked like a sheathing bug at first. The test now steps out as soon as it gets burned.
 
+## Follow-up 24: the Sky Ride and the Hail Golem (Nov 19)
+
+The designer played the whole game through. His verdict on the flight home: "a great idea", but slow, long and plain. "That whole scene about the ride home should be a video game in itself."
+
+**The Sky Ride** (`scripts/world/sky_ride.gd`) is a rail-style flyer built on the existing course spline:
+- **Arc-length table:** the Catmull-Rom path has 3,000 samples, so rings and scenery are placed in metres along the course, offset sideways and up.
+- **Riding:** each physics frame the ride finds where you are on the course and points the dragonfly along it (a `ride_dir` and `ride_speed` on the player, 17–21 m/s, plus boosts). The stick only steers sideways, and FLY/BLOCK move you up and down relative to the course.
+- **A soft corridor** turns you back if you wander more than about 15 m off the line.
+- **Rings:** 43 in five patterns (straight, slalom, weave, corkscrew, dives and climbs), each ring 30–34 m (about 1.5 s) from the next. That's well inside what the climb, dive and steering rates can cover.
+- **Score:** each ring scores its base points times (1 + streak/10, capped at 3). The maximum score is worked out when the course is built, and medals are fractions of it.
+
+Two looks fixes after the first test shots:
+- The additive glow materials washed out to white against the pale sunset sky, so the rings and rainbow trail now use plain colours.
+- The camera's "high" view (past 4.5 m) looked down at the clouds, so the ride holds it just behind you.
+
+The `homeflight` bot now flies like a player (sideways input plus FLY/BLOCK toward the next ring). It scored 40 of 43 rings, a gold medal, and a 33-ring streak.
+
+**The Hail Golem** used the same ball-built "humanoid" shape as Mr. Bubbles. He is now a hailstone:
+- a core inside a translucent shell, with growth bands showing through, the way real hail forms in layers;
+- seeded lumps and ice-crystal cones;
+- a face that stays in front while the body rolls with his movement;
+- floating fists and orbiting hailstones.
+
