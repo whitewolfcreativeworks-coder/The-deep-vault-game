@@ -14,6 +14,10 @@ const JUMP_V := 7.0          # a tap: a modest hop
 const DOUBLE_JUMP_V := 11.0  # tap again in the air: a big boosted jump
 # Cloud Island physics (set by the world every frame; 1 / 0 / none elsewhere)
 var gravity_mult := 1.0      # floaty < 1 < heavy
+# Insane mode's wild events (InsaneChaos): moon gravity, back-to-front steering, boing
+var chaos_gravity := 1.0
+var mirror_t := 0.0
+var bouncy_t := 0.0
 var jump_mult := 1.0
 var fall_cap := 60.0         # fastest you can fall (floaty skins drift down)
 var lift := -999.0           # a bubble carrying you: target vertical speed (none below -100)
@@ -605,6 +609,8 @@ func _physics_process(delta: float) -> void:
 		else:
 			_handle_actions()
 			var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+			if mirror_t > 0.0:
+				iv.x = -iv.x        # MIRROR WORLD: left is right!
 			if Input.is_action_just_pressed("auto_run"):
 				set_auto_run(not auto_run)
 			if auto_run:
@@ -683,7 +689,7 @@ func _physics_process(delta: float) -> void:
 	elif lift > -100.0:
 		velocity.y = lerpf(velocity.y, lift, 1.0 - exp(-4.0 * delta))    # riding a bubble
 	elif not is_on_floor():
-		velocity.y -= GRAVITY * gravity_mult * delta
+		velocity.y -= GRAVITY * gravity_mult * chaos_gravity * delta
 		velocity.y = maxf(velocity.y, -fall_cap)
 	move_and_slide()
 	if global_position.y < kill_y:
@@ -781,6 +787,11 @@ func _update_timers(delta: float) -> void:
 			hurt_time = -1.0
 	_attack_buffer -= delta
 	_weapon_tick(delta)
+	mirror_t = maxf(0.0, mirror_t - delta)
+	if bouncy_t > 0.0:
+		bouncy_t -= delta
+		if is_on_floor() and not mounted and vehicle == null and velocity.y <= 0.5:
+			velocity.y = 10.0         # BOING!
 	stamina_delay -= delta
 	if stamina_delay <= 0.0 and not blocking:
 		Game.stamina = minf(Game.max_stamina(), Game.stamina + 30.0 * delta * (1.7 if Game.has_buff("fed") else 1.0))
@@ -1118,6 +1129,7 @@ func drink_stamina_potion() -> void:
 func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false) -> void:
 	if dead or invuln > 0.0:
 		return
+	amount *= Game.mode_value("dmg")       # Hard and Insane hit harder
 	draw_weapon()
 	var to_src := from_pos - global_position
 	to_src.y = 0

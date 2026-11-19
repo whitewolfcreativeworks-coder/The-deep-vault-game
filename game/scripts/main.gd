@@ -61,6 +61,13 @@ func _ready() -> void:
 	rainbow = RainbowVision.new()
 	add_child(rainbow)
 	rainbow.player = player
+	# INSANE mode: wild things happen every half a minute or so
+	if Game.mode == "insane" and Game.zone != "home":
+		chaos = InsaneChaos.new()
+		chaos.player = player
+		chaos.world = world
+		chaos.process_mode = Node.PROCESS_MODE_PAUSABLE
+		add_child(chaos)
 	hud.visible = false
 	menus = Menus.new()
 	add_child(menus)
@@ -367,6 +374,8 @@ func _check_forest_done() -> void:
 		won = "home"
 	if won != "":
 		Game.flags[won + "_won"] = true
+		if won == "home":
+			Game.flags["adventure_done"] = true      # the family portal now offers a new adventure
 		Game.set_objective(Game.forest_objective())
 		autosave()
 		get_tree().create_timer(2.5).timeout.connect(func() -> void:
@@ -424,7 +433,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		if menus.current == "designer":
 			menus.designer.close(false)      # Esc steps back out of the Skin Designer
-		elif menus.current == "ask" and _ask_cancel.is_valid():
+		elif menus.current in ["ask", "modes"] and _ask_cancel.is_valid():
 			_ask_cancel.call()
 		elif menus.current in ["pause", "inventory", "lore", "stash", "ask"]:
 			_resume()
@@ -485,6 +494,7 @@ func hide_boss_bar() -> void:
 
 # --- Port Home ----------------------------------------------------------------------
 var _ask_cancel: Callable      # what Esc does on a question
+var chaos: InsaneChaos
 ## The HOME button (or Y): once unlocked, back to your cabin from anywhere. The
 ## family portal in the yard can then take you back to where you were.
 func ask_port_home() -> void:
@@ -523,25 +533,53 @@ func _port_home() -> void:
 func family_portal_choice(stay: Callable) -> void:
 	var pf: Dictionary = Game.flags.get("port_from", {})
 	var there: String = Game.PLACE_NAMES.get(String(pf.get("zone", "")), "where you were")
+	var done := bool(Game.flags.get("adventure_done", false)) or bool(Game.flags.get("home_won", false))
 	_ask_cancel = func() -> void:
 		_resume()
 		stay.call()
-	menus.ask("The family portal", "Where would you like to go?", [
-		["Back to " + there, func() -> void:
+	var opts: Array = []
+	if not pf.is_empty():
+		opts.append(["Back to " + there, func() -> void:
 			menus.close_all(); get_tree().paused = false
-			_port_back()],
-		["The Vault outpost", func() -> void:
-			Game.flags.erase("port_from")
-			menus.close_all(); get_tree().paused = false
-			player.set_mouse_captured(true)
-			FX.screen_flash(Color(0.85, 1.0, 0.95), 1.0, 1.2)
-			Sfx.play("portal", 0.0, 0.0)
-			go_to_vault()],
-		["Stay home", func() -> void:
-			_resume()
-			stay.call()]])
+			_port_back()])
+	if done:
+		opts.append(["A new adventure!", func() -> void:
+			_ask_mode(stay)])
+	opts.append(["Visit the Vault outpost" if done else "The Vault outpost", func() -> void:
+		Game.flags.erase("port_from")
+		menus.close_all(); get_tree().paused = false
+		player.set_mouse_captured(true)
+		FX.screen_flash(Color(0.85, 1.0, 0.95), 1.0, 1.2)
+		Sfx.play("portal", 0.0, 0.0)
+		go_to_vault()])
+	opts.append(["Stay home", func() -> void:
+		_resume()
+		stay.call()])
+	var text := "Where would you like to go?"
+	if done:
+		text += "\n\nA new adventure starts it all again from the Vault outpost, in Normal, Hard or INSANE mode."
+	menus.ask("The family portal", text, opts)
 	get_tree().paused = true
 	player.set_mouse_captured(false)
+
+## Pick Normal, Hard or Insane, with or without your gear.
+func _ask_mode(stay: Callable) -> void:
+	_ask_cancel = func() -> void:
+		_resume()
+		stay.call()
+	menus.choose_mode(func(m: String, geared: bool) -> void: start_new_adventure(m, geared), _ask_cancel)
+
+## A whole new adventure from the Vault outpost (you keep your level and gold).
+func start_new_adventure(m: String, geared: bool) -> void:
+	menus.close_all()
+	get_tree().paused = false
+	player.input_enabled = false
+	Sfx.play("portal", 0.0, 0.0)
+	FX.screen_flash(Color(1.0, 0.95, 0.85), 1.0, 1.2)
+	await menus.fade_to(1.0, 0.9).finished
+	Game.new_adventure(m, geared)
+	Game.set_meta("arrive_say", "A NEW ADVENTURE: %s mode%s! Good luck, %s." % [Game.mode_name(), "" if geared else " (your gear waits in the chest at home)", Game.profile.name])
+	_travel("vault")
 
 func _port_back() -> void:
 	var pf: Dictionary = Game.flags.get("port_from", {})

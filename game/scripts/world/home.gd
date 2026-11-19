@@ -64,7 +64,8 @@ func build() -> void:
 	# already home (a saved game after the flight, continuing by the cabin or in it):
 	# no flying, the portal is awake. (Through the Sky Gate again, you fly again.)
 	var rp := Game.resume_pos
-	if Game.quest_state("flight_home") == "done" and rp != Vector3.ZERO and Vector2(rp.x, rp.z).length() < 70.0:
+	var home_done: bool = Game.quest_state("flight_home") == "done" or Game.flags.get("adventure_done", false)
+	if home_done and rp != Vector3.ZERO and Vector2(rp.x, rp.z).length() < 70.0:
 		landed = true
 		_portal_awake()
 		if ride:
@@ -149,7 +150,8 @@ func _valley() -> void:
 		if bd.is_in_group("player") and landed:
 			pa.set_deferred("monitoring", false)
 			var sc := get_tree().current_scene
-			if not Game.flags.get("port_from", {}).is_empty() and sc.has_method("family_portal_choice"):
+			var done: bool = Game.flags.get("adventure_done", false) or Game.flags.get("home_won", false)
+			if (done or not Game.flags.get("port_from", {}).is_empty()) and sc.has_method("family_portal_choice"):
 				# you ported home from somewhere: back there, or to the Vault outpost?
 				sc.family_portal_choice(func() -> void:
 					# stayed home: step back out of the portal; it wakes again in a moment

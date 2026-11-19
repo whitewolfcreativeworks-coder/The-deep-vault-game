@@ -38,6 +38,8 @@ var _step_acc := 0.0
 var summon_callback: Callable
 
 func _ready() -> void:
+	max_hp *= Game.mode_value("boss_hp")
+	hp = max_hp
 	add_to_group("damageable")
 	add_to_group("enemy")
 	add_to_group("boss")

@@ -315,6 +315,9 @@ func _run() -> void:
 			return
 	elif mode == "shroomvis":
 		await _shroomvis_test()
+	elif mode == "modes":
+		if await _modes_test():
+			return
 	elif mode == "porthome":
 		if await _porthome_test():
 			return
@@ -4802,6 +4805,112 @@ func _shroomvis_test() -> void:
 	Game.shroom = 1.3
 	await wait(14.0)
 	check("sv_wears_off", Game.shroom < 0.05, "%.2f" % Game.shroom)
+
+## Replay modes: after the first adventure the family portal offers a new one;
+## Insane + start fresh: gear to the chest, tougher (and odd) monsters, twins,
+## harder hits, and the kitchen-sink events.
+func _modes_test() -> bool:
+	var phase := int(Game.get_meta("md_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("md_phase", 1)
+		Game.level = 16
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		Game.flags["adventure_done"] = true
+		for k in 4:
+			var id := Loot.make_random(14, 0.5, 2)
+			Game.add_item(id, true)
+		Game.set_meta("md_bag", Game.inventory.size())
+		Game.set_meta("md_gold", Game.gold)
+		Game.resume_pos = HomeCabin.arrival()
+		main._travel("home", HomeCabin.arrival(), 0.0)
+		return true
+	if phase == 1:
+		Game.set_meta("md_phase", 2)
+		await wait(2.5)
+		player = main.player
+		god = true
+		var w: HomeWorld = main.world
+		check("md_home_landed", w.landed, str(w.landed))
+		await tp(w.ground(IntroMovie.PORTAL.x, IntroMovie.PORTAL.z) + Vector3(0, 0.3, 0), 0.0)
+		await wait(0.8)
+		var has_new := false
+		for b in main.menus._ask_btns.get_children():
+			if (b as Button).text.begins_with("A new adventure"):
+				has_new = true
+		check("md_portal_offers_new_adventure", main.menus.current == "ask" and has_new, main.menus.current)
+		_ask_press("A new adventure")
+		await wait(0.4)
+		check("md_mode_panel", main.menus.current == "modes", main.menus.current)
+		await shot("md_01_modes")
+		main.menus._mode_pick.call("insane", false)
+		return true
+	await wait(3.0)
+	player = main.player
+	god = true
+	var bag0: int = Game.get_meta("md_bag", 0)
+	check("md_insane_new_run", Game.mode == "insane" and Game.zone == "vault" and Game.quests.is_empty() and Game.flags.get("adventure_done", false), "%s %s %d" % [Game.mode, Game.zone, Game.quests.size()])
+	check("md_keeps_level", Game.level == 16, "%d" % Game.level)
+	check("md_fresh_gear_in_chest", Game.equipped.weapon == "rusty_sword" and Game.stash.size() >= bag0 - 2 and Game.inventory.size() <= 3, "bag %d -> %d, chest %d, weapon %s" % [bag0, Game.inventory.size(), Game.stash.size(), Game.equipped.weapon])
+	check("md_hud_says_insane", main.hud.name_label.text.contains("INSANE"), main.hud.name_label.text)
+	await wait(1.0)
+	var es := get_tree().get_nodes_in_group("enemy")
+	var twins := 0
+	var odd := 0
+	var minion_hp := 0.0
+	for e in es:
+		if e is Enemy:
+			if String((e as Enemy).uid).ends_with("+"):
+				twins += 1
+			if (e as Enemy).oddity != "":
+				odd += 1
+			if (e as Enemy).type_id == "minion" and (e as Enemy).oddity == "":
+				minion_hp = (e as Enemy).max_hp
+	print("MODES enemies %d twins %d odd %d minion hp %.0f" % [es.size(), twins, odd, minion_hp])
+	check("md_more_monsters", twins >= 3, "%d twins of %d" % [twins, es.size()])
+	check("md_odd_monsters", odd >= 2, "%d" % odd)
+	check("md_tougher", minion_hp >= 48.0 * 2.8, "%.0f" % minion_hp)
+	var d0 := player.damage_taken
+	god = false
+	player.invuln = 0.0
+	player.take_damage(10.0, player.global_position + Vector3(0, 0, -1), 0.0)
+	god = true
+	check("md_hits_harder", player.damage_taken - d0 > Game.mitigate(10.0) * 1.8, "%.1f" % (player.damage_taken - d0))
+	var ch: InsaneChaos = main.chaos
+	check("md_chaos_running", ch != null)
+	if ch:
+		await tp(Vector3(0, 0.2, 24), 0.0, -0.15)
+		player.zoom_target = 6.0; player.zoom = 6.0; player.snap_view()
+		var fowl0 := get_tree().get_nodes_in_group("damageable").size()
+		var gold0 := Game.gold
+		var enemies0 := get_tree().get_nodes_in_group("enemy").size()
+		for ev in InsaneChaos.EVENTS:
+			ch.fire(ev)
+			await wait(0.6)
+			match ev:
+				"moon":
+					check("md_ev_moon", player.chaos_gravity < 0.5)
+				"mirror":
+					check("md_ev_mirror", player.mirror_t > 5.0)
+				"boing":
+					check("md_ev_boing", player.bouncy_t > 5.0)
+				"rainbow":
+					check("md_ev_rainbow", Game.shroom > 3.0)
+			if ev in ["meteors", "chickens", "disco", "giants", "monsters"]:
+				await wait(1.2)
+				await shot("md_ev_" + ev)
+		await wait(3.5)
+		check("md_ev_gold", Game.gold > gold0 or get_tree().get_nodes_in_group("pickup").size() > 0, "%d -> %d" % [gold0, Game.gold])
+		check("md_ev_monsters", get_tree().get_nodes_in_group("enemy").size() > enemies0, "%d -> %d" % [enemies0, get_tree().get_nodes_in_group("enemy").size()])
+		check("md_ev_chickens", get_tree().get_nodes_in_group("damageable").size() > fowl0, "%d" % get_tree().get_nodes_in_group("damageable").size())
+		check("md_events_count", ch.events_fired >= InsaneChaos.EVENTS.size())
+	main.autosave()
+	check("md_mode_saved", String(Game.read_slot(Game.active_slot).get("mode", "")) == "insane")
+	return false
 
 ## Port Home: from the Vault to the cabin, home again from the yard, and back
 ## through the family portal to the very spot you left.

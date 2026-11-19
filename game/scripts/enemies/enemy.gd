@@ -144,6 +144,11 @@ var _summoned := false
 var _summoned2 := false
 var hp_mult := 1.0          # set before add_child: tougher versions (e.g. underground goblins)
 var dmg_mult := 1.0
+## Insane mode: some monsters are odd. "giant" (big and tough), "speedy" (fast),
+## "splitter" (bursts into two little ones). mini = one of those little ones.
+var oddity := ""
+var mini := false
+var _base_hp_mult := 1.0
 var _enraged := false
 var _los_t := 0.0
 var _los_ok := true
@@ -163,6 +168,15 @@ func configure(type_name: String, id: String, wake_range := 0.0) -> void:
 
 func _ready() -> void:
 	t = TYPES[type_id]
+	_base_hp_mult = hp_mult
+	var boss := bool(t.get("heavy", false)) or int(t.xp) >= 900
+	hp_mult *= Game.mode_value("boss_hp" if boss else "hp")
+	if Game.mode == "insane" and not boss and not mini and oddity == "" and randf() < 0.3:
+		oddity = ["giant", "speedy", "splitter"].pick_random()
+	if oddity == "giant":
+		hp_mult *= 1.6
+	if mini:
+		hp_mult *= 0.3
 	# The deeper into the game, the tougher: foes grow when you out-level their
 	# zone, and again as you finish more of that zone's quests.
 	var over := maxi(0, Game.level - Game.zone_level())
@@ -172,11 +186,20 @@ func _ready() -> void:
 			done += 1
 	hp_mult *= (1.0 + 0.1 * minf(over, 10.0)) * (1.0 + 0.05 * done)
 	dmg_mult *= (1.0 + 0.07 * minf(over, 10.0)) * (1.0 + 0.03 * done)
-	if hp_mult != 1.0 or dmg_mult != 1.0:
+	if hp_mult != 1.0 or dmg_mult != 1.0 or Game.mode != "normal" or oddity != "" or mini:
 		t = t.duplicate()
 		t.hp = float(t.hp) * hp_mult
-		t.dmg = float(t.dmg) * dmg_mult
-	display_name = t.name
+		t.dmg = float(t.dmg) * dmg_mult * (1.3 if oddity == "giant" else 1.0)
+		t.speed = float(t.speed) * Game.mode_value("speed") * (1.6 if oddity == "speedy" else (1.15 if mini else 1.0))
+		var rw := Game.mode_value("reward") * (0.3 if mini else 1.0)
+		t.xp = int(float(t.xp) * rw)
+		var g0: Array = t.gold
+		t.gold = [int(float(g0[0]) * rw), maxi(1, int(float(g0[1]) * rw))]
+		if oddity == "giant":
+			t.scale = float(t.scale) * 1.4
+		elif mini:
+			t.scale = float(t.scale) * 0.6
+	display_name = {"giant": "Giant ", "speedy": "Speedy ", "splitter": "Splitting "}.get(oddity, "Little " if mini else "") + String(t.name)
 	add_to_group("enemy")
 	add_to_group("damageable")
 	collision_layer = 4
@@ -213,6 +236,12 @@ func _ready() -> void:
 		_spectral.call_deferred()
 	leash = t.get("leash", leash)
 	home = global_position
+	if oddity != "":
+		_oddity_look.call_deferred()
+	# Hard and Insane: more monsters (a twin turns up beside many of them)
+	if Game.mode != "normal" and not boss and not mini and uid != "" and not uid.ends_with("+"):
+		if float(absi(hash(uid)) % 100) < Game.mode_value("twins") * 100.0 and not Game.flags.get(uid + "+", false):
+			_spawn_twin.call_deferred()
 	facing = rotation.y
 	rotation.y = 0
 	body.rotation.y = facing
@@ -1153,11 +1182,48 @@ func _die(away: Vector3) -> void:
 		Game.flags[uid] = true
 	Game.on_enemy_killed(type_id, uid)
 	_drop_loot()
+	if oddity == "splitter":
+		for k in 2:
+			var e := Enemy.new()
+			e.configure(type_id, "", 0.0)
+			e.mini = true
+			e.hp_mult = _base_hp_mult
+			get_parent().add_child.call_deferred(e)
+			var at := global_position + Vector3(cos(k * PI) * 1.2, 0.3, sin(k * PI + 0.5) * 1.2)
+			e.set_deferred("global_position", at)
+		FX.burst(global_position + Vector3(0, 1.0, 0), Color(1.0, 0.3, 0.9), 40, 4.0, 0.2, 0.7, 0.0)
 	died.emit(self)
 	var tw := create_tween()
 	tw.tween_interval(3.0)
 	tw.tween_property(body, "position:y", -1.2, 1.5)
 	tw.tween_callback(queue_free)
+
+## A twin for Hard and Insane mode, right beside the original.
+func _spawn_twin() -> void:
+	if not is_inside_tree() or get_parent() == null:
+		return
+	var e := Enemy.new()
+	e.configure(type_id, uid + "+", dormant_wake)
+	e.hp_mult = _base_hp_mult
+	e.dmg_mult = dmg_mult
+	var a := float(absi(hash(uid)) % 628) / 100.0
+	var off := Vector3(cos(a), 0, sin(a)) * 2.2
+	get_parent().add_child(e)
+	e.global_position = home + off + Vector3(0, 0.2, 0)
+	e.rotation.y = facing
+
+## Insane oddities show: sparkles in yellow (speedy) or pink (splitter).
+func _oddity_look() -> void:
+	if oddity == "giant":
+		return
+	var col := Color(1.0, 0.9, 0.2) if oddity == "speedy" else Color(1.0, 0.3, 0.9)
+	var p := CPUParticles3D.new(); p.amount = 16; p.lifetime = 0.8
+	p.mesh = FX.quad(0.14); p.material_override = FX.glow_material(col, 2.0)
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; p.emission_sphere_radius = 0.6 * float(t.scale)
+	p.direction = Vector3.UP; p.spread = 40; p.gravity = Vector3(0, 0.5, 0)
+	p.initial_velocity_min = 0.3; p.initial_velocity_max = 0.8
+	p.position.y = 1.0 * float(t.scale)
+	add_child(p)
 
 ## Cloud Island creatures: hide the stand-in skeleton and show the shape-built look.
 var look: CreatureLook

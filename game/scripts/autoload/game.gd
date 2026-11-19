@@ -29,7 +29,64 @@ var profile := {
 ## Port Home: once you've flown home after the main adventure, you can whoosh
 ## back to your cabin from anywhere (the HOME button, or Y).
 func can_port_home() -> bool:
-	return quest_state("flight_home") == "done"
+	return quest_state("flight_home") == "done" or flags.get("home_won", false) or flags.get("adventure_done", false)
+
+# --- Replay modes: after the first adventure, the family portal starts a new one ---
+## Normal, Hard (twice as tough, more monsters) or INSANE (tougher still, and the
+## kitchen sink: wild random events and strange monsters, see InsaneChaos). You
+## keep your level, gold and gear; "start fresh" puts your gear in the chest.
+var mode := "normal"
+const MODES := {
+	"normal": {"name": "Normal", "hp": 1.0, "boss_hp": 1.0, "dmg": 1.0, "speed": 1.0, "reward": 1.0, "twins": 0.0},
+	"hard": {"name": "Hard", "hp": 2.0, "boss_hp": 1.7, "dmg": 1.6, "speed": 1.12, "reward": 1.6, "twins": 0.5},
+	"insane": {"name": "INSANE", "hp": 2.8, "boss_hp": 2.3, "dmg": 2.1, "speed": 1.25, "reward": 2.5, "twins": 0.9},
+}
+
+func mode_value(key: String) -> float:
+	return float((MODES.get(mode, MODES.normal) as Dictionary).get(key, 1.0))
+
+func mode_name() -> String:
+	return String((MODES.get(mode, MODES.normal) as Dictionary).name)
+
+## Start the whole adventure again from the Vault outpost.
+func new_adventure(m: String, geared: bool) -> void:
+	mode = m if MODES.has(m) else "normal"
+	var keep := {}
+	for k in flags:
+		var ks := String(k)
+		if ks.begins_with("mount_") or ks in ["special2", "special2_told", "sky_ride_best", "sky_ride_medal", "fish_caught", "climb_top", "climb_red"]:
+			keep[k] = flags[k]
+	keep["adventure_done"] = true
+	keep["adventures"] = int(flags.get("adventures", 0)) + 1
+	flags = keep
+	quests = {}
+	tracked_quest = ""
+	tracked_manual = false
+	zone = "vault"
+	checkpoint_pos = Vector3.ZERO
+	resume_pos = Vector3.ZERO
+	objective = ""
+	day_clock = 150.0
+	buffs.clear()
+	shroom = 0.0
+	game_over = false
+	# quest items belong to the last adventure
+	for id in inventory.duplicate():
+		if item(id).get("slot", "") == "quest":
+			inventory.erase(id)
+	if not geared:
+		# start fresh: everything you've found waits for you in the gear chest
+		for id in inventory.duplicate():
+			if id in ["rusty_sword", "traveler_garb"]:
+				continue
+			inventory.erase(id)
+			stash.append(id)
+		for base in ["rusty_sword", "traveler_garb"]:
+			if not inventory.has(base):
+				inventory.append(base)
+		equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
+	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
+	inventory_changed.emit(); stats_changed.emit()
 
 const PLACE_NAMES := {"vault": "the Deep Vault", "forest": "the Goblin Forest", "castle": "Ghost Knight Castle", "cloud": "Cloud Island", "home": "home"}
 
@@ -382,6 +439,7 @@ func reset_run() -> void:
 	inventory = ["rusty_sword", "traveler_garb"]
 	equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
 	stash = []
+	mode = "normal"
 	flags = {}
 	quests = {}
 	tracked_quest = ""
@@ -636,6 +694,7 @@ func save_slot(i := -1) -> bool:
 		"inventory": Array(inventory),
 		"equipped": equipped.duplicate(),
 		"stash": Array(stash),
+		"mode": mode,
 		"kills": kills, "play_time": play_time,
 		"flags": flags.duplicate(true),
 		"checkpoint_pos": checkpoint_pos, "checkpoint_yaw": checkpoint_yaw, "checkpoint_name": checkpoint_name,
@@ -687,6 +746,7 @@ func load_slot(i: int) -> bool:
 		items[k] = its[k]
 	inventory.assign(d.get("inventory", ["rusty_sword", "traveler_garb"]))
 	stash.assign(d.get("stash", []))
+	mode = String(d.get("mode", "normal"))
 	var eq: Dictionary = d.get("equipped", {})
 	for k in eq:
 		equipped[k] = eq[k]

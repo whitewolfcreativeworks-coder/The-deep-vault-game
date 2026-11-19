@@ -53,6 +53,7 @@ func _ready() -> void:
 	_build_inventory()
 	_build_stash()
 	_build_ask()
+	_build_modes()
 	_build_lore()
 	_build_death()
 	_build_victory()
@@ -993,7 +994,8 @@ func _item_row(id: String, equipped_now: bool) -> Control:
 	if slot in Game.SLOTS and not equipped_now:
 		var cur: String = Game.equipped.get(slot, "")
 		var diff := Game.score(id) - Game.score(cur)
-		var cmp := UIKit.label(("▲ better (+%.0f)" if diff > 0.5 else ("▼ weaker (%.0f)" if diff < -0.5 else "about the same")) % diff, 14,
+		var cmp_text := ("▲ better (+%.0f)" % diff) if diff > 0.5 else (("▼ weaker (%.0f)" % diff) if diff < -0.5 else "about the same")
+		var cmp := UIKit.label(cmp_text, 14,
 			Color(0.4, 1.0, 0.45) if diff > 0.5 else (Color(1.0, 0.45, 0.4) if diff < -0.5 else UIKit.DIM))
 		vb.add_child(cmp)
 	if slot == "skin" and it.has("desc"):
@@ -1074,11 +1076,56 @@ func ask(title: String, text: String, options: Array) -> void:
 	for c in _ask_btns.get_children():
 		c.queue_free()
 	for o in options:
-		var b := _button(String(o[0]), o[1], 270.0 if options.size() > 2 else 320.0)
+		var b := _button(String(o[0]), o[1], 320.0 if options.size() <= 2 else (270.0 if options.size() == 3 else 205.0))
 		b.custom_minimum_size.y = 66
 		b.add_theme_font_size_override("font_size", 22)
 		_ask_btns.add_child(b)
 	show_panel("ask")
+
+# --- a new adventure: Normal, Hard or Insane, with or without your gear --------------
+var _mode_pick: Callable
+var _mode_cancel: Callable
+
+func _build_modes() -> void:
+	var p := _center_panel("modes", 1180, 700)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 14); p.add_child(v)
+	v.add_child(UIKit.label("A New Adventure!", 36, UIKit.GOLD, true))
+	var intro := UIKit.label("Start the whole adventure again from the Vault outpost. You keep your level and gold. With your gear, you keep everything you carry. Starting fresh, you begin with the old rusty sword, and your gear waits for you in the gear chest at home.", 19, UIKit.PARCH)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD; intro.custom_minimum_size.x = 1120
+	v.add_child(intro)
+	var rows := [
+		["normal", "NORMAL", "The adventure as you know it.", Color(0.55, 0.9, 0.55)],
+		["hard", "HARD", "Twice as tough: monsters have twice the health, hit harder, move faster, and there are more of them. Better rewards.", Color(1.0, 0.7, 0.3)],
+		["insane", "INSANE", "Tougher still, and the kitchen sink: wild random events (moon gravity, meteor showers, mirror world...) and strange monsters (giants, speedy ones, ones that split in two). Very hard, very crazy!", Color(1.0, 0.4, 0.8)],
+	]
+	for r in rows:
+		var m: String = r[0]
+		var row := PanelContainer.new()
+		row.add_theme_stylebox_override("panel", UIKit.panel_style(0.5, r[3], 6))
+		v.add_child(row)
+		var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 14); row.add_child(h)
+		var info := VBoxContainer.new(); info.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(info)
+		info.add_child(UIKit.label(String(r[1]), 30, r[3], true))
+		var d := UIKit.label(String(r[2]), 17, UIKit.PARCH)
+		d.autowrap_mode = TextServer.AUTOWRAP_WORD; d.custom_minimum_size.x = 600
+		info.add_child(d)
+		for geared in [true, false]:
+			var g: bool = geared
+			var b := _button("With my gear" if g else "Start fresh", func() -> void:
+				if _mode_pick.is_valid():
+					_mode_pick.call(m, g), 200)
+			b.custom_minimum_size.y = 64
+			b.add_theme_font_size_override("font_size", 20)
+			h.add_child(b)
+	var foot := HBoxContainer.new(); foot.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(foot)
+	foot.add_child(_button("Not now", func() -> void:
+		if _mode_cancel.is_valid():
+			_mode_cancel.call(), 220))
+
+func choose_mode(pick: Callable, cancel: Callable) -> void:
+	_mode_pick = pick
+	_mode_cancel = cancel
+	show_panel("modes")
 
 # --- the gear chest at home ---------------------------------------------------------
 var _stash_bag: VBoxContainer

@@ -266,7 +266,7 @@ func hide_boss() -> void:
 func _process(delta: float) -> void:
 	if player == null:
 		return
-	name_label.text = "%s  ·  Level %d" % [Game.profile.name, Game.level]
+	name_label.text = "%s  ·  Level %d" % [Game.profile.name, Game.level] + ("" if Game.mode == "normal" else "  ·  " + Game.mode_name().to_upper())
 	hp_bar.max_value = Game.max_hp(); hp_bar.value = lerpf(hp_bar.value, Game.hp, 1.0 - exp(-12.0 * delta))
 	hp_text.text = " %d / %d" % [int(ceil(maxf(Game.hp, 0.0))), int(Game.max_hp())]
 	mp_bar.max_value = Game.max_mana(); mp_bar.value = Game.mana

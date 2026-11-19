@@ -835,3 +835,31 @@ The `homeflight` bot now flies like a player (sideways input plus FLY/BLOCK towa
 - a face that stays in front while the body rolls with his movement;
 - floating fists and orbiting hailstones.
 
+## Follow-up 25: replay modes (Nov 19)
+
+The roadmap's replay modes, built now because they sit on top of the levels rather than in them, so polishing the levels later doesn't conflict.
+
+**A new adventure** (`Game.new_adventure`):
+- What resets: quests and world flags.
+- What stays: mounts, the second power, Sky Ride records, a permanent `adventure_done` flag, and level, gold and stash.
+- "Start fresh" moves everything but the starter sword and garb into the gear chest.
+
+`adventure_done` (rather than the flight-home quest) now unlocks Port Home and tells the home world you've already landed, since a replay resets that quest.
+
+**Difficulty:**
+- Health is multiplied when each enemy spawns, and the Warden's in its setup. Speed and rewards are scaled on the enemy's own copy of its stats.
+- Damage is scaled once, in `Player.take_damage`, so every source (monsters, fire, the river, lightning, the Warden) is covered without touching each one.
+- **More monsters:** a twin is spawned beside an enemy based on a hash of its id, so the same monsters get twins on every visit. The twin's death is saved under the id plus `+`.
+
+**Insane** adds two things:
+- **Oddities** (Giant, Speedy, Splitting).
+- **`InsaneChaos`:** an event every 25–42 s, chosen from eleven, never the same twice in a row. Most work through small player hooks (`chaos_gravity`, `mirror_t`, `bouncy_t`, the existing haste timer, rainbow vision) or spawn things (Fowl, Pickups, Enemies, meteors).
+
+New autotest `modes` (21 checks):
+- the portal offers the new adventure and the mode panel;
+- Insane + Start fresh resets the run but keeps your level, puts your gear in the chest and shows INSANE on the HUD;
+- there are twins and odd monsters;
+- a minion has more than 2.8 times its health, and a hit does more than 1.8 times its damage;
+- every chaos event works;
+- the mode is saved.
+

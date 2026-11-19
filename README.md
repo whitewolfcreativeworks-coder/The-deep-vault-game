@@ -73,6 +73,33 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### Replay modes: Normal, Hard and INSANE
+Once you've finished the adventure (flown home on the Sky Ride), the family portal in the yard offers **A new adventure!** It starts the whole thing again from the Vault outpost, with every quest, monster and boss back. You keep your level and gold, and pick two things:
+
+- **With my gear** (keep everything you carry) or **Start fresh** (back to the rusty sword; your gear waits in the gear chest at home).
+- A mode:
+
+| Mode | Monster health | They hit | They move | Rewards | More monsters? |
+|---|---|---|---|---|---|
+| **Normal** | as usual | as usual | as usual | as usual | no |
+| **Hard** | x2 (bosses x1.7) | x1.6 | 12% faster | x1.6 | about half get a twin |
+| **INSANE** | x2.8 (bosses x2.3) | x2.1 | 25% faster | x2.5 | nearly all get a twin |
+
+**INSANE is the kitchen sink.** Some monsters are odd: **Giant** (huge and tough), **Speedy** (yellow sparkles) or **Splitting** (pink sparkles; it bursts into two little ones). And every half a minute or so something wild happens, announced in big rainbow letters:
+- **Rainbow Storm** (rainbow vision without the mushrooms)
+- **Moon Gravity**
+- **Mirror World** (left is right!)
+- **Boing Boing** (you bounce on every landing)
+- **Speed Freak**
+- **Meteor Shower** (get out of the red circles)
+- **Chicken Party**
+- **Monster Party**
+- **Disco Time**
+- **Gold Rain**
+- **Giant Foes**
+
+Your mode shows next to your level, and it's saved with your game. You can also still just **visit** the Vault outpost without starting over, and Port Home works in every mode.
+
 ### New in the Nov 19 afternoon notes
 - **The Sky Ride: the flight home is its own arcade game.** Your dragonfly now flies itself along the course, about a minute and a half home.
   - **Controls:** steer left and right with the stick, hold **FLY** (JUMP) to climb and **BLOCK** to dive. Let go and you sink gently, so you time your climbs into the high rings.
