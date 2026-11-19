@@ -149,6 +149,7 @@ var dmg_mult := 1.0
 var oddity := ""
 var mini := false
 var _base_hp_mult := 1.0
+var _base_dmg_mult := 1.0
 var _enraged := false
 var _los_t := 0.0
 var _los_ok := true
@@ -178,20 +179,30 @@ func _ready() -> void:
 	if mini:
 		hp_mult *= 0.3
 	# The deeper into the game, the tougher: foes grow when you out-level their
-	# zone, and again as you finish more of that zone's quests.
-	var over := maxi(0, Game.level - Game.zone_level())
+	# zone, and again as you finish more of that zone's quests. In Hard and Insane
+	# they grow to match you instead (your level; in Insane with gear, your gear too).
+	_base_dmg_mult = dmg_mult
 	var done := 0
 	for q in Game.zone_quests(Game.zone):
 		if Game.quest_state(q) == "done":
 			done += 1
-	hp_mult *= (1.0 + 0.1 * minf(over, 10.0)) * (1.0 + 0.05 * done)
-	dmg_mult *= (1.0 + 0.07 * minf(over, 10.0)) * (1.0 + 0.03 * done)
+	var fs := Vector2.ONE
+	if Game.mode == "normal":
+		var over := maxi(0, Game.level - Game.zone_level())
+		hp_mult *= 1.0 + 0.1 * minf(over, 10.0)
+		dmg_mult *= 1.0 + 0.07 * minf(over, 10.0)
+	else:
+		fs = Game.foe_scale()
+		hp_mult *= fs.x
+		dmg_mult *= fs.y
+	hp_mult *= 1.0 + 0.05 * done
+	dmg_mult *= 1.0 + 0.03 * done
 	if hp_mult != 1.0 or dmg_mult != 1.0 or Game.mode != "normal" or oddity != "" or mini:
 		t = t.duplicate()
 		t.hp = float(t.hp) * hp_mult
 		t.dmg = float(t.dmg) * dmg_mult * (1.3 if oddity == "giant" else 1.0)
 		t.speed = float(t.speed) * Game.mode_value("speed") * (1.6 if oddity == "speedy" else (1.15 if mini else 1.0))
-		var rw := Game.mode_value("reward") * (0.3 if mini else 1.0)
+		var rw := Game.mode_value("reward") * (0.3 if mini else 1.0) * fs.x
 		t.xp = int(float(t.xp) * rw)
 		var g0: Array = t.gold
 		t.gold = [int(float(g0[0]) * rw), maxi(1, int(float(g0[1]) * rw))]
@@ -238,10 +249,14 @@ func _ready() -> void:
 	home = global_position
 	if oddity != "":
 		_oddity_look.call_deferred()
-	# Hard and Insane: more monsters (a twin turns up beside many of them)
+	# Hard and Insane: more monsters (a twin turns up beside many of them; in
+	# Insane most come in a pack of three)
 	if Game.mode != "normal" and not boss and not mini and uid != "" and not uid.ends_with("+"):
-		if float(absi(hash(uid)) % 100) < Game.mode_value("twins") * 100.0 and not Game.flags.get(uid + "+", false):
+		var roll := float(absi(hash(uid)) % 100)
+		if roll < Game.mode_value("twins") * 100.0 and not Game.flags.get(uid + "+", false):
 			_spawn_twin.call_deferred()
+		if float(absi(hash(uid + "#")) % 100) < Game.mode_value("triplets") * 100.0 and not Game.flags.get(uid + "++", false):
+			_spawn_twin.call_deferred("++")
 	facing = rotation.y
 	rotation.y = 0
 	body.rotation.y = facing
@@ -1188,6 +1203,7 @@ func _die(away: Vector3) -> void:
 			e.configure(type_id, "", 0.0)
 			e.mini = true
 			e.hp_mult = _base_hp_mult
+			e.dmg_mult = _base_dmg_mult
 			get_parent().add_child.call_deferred(e)
 			var at := global_position + Vector3(cos(k * PI) * 1.2, 0.3, sin(k * PI + 0.5) * 1.2)
 			e.set_deferred("global_position", at)
@@ -1199,14 +1215,14 @@ func _die(away: Vector3) -> void:
 	tw.tween_callback(queue_free)
 
 ## A twin for Hard and Insane mode, right beside the original.
-func _spawn_twin() -> void:
+func _spawn_twin(tag := "+") -> void:
 	if not is_inside_tree() or get_parent() == null:
 		return
 	var e := Enemy.new()
-	e.configure(type_id, uid + "+", dormant_wake)
+	e.configure(type_id, uid + tag, dormant_wake)
 	e.hp_mult = _base_hp_mult
-	e.dmg_mult = dmg_mult
-	var a := float(absi(hash(uid)) % 628) / 100.0
+	e.dmg_mult = _base_dmg_mult
+	var a := float(absi(hash(uid + tag)) % 628) / 100.0
 	var off := Vector3(cos(a), 0, sin(a)) * 2.2
 	get_parent().add_child(e)
 	e.global_position = home + off + Vector3(0, 0.2, 0)

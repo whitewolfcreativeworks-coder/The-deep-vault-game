@@ -54,6 +54,7 @@ func _ready() -> void:
 	_build_stash()
 	_build_ask()
 	_build_modes()
+	_build_levels()
 	_build_lore()
 	_build_death()
 	_build_victory()
@@ -1087,16 +1088,17 @@ var _mode_pick: Callable
 var _mode_cancel: Callable
 
 func _build_modes() -> void:
-	var p := _center_panel("modes", 1180, 700)
+	var p := _center_panel("modes", 1180, 670)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 14); p.add_child(v)
-	v.add_child(UIKit.label("A New Adventure!", 36, UIKit.GOLD, true))
-	var intro := UIKit.label("Start the whole adventure again from the Vault outpost. You keep your level and gold. With your gear, you keep everything you carry. Starting fresh, you begin with the old rusty sword, and your gear waits for you in the gear chest at home.", 19, UIKit.PARCH)
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD; intro.custom_minimum_size.x = 1120
-	v.add_child(intro)
+	_mode_title = UIKit.label(MODE_TITLE, 36, UIKit.GOLD, true)
+	v.add_child(_mode_title)
+	_mode_intro = UIKit.label(MODE_INTRO, 19, UIKit.PARCH)
+	_mode_intro.autowrap_mode = TextServer.AUTOWRAP_WORD; _mode_intro.custom_minimum_size.x = 1120
+	v.add_child(_mode_intro)
 	var rows := [
 		["normal", "NORMAL", "The adventure as you know it.", Color(0.55, 0.9, 0.55)],
-		["hard", "HARD", "Twice as tough: monsters have twice the health, hit harder, move faster, and there are more of them. Better rewards.", Color(1.0, 0.7, 0.3)],
-		["insane", "INSANE", "Tougher still, and the kitchen sink: wild random events (moon gravity, meteor showers, mirror world...) and strange monsters (giants, speedy ones, ones that split in two). Very hard, very crazy!", Color(1.0, 0.4, 0.8)],
+		["hard", "HARD", "The monsters grow to match your level, then get twice the health, hit harder, move faster, and many come in pairs. Better rewards and loot at your level.", Color(1.0, 0.7, 0.3)],
+		["insane", "INSANE", "The monsters match your level AND your gear (bring your best gear and they get even tougher; start fresh and they only match your level). Packs of three, giants, speedy ones, ones that split in two, and something crazy every 15 seconds or so: meteor showers, mirror world, moon gravity... Extremely hard!", Color(1.0, 0.4, 0.8)],
 	]
 	for r in rows:
 		var m: String = r[0]
@@ -1122,10 +1124,66 @@ func _build_modes() -> void:
 		if _mode_cancel.is_valid():
 			_mode_cancel.call(), 220))
 
-func choose_mode(pick: Callable, cancel: Callable) -> void:
+const MODE_TITLE := "A New Adventure!"
+const MODE_INTRO := "Start the whole adventure again from the Vault outpost. You keep your level and gold. With your gear, you keep everything you carry. Starting fresh, you begin with the old rusty sword, and your gear waits for you in the gear chest at home."
+var _mode_title: Label
+var _mode_intro: Label
+
+func choose_mode(pick: Callable, cancel: Callable, title := MODE_TITLE, intro := MODE_INTRO) -> void:
 	_mode_pick = pick
 	_mode_cancel = cancel
+	_mode_title.text = title
+	_mode_intro.text = intro
 	show_panel("modes")
+
+# --- the family portal's level picker ------------------------------------------------
+var _level_pick: Callable
+var _level_cancel: Callable
+var _ride_best: Label
+
+func _build_levels() -> void:
+	var p := _center_panel("levels", 1180, 740)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); p.add_child(v)
+	v.add_child(UIKit.label("Choose a Level", 36, UIKit.GOLD, true))
+	var intro := UIKit.label("Play any level again, fresh: its monsters, bosses, chests and quests all come back. Next you pick Normal, Hard or INSANE. The rest of the world stays just as you left it.", 19, UIKit.PARCH)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD; intro.custom_minimum_size.x = 1120
+	v.add_child(intro)
+	var rows: Array = Game.LEVELS.duplicate()
+	rows.append(["skyride", "The Sky Ride", "The dragonfly race home: rings, storms, thunder birds and the rainbow arch.", Color(1.0, 0.85, 0.4)])
+	for r in rows:
+		var z: String = r[0]
+		var row := PanelContainer.new()
+		row.add_theme_stylebox_override("panel", UIKit.panel_style(0.5, r[3], 6))
+		v.add_child(row)
+		var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 14); row.add_child(h)
+		var info := VBoxContainer.new(); info.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(info)
+		info.add_child(UIKit.label(String(r[1]), 28, r[3], true))
+		var d := UIKit.label(String(r[2]), 17, UIKit.PARCH)
+		d.autowrap_mode = TextServer.AUTOWRAP_WORD; d.custom_minimum_size.x = 760
+		info.add_child(d)
+		if z == "skyride":
+			_ride_best = UIKit.label("", 16, UIKit.GOLD)
+			info.add_child(_ride_best)
+		var b := _button("Fly!  ▶" if z == "skyride" else "Play  ▶", func() -> void:
+			if _level_pick.is_valid():
+				_level_pick.call(z), 220)
+		b.custom_minimum_size.y = 64
+		b.add_theme_font_size_override("font_size", 22)
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(b)
+	var foot := HBoxContainer.new(); foot.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(foot)
+	foot.add_child(_button("Not now", func() -> void:
+		if _level_cancel.is_valid():
+			_level_cancel.call(), 220))
+
+func choose_level(pick: Callable, cancel: Callable) -> void:
+	_level_pick = pick
+	_level_cancel = cancel
+	var best := int(Game.flags.get("sky_ride_best", 0))
+	var medal := String(Game.flags.get("sky_ride_medal", ""))
+	_ride_best.text = "Your best: %d points%s" % [best, (", %s medal" % medal) if medal != "" else ""]
+	_ride_best.visible = best > 0
+	show_panel("levels")
 
 # --- the gear chest at home ---------------------------------------------------------
 var _stash_bag: VBoxContainer

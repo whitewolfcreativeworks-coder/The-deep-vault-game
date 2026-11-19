@@ -1,7 +1,7 @@
 extends Node
 class_name InsaneChaos
-## INSANE MODE's kitchen sink: every half a minute or so something wild happens,
-## announced in big rainbow letters. Most last a few seconds; you can still play
+## INSANE MODE's kitchen sink: every 15-25 seconds something wild happens (and
+## sometimes two things at once), announced in big rainbow letters. Most last a few seconds; you can still play
 ## through all of them, but they make an already hard mode crazy.
 ##   RAINBOW STORM   rainbow vision without the mushrooms
 ##   MOON GRAVITY    huge floaty jumps (and falls)
@@ -26,7 +26,7 @@ const HINTS := {"rainbow": "Everything's gone wobbly...", "moon": "Jump! Wheee!"
 
 var player: Player
 var world: Node3D
-var next_t := 15.0
+var next_t := 8.0
 var last := ""
 var events_fired := 0
 var _ui: CanvasLayer
@@ -49,6 +49,7 @@ func _ready() -> void:
 	_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_label.offset_left = -600; _label.offset_right = 600; _label.offset_top = 150
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_label.modulate.a = 0.0
 	_ui.add_child(_label)
 
@@ -79,17 +80,28 @@ func _process(delta: float) -> void:
 		return
 	next_t -= delta
 	if next_t <= 0.0:
-		next_t = _rng.randf_range(25.0, 42.0)
+		next_t = _rng.randf_range(14.0, 24.0)
 		var pick := last
 		while pick == last:
 			pick = EVENTS[_rng.randi() % EVENTS.size()]
 		fire(pick)
+		if _rng.randf() < 0.3:       # double trouble!
+			var two := pick
+			while two == pick:
+				two = EVENTS[_rng.randi() % EVENTS.size()]
+			fire(two, true)
 
 ## Set something off now (the tests use this too).
-func fire(ev: String) -> void:
-	last = ev
+func fire(ev: String, also := false) -> void:
+	if not also:
+		last = ev
 	events_fired += 1
-	_label.text = "INSANE: %s\n%s" % [NAMES[ev], HINTS[ev]]
+	if also:
+		_label.text = _label.text.get_slice("\n", 0) + " + " + String(NAMES[ev]) + "\nDOUBLE TROUBLE!"
+		_label.add_theme_font_size_override("font_size", 46)
+	else:
+		_label.text = "INSANE: %s\n%s" % [NAMES[ev], HINTS[ev]]
+		_label.add_theme_font_size_override("font_size", 64)
 	if _tw and _tw.is_valid():
 		_tw.kill()
 	var tw := _label.create_tween()
@@ -165,14 +177,14 @@ func _meteor() -> void:
 		FX.burst(at + Vector3(0, 0.5, 0), Color(1.0, 0.5, 0.15), 50, 7.0, 0.25, 0.8, -6.0)
 		Sfx.play_at("fire_burst", at, -2.0, 0.2)
 		if is_instance_valid(player) and Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length() < 2.4 and absf(player.global_position.y - at.y) < 2.5:
-			player.take_damage(Game.max_hp() * 0.08, at, 5.0)
+			player.take_damage(16.0 * Game.foe_scale().y, at, 5.0)
 		for e in get_tree().get_nodes_in_group("enemy"):
 			if e is Enemy and (e as Enemy).global_position.distance_to(at) < 2.4:
 				(e as Enemy).take_damage(60.0, at, 4.0)
 		ring.queue_free()
 		rock.queue_free())
 
-## Three more of whatever monster lives nearest climb out of the ground.
+## Four more of whatever monster lives nearest climb out of the ground.
 func _monster_party() -> void:
 	var best: Enemy = null
 	var bd := INF
@@ -182,8 +194,8 @@ func _monster_party() -> void:
 			if d < bd:
 				bd = d; best = e
 	var kind := best.type_id if best and bd < 80.0 else "minion"
-	for k in 3:
-		var a := k * TAU / 3.0 + 0.4
+	for k in 4:
+		var a := k * TAU / 4.0 + 0.4
 		var e2 := Enemy.new()
 		e2.configure(kind, "", 6.0)
 		world.add_child(e2)

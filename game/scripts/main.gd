@@ -433,7 +433,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		if menus.current == "designer":
 			menus.designer.close(false)      # Esc steps back out of the Skin Designer
-		elif menus.current in ["ask", "modes"] and _ask_cancel.is_valid():
+		elif menus.current in ["ask", "modes", "levels"] and _ask_cancel.is_valid():
 			_ask_cancel.call()
 		elif menus.current in ["pause", "inventory", "lore", "stash", "ask"]:
 			_resume()
@@ -528,8 +528,10 @@ func _port_home() -> void:
 	Game.set_meta("arrive_say", "Whoosh! Home sweet home.")
 	_travel("home", HomeCabin.arrival(), 0.0)
 
-## Walking into the family portal after porting home: back to where you were,
-## to the Vault outpost, or stay home.
+## Walking into the family portal after porting home. Before the first adventure is
+## done: back to where you were, the Vault outpost, or stay home. After it: back
+## where you left off, choose any level (in Normal, Hard or Insane), a whole new
+## adventure, or stay home.
 func family_portal_choice(stay: Callable) -> void:
 	var pf: Dictionary = Game.flags.get("port_from", {})
 	var there: String = Game.PLACE_NAMES.get(String(pf.get("zone", "")), "where you were")
@@ -539,25 +541,31 @@ func family_portal_choice(stay: Callable) -> void:
 		stay.call()
 	var opts: Array = []
 	if not pf.is_empty():
-		opts.append(["Back to " + there, func() -> void:
+		opts.append(["Back where I left off" if done else "Back to " + there, func() -> void:
 			menus.close_all(); get_tree().paused = false
 			_port_back()])
 	if done:
+		opts.append(["Choose a level", func() -> void:
+			_ask_level(stay)])
 		opts.append(["A new adventure!", func() -> void:
 			_ask_mode(stay)])
-	opts.append(["Visit the Vault outpost" if done else "The Vault outpost", func() -> void:
-		Game.flags.erase("port_from")
-		menus.close_all(); get_tree().paused = false
-		player.set_mouse_captured(true)
-		FX.screen_flash(Color(0.85, 1.0, 0.95), 1.0, 1.2)
-		Sfx.play("portal", 0.0, 0.0)
-		go_to_vault()])
+	else:
+		opts.append(["The Vault outpost", func() -> void:
+			Game.flags.erase("port_from")
+			menus.close_all(); get_tree().paused = false
+			player.set_mouse_captured(true)
+			FX.screen_flash(Color(0.85, 1.0, 0.95), 1.0, 1.2)
+			Sfx.play("portal", 0.0, 0.0)
+			go_to_vault()])
 	opts.append(["Stay home", func() -> void:
 		_resume()
 		stay.call()])
 	var text := "Where would you like to go?"
 	if done:
-		text += "\n\nA new adventure starts it all again from the Vault outpost, in Normal, Hard or INSANE mode."
+		text = "Where would you like to go?\n\n"
+		if not pf.is_empty():
+			text += "Back where I left off: the exact spot you ported home from, in %s.\n" % there
+		text += "Choose a level: play any one level again, fresh, in Normal, Hard or INSANE.\nA new adventure: the whole thing again from the very beginning."
 	menus.ask("The family portal", text, opts)
 	get_tree().paused = true
 	player.set_mouse_captured(false)
@@ -568,6 +576,49 @@ func _ask_mode(stay: Callable) -> void:
 		_resume()
 		stay.call()
 	menus.choose_mode(func(m: String, geared: bool) -> void: start_new_adventure(m, geared), _ask_cancel)
+
+## Pick a level, then Normal, Hard or Insane (the Sky Ride just flies).
+func _ask_level(stay: Callable) -> void:
+	_ask_cancel = func() -> void:
+		_resume()
+		stay.call()
+	menus.choose_level(func(z: String) -> void:
+		if z == "skyride":
+			start_sky_ride()
+			return
+		var place := String(Game.PLACE_NAMES.get(z, z))
+		var title := place.substr(0, 1).to_upper() + place.substr(1)
+		menus.choose_mode(func(m: String, geared: bool) -> void: start_level(z, m, geared), func() -> void: _ask_level(stay),
+			title + "!", "Play %s again, fresh: its monsters, bosses, chests and quests all come back. You keep your level and gold. With your gear, you keep everything you carry. Starting fresh, you begin with the old rusty sword, and your gear waits in the gear chest at home." % place),
+		_ask_cancel)
+
+## One level again, fresh, in the chosen mode.
+func start_level(z: String, m: String, geared: bool) -> void:
+	menus.close_all()
+	get_tree().paused = false
+	player.input_enabled = false
+	Sfx.play("portal", 0.0, 0.0)
+	FX.screen_flash(Color(1.0, 0.95, 0.85), 1.0, 1.2)
+	await menus.fade_to(1.0, 0.9).finished
+	Game.replay_level(z, m, geared)
+	var nm := String(Game.PLACE_NAMES.get(z, z))
+	nm = nm.substr(0, 1).to_upper() + nm.substr(1)
+	Game.set_meta("arrive_say", "%s: %s mode%s! Good luck, %s." % [nm.to_upper(), Game.mode_name(), "" if geared else " (your gear waits in the chest at home)", Game.profile.name])
+	_travel(z)
+
+## The Sky Ride again: up into the sky on the dragonfly, through the rings home.
+func start_sky_ride() -> void:
+	menus.close_all()
+	get_tree().paused = false
+	player.input_enabled = false
+	Game.flags.erase("port_from")
+	Game.flags["ride_again"] = true
+	Game.flags.erase("home_chest")      # a perfect flight earns the gift again
+	Sfx.play("portal", 0.0, 0.0)
+	FX.screen_flash(Color(1.0, 0.95, 0.8), 1.0, 1.2)
+	await menus.fade_to(1.0, 0.9).finished
+	Game.set_meta("arrive_say", "THE SKY RIDE! Follow the rings home. Go for the RAINBOW medal!")
+	_travel("home")
 
 ## A whole new adventure from the Vault outpost (you keep your level and gold).
 func start_new_adventure(m: String, geared: bool) -> void:

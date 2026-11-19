@@ -318,6 +318,9 @@ func _run() -> void:
 	elif mode == "modes":
 		if await _modes_test():
 			return
+	elif mode == "levels":
+		if await _levels_test():
+			return
 	elif mode == "porthome":
 		if await _porthome_test():
 			return
@@ -4912,6 +4915,192 @@ func _modes_test() -> bool:
 	check("md_mode_saved", String(Game.read_slot(Game.active_slot).get("mode", "")) == "insane")
 	return false
 
+## Every uid-bearing thing a level builds must belong to that level (so a level
+## replay resets exactly its own chests, monsters, gates and quest items).
+func _uid_zone_check(z: String) -> void:
+	var bad: Array = []
+	var n := 0
+	for c in main.world.find_children("*", "", true, false):
+		var u := ""
+		if c is Enemy or c is Interactable or c is Gate or c is QuestItem or c is WarrenTotem or c is GhostHorse or c is DigMound:
+			u = String(c.get("uid"))
+		elif c.has_meta("uid"):
+			u = String(c.get_meta("uid"))
+		if u == "":
+			continue
+		n += 1
+		if Game.flag_zone(u) != z:
+			bad.append(u)
+	print("LEVELS uids in %s: %d, not attributed: %s" % [z, n, str(bad)])
+	check("lv_uids_belong_to_" + z, n > 3 and bad.is_empty(), "%d uids, wrong: %s" % [n, str(bad.slice(0, 12))])
+
+func _enemy_census() -> Dictionary:
+	var out := {"n": 0, "twins": 0, "triplets": 0, "minion_hp": 0.0, "minion_dmg": 0.0}
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e is Enemy and not (e as Enemy).dead:
+			var en := e as Enemy
+			out.n += 1
+			if en.uid.ends_with("++"):
+				out.triplets += 1
+			elif en.uid.ends_with("+"):
+				out.twins += 1
+			if en.type_id in ["minion", "goblin"] and en.oddity == "" and not en.mini:
+				out.minion_hp = maxf(out.minion_hp, en.max_hp)
+				out.minion_dmg = maxf(out.minion_dmg, float(en.t.dmg))
+	return out
+
+## The family portal's level picker: choose any one level again, fresh, in a mode;
+## only that level resets. Hard and Insane grow the monsters to match the hero
+## (Insane with gear: the gear too). The Sky Ride can be flown again.
+func _levels_test() -> bool:
+	var phase := int(Game.get_meta("lv_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("lv_phase", 1)
+		Game.level = 20
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		for q in Game.zone_quests("forest"):
+			Game.quests[q] = {"state": "done", "n": 1}
+		for q in Game.zone_quests("castle"):
+			Game.quests[q] = {"state": "done", "n": 1}
+		for k in ["home_won", "adventure_done", "forest_won", "castle_won", "cloud_won", "mount_dragonfly",
+				"e_arm_1", "e_arm_1+", "chest_hall_a", "warden_dead", "victory", "lever_corridor",
+				"f_scout_0", "w_chest_gruk", "disc_bee_hive", "s_chest_lake", "sinkhole_open", "qi_axe_w",
+				"c_chest_lord", "crypt_bells", "cl_garden", "qi_feather_1"]:
+			Game.flags[k] = true
+		Game.flags["sky_ride_best"] = 5000
+		Game.flags["sky_ride_medal"] = "GOLD"
+		Game.add_item("heart_vault", false)
+		for slot in ["weapon", "armor"]:
+			var id := Loot.make_random(20, 0.8, 3, slot)
+			Game.add_item(id, true)
+		Game.resume_pos = HomeCabin.arrival()
+		main._travel("home", HomeCabin.arrival(), 0.0)
+		return true
+	if phase == 1:
+		Game.set_meta("lv_phase", 2)
+		await wait(2.5)
+		player = main.player
+		god = true
+		var w: HomeWorld = main.world
+		await tp(w.ground(IntroMovie.PORTAL.x, IntroMovie.PORTAL.z) + Vector3(0, 0.3, 0), 0.0)
+		await wait(0.8)
+		var labels: Array = []
+		for b in main.menus._ask_btns.get_children():
+			if (b as Button).visible:
+				labels.append((b as Button).text)
+		print("LEVELS portal buttons: ", labels)
+		check("lv_portal_has_level_picker", main.menus.current == "ask" and labels.has("Choose a level") and labels.has("A new adventure!"), str(labels))
+		check("lv_no_duplicate_vault_button", not str(labels).contains("Vault outpost"), str(labels))
+		await shot("lv_01_portal")
+		_ask_press("Choose a level")
+		await wait(0.4)
+		check("lv_level_panel", main.menus.current == "levels", main.menus.current)
+		check("lv_sky_ride_best_shown", main.menus._ride_best.text.contains("5000") and main.menus._ride_best.text.contains("GOLD"), main.menus._ride_best.text)
+		await shot("lv_02_levels")
+		main.menus._level_pick.call("forest")
+		await wait(0.4)
+		check("lv_then_mode_panel", main.menus.current == "modes" and main.menus._mode_title.text == "The Goblin Forest!", main.menus._mode_title.text)
+		await shot("lv_03_forest_modes")
+		# how much the monsters grow, at level 20 in the Vault
+		var keep_mode := Game.mode
+		var keep_zone := Game.zone
+		Game.zone = "vault"
+		var vals := {}
+		for m in [["hard", true], ["insane", false], ["insane", true]]:
+			Game.mode = m[0]; Game.mode_geared = m[1]
+			vals["%s_%s" % [m[0], "gear" if m[1] else "fresh"]] = Game.foe_scale()
+		Game.mode = keep_mode; Game.zone = keep_zone; Game.mode_geared = true
+		print("LEVELS foe_scale at level 20 in the vault: ", vals)
+		var h: Vector2 = vals.hard_gear
+		var i_f: Vector2 = vals.insane_fresh
+		var i_g: Vector2 = vals.insane_gear
+		check("lv_hard_matches_level", h.x > 2.0 and h.y > 2.5, str(h))
+		check("lv_insane_fresh_matches_level_only", i_f.is_equal_approx(h), "%s vs %s" % [i_f, h])
+		check("lv_insane_gear_tougher_still", i_g.x > i_f.x * 1.1 and i_g.y > i_f.y * 1.1, "%s vs %s" % [i_g, i_f])
+		Game.set_meta("lv_weapon", Game.equipped.weapon)
+		main.menus._mode_pick.call("insane", true)
+		return true
+	if phase == 2:
+		Game.set_meta("lv_phase", 3)
+		await wait(3.0)
+		player = main.player
+		god = true
+		check("lv_in_forest_insane", Game.zone == "forest" and Game.mode == "insane" and Game.mode_geared, "%s %s %s" % [Game.zone, Game.mode, Game.mode_geared])
+		var forest_cleared := true
+		for k in ["f_scout_0", "w_chest_gruk", "disc_bee_hive", "s_chest_lake", "sinkhole_open", "qi_axe_w", "forest_won"]:
+			if Game.flags.has(k):
+				forest_cleared = false
+		check("lv_forest_reset", forest_cleared and Game.quest_state(Game.zone_quests("forest")[0]) != "done", str(Game.flags.keys()))
+		var others_kept := true
+		for k in ["e_arm_1", "e_arm_1+", "chest_hall_a", "warden_dead", "c_chest_lord", "crypt_bells", "cl_garden", "qi_feather_1", "mount_dragonfly", "castle_won", "adventure_done", "sky_ride_best"]:
+			if not Game.flags.has(k):
+				others_kept = false
+				print("LEVELS lost flag ", k)
+		check("lv_other_levels_untouched", others_kept and Game.quest_state(Game.zone_quests("castle")[0]) == "done")
+		check("lv_kept_gear", Game.equipped.weapon == String(Game.get_meta("lv_weapon", "")), Game.equipped.weapon)
+		await wait(1.0)
+		var cen := _enemy_census()
+		print("LEVELS forest insane census: ", cen)
+		check("lv_insane_packs", cen.twins >= 4 and cen.triplets >= 2, str(cen))
+		var gob: Dictionary = Enemy.TYPES["goblin"]
+		check("lv_insane_monsters_grown", cen.minion_hp > float(gob.hp) * 2.8 * 2.0, "%.0f vs base %.0f" % [cen.minion_hp, float(gob.hp)])
+		check("lv_chaos_soon", main.chaos != null and main.chaos.next_t <= 8.5, str(main.chaos.next_t if main.chaos else -1.0))
+		await shot("lv_04_forest_insane")
+		_uid_zone_check("forest")
+		await wait(9.0)
+		check("lv_chaos_fired", main.chaos.events_fired >= 1, str(main.chaos.events_fired))
+		await shot("lv_05_forest_event")
+		main.start_level("vault", "hard", false)
+		return true
+	if phase == 3:
+		Game.set_meta("lv_phase", 4)
+		await wait(3.0)
+		player = main.player
+		god = true
+		var vault_cleared := true
+		for k in ["e_arm_1", "e_arm_1+", "chest_hall_a", "warden_dead", "victory", "lever_corridor"]:
+			if Game.flags.has(k):
+				vault_cleared = false
+		check("lv_vault_reset", Game.zone == "vault" and vault_cleared and not Game.inventory.has("heart_vault"), str(Game.flags.keys()))
+		check("lv_vault_hard_fresh", Game.mode == "hard" and not Game.mode_geared and Game.equipped.weapon == "rusty_sword" and Game.stash.size() >= 2,
+			"%s %s %s chest %d" % [Game.mode, Game.mode_geared, Game.equipped.weapon, Game.stash.size()])
+		check("lv_castle_still_done", Game.flags.has("c_chest_lord") and Game.flags.has("castle_won"))
+		await wait(1.0)
+		var cen := _enemy_census()
+		print("LEVELS vault hard census: ", cen)
+		var mn: Dictionary = Enemy.TYPES["minion"]
+		check("lv_hard_monsters_grown", cen.minion_hp > float(mn.hp) * 2.0 * 2.0 and cen.minion_dmg > float(mn.dmg) * 2.0, "%s base hp %.0f dmg %.0f" % [str(cen), float(mn.hp), float(mn.dmg)])
+		check("lv_hard_no_chaos", main.chaos == null)
+		_uid_zone_check("vault")
+		await shot("lv_06_vault_hard")
+		main.start_sky_ride()
+		return true
+	if phase == 4:
+		Game.set_meta("lv_phase", 5)
+		await wait(6.0)
+		player = main.player
+		god = true
+		var w: HomeWorld = main.world
+		check("lv_sky_ride_again", Game.zone == "home" and not w.landed and w.ride != null and not w.ride.finished, "%s landed %s" % [Game.zone, w.landed])
+		check("lv_on_the_dragonfly", player.mounted and player.mount_kind == "dragonfly", "%s %s" % [player.mounted, player.mount_kind])
+		check("lv_ride_objective", Game.objective.begins_with("Follow the golden rings"), Game.objective)
+		await shot("lv_07_sky_ride")
+		main._travel("castle")
+		return true
+	if phase == 5:
+		Game.set_meta("lv_phase", 6)
+		await wait(3.0)
+		_uid_zone_check("castle")
+		main._travel("cloud")
+		return true
+	await wait(3.0)
+	_uid_zone_check("cloud")
+	return false
+
 ## Port Home: from the Vault to the cabin, home again from the yard, and back
 ## through the family portal to the very spot you left.
 func _ask_press(prefix: String) -> bool:
@@ -4985,7 +5174,8 @@ func _porthome_test() -> bool:
 		await tp(pp, 0.0)
 		await wait(0.8)
 		check("ph_portal_asks_again", main.menus.current == "ask", main.menus.current)
-		_ask_press("Back to")
+		if not _ask_press("Back where"):
+			_ask_press("Back to")
 		return true
 	await wait(3.0)
 	player = main.player

@@ -37,9 +37,9 @@ func can_port_home() -> bool:
 ## keep your level, gold and gear; "start fresh" puts your gear in the chest.
 var mode := "normal"
 const MODES := {
-	"normal": {"name": "Normal", "hp": 1.0, "boss_hp": 1.0, "dmg": 1.0, "speed": 1.0, "reward": 1.0, "twins": 0.0},
-	"hard": {"name": "Hard", "hp": 2.0, "boss_hp": 1.7, "dmg": 1.6, "speed": 1.12, "reward": 1.6, "twins": 0.5},
-	"insane": {"name": "INSANE", "hp": 2.8, "boss_hp": 2.3, "dmg": 2.1, "speed": 1.25, "reward": 2.5, "twins": 0.9},
+	"normal": {"name": "Normal", "hp": 1.0, "boss_hp": 1.0, "dmg": 1.0, "speed": 1.0, "reward": 1.0, "twins": 0.0, "triplets": 0.0},
+	"hard": {"name": "Hard", "hp": 2.0, "boss_hp": 1.7, "dmg": 1.6, "speed": 1.12, "reward": 1.6, "twins": 0.5, "triplets": 0.0},
+	"insane": {"name": "INSANE", "hp": 2.8, "boss_hp": 2.3, "dmg": 2.1, "speed": 1.25, "reward": 2.5, "twins": 1.0, "triplets": 0.6},
 }
 
 func mode_value(key: String) -> float:
@@ -48,9 +48,106 @@ func mode_value(key: String) -> float:
 func mode_name() -> String:
 	return String((MODES.get(mode, MODES.normal) as Dictionary).name)
 
+## Did this run start "with my gear"? (INSANE then matches your gear too.)
+var mode_geared := true
+
+## Hard and Insane: the monsters grow to match YOU, so a high-level hero still gets
+## a real fight in the first dungeon. Both modes match your level. INSANE "with my
+## gear" also matches the gear you carry, and adds a bit more on top; start fresh
+## and your gear doesn't count against you. Returns (monster health, monster damage)
+## multipliers; the mode's own multipliers come on top.
+func foe_scale() -> Vector2:
+	if mode == "normal":
+		return Vector2.ONE
+	var z := zone_level()
+	var gz := (2.0 + 2.2 * z) * 1.3            # the gear a hero usually has by this level
+	var ref_dmg := BASE_DAMAGE + (z - 1) * 3.5 + gz
+	var ref_ehp := (BASE_HP + (z - 1) * 18.0) * ((z - 1) + gz + 45.0) / 45.0
+	var lv := maxi(level, z)
+	var you_dmg := BASE_DAMAGE + (lv - 1) * 3.5 + gz
+	var you_ehp := (BASE_HP + (lv - 1) * 18.0) * ((lv - 1) + gz + 45.0) / 45.0
+	var extra := 1.0
+	if mode == "insane" and mode_geared:
+		you_dmg = maxf(you_dmg, BASE_DAMAGE + (level - 1) * 3.5 + gear("damage") + gear("spell") * 0.25)
+		you_ehp = maxf(you_ehp, max_hp() * (defense() + 45.0) / 45.0)
+		extra = 1.15
+	return Vector2(clampf(you_dmg / ref_dmg, 1.0, 12.0) * extra, clampf(you_ehp / ref_ehp, 1.0, 12.0) * extra)
+
+## Loot in Hard and Insane is worth having at your level.
+func mode_ilvl(ilvl: int) -> int:
+	if mode == "normal":
+		return ilvl
+	return maxi(ilvl, level) + (1 if mode == "insane" else 0)
+
+## The levels you can play again from the family portal (after the first adventure).
+const LEVELS := [
+	["vault", "The Deep Vault", "Level 1: rising skeletons, fire vents, the glowing river and the Vault Warden.", Color(0.5, 0.75, 1.0)],
+	["forest", "The Goblin Forest", "Level 2: goblin camps, the Warren, the Sinkhole, Chief Gruk and Grimgor.", Color(0.55, 0.95, 0.45)],
+	["castle", "Ghost Knight Castle", "Level 3: ghost knights, the Bone Crypt, the Bone Colossus and the Ghost Lord.", Color(0.8, 0.65, 1.0)],
+	["cloud", "Cloud Island", "Level 4: storm creatures, the Hail Golem and Mr. Bubbles.", Color(0.6, 0.92, 1.0)],
+]
+## Which level a saved world flag belongs to (chests, monsters, gates, quest items...),
+## so one level can be reset without touching the others. Twins add "+" to the name.
+const ZONE_FLAGS := {
+	"vault": ["e_", "chest_", "gate_corridor", "lever_corridor", "altar", "warden_dead", "victory"],
+	"forest": ["f_", "w_", "s_", "qi_axe", "qi_petal", "qi_strongbox", "sinkhole_", "warren_", "disc_", "gruk", "cyclops", "forest_won"],
+	"castle": ["c_", "qi_beacon", "qi_musicbox", "qi_holy", "qi_locket", "crypt_", "bone_colossus", "ghost_pike", "castle_won"],
+	"cloud": ["cl_", "qi_feather", "qi_sbub", "qi_updraft", "qi_vent", "cloud_won"],
+}
+
+func flag_zone(k: String) -> String:
+	var key := k.rstrip("+")
+	for z in ZONE_FLAGS:
+		for p in ZONE_FLAGS[z]:
+			if key.begins_with(String(p)):
+				return String(z)
+	return ""
+
+## Play one level again, fresh (its monsters, bosses, chests and quests all come
+## back), in Normal, Hard or Insane, with your gear or starting fresh. Everything
+## else in the world stays as you left it.
+func replay_level(z: String, m: String, geared: bool) -> void:
+	mode = m if MODES.has(m) else "normal"
+	mode_geared = geared
+	for k in flags.keys():
+		if flag_zone(String(k)) == z:
+			flags.erase(k)
+	flags.erase("port_from")
+	for q in zone_quests(z):
+		quests.erase(q)
+	if zone_quests(z).has(tracked_quest):
+		tracked_quest = ""
+		tracked_manual = false
+	if z == "vault":
+		inventory.erase("heart_vault")
+	zone = z
+	checkpoint_pos = Vector3.ZERO
+	resume_pos = Vector3.ZERO
+	objective = ""
+	buffs.clear()
+	shroom = 0.0
+	game_over = false
+	if not geared:
+		_start_fresh()
+	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
+	inventory_changed.emit(); stats_changed.emit()
+
+## "Start fresh": everything you've found waits for you in the gear chest at home.
+func _start_fresh() -> void:
+	for id in inventory.duplicate():
+		if id in ["rusty_sword", "traveler_garb"]:
+			continue
+		inventory.erase(id)
+		stash.append(id)
+	for base in ["rusty_sword", "traveler_garb"]:
+		if not inventory.has(base):
+			inventory.append(base)
+	equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
+
 ## Start the whole adventure again from the Vault outpost.
 func new_adventure(m: String, geared: bool) -> void:
 	mode = m if MODES.has(m) else "normal"
+	mode_geared = geared
 	var keep := {}
 	for k in flags:
 		var ks := String(k)
@@ -75,16 +172,7 @@ func new_adventure(m: String, geared: bool) -> void:
 		if item(id).get("slot", "") == "quest":
 			inventory.erase(id)
 	if not geared:
-		# start fresh: everything you've found waits for you in the gear chest
-		for id in inventory.duplicate():
-			if id in ["rusty_sword", "traveler_garb"]:
-				continue
-			inventory.erase(id)
-			stash.append(id)
-		for base in ["rusty_sword", "traveler_garb"]:
-			if not inventory.has(base):
-				inventory.append(base)
-		equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
+		_start_fresh()
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
 	inventory_changed.emit(); stats_changed.emit()
 
@@ -440,6 +528,7 @@ func reset_run() -> void:
 	equipped = {"weapon": "rusty_sword", "armor": "traveler_garb", "artifact": "", "skin": ""}
 	stash = []
 	mode = "normal"
+	mode_geared = true
 	flags = {}
 	quests = {}
 	tracked_quest = ""
@@ -694,7 +783,7 @@ func save_slot(i := -1) -> bool:
 		"inventory": Array(inventory),
 		"equipped": equipped.duplicate(),
 		"stash": Array(stash),
-		"mode": mode,
+		"mode": mode, "mode_geared": mode_geared,
 		"kills": kills, "play_time": play_time,
 		"flags": flags.duplicate(true),
 		"checkpoint_pos": checkpoint_pos, "checkpoint_yaw": checkpoint_yaw, "checkpoint_name": checkpoint_name,
@@ -747,6 +836,7 @@ func load_slot(i: int) -> bool:
 	inventory.assign(d.get("inventory", ["rusty_sword", "traveler_garb"]))
 	stash.assign(d.get("stash", []))
 	mode = String(d.get("mode", "normal"))
+	mode_geared = bool(d.get("mode_geared", true))
 	var eq: Dictionary = d.get("equipped", {})
 	for k in eq:
 		equipped[k] = eq[k]
@@ -1132,7 +1222,11 @@ func forest_objective() -> String:
 	if zone == "cloud":
 		return cloud_objective()
 	if zone == "home":
-		return "Home at last! The family portal in the yard leads back to the Vault." if quest_state("flight_home") == "done" else "Follow the golden rings all the way home."
+		if flags.get("ride_again", false) or quest_state("flight_home") != "done":
+			return "Follow the golden rings all the way home."
+		if flags.get("adventure_done", false):
+			return "Home at last! The family portal in the yard leads to any level, or a whole new adventure."
+		return "Home at last! The family portal in the yard leads back to the Vault."
 	if zone != "forest":
 		return objective
 	if zone_complete("forest"):

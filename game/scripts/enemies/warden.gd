@@ -37,8 +37,11 @@ var _combo := 0
 var _step_acc := 0.0
 var summon_callback: Callable
 
+var _fs := Vector2.ONE     # Hard and Insane: grows to match the hero (see Game.foe_scale)
+
 func _ready() -> void:
-	max_hp *= Game.mode_value("boss_hp")
+	_fs = Game.foe_scale()
+	max_hp *= Game.mode_value("boss_hp") * _fs.x
 	hp = max_hp
 	add_to_group("damageable")
 	add_to_group("enemy")
@@ -142,7 +145,7 @@ func _physics_process(delta: float) -> void:
 				Sfx.play_at("swing", global_position + Vector3(0, 2, 0), 4.0, 0.0, 12.0)
 				var fwd := -Vector3(sin(facing), 0, cos(facing))
 				if dist < 5.2 and fwd.dot(to_p.normalized()) > 0.1 and not pdead:
-					player.take_damage(32.0, global_position, 7.0)
+					player.take_damage(32.0 * _fs.y, global_position, 7.0)
 			if st >= dur:
 				_combo += 1
 				cooldown = 0.6 * tempo
@@ -249,7 +252,7 @@ func _impact(p: Vector3, radius: float, dmg: float) -> void:
 		player.add_trauma(0.55)
 	var d := Vector2(player.global_position.x - p.x, player.global_position.z - p.z).length()
 	if d < radius and player.get("dead") != true and player.global_position.y < p.y + 1.5:
-		player.take_damage(dmg, p, 9.0)
+		player.take_damage(dmg * _fs.y, p, 9.0)
 
 func take_damage(amount: float, from_pos: Vector3, _knock := 0.0, crit := false) -> void:
 	if dead or state == S.DORMANT:
@@ -300,7 +303,7 @@ func _die(from_pos: Vector3) -> void:
 	away.y = 0
 	body.shatter(away.normalized() * 0.6, 4.0, 14.0)
 	Game.kills += 1
-	Game.add_xp(600)
+	Game.add_xp(int(600 * Game.mode_value("reward") * _fs.x))
 	Game.flags["warden_dead"] = true
 	Pickup.spawn(global_position + Vector3(0, 1.5, 0), "item", 1, Loot.make_random(5, 2.0, 3))
 	for i in 6:

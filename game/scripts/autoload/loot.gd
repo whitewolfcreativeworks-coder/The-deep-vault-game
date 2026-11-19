@@ -411,6 +411,7 @@ static func _potions(out: Array, n: int, mana_bias := 0.4) -> void:
 
 ## Chest tiers: small, big, supply (before the boss), boss (after it), skin, weapon, armor.
 static func roll_chest(tier: String, ilvl: int) -> Array:
+	ilvl = Game.mode_ilvl(ilvl)      # Hard and Insane: loot at your level
 	var out: Array = []
 	# any chest might hold a magic costume
 	# full-body costumes are rare treats...
@@ -463,6 +464,7 @@ static func roll_chest(tier: String, ilvl: int) -> Array:
 
 ## What a slain monster drops.
 static func roll_enemy(type_name: String, ilvl: int) -> Array:
+	ilvl = Game.mode_ilvl(ilvl)
 	var out: Array = []
 	var t: Array = {"minion": [0.32, 0.1, 0.0], "warrior": [0.4, 0.18, 0.2], "mage": [0.45, 0.18, 0.2],
 		"revenant": [1.0, 1.0, 1.0], "summon": [0.7, 0.04, 0.0],

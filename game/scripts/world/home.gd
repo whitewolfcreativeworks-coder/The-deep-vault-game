@@ -67,6 +67,7 @@ func build() -> void:
 	var home_done: bool = Game.quest_state("flight_home") == "done" or Game.flags.get("adventure_done", false)
 	if home_done and rp != Vector3.ZERO and Vector2(rp.x, rp.z).length() < 70.0:
 		landed = true
+		Game.flags.erase("ride_again")
 		_portal_awake()
 		if ride:
 			ride.finished = true
@@ -327,6 +328,9 @@ func _land() -> void:
 		Game.say("A perfect flight! The sky leaves a gift by the door.", Color(1.0, 0.9, 0.6))
 		Interactable.create(self, "chest", ground(2.5, 6.5), 180.0, "home_chest", [{"roll": "boss", "ilvl": 14}])
 	Game.on_quest_item("home")
+	if Game.flags.has("ride_again"):
+		Game.flags.erase("ride_again")
+		Game.set_objective(Game.forest_objective())
 	var first := Game.quest_state("flight_home") == "ready"
 	if first:
 		Game.quest_turn_in("flight_home")
@@ -339,7 +343,9 @@ func _portal_awake() -> void:
 		_scen._portal_mat.set_shader_parameter("intensity", 2.0)
 	var lbl := Label3D.new(); lbl.text = "The family portal\n(back to the Vault outpost)"; lbl.font_size = 48; lbl.pixel_size = 0.006
 	var pf: Dictionary = Game.flags.get("port_from", {})
-	if not pf.is_empty():
+	if Game.flags.get("adventure_done", false):
+		lbl.text = "The family portal\n(any level, or a new adventure)"
+	elif not pf.is_empty():
 		lbl.text = "The family portal\n(back to %s, or the Vault outpost)" % Game.PLACE_NAMES.get(String(pf.get("zone", "")), "where you were")
 	lbl.outline_size = 12; lbl.modulate = Color(0.6, 1.0, 0.85); lbl.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 	add_child(lbl); lbl.global_position = ground(IntroMovie.PORTAL.x, IntroMovie.PORTAL.z) + Vector3(0, 6.2, 0)

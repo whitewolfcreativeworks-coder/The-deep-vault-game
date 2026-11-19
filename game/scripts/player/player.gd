@@ -1147,7 +1147,10 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 		var cost := maxf(3.0, dmg * 0.5)
 		if Game.stamina >= cost:
 			Game.stamina -= cost
-			dmg = 0.0 if amount < 40.0 else dmg * 0.15   # only the Warden's biggest blows get through a little
+			# only the biggest blows (the Warden's slams) get through a little; in Hard
+			# and Insane "big" grows with the monsters
+			var big := 40.0 * (Game.mode_value("dmg") * Game.foe_scale().y if Game.mode != "normal" else 1.0)
+			dmg = 0.0 if amount < big else dmg * 0.15
 			blocks += 1
 			Sfx.play("clang", -3.0)
 			_guard_hit = 1.0

@@ -863,3 +863,40 @@ New autotest `modes` (21 checks):
 - every chaos event works;
 - the mode is saved.
 
+
+## Follow-up 26: the level picker, and Insane that matches you (Nov 19, afternoon)
+
+Jason's first Insane run, at level 20 with good gear, found the Deep Vault easy. The mode multipliers sat on top of monsters tuned for a level-4 hero: an Insane skeleton had about 5.6x its health and 3.6x its damage, against a hero who was five times stronger. He also found two portal buttons that went to the same place: "Back to the Deep Vault" and "Visit the Vault outpost".
+
+**Level picker:**
+- Once the adventure is done, the family portal offers Back where I left off / Choose a level / A new adventure! / Stay home.
+- Choose a level lists the four levels plus the Sky Ride, then the usual mode-and-gear panel.
+- `Game.replay_level` resets only that level:
+  - quests come from the existing zone tags;
+  - world flags come from a new prefix table, `Game.ZONE_FLAGS` / `Game.flag_zone()` (`e_`/`chest_` are the Vault; `f_`/`w_`/`s_`/`disc_` are the forest; `c_` is the castle; `cl_` is the cloud). Twin suffixes are stripped.
+- Flags had never recorded their level. The level scripts already used consistent id prefixes, so a table plus a test is enough; no save migration is needed.
+- The test builds each level and checks that every uid-bearing object (enemies, chests, gates, quest items, totems, horses, mounds, lamps) maps back to its own level.
+
+**Monsters that grow to match you** (`Game.foe_scale`):
+- Monster health is scaled by how much the hero's hitting power exceeds a reference hero at the zone's level with typical gear. Monster damage is scaled by how much the hero's effective health (health × armor factor) exceeds that reference.
+- **Hard** and **Insane, start fresh** count your level only, using zone-typical gear. So a fresh start is underpowered at first and catches up as loot drops.
+- **Insane with your gear** uses your actual weapon and armor (when better), times 1.15. This is the "compensates for your best gear" rule Jason asked for.
+- Normal keeps the old gentle out-level bump.
+- Applied in `Enemy._ready` (replacing the out-level bump) and in the Warden. XP and gold scale with the health factor. Loot item level becomes your level in Hard, and your level + 1 in Insane.
+- Blocking still stops ordinary hits fully: the "big blow" threshold grows with the scaling.
+- Meteor damage is now a scaled fixed hit instead of a share of max health.
+- **Fixed a bug:** a twin copied its parent's already-scaled damage multiplier and scaled it again.
+
+**More Insane:**
+- Every monster gets a twin, and most get a third (ids `+` and `++`).
+- Chaos starts 8 s after arrival and repeats every 14–24 s. 30% of the time it's DOUBLE TROUBLE (two events at once).
+- Monster Party brings four.
+
+New autotest `levels`:
+- the portal buttons;
+- the level panel, including the Sky Ride best score;
+- the scaling numbers;
+- the forest replay in Insane with gear: only forest flags and quests reset, other levels untouched, gear kept, packs, grown monsters, chaos within seconds;
+- the Vault replay in Hard, starting fresh;
+- the Sky Ride replay on the dragonfly;
+- uid ownership for all four levels.
