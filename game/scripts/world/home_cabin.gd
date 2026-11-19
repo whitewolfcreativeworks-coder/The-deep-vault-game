@@ -31,6 +31,10 @@ static func build_in(h: HomeWorld) -> HomeCabin:
 func w(p: Vector3) -> Vector3:
 	return AT + p * S
 
+## Where you appear when you come in (by the door or by Port Home).
+static func arrival() -> Vector3:
+	return AT + (IN_DOOR + Vector3(0, 0.05, -1.2)) * S
+
 func is_inside(p: Vector3) -> bool:
 	return absf(p.y - AT.y - 2.0) < 6.0 and absf(p.x - AT.x) < 9.0 and absf(p.z - AT.z) < 8.0
 
@@ -161,7 +165,7 @@ func go_in() -> void:
 	var sc := get_tree().current_scene
 	if sc.has_method("teleport_player"):
 		Sfx.play("door", -4.0, 0.1)
-		sc.teleport_player(w(IN_DOOR + Vector3(0, 0.05, -1.2)), 0.0, "Home sweet home!")
+		sc.teleport_player(arrival(), 0.0, "Home sweet home!")
 
 func go_out() -> void:
 	var sc := get_tree().current_scene

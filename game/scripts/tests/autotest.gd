@@ -281,6 +281,9 @@ func _run() -> void:
 	elif mode == "cabin":
 		if await _cabin_test():
 			return
+	elif mode == "porthome":
+		if await _porthome_test():
+			return
 	elif mode == "walls":
 		await _walls_test()
 	elif mode == "nov18b":
@@ -4570,6 +4573,90 @@ func _cabin_test_2() -> void:
 	player.zoom_target = 6.0; player.zoom = 6.0; player.snap_view()
 	await wait(0.5)
 	await shot("cab_10_back_outside")
+
+
+## Port Home: from the Vault to the cabin, home again from the yard, and back
+## through the family portal to the very spot you left.
+func _ask_press(prefix: String) -> bool:
+	for b in main.menus._ask_btns.get_children():
+		if (b as Button).text.begins_with(prefix):
+			(b as Button).pressed.emit()
+			return true
+	return false
+
+func _porthome_test() -> bool:
+	var phase := int(Game.get_meta("ph_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("ph_phase", 1)
+		Game.level = 16
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "active", "n": 0}
+		check("ph_locked_before_the_flight", not Game.can_port_home())
+		main.ask_port_home()
+		await wait(0.3)
+		check("ph_no_button_yet", main.menus.current == "", main.menus.current)
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		var tc: TouchControls = main.touch
+		check("ph_home_button_shows", tc != null and not tc.button("home").is_empty() and tc._available(tc.button("home")))
+		player = main.player
+		await wait(2.0)     # (stand somewhere safe so it's remembered)
+		Game.set_meta("ph_from", Game.resume_pos)
+		await shot("ph_01_vault_before")
+		Input.action_press("port_home")
+		var ev := InputEventAction.new(); ev.action = "port_home"; ev.pressed = true
+		Input.parse_input_event(ev)
+		await wait(0.4)
+		Input.action_release("port_home")
+		check("ph_asks_first", main.menus.current == "ask" and get_tree().paused, main.menus.current)
+		await shot("ph_02_ask")
+		_ask_press("Port home")
+		return true
+	if phase == 1:
+		Game.set_meta("ph_phase", 2)
+		await wait(3.0)
+		player = main.player
+		god = true
+		var w: HomeWorld = main.world
+		check("ph_arrived_home", Game.zone == "home" and w.landed and w.cabin.is_inside(player.global_position), "%s %s %s" % [Game.zone, w.landed, player.global_position])
+		check("ph_remembers_where_from", String(Game.flags.get("port_from", {}).get("zone", "")) == "vault", str(Game.flags.get("port_from", {})))
+		await shot("ph_03_home")
+		main.ask_port_home()
+		await wait(0.3)
+		check("ph_already_home", main.menus.current == "", main.menus.current)
+		# out in the yard: Port Home pops you back inside
+		await tp(w.ground(IntroMovie.PORTAL.x - 6.0, IntroMovie.PORTAL.z - 6.0) + Vector3(0, 0.3, 0), 0.0)
+		await wait(0.5)
+		main.ask_port_home()
+		await wait(0.3)
+		_ask_press("Port home")
+		await wait(1.5)
+		check("ph_yard_to_cabin", w.cabin.is_inside(player.global_position), str(player.global_position))
+		# the family portal: stay home first, then back to the Vault
+		var pp := w.ground(IntroMovie.PORTAL.x, IntroMovie.PORTAL.z) + Vector3(0, 0.3, 0)
+		await tp(pp, 0.0)
+		await wait(0.8)
+		check("ph_portal_asks", main.menus.current == "ask" and main.menus._ask_title.text == "The family portal", main.menus.current)
+		await shot("ph_04_portal_choice")
+		_ask_press("Stay home")
+		await wait(0.5)
+		check("ph_stay_home", main.menus.current == "" and not get_tree().paused and player.global_position.distance_to(pp) > 2.0, str(player.global_position))
+		await wait(2.0)
+		await tp(pp, 0.0)
+		await wait(0.8)
+		check("ph_portal_asks_again", main.menus.current == "ask", main.menus.current)
+		_ask_press("Back to")
+		return true
+	await wait(3.0)
+	player = main.player
+	var from: Vector3 = Game.get_meta("ph_from", Vector3.ZERO)
+	check("ph_back_where_you_were", Game.zone == "vault" and player.global_position.distance_to(from) < 3.0, "%s %s vs %s" % [Game.zone, player.global_position, from])
+	check("ph_portal_memory_cleared", not Game.flags.has("port_from"))
+	await shot("ph_05_back_in_the_vault")
+	return false
 
 
 ## The chiselled dungeon stone, the carved frieze and the base course.

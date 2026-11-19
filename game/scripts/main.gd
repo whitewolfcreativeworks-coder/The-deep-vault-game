@@ -156,7 +156,10 @@ func _continue_game() -> void:
 	if Game.zone in ["forest", "castle", "cloud", "home"]:
 		Game.objective = Game.forest_objective()
 	Game.set_objective(Game.objective if Game.objective != "" else "Enter the Deep Vault beneath the cliffs.")
-	if Game.zone == "cloud" and Game.resume_pos == Vector3.ZERO:
+	if Game.has_meta("arrive_say"):
+		Game.say(String(Game.get_meta("arrive_say")), UIKit.GOLD)
+		Game.remove_meta("arrive_say")
+	elif Game.zone == "cloud" and Game.resume_pos == Vector3.ZERO:
 		Game.say("Up, up, up through the clouds... Welcome to Cloud Island!", Color(0.85, 0.95, 1.0))
 		if not Game.flags.get("special2_told", false):
 			Game.flags["special2_told"] = true
@@ -315,12 +318,13 @@ func go_back_to_castle() -> void:
 	await menus.fade_to(1.0, 0.8).finished
 	_travel("castle")
 
-func _travel(z: String) -> void:
+func _travel(z: String, arrive := Vector3.ZERO, arrive_yaw := 0.0) -> void:
 	Game.zone = z
 	if z == "cloud":
 		Game.flags["special2"] = true      # every hero learns a second power in the sky
 	Game.checkpoint_pos = Vector3.ZERO
-	Game.resume_pos = Vector3.ZERO
+	Game.resume_pos = arrive               # (zero: the level's own starting spot)
+	Game.resume_yaw = arrive_yaw
 	Game.objective = ""
 	Game.game_over = false
 	Game.in_game = true
@@ -420,7 +424,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		if menus.current == "designer":
 			menus.designer.close(false)      # Esc steps back out of the Skin Designer
-		elif menus.current in ["pause", "inventory", "lore", "stash"]:
+		elif menus.current == "ask" and _ask_cancel.is_valid():
+			_ask_cancel.call()
+		elif menus.current in ["pause", "inventory", "lore", "stash", "ask"]:
 			_resume()
 		elif menus.current == "" and state == "play":
 			_open("pause")
@@ -430,6 +436,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_resume()
 		elif menus.current == "" and state == "play":
 			_open("inventory")
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("port_home"):
+		ask_port_home()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("interact") and menus.current == "lore":
 		_resume()
@@ -473,6 +482,78 @@ func show_boss_bar(w: Warden) -> void:
 
 func hide_boss_bar() -> void:
 	hud.hide_boss()
+
+# --- Port Home ----------------------------------------------------------------------
+var _ask_cancel: Callable      # what Esc does on a question
+## The HOME button (or Y): once unlocked, back to your cabin from anywhere. The
+## family portal in the yard can then take you back to where you were.
+func ask_port_home() -> void:
+	if state != "play" or player == null or player.dead or menus.current != "" or not Game.can_port_home() or not player.input_enabled:
+		return
+	if Game.zone == "home" and world is HomeWorld and (world as HomeWorld).cabin and (world as HomeWorld).cabin.is_inside(player.global_position):
+		Game.say("You're already home!", Color(1.0, 0.9, 0.6))
+		return
+	var here: String = Game.PLACE_NAMES.get(Game.zone, "here")
+	var back := "" if Game.zone == "home" else "\n\nThe family portal in the yard can bring you right back to %s." % here
+	_ask_cancel = _resume
+	menus.ask("Port home?", "Whoosh back to your cabin?" + back, [["Port home!", _port_home], ["Stay here", _resume]])
+	get_tree().paused = true
+	player.set_mouse_captured(false)
+
+func _port_home() -> void:
+	menus.close_all()
+	get_tree().paused = false
+	player.set_mouse_captured(true)
+	if player.mounted:
+		player.dismount()
+	Sfx.play("portal", -2.0, 0.0)
+	FX.burst(player.global_position + Vector3(0, 1.0, 0), Color(0.5, 1.0, 0.85), 80, 6.0, 0.2, 1.0, 2.0)
+	FX.screen_flash(Color(0.75, 1.0, 0.9), 0.9, 1.0)
+	if Game.zone == "home":
+		teleport_player(HomeCabin.arrival(), 0.0, "Whoosh! Home sweet home.")
+		return
+	player.input_enabled = false
+	Game.flags["port_from"] = {"zone": Game.zone, "pos": Game.resume_pos, "yaw": Game.resume_yaw}
+	await menus.fade_to(1.0, 0.8).finished
+	Game.set_meta("arrive_say", "Whoosh! Home sweet home.")
+	_travel("home", HomeCabin.arrival(), 0.0)
+
+## Walking into the family portal after porting home: back to where you were,
+## to the Vault outpost, or stay home.
+func family_portal_choice(stay: Callable) -> void:
+	var pf: Dictionary = Game.flags.get("port_from", {})
+	var there: String = Game.PLACE_NAMES.get(String(pf.get("zone", "")), "where you were")
+	_ask_cancel = func() -> void:
+		_resume()
+		stay.call()
+	menus.ask("The family portal", "Where would you like to go?", [
+		["Back to " + there, func() -> void:
+			menus.close_all(); get_tree().paused = false
+			_port_back()],
+		["The Vault outpost", func() -> void:
+			Game.flags.erase("port_from")
+			menus.close_all(); get_tree().paused = false
+			player.set_mouse_captured(true)
+			FX.screen_flash(Color(0.85, 1.0, 0.95), 1.0, 1.2)
+			Sfx.play("portal", 0.0, 0.0)
+			go_to_vault()],
+		["Stay home", func() -> void:
+			_resume()
+			stay.call()]])
+	get_tree().paused = true
+	player.set_mouse_captured(false)
+
+func _port_back() -> void:
+	var pf: Dictionary = Game.flags.get("port_from", {})
+	Game.flags.erase("port_from")
+	player.set_mouse_captured(true)
+	player.input_enabled = false
+	Sfx.play("portal", 0.0, 0.0)
+	FX.screen_flash(Color(0.85, 1.0, 0.95), 1.0, 1.2)
+	await menus.fade_to(1.0, 0.8).finished
+	var z := String(pf.get("zone", "vault"))
+	Game.set_meta("arrive_say", "Whoosh! Back to %s." % Game.PLACE_NAMES.get(z, "where you were"))
+	_travel(z, pf.get("pos", Vector3.ZERO), float(pf.get("yaw", 0.0)))
 
 ## The desk in the cabin at home: change your name and looks.
 func open_desk() -> void:

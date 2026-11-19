@@ -83,6 +83,7 @@ func _defaults() -> Array:
 		{"name": "view", "action": "toggle_view", "label": "VIEW", "center": Vector2(w - 270, 62), "radius": 44.0, "hold": false},
 		{"name": "inventory", "action": "inventory", "label": "BAG", "center": Vector2(w - 166, 62), "radius": 44.0, "hold": false},
 		{"name": "pause", "action": "pause", "label": "II", "center": Vector2(w - 62, 62), "radius": 44.0, "hold": false},
+		{"name": "home", "action": "port_home", "label": "HOME", "center": Vector2(w - 780, 62), "radius": 44.0, "hold": false},
 	]
 
 func _layout() -> void:
@@ -364,6 +365,8 @@ func _available(b: Dictionary) -> bool:
 		return (player != null and player.has_mount()) or arrange
 	if b.name == "special2":
 		return Game.has_special2() or arrange
+	if b.name == "home":
+		return Game.can_port_home() or arrange
 	return true
 
 func _use_ready() -> bool:
@@ -390,7 +393,7 @@ func _button_at(p: Vector2) -> Dictionary:
 func _press_button(b: Dictionary) -> void:
 	_held[b.name] = true
 	match b.name:
-		"pause", "inventory":
+		"pause", "inventory", "home":
 			var ev := InputEventAction.new()
 			ev.action = b.action; ev.pressed = true
 			Input.parse_input_event(ev)
@@ -494,6 +497,8 @@ func _draw_pad() -> void:
 			fill = Color(0.06, 0.12, 0.38, 0.5 if Game.mana_potions > 0 else 0.2)
 		elif b.name == "energy":
 			fill = Color(0.22, 0.32, 0.04, 0.5 if Game.stamina_potions > 0 else 0.2)
+		elif b.name == "home":
+			fill = Color(0.05, 0.32, 0.28, 0.6)
 		elif b.name == "special":
 			var abc: Color = Game.ability().color
 			fill = Color(abc.r * 0.45, abc.g * 0.3, abc.b * 0.55, 0.6 if player == null or player.special_cd <= 0.0 else 0.25)

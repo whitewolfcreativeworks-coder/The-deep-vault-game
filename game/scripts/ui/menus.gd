@@ -52,6 +52,7 @@ func _ready() -> void:
 	_build_pause()
 	_build_inventory()
 	_build_stash()
+	_build_ask()
 	_build_lore()
 	_build_death()
 	_build_victory()
@@ -1037,6 +1038,36 @@ func _refresh_inventory() -> void:
 		_inv_list.add_child(UIKit.label("Nothing else yet. Open chests and defeat monsters to find gear!", 16, UIKit.DIM))
 	for id in bag:
 		_inv_list.add_child(_item_row(id, false))
+
+# --- a question with a few answers (Port Home, the family portal) -----------------------
+var _ask_title: Label
+var _ask_text: Label
+var _ask_btns: HBoxContainer
+
+func _build_ask() -> void:
+	var p := _center_panel("ask", 900, 380)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 18); p.add_child(v)
+	_ask_title = UIKit.label("", 34, UIKit.GOLD, true); v.add_child(_ask_title)
+	_ask_text = UIKit.label("", 21, UIKit.PARCH)
+	_ask_text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_ask_text.custom_minimum_size = Vector2(840, 130)
+	v.add_child(_ask_text)
+	_ask_btns = HBoxContainer.new(); _ask_btns.add_theme_constant_override("separation", 14)
+	_ask_btns.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(_ask_btns)
+
+## Ask something: options are [label, Callable] pairs; each answer closes the panel itself.
+func ask(title: String, text: String, options: Array) -> void:
+	_ask_title.text = title
+	_ask_text.text = text
+	for c in _ask_btns.get_children():
+		c.queue_free()
+	for o in options:
+		var b := _button(String(o[0]), o[1], 270.0 if options.size() > 2 else 320.0)
+		b.custom_minimum_size.y = 66
+		b.add_theme_font_size_override("font_size", 22)
+		_ask_btns.add_child(b)
+	show_panel("ask")
 
 # --- the gear chest at home ---------------------------------------------------------
 var _stash_bag: VBoxContainer

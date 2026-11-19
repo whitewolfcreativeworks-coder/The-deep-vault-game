@@ -26,6 +26,13 @@ var profile := {
 	"sex": "",              # "male" / "female" ("" = the class's own)
 }
 
+## Port Home: once you've flown home after the main adventure, you can whoosh
+## back to your cabin from anywhere (the HOME button, or Y).
+func can_port_home() -> bool:
+	return quest_state("flight_home") == "done"
+
+const PLACE_NAMES := {"vault": "the Deep Vault", "forest": "the Goblin Forest", "castle": "Ghost Knight Castle", "cloud": "Cloud Island", "home": "home"}
+
 ## Is the hero a man or a woman? (The class's own unless chosen in the creator.)
 func hero_sex() -> String:
 	var sx := String(profile.get("sex", ""))
@@ -548,6 +555,7 @@ func _register_inputs() -> void:
 		"pause": [KEY_ESCAPE], "spell": [KEY_Q], "potion": [KEY_R, KEY_1], "mana_potion": [KEY_F, KEY_2], "stamina_potion": [KEY_H, KEY_4],
 		"zoom_in_key": [KEY_EQUAL, KEY_KP_ADD], "zoom_out_key": [KEY_MINUS, KEY_KP_SUBTRACT],
 		"toggle_view": [KEY_V], "special": [KEY_X], "track_quest": [KEY_T], "mount": [KEY_G], "pose": [KEY_P], "auto_run": [KEY_Z, KEY_NUMLOCK], "special2": [KEY_B, KEY_3],
+		"port_home": [KEY_Y, KEY_HOME],
 	}
 	for action in keys:
 		if not InputMap.has_action(action):

@@ -764,3 +764,5 @@ Exceptions:
 - The desk opens the character creator in "desk mode": the class is locked, Cancel restores your old look, and Done rebuilds your hero.
 - The gear chest is a new `stash` list in the save file (60 items).
 - A game saved in the cabin continues in the cabin with the flight already done. Taking the Sky Gate again means flying the course again.
+
+**Port Home** (asked for the same night). Once the flight home is done, a HOME button (Y or Home on a keyboard) asks "Port home?" and travels to the home zone. You arrive in the cabin. The zone you left and your last safe spot are saved, and the family portal in the yard then offers "Back to <that place>", "The Vault outpost" or "Stay home". The level change takes an optional arrival point for this.

@@ -187,7 +187,7 @@ func _ready() -> void:
 		crosshair.draw_arc(Vector2.ZERO, 9.0, 0, TAU, 24, Color(1, 1, 1, 0.25), 1.5))
 	root.add_child(crosshair)
 
-	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt · X special · B 2nd special\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · T follow next quest · Esc menu", 15, UIKit.DIM)
+	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt · X special · B 2nd special\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · T follow next quest%s · Esc menu" % (" · Y port home" if Game.can_port_home() else ""), 15, UIKit.DIM)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	hint.position = Vector2(-600, -70); hint.size = Vector2(1200, 50)

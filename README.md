@@ -66,6 +66,7 @@ A GPU with Vulkan gives the full look (volumetric fog and light shafts). Without
 | R or 1 | Drink a healing draught |
 | F or 2 | Drink a mana potion |
 | I or Tab | Inventory and character sheet |
+| **Y** or Home | **Port Home** to your cabin (HOME button on iPad). Unlocked after the flight home |
 | Esc | Pause menu |
 
 Basic gamepad support is included: left stick to move, A jump, X attack, LB block, RB spell, B dodge, Y interact, right-stick click special.
@@ -83,6 +84,7 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - **The gear chest:** keep gear you don't want to carry (up to 60 things). Take it back any time.
   - **The bed:** have a nap for full health, magic and energy.
 - **An on-screen keyboard for names.** On an iPad, tap the name box and big letter keys appear.
+- **Port Home.** After the flight home, a **HOME** button appears (Y on a keyboard). It takes you back to the cabin from anywhere, after asking first so a stray tap doesn't whisk you away. Walk into the family portal in the yard and it offers to take you **back to the exact spot you left**, or to the Vault outpost. (It's meant for the open world too.)
 
 ### New in the Nov 18 Goblin Forest notes
 - **Rainbow mushrooms.** Every glowing mushroom in the Goblin Warren (the mine) and around the forest can be eaten. Each one gives a little magic (mana) and a dose of rainbow vision: the screen shimmers, swims and turns rainbow, with rainbow sparkles all around you.

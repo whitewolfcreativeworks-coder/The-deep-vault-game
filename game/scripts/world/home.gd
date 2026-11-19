@@ -154,9 +154,19 @@ func _valley() -> void:
 	pa.body_entered.connect(func(bd: Node) -> void:
 		if bd.is_in_group("player") and landed:
 			pa.set_deferred("monitoring", false)
+			var sc := get_tree().current_scene
+			if not Game.flags.get("port_from", {}).is_empty() and sc.has_method("family_portal_choice"):
+				# you ported home from somewhere: back there, or to the Vault outpost?
+				sc.family_portal_choice(func() -> void:
+					# stayed home: step back out of the portal; it wakes again in a moment
+					var to_door := Vector3(IntroMovie.DOOR.x - IntroMovie.PORTAL.x, 0, IntroMovie.DOOR.z - IntroMovie.PORTAL.z).normalized()
+					var at := IntroMovie.PORTAL + to_door * 3.5
+					player.global_position = ground(at.x, at.z) + Vector3(0, 0.2, 0)
+					player.velocity = Vector3.ZERO
+					get_tree().create_timer(1.5).timeout.connect(func() -> void: pa.monitoring = true))
+				return
 			Sfx.play("portal", 0.0, 0.0)
 			FX.screen_flash(Color(0.85, 1.0, 0.95), 1.0, 1.2)
-			var sc := get_tree().current_scene
 			if sc.has_method("go_to_vault"):
 				get_tree().create_timer(0.5).timeout.connect(sc.go_to_vault))
 	var sg := Label3D.new(); sg.text = "HOME SWEET HOME"; sg.font_size = 72; sg.pixel_size = 0.008; sg.outline_size = 16
@@ -503,14 +513,20 @@ func _land() -> void:
 		Game.say("A perfect flight! The sky leaves a gift by the door.", Color(1.0, 0.9, 0.6))
 		Interactable.create(self, "chest", ground(2.5, 6.5), 180.0, "home_chest", [{"roll": "boss", "ilvl": 14}])
 	Game.on_quest_item("home")
-	if Game.quest_state("flight_home") == "ready":
+	var first := Game.quest_state("flight_home") == "ready"
+	if first:
 		Game.quest_turn_in("flight_home")
+		get_tree().create_timer(6.0).timeout.connect(func() -> void:
+			Game.say("NEW! Port Home: tap HOME (or press Y) to whoosh back to your cabin from anywhere.", Color(0.5, 1.0, 0.8)))
 	_portal_awake()
 
 func _portal_awake() -> void:
 	if _scen and _scen._portal_mat:
 		_scen._portal_mat.set_shader_parameter("intensity", 2.0)
 	var lbl := Label3D.new(); lbl.text = "The family portal\n(back to the Vault outpost)"; lbl.font_size = 48; lbl.pixel_size = 0.006
+	var pf: Dictionary = Game.flags.get("port_from", {})
+	if not pf.is_empty():
+		lbl.text = "The family portal\n(back to %s, or the Vault outpost)" % Game.PLACE_NAMES.get(String(pf.get("zone", "")), "where you were")
 	lbl.outline_size = 12; lbl.modulate = Color(0.6, 1.0, 0.85); lbl.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 	add_child(lbl); lbl.global_position = ground(IntroMovie.PORTAL.x, IntroMovie.PORTAL.z) + Vector3(0, 6.2, 0)
 
