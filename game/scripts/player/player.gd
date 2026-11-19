@@ -702,7 +702,7 @@ func _update_timers(delta: float) -> void:
 		Game.stamina = minf(Game.max_stamina(), Game.stamina + 30.0 * delta * (1.7 if Game.has_buff("fed") else 1.0))
 	Game.tick_buffs(delta)
 	if Game.shroom > 0.0:
-		Game.shroom = maxf(0.0, Game.shroom - delta / 16.0)     # each mushroom wears off in about 16 s
+		Game.shroom = maxf(0.0, Game.shroom - delta / 10.0)     # one mushroom wears off in about 13 s
 		_shroom_t += delta
 		if Game.shroom >= 5.0 and is_on_floor() and not mounted and vehicle == null:
 			# far too many mushrooms: you wobble about on your own
@@ -1534,10 +1534,14 @@ func _update_camera(delta: float) -> void:
 	var tt := Time.get_ticks_msec() * 0.001
 	camera.h_offset = sin(tt * 37.0) * 0.12 * sh
 	camera.v_offset = cos(tt * 41.0) * 0.12 * sh
-	camera.rotation.z = sin(tt * 23.0) * 0.04 * sh
+	# rainbow vision (glowing mushrooms): the view breathes in and out and sways
+	var trip := clampf(Game.shroom, 0.0, 5.0) / 5.0
+	var trip_on := smoothstep(0.0, 0.6, Game.shroom)
+	camera.rotation.z = sin(tt * 23.0) * 0.04 * sh + sin(tt * 0.8) * deg_to_rad(1.5 + 4.5 * trip) * trip_on
+	var trip_fov := sin(tt * 1.3) * (3.0 + 8.0 * trip) * trip_on
 	var sprint_kick := 5.0 if hspeed > WALK + 0.8 else 0.0
 	fov_kick = maxf(0.0, fov_kick - delta * 30.0)
-	camera.fov = lerpf(camera.fov, (80.0 if fp else 74.0) + sprint_kick + fov_kick, 1.0 - exp(-(5.0 if fov_kick < 0.5 else 14.0) * delta))
+	camera.fov = lerpf(camera.fov, (80.0 if fp else 74.0) + sprint_kick + fov_kick + trip_fov, 1.0 - exp(-(5.0 if fov_kick < 0.5 else 14.0) * delta))
 
 var _head_hidden := false
 var kill_y := -40.0      # falling below this is death (the forest Warren sits deeper)

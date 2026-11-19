@@ -50,9 +50,15 @@ const HAIR_STYLE_NAMES := {"natural": "Natural", "short": "Short", "long": "Long
 const HAIR_COLORS2 := [Color(0.5, 0.3, 0.2), Color(0.12, 0.08, 0.06), Color(0.32, 0.19, 0.1), Color(0.55, 0.3, 0.14), Color(0.85, 0.66, 0.35),
 	Color(0.78, 0.33, 0.12), Color(0.9, 0.9, 0.92), Color(0.25, 0.45, 0.95), Color(0.95, 0.4, 0.7), Color(0.3, 0.75, 0.35)]
 const HAIR_COLOR_NAMES := ["Hero's own", "Black", "Dark brown", "Chestnut", "Blonde", "Ginger", "White", "Blue", "Pink", "Green"]
-const FACES := ["none", "beard", "mustache", "eyepatch", "glow_eyes", "mask", "warpaint"]
-const FACE_NAMES := {"none": "Plain", "beard": "Beard", "mustache": "Mustache", "eyepatch": "Eyepatch",
-	"glow_eyes": "Glowing eyes", "mask": "Ninja mask", "warpaint": "War paint"}
+const FACES := ["none", "beard", "mustache", "makeup", "glitter", "eyepatch", "glow_eyes", "mask", "warpaint"]
+const FACE_NAMES := {"none": "Plain", "beard": "Beard", "mustache": "Mustache", "makeup": "Makeup", "glitter": "Glitter",
+	"eyepatch": "Eyepatch", "glow_eyes": "Glowing eyes", "mask": "Ninja mask", "warpaint": "War paint"}
+## Heroes can have beards and moustaches; heroines get makeup and glitter instead.
+const MAN_FACES := ["none", "beard", "mustache", "eyepatch", "glow_eyes", "mask", "warpaint"]
+const WOMAN_FACES := ["none", "makeup", "glitter", "eyepatch", "glow_eyes", "mask", "warpaint"]
+
+func faces_for(sex: String) -> Array:
+	return WOMAN_FACES if sex == "female" else MAN_FACES
 const HERO_ORDER := ["Knight", "Rogue", "Barbarian", "Ranger", "Mage", "Priest", "Druid", "Necromancer", "Beastmaster"]
 const HERO_BLURB := {
 	"Knight": "A sworn blade of the old roads.",

@@ -476,7 +476,7 @@ func _build_creator() -> void:
 		b.custom_minimum_size.y = 56
 		b.add_theme_font_size_override("font_size", 20)
 		fg.add_child(b); _face_btns[f] = b
-	pf.add_child(UIKit.label("Beards, mustaches and war paint take your hair colour.", 16, UIKit.DIM))
+	pf.add_child(UIKit.label("Beards and mustaches take your hair colour. Heroines get makeup and glitter instead.", 16, UIKit.DIM))
 	# Colours
 	var pc := _page("colours", stack)
 	_heading("Armor & cloak colour", pc)
@@ -674,6 +674,10 @@ func _is_silly_name(t: String) -> bool:
 func _set_sex(sex: String) -> void:
 	var was := Game.hero_sex()
 	Game.profile.sex = sex
+	# beards and moustaches become makeup and glitter (and back)
+	var swap := {"beard": "makeup", "mustache": "glitter", "makeup": "beard", "glitter": "mustache"}
+	if not String(Game.profile.face) in Game.faces_for(sex):
+		Game.profile.face = swap.get(String(Game.profile.face), "none")
 	if was != sex and (_is_silly_name(_name_edit.text) or _name_edit.text.strip_edges() == ""):
 		_name_edit.text = random_name(sex)
 	_refresh_preview(true)
@@ -681,10 +685,11 @@ func _set_sex(sex: String) -> void:
 func _randomize_look() -> void:
 	var p := Game.profile
 	p.sex = ["male", "female"].pick_random()
+	p.face = Game.faces_for(p.sex).pick_random()
 	p.skin = randi() % Game.SKIN_COLORS.size()
-	p.hair_style = Game.HAIR_STYLES2.pick_random()
+	p.hair_style = Game.HAIR_STYLES2.filter(func(h: String) -> bool:
+		return not (p.sex == "female" and h in CharacterModel.HAIR_HEAD_BEARDED)).pick_random()
 	p.hair_color = randi() % Game.HAIR_COLORS2.size()
-	p.face = Game.FACES.pick_random()
 	p.cape = randi() % Game.CAPE_COLORS.size()
 	p.build = snappedf(randf_range(0.85, 1.25), 0.01)
 	p.height = snappedf(randf_range(0.88, 1.12), 0.01)
@@ -711,6 +716,12 @@ func _refresh_preview(cheer := false) -> void:
 	for k in _face_btns:
 		(_face_btns[k] as Button).set_pressed_no_signal(k == p.face)
 	var sex := Game.hero_sex()
+	# only the face details for a man or for a woman
+	if not String(p.face) in Game.faces_for(sex):
+		p.face = {"beard": "makeup", "mustache": "glitter", "makeup": "beard", "glitter": "mustache"}.get(String(p.face), "none")
+	for k in _face_btns:
+		(_face_btns[k] as Button).visible = k in Game.faces_for(sex)
+		(_face_btns[k] as Button).set_pressed_no_signal(k == p.face)
 	for k in _sex_btns:
 		(_sex_btns[k] as Button).set_pressed_no_signal(k == sex)
 	# the Wild and Bald heads come with beards, so they're for men

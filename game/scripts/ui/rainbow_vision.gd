@@ -1,31 +1,47 @@
 extends CanvasLayer
 class_name RainbowVision
-## The full-screen rainbow-vision effect from eating glowing mushrooms (Game.shroom),
-## drawn under the HUD, plus rainbow sparkles drifting round the hero.
+## "Rainbow vision" from eating glowing mushrooms (Game.shroom, 0..5): the game
+## goes wavy and colourful but stays playable. Drawn under the HUD:
+##   - slow waves of rainbow colour multiplied onto the view (shaders/rainbow_vision)
+##   - a soft rainbow glow round the edges and drifting colour blobs (shaders/rainbow_glow)
+##   - the camera breathes in and out and sways (see Player._camera_trip)
+##   - rainbow sparkles drift round the hero
+## None of it reads the screen back, so it looks the same on the iPad as on a PC.
 
-var _rect: ColorRect
-var _mat: ShaderMaterial
+var _tint: ColorRect
+var _glow: ColorRect
+var _tint_mat: ShaderMaterial
+var _glow_mat: ShaderMaterial
 var _t := 0.0
 var _sparkles: CPUParticles3D
 var player: Node3D
 
 func _ready() -> void:
 	layer = 2
-	_rect = ColorRect.new()
-	_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_mat = ShaderMaterial.new(); _mat.shader = load("res://shaders/rainbow_vision.gdshader")
-	_rect.material = _mat
-	_rect.visible = false
-	add_child(_rect)
+	_tint_mat = ShaderMaterial.new(); _tint_mat.shader = load("res://shaders/rainbow_vision.gdshader")
+	_glow_mat = ShaderMaterial.new(); _glow_mat.shader = load("res://shaders/rainbow_glow.gdshader")
+	_tint = _rect(_tint_mat)
+	_glow = _rect(_glow_mat)
+
+func _rect(m: ShaderMaterial) -> ColorRect:
+	var r := ColorRect.new()
+	r.set_anchors_preset(Control.PRESET_FULL_RECT)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.material = m
+	r.visible = false
+	add_child(r)
+	return r
 
 func _process(delta: float) -> void:
 	_t += delta
 	var amt := clampf(Game.shroom, 0.0, 5.0)
-	_rect.visible = amt > 0.02
-	if _rect.visible:
-		_mat.set_shader_parameter("amount", amt)
-		_mat.set_shader_parameter("t", _t)
+	var on := amt > 0.02
+	_tint.visible = on
+	_glow.visible = on
+	if on:
+		for m in [_tint_mat, _glow_mat]:
+			(m as ShaderMaterial).set_shader_parameter("amount", amt)
+			(m as ShaderMaterial).set_shader_parameter("t", _t)
 	# rainbow sparkles round the hero
 	if player and is_instance_valid(player):
 		if _sparkles == null or not is_instance_valid(_sparkles):
@@ -40,5 +56,5 @@ func _process(delta: float) -> void:
 			_sparkles.color_ramp = g
 			_sparkles.position.y = 1.2
 			player.add_child(_sparkles)
-		_sparkles.emitting = amt > 0.5
+		_sparkles.emitting = amt > 0.3
 		_sparkles.scale = Vector3.ONE * clampf(0.5 + amt * 0.15, 0.5, 1.25)

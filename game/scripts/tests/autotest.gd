@@ -158,6 +158,8 @@ func _run() -> void:
 		await _looks_test()
 	elif mode == "sexes":
 		await _sexes_test()
+	elif mode == "faces2":
+		await _faces2_test()
 	elif mode == "special":
 		await _special_test()
 	elif mode == "combat2":
@@ -281,6 +283,8 @@ func _run() -> void:
 	elif mode == "cabin":
 		if await _cabin_test():
 			return
+	elif mode == "shroomvis":
+		await _shroomvis_test()
 	elif mode == "porthome":
 		if await _porthome_test():
 			return
@@ -2013,6 +2017,48 @@ func _looks_test() -> void:
 	await wait(0.6)
 	await shot("k_creator_random")
 	check("looks_rendered", true)
+
+## Face details on heroes and heroines: makeup and glitter for women only, the
+## ninja mask that follows the face, and eye details on the long-hair heads.
+func _faces2_test() -> void:
+	var m = main.menus
+	m.show_panel("creator")
+	await wait(0.5)
+	m._set_tab("face")
+	m.current = "looks"
+	var cam: Camera3D = m._preview_vp.find_children("*", "Camera3D", true, false)[0]
+	Game.profile.merge({"hair_style": "natural", "skin": 0, "hair_color": 0, "cape": 0, "build": 1.0, "height": 1.0, "show_hat": false}, true)
+	for combo in [["Knight", "male"], ["Knight", "female"], ["Rogue", "female"], ["Necromancer", "male"], ["Barbarian", "female"]]:
+		Game.profile.hero = combo[0]
+		m._set_sex(combo[1])
+		for f in Game.faces_for(combo[1]):
+			Game.profile.face = f
+			m._refresh_preview()
+			for side in [PI, PI + 0.8]:
+				m._preview.rotation.y = side
+				cam.position = Vector3(0, 1.8, 4.2); cam.look_at(Vector3(0, 1.62, 0))
+				await frames(4)
+				await RenderingServer.frame_post_draw
+				m._preview_vp.get_texture().get_image().save_png(out_dir.path_join("fc_%s_%s_%s_%s.png" % [combo[0], combo[1], f, "f" if side == PI else "s"]))
+	# switching to a woman turns a beard into makeup, and the beard button hides
+	Game.profile.hero = "Knight"
+	m._set_sex("male")
+	Game.profile.face = "beard"
+	m._refresh_preview()
+	m._set_sex("female")
+	await frames(2)
+	check("fc_beard_becomes_makeup", Game.profile.face == "makeup", Game.profile.face)
+	check("fc_no_beard_button_for_women", not (m._face_btns["beard"] as Button).visible and (m._face_btns["glitter"] as Button).visible)
+	m._set_sex("male")
+	await frames(2)
+	check("fc_makeup_back_to_beard", Game.profile.face == "beard" and not (m._face_btns["makeup"] as Button).visible, Game.profile.face)
+	var shells := 0
+	Game.profile.face = "mask"
+	m._refresh_preview()
+	for mi in m._preview.find_children("*", "MeshInstance3D", true, false):
+		if (mi as MeshInstance3D).mesh is ArrayMesh and (mi as MeshInstance3D).get_parent() == m._preview.looks_root:
+			shells += 1
+	check("fc_mask_follows_the_face", shells >= 1, "%d" % shells)
 
 ## Every class as a man and as a woman, helm on and off, body and face.
 func _sexes_test() -> void:
@@ -4574,6 +4620,61 @@ func _cabin_test_2() -> void:
 	await wait(0.5)
 	await shot("cab_10_back_outside")
 
+
+## Rainbow vision must leave the game visible: shots at 0, 1, 2 and 5 mushrooms'
+## worth from the same spot, compared with the plain view (small grey copies).
+func _gray_small() -> PackedFloat32Array:
+	await frames(3)
+	var img := get_viewport().get_texture().get_image()
+	img.resize(48, 27, Image.INTERPOLATE_BILINEAR)
+	var out := PackedFloat32Array()
+	for y in 27:
+		for x in 48:
+			out.append(img.get_pixel(x, y).get_luminance())
+	return out
+
+func _corr(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
+	var ma := 0.0; var mb := 0.0
+	for i in a.size():
+		ma += a[i]; mb += b[i]
+	ma /= a.size(); mb /= b.size()
+	var sab := 0.0; var saa := 0.0; var sbb := 0.0
+	for i in a.size():
+		sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) * (a[i] - ma); sbb += (b[i] - mb) * (b[i] - mb)
+	return sab / sqrt(maxf(saa * sbb, 1e-9))
+
+func _shroomvis_test() -> void:
+	await _start()
+	player = main.player
+	god = true
+	await tp(Vector3(0, 0.2, 24), 0.0, -0.1)
+	player.zoom_target = 5.0; player.zoom = 5.0; player.snap_view()
+	await wait(1.5)
+	Game.shroom = 0.0
+	await wait(0.5)
+	var base := await _gray_small()
+	await shot("sv_0_plain")
+	var mean0 := 0.0
+	for v in base:
+		mean0 += v
+	mean0 /= base.size()
+	for lv in [1.3, 2.6, 5.2]:
+		Game.shroom = lv
+		await wait(1.2)
+		Game.shroom = lv
+		var g := await _gray_small()
+		await shot("sv_%d_mushrooms" % roundi(lv / 1.3))
+		var mean := 0.0
+		for v in g:
+			mean += v
+		mean /= g.size()
+		var c := _corr(base, g)
+		print("SHROOMVIS level %.1f corr %.2f mean %.2f (plain %.2f)" % [lv, c, mean, mean0])
+		check("sv_still_see_the_game_%d" % roundi(lv / 1.3), c > (0.35 if lv > 5.0 else 0.5) and mean > mean0 * 0.55, "corr %.2f, brightness %.2f of %.2f" % [c, mean, mean0])
+	# and it wears off: one mushroom in about 13 seconds
+	Game.shroom = 1.3
+	await wait(14.0)
+	check("sv_wears_off", Game.shroom < 0.05, "%.2f" % Game.shroom)
 
 ## Port Home: from the Vault to the cabin, home again from the yard, and back
 ## through the family portal to the very spot you left.

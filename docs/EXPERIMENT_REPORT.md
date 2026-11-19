@@ -766,3 +766,14 @@ Exceptions:
 - A game saved in the cabin continues in the cabin with the flight already done. Taking the Sky Gate again means flying the course again.
 
 **Port Home** (asked for the same night). Once the flight home is done, a HOME button (Y or Home on a keyboard) asks "Port home?" and travels to the home zone. You arrive in the cabin. The zone you left and your last safe spot are saved, and the family portal in the yard then offers "Back to <that place>", "The Vault outpost" or "Stay home". The level change takes an optional arrival point for this.
+
+**Rainbow vision, take two** (the next playtest). On the iPad, eating a mushroom showed nothing but one big rainbow, with the game gone. The effect read the screen back (`hint_screen_texture`) to warp it, and in the iPad's WebGL build that read seems to have returned nothing. The colour bands and rainbow arc were then all that was drawn. Even on a PC, three mushrooms' worth was more rainbow than game. The new effect never reads the screen:
+- One overlay is multiplied onto the view: slow waves of rainbow colour.
+- A second overlay is added: a rainbow glow at the edges and drifting blobs.
+- The camera's field of view breathes and the camera sways.
+- The sparkles round the hero stay.
+
+A new test (`shroomvis`) shoots the same view plain and at one, two and five mushrooms' worth, and checks that the picture still matches the plain one (correlation of small grey copies) and isn't darker. It passes in both the desktop and the web (compatibility) renderer. One mushroom now lasts about 13 seconds, and five in a row about a minute.
+
+**Faces for heroines, and the ninja mask.** Women get Makeup and Glitter in place of Beard and Mustache, and switching sex swaps one for the other. The ninja mask is now a copy of the visible head's own triangles below the bridge of the nose and in front of the ears. They are clipped against those two planes, pushed out 3 cm along their normals, and drawn in dark cloth, with a strap fitted by rays and a knot at the back. Face details on swapped heads are now placed from the nose tip, so eyepatches and glowing eyes sit on the eyes of the long-hair heads.
+

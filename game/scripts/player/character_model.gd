@@ -1308,17 +1308,7 @@ func _head_hit(from: Vector3, dir: Vector3) -> Variant:
 	return _head_xf * (hit.position as Vector3)
 
 ## A woman's face: lashes, rosy lips and cheeks; under a helm, a long braid.
-func _female_face(c: Vector3, rx: float, ry: float, rz: float, _eye_x: float, _eye_y: float, fz: Callable, covered: bool, cfg: Dictionary) -> void:
-	# Every KayKit head shares one face: find the nose (the face's frontmost point
-	# down the middle) and lay the eyes, mouth and cheeks out from it.
-	var nose_y := c.y - ry * 0.45
-	var best := -INF
-	var yy := c.y - ry * 0.1
-	while yy > c.y - ry * 0.7:
-		var z: float = fz.call(0.0, yy)
-		if z > best:
-			best = z; nose_y = yy
-		yy -= 0.01
+func _female_face(c: Vector3, rx: float, ry: float, rz: float, nose_y: float, fz: Callable, covered: bool, cfg: Dictionary, mouth := true) -> void:
 	var eye_c := nose_y + 0.105
 	var eye_x := 0.24
 	# lashes: three little flicks round the top outer edge of each eye
@@ -1330,9 +1320,10 @@ func _female_face(c: Vector3, rx: float, ry: float, rz: float, _eye_x: float, _e
 			var p2 := Vector2(sd * eye_x, eye_c) + Vector2(sd * cos(a) * 0.088, sin(a) * 0.064) + d * 0.022
 			var lz: float = fz.call(p2.x, p2.y) + 0.006
 			_piece(_boxm(0.014, 0.05, 0.012), lash, Vector3(p2.x, p2.y, lz), Vector3.ONE, Vector3(0, 0, -atan2(d.x, d.y)))
-	# rosy lips
+	# rosy lips (not under a ninja mask)
 	var lip_y := nose_y - 0.165
-	_piece(_sphere(), _look_mat(Color(0.88, 0.3, 0.42), 0.35), Vector3(0, lip_y, float(fz.call(0.0, lip_y)) - 0.004), Vector3(0.075, 0.026, 0.03))
+	if mouth:
+		_piece(_sphere(), _look_mat(Color(0.88, 0.3, 0.42), 0.35), Vector3(0, lip_y, float(fz.call(0.0, lip_y)) - 0.004), Vector3(0.075, 0.026, 0.03))
 	# and pink cheeks
 	var pink := StandardMaterial3D.new()
 	pink.albedo_color = Color(1.0, 0.45, 0.5, 0.45)
@@ -1340,7 +1331,7 @@ func _female_face(c: Vector3, rx: float, ry: float, rz: float, _eye_x: float, _e
 	pink.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	pink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	pink.cull_mode = BaseMaterial3D.CULL_DISABLED
-	for sd in [-1.0, 1.0]:
+	for sd in ([-1.0, 1.0] if mouth else []):
 		var cy := nose_y - 0.01
 		var cx: float = sd * 0.31
 		var qd := QuadMesh.new(); qd.size = Vector2(0.16, 0.09)
@@ -1364,6 +1355,157 @@ func _female_face(c: Vector3, rx: float, ry: float, rz: float, _eye_x: float, _e
 			for k in 5:
 				var r2 := rx * (0.15 - k * 0.012)
 				_piece(_sphere(), hm, Vector3(sd * rx * (0.9 - k * 0.02), c.y - ry * (0.42 + k * 0.2), c.z + rz * (0.12 - k * 0.03)), Vector3(r2, r2 * 1.35, r2 * 0.9))
+
+## A ninja mask: dark cloth that follows the face itself (a copy of the head's own
+## surface below the bridge of the nose, puffed out a little), tied with a strap
+## and a knot at the back with two tails.
+func _ninja_mask(hero: Dictionary, c: Vector3, rx: float, ry: float, rz: float, nose_y: float, long_hair := false) -> void:
+	var cloth := _look_mat(Color(0.09, 0.1, 0.16), 0.85)
+	var top := nose_y + 0.03
+	# (on long hair, just the face: not the locks hanging down beside it)
+	var shell := _face_shell(hero, top, c.z - rz * 0.25, 0.03, 0.43 if long_hair else INF)
+	if shell:
+		_piece(shell, cloth, Vector3.ZERO)
+	else:
+		_piece(_sphere(), cloth, Vector3(c.x, nose_y - 0.1, c.z + rz * 0.3), Vector3(rx * 0.9, 0.16, rz * 0.75))
+	# tied in a knot at the back of the head, with two tails
+	var by := top - 0.04
+	var back_z := c.z - rz
+	var h_b = _head_hit(Vector3(0, by, c.z - 6.0), Vector3(0, 0, 1))
+	if h_b != null:
+		back_z = (h_b as Vector3).z
+	var knot := _piece(_sphere(), cloth, Vector3(0, by, back_z - 0.03), Vector3(0.07, 0.06, 0.05))
+	for sd in [-1.0, 1.0]:
+		var tail := _piece(_boxm(0.06, 0.24, 0.015), cloth, knot.position + Vector3(sd * 0.05, -0.12, -0.02))
+		tail.rotation = Vector3(0.25, 0, sd * 0.4)
+
+## The visible head's own surface below `top_y` and in front of `back_z`, pushed out
+## along its normals by `out` (in skeleton space, like every face detail).
+func _face_shell(hero: Dictionary, top_y: float, back_z: float, out: float, half_w := INF) -> ArrayMesh:
+	var fm := _visible_head(hero)
+	if fm == null or fm.mesh == null:
+		return null
+	var xf: Transform3D = fm.transform if fm.get_parent() == skel else Transform3D.IDENTITY
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	# The low-poly heads are flat shaded (every corner has its own copy per face),
+	# so pushing each face out along its own normal would crack the shell open
+	# along every edge. Average the normals of corners that share a position.
+	var avg := {}
+	var surfs: Array = []
+	for si in fm.mesh.get_surface_count():
+		var arr := fm.mesh.surface_get_arrays(si)
+		var vs: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var ns: PackedVector3Array = arr[Mesh.ARRAY_NORMAL] if arr[Mesh.ARRAY_NORMAL] != null else PackedVector3Array()
+		var ix: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		surfs.append([vs, ns, ix])
+		for vi in vs.size():
+			var key := (xf * vs[vi]).snapped(Vector3.ONE * 0.0005)
+			var n: Vector3 = (xf.basis * ns[vi]).normalized() if vi < ns.size() else Vector3.BACK
+			avg[key] = avg.get(key, Vector3.ZERO) + n
+	for sf in surfs:
+		var vs: PackedVector3Array = sf[0]
+		var ix: PackedInt32Array = sf[2]
+		var tris := ix.size() / 3 if ix.size() > 0 else vs.size() / 3
+		for t in tris:
+			var poly: Array = []
+			for j in 3:
+				var vi: int = ix[t * 3 + j] if ix.size() > 0 else t * 3 + j
+				var p: Vector3 = xf * vs[vi]
+				var n: Vector3 = (avg.get(p.snapped(Vector3.ONE * 0.0005), Vector3.BACK) as Vector3).normalized()
+				poly.append([p + n * out, n])
+			poly = _clip_poly(poly, func(p: Vector3) -> float: return top_y - p.y)
+			poly = _clip_poly(poly, func(p: Vector3) -> float: return p.z - back_z)
+			if half_w < INF:
+				poly = _clip_poly(poly, func(p: Vector3) -> float: return half_w - absf(p.x))
+			for k in range(1, poly.size() - 1):
+				for q in [poly[0], poly[k], poly[k + 1]]:
+					verts.append(q[0]); norms.append(q[1])
+	if verts.size() < 3:
+		return null
+	var am := ArrayMesh.new()
+	var a := []
+	a.resize(Mesh.ARRAY_MAX)
+	a[Mesh.ARRAY_VERTEX] = verts
+	a[Mesh.ARRAY_NORMAL] = norms
+	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
+	return am
+
+## Keep the part of a polygon ([position, normal] pairs) where side(p) >= 0.
+func _clip_poly(poly: Array, side: Callable) -> Array:
+	var out: Array = []
+	for i in poly.size():
+		var a: Array = poly[i]
+		var b: Array = poly[(i + 1) % poly.size()]
+		var da: float = side.call(a[0]); var db: float = side.call(b[0])
+		if da >= 0.0:
+			out.append(a)
+		if (da >= 0.0) != (db >= 0.0):
+			var t := da / (da - db)
+			out.append([(a[0] as Vector3).lerp(b[0], t), (a[1] as Vector3).lerp(b[1], t).normalized()])
+	return out
+
+## Makeup: shimmering eyeshadow, bold lips and rosy cheeks.
+func _makeup(nose_y: float, fz: Callable) -> void:
+	var eye_c := nose_y + 0.105
+	var shadow := StandardMaterial3D.new()
+	shadow.albedo_color = Color(0.72, 0.28, 0.95, 0.95)
+	shadow.albedo_texture = FX.soft_texture()
+	shadow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	shadow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	shadow.cull_mode = BaseMaterial3D.CULL_DISABLED
+	for sd in [-1.0, 1.0]:
+		var x: float = sd * 0.245
+		var y := eye_c + 0.05
+		var q := QuadMesh.new(); q.size = Vector2(0.25, 0.11)
+		_piece(q, shadow, Vector3(x, y, float(fz.call(x, y)) + 0.014), Vector3.ONE, Vector3(0, sd * 0.3, sd * -0.12))
+	var lip_y := nose_y - 0.165
+	_piece(_sphere(), _look_mat(Color(0.85, 0.08, 0.22), 0.2), Vector3(0, lip_y, float(fz.call(0.0, lip_y)) + 0.002), Vector3(0.09, 0.034, 0.034))
+	var pink := StandardMaterial3D.new()
+	pink.albedo_color = Color(1.0, 0.35, 0.45, 0.5)
+	pink.albedo_texture = FX.soft_texture()
+	pink.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pink.cull_mode = BaseMaterial3D.CULL_DISABLED
+	for sd in [-1.0, 1.0]:
+		var cx: float = sd * 0.3
+		var q2 := QuadMesh.new(); q2.size = Vector2(0.18, 0.1)
+		_piece(q2, pink, Vector3(cx, nose_y - 0.01, float(fz.call(cx, nose_y - 0.01)) + 0.009), Vector3.ONE, Vector3(0, sd * 0.5, 0))
+
+## Glitter: little rainbow gems on the cheeks, a star by one eye, and sparkles
+## that twinkle on and off.
+func _glitter(nose_y: float, fz: Callable) -> void:
+	var eye_c := nose_y + 0.105
+	var cols := [Color(1.0, 0.45, 0.8), Color(0.55, 0.8, 1.0), Color(1.0, 0.9, 0.4), Color(0.75, 0.55, 1.0), Color(0.5, 1.0, 0.8)]
+	var rng := RandomNumberGenerator.new(); rng.seed = 7
+	for sd in [-1.0, 1.0]:
+		for k in 7:
+			var x: float = sd * (0.22 + rng.randf_range(0.0, 0.16))
+			var y: float = nose_y + rng.randf_range(-0.06, 0.05)
+			var col: Color = cols[k % cols.size()]
+			var m := StandardMaterial3D.new(); m.albedo_color = col; m.emission_enabled = true; m.emission = col
+			m.emission_energy_multiplier = 1.6; m.metallic = 0.8; m.roughness = 0.15
+			_piece(_sphere(), m, Vector3(x, y, float(fz.call(x, y)) + 0.004), Vector3.ONE * rng.randf_range(0.009, 0.016))
+	# a little four-pointed star beside the right eye
+	var gold := StandardMaterial3D.new(); gold.albedo_color = Color(1.0, 0.85, 0.35); gold.emission_enabled = true
+	gold.emission = Color(1.0, 0.8, 0.3); gold.emission_energy_multiplier = 2.0; gold.metallic = 0.9; gold.roughness = 0.2
+	var sx := 0.4; var sy := eye_c - 0.02
+	var sz: float = float(fz.call(sx, sy)) + 0.006
+	for r in [0.0, PI / 2]:
+		_piece(_boxm(0.014, 0.075, 0.008), gold, Vector3(sx, sy, sz), Vector3.ONE, Vector3(0, 0.6, r + PI / 4))
+		_piece(_boxm(0.01, 0.045, 0.008), gold, Vector3(sx, sy, sz), Vector3.ONE, Vector3(0, 0.6, r))
+	# twinkles
+	var tw := CPUParticles3D.new(); tw.amount = 14; tw.lifetime = 0.9; tw.local_coords = true
+	tw.mesh = FX.quad(0.035); tw.material_override = FX.glow_material(Color(1, 1, 1), 3.0)
+	tw.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX; tw.emission_box_extents = Vector3(0.36, 0.08, 0.03)
+	tw.gravity = Vector3.ZERO; tw.initial_velocity_min = 0.0; tw.initial_velocity_max = 0.01
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+	ramp.colors = PackedColorArray([Color(1, 0.8, 1, 0), Color(1, 1, 1, 1), Color(0.8, 0.9, 1, 0)])
+	tw.color_ramp = ramp
+	tw.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	looks_root.add_child(tw)
+	tw.position = Vector3(0, nose_y + 0.01, float(fz.call(0.0, nose_y)) + 0.01)
 
 ## A heroine Barbarian wears a fur wrap across her chest.
 func _fur_top() -> void:
@@ -1503,10 +1645,32 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 		return c.z + rz * sqrt(maxf(k, 0.05))
 	var eye_y := c.y - ry * 0.08
 	var eye_x := rx * 0.36
+	# Every KayKit head shares one face: find the nose (the frontmost point down the
+	# middle) and lay the face out from it. (Swapped hair heads have differently
+	# sized bounds, so the box-based guess above lands on the eyebrows there.)
+	var nose_y := c.y - ry * 0.3
+	var nose_z := -INF
+	var sy := c.y - ry * 0.1
+	while sy > c.y - ry * 0.7:
+		var zr: float = ray.call(0.0, sy)
+		if not is_nan(zr) and zr > nose_z and zr < c.z + rz * 1.15:     # (not the Necromancer's jaw piece)
+			nose_z = zr; nose_y = sy
+		sy -= 0.01
+	var swapped := _visible_head(hero) != null and _visible_head(hero).name == "Hair_Head"
+	if nose_z > -INF and (swapped or fem):
+		eye_y = nose_y + 0.105
+	# heroines don't get beards; heroes don't get makeup
+	if fem and face in ["beard", "mustache"]:
+		face = "none"
+	elif not fem and face in ["makeup", "glitter"]:
+		face = "none"
 	if style in HAIR_HEAD_BEARDED and not covered and face in ["beard", "mustache"]:
 		face = "none"          # this head already has a fine beard
 	if fem:
-		_female_face(c, rx, ry, rz, eye_x, eye_y, fz, covered, cfg)
+		_female_face(c, rx, ry, rz, nose_y, fz, covered, cfg, face != "mask")
+	# pale facial hair (a blond Knight) would vanish against the skin
+	if face in ["beard", "mustache"] and hair_c.get_luminance() > 0.55:
+		hair = _look_mat(hair_c.darkened(0.35), 0.7)
 	match face:
 		"beard":
 			_piece(_sphere(), hair, Vector3(0, c.y - ry * 0.62, fz.call(0.0, c.y - ry * 0.62) - rz * 0.25), Vector3(rx * 0.62, ry * 0.4, rz * 0.32))
@@ -1552,7 +1716,7 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 			var paint := _look_mat(Color(0.15, 0.35, 0.95), 0.5)
 			for sd in [-1.0, 1.0]:
 				for k in 2:
-					var yy := c.y - ry * (0.26 + 0.12 * k)
+					var yy := nose_y + 0.02 - 0.06 * k
 					_piece(_boxm(rx * 0.32, ry * 0.05, 0.02), paint, Vector3(sd * rx * 0.48, yy, fz.call(sd * rx * 0.48, yy) + 0.005), Vector3.ONE, Vector3(0, sd * 0.45, 0))
 		"blush":
 			# soft rosy cheeks: a gentle pink glow that fades out at the edges
@@ -1567,6 +1731,10 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 				var xx2: float = sd * rx * 0.52
 				var qd := QuadMesh.new(); qd.size = Vector2(rx * 0.5, ry * 0.32)
 				_piece(qd, pink, Vector3(xx2, yy2, fz.call(xx2, yy2) + 0.006), Vector3.ONE, Vector3(0, sd * 0.55, 0))
+		"makeup":
+			_makeup(nose_y, fz)
+		"glitter":
+			_glitter(nose_y, fz)
 		"glow_eyes":
 			# magic glowing eyes with a soft halo
 			var gc := Color(0.35, 0.95, 1.0)
@@ -1583,13 +1751,4 @@ func _add_head_looks(hero: Dictionary, cfg: Dictionary, covered: bool) -> void:
 				var hq := QuadMesh.new(); hq.size = Vector2(rx * 0.45, rx * 0.45)
 				_piece(hq, halo, Vector3(ex, eye_y, ez + 0.006))
 		"mask":
-			# a ninja mask: cloth wrapped over the nose and mouth, knotted at the back
-			var cloth := _look_mat(Color(0.1, 0.12, 0.22), 0.7)
-			var my := c.y - ry * 0.64
-			var mz := c.z + rz * 0.05
-			var front: float = maxf(fz.call(0.0, my), fz.call(0.0, my + ry * 0.2))
-			_piece(_sphere(), cloth, Vector3(c.x, my, mz), Vector3(rx * 1.03, ry * 0.36, clampf(front + 0.025 - mz, rz * 0.5, rz * 1.02)))
-			var knot := _piece(_sphere(), cloth, Vector3(c.x, c.y - ry * 0.4, c.z - rz * 1.0), Vector3(rx * 0.16, ry * 0.12, rz * 0.12))
-			for sd in [-1.0, 1.0]:
-				var tail := _piece(_boxm(rx * 0.12, ry * 0.5, 0.02), cloth, knot.position + Vector3(sd * rx * 0.12, -ry * 0.25, -rz * 0.05))
-				tail.rotation.z = sd * 0.35
+			_ninja_mask(hero, c, rx, ry, rz, nose_y, fem)

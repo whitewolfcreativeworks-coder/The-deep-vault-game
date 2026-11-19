@@ -1,9 +1,10 @@
 extends Node3D
 class_name RainbowShroom
 ## A glowing mushroom you can eat (USE). Each one gives a little magic (mana) and
-## a dose of "rainbow vision" (Game.shroom). One is pretty. Five and you can hardly
-## tell up from down. The lesson: don't eat too many mushrooms! A mushroom grows
-## back after a couple of minutes.
+## a dose of "rainbow vision" (Game.shroom): the world goes wavy and colourful for
+## about 13 seconds. Each extra one is stronger and lasts longer, and five in a row
+## and you can hardly walk straight or hit anything. The lesson: don't eat too many
+## mushrooms! A mushroom grows back after a couple of minutes.
 
 const REGROW := 120.0
 const LINES := [
@@ -19,6 +20,7 @@ var lit := true
 var _vis: Node3D
 var _light: OmniLight3D
 var _gone := 0.0
+static var _in_a_row := 0      # mushrooms eaten before the last ones wore off
 
 static func make(parent: Node, at: Vector3, c: Color, size := 1.0, with_light := true) -> RainbowShroom:
 	var s := RainbowShroom.new()
@@ -66,8 +68,12 @@ func interact(by: Node) -> void:
 	_gone = REGROW
 	_vis.visible = false
 	_light.visible = false
-	var lvl := mini(int(floor(Game.shroom)) + 1, 5)
-	Game.shroom = minf(5.0, floor(Game.shroom) + 1.0) + 0.6
+	# each one adds a bit more (and lasts a bit longer); five in a row is too many
+	if Game.shroom < 0.3:
+		_in_a_row = 0
+	_in_a_row += 1
+	Game.shroom = minf(5.6, Game.shroom + 1.3)
+	var lvl := mini(_in_a_row, 5)
 	Game.mana = minf(Game.max_mana(), Game.mana + Game.max_mana() * 0.15)
 	Sfx.play("pickup", -6.0, 0.4)
 	Sfx.play_at("pop", global_position, -6.0, 0.4)

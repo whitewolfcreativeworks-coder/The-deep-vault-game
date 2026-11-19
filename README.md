@@ -78,6 +78,8 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - **Women:** long or shoulder-length hair, eyelashes, rosy lips and cheeks, and a slimmer build. A woman in a knight's helm has a long braid hanging out the back.
   - **Men:** short hair and a broader build.
   - The Wild and Bald hair styles come with beards, so they're for men only.
+  - **Face details:** heroines get **Makeup** (purple eyeshadow, red lips, rosy cheeks) and **Glitter** (rainbow gems on the cheeks, a gold star by the eye, twinkling sparkles) instead of the beard and mustache. Switching between man and woman swaps them over.
+- **A real ninja mask.** The old one looked like an inner tube round the chin. The new one is cloth that follows the shape of the face from the bridge of the nose down, tied round the head with a knot and two tails at the back.
 - **Funny names for heroines.** "Random name" and "Surprise me!" pick from about fifty Bobek names for women (Bobekita, Queen Bobekah, Bobekunzel, Lady Bobs-a-Lot...).
 - **The cabin at home is open.** After the flight home, USE the front door to go inside. It's the room from the opening movie.
   - **The desk:** change your name and your looks. Your class stays the same. Pick a name all your own for when the open-world portal opens.
@@ -87,10 +89,16 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 - **Port Home.** After the flight home, a **HOME** button appears (Y on a keyboard). It takes you back to the cabin from anywhere, after asking first so a stray tap doesn't whisk you away. Walk into the family portal in the yard and it offers to take you **back to the exact spot you left**, or to the Vault outpost. (It's meant for the open world too.)
 
 ### New in the Nov 18 Goblin Forest notes
-- **Rainbow mushrooms.** Every glowing mushroom in the Goblin Warren (the mine) and around the forest can be eaten. Each one gives a little magic (mana) and a dose of rainbow vision: the screen shimmers, swims and turns rainbow, with rainbow sparkles all around you.
-  - **Three mushrooms:** your steering starts to drift.
-  - **Five:** you wobble about on your own and miss most of your swings.
-  - It wears off over about a minute. (The lesson: don't eat so many mushrooms!)
+- **Rainbow mushrooms.** Every glowing mushroom in the Goblin Warren (the mine) and around the forest can be eaten. Each one gives a little magic (mana) and a dose of rainbow vision. You still see the whole game, but:
+  - waves of rainbow colour drift across everything;
+  - a rainbow glow pulses round the edges;
+  - the view breathes in and out and sways;
+  - rainbow sparkles float around you.
+
+  It gets stronger with each one:
+  - **One mushroom:** wears off in about 13 seconds.
+  - **Two:** your steering starts to drift.
+  - **Five in a row:** you wobble about on your own and miss most of your swings, for nearly a minute. (The lesson: don't eat so many mushrooms!)
 - **Chief Gruk is twice as tough, bigger, and has two new moves:**
   - **Spore Bomb:** he hurls a giant mushroom that bursts into a stinging cloud of rainbow spores.
   - **War Horn:** a blast that throws you back and calls goblins in from the dark.
