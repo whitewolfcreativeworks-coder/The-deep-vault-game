@@ -277,7 +277,15 @@ static func stock_world(world: Node3D) -> int:
 	var total := 0
 	for t in tables:
 		total += spread_on(t, 3, rng, world)
-	tops.shuffle()
+	# (the same barrels every time, not a different set each visit)
+	for i in range(tops.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp = tops[i]; tops[i] = tops[j]; tops[j] = tmp
+	# nothing to eat right next to a lever, door or chest: it would steal your USE
+	var busy: Array = []
+	for it in world.get_tree().get_nodes_in_group("interactable"):
+		if it is Node3D and not (it is Food):
+			busy.append((it as Node3D).global_position)
 	var used: Array = []
 	for b in tops:
 		if used.size() >= 8:
@@ -286,6 +294,10 @@ static func stock_world(world: Node3D) -> int:
 		var near := false
 		for u in used:
 			if (u as Vector3).distance_to(bp) < 12.0:
+				near = true
+				break
+		for q in busy:
+			if (q as Vector3).distance_to(bp) < 3.5:
 				near = true
 				break
 		if near or rng.randf() > 0.5:

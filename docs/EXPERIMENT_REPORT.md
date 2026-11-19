@@ -777,3 +777,38 @@ A new test (`shroomvis`) shoots the same view plain and at one, two and five mus
 
 **Faces for heroines, and the ninja mask.** Women get Makeup and Glitter in place of Beard and Mustache, and switching sex swaps one for the other. The ninja mask is now a copy of the visible head's own triangles below the bridge of the nose and in front of the ears. They are clipped against those two planes, pushed out 3 cm along their normals, and drawn in dark cloth, with a strap fitted by rays and a knot at the back. Face details on swapped heads are now placed from the nose tip, so eyepatches and glowing eyes sit on the eyes of the long-hair heads.
 
+## Follow-up 23: weapons away, and a real fishing fight (Nov 19)
+
+**Sheathing.** A `BoneAttachment3D` can change bone at run time, so drawing and sheathing just switch the weapon's attachment between the hand slot and the chest bone. A pivot node inside it moves to a "back" transform:
+- A staff stands up over the right shoulder; a blade hangs hilt-up and slants down to the left hip.
+- The shield's thinnest axis (measured from its own meshes) is turned to face out. The weapon rides on top of it.
+- How far back to sit comes from the body and cape meshes' bounds.
+
+The player draws on attack, block, a spell, a special or damage, and sheathes 4.5 s after the last of those while no enemy is within 10 m. Mounting and fishing sheathe at once (fishing used to hide the weapon). New autotest `sheath`.
+
+**Fishing.** The old reel bar only rewarded tapping as fast as possible. The new fight has two bars, line tension and reel.
+
+How the line moves:
+- Each tap adds 0.085 to the tension.
+- The line slackens by 0.3 a second while the fish rests.
+- While it runs it barely slackens at all, and each tap counts 20% more. So you have to stop reeling.
+- A run starts with a tug.
+
+The green zone drifts and is narrower for stronger fish. The reel bar fills only while the tension is in the green, and drains a little outside it. You lose the fish after 1.5 s near slack, or 0.6 s near snapping.
+
+The numbers were tuned with a quick simulation of five kinds of player over 80 fights per fish:
+
+| Player | Result |
+|---|---|
+| Careful | Lands every fish in 6–10 s, Ghost Pike included |
+| Taps on, a beat late into each run | Lands every fish, but only about three Ghost Pikes in four (6–29 s) |
+| Sloppy (keeps reeling above the green) | Mostly loses the bigger fish |
+| Taps flat out | Always snaps the line |
+| Never reels | Always lets the line go slack |
+
+The `castle5` bot now plays it by watching the tension. It also checks both ways of losing: tapping flat out snaps the line, and not reeling lets it go slack.
+
+**Two test-suite lessons.**
+- The food placed on barrels and crates used the engine's global random shuffle, so it changed from run to run, and could land right beside the dungeon lever. It now uses the level's own seeded generator, and never goes within 3.5 m of a lever, door or chest (where it would steal USE).
+- Since the fire vents were made hotter, the `flow` test's 3.6-second stand in the fire could kill a level 2 hero. Everything after that failed, which looked like a sheathing bug at first. The test now steps out as soon as it gets burned.
+

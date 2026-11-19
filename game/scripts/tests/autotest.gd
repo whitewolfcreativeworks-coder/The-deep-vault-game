@@ -160,6 +160,8 @@ func _run() -> void:
 		await _sexes_test()
 	elif mode == "faces2":
 		await _faces2_test()
+	elif mode == "sheath":
+		await _sheath_test()
 	elif mode == "special":
 		await _special_test()
 	elif mode == "combat2":
@@ -529,10 +531,13 @@ func _flow() -> void:
 	Game.hp = Game.max_hp()
 	await tp(Vector3(0, -5.9, -38.5), 0.0)
 	var hp_v := Game.hp
-	await wait(3.6)
+	for i in 36:            # (stand in the fire only until it burns: a long stay can kill a level 2 hero)
+		await wait(0.1)
+		if Game.hp < hp_v:
+			break
+	god = true
 	check("fire_trap_damage", Game.hp < hp_v, "hp %.0f -> %.0f" % [hp_v, Game.hp])
 	await shot("05_fire_vents")
-	god = true
 	await tp(Vector3(1.7, -5.9, -58.6), -PI / 2)
 	var lever_ok := await use_nearest_interactable()
 	await wait(2.6)
@@ -2017,6 +2022,50 @@ func _looks_test() -> void:
 	await wait(0.6)
 	await shot("k_creator_random")
 	check("looks_rendered", true)
+
+## Weapons away when not fighting: on your back, drawn to fight, put away again,
+## away on the chicken; a Necromancer's staff and a Knight's shield.
+func _sheath_test() -> void:
+	Game.profile.hero = "Knight"
+	Game.profile.show_hat = true
+	await _start()
+	player = main.player
+	god = true
+	await tp(Vector3(0, 0.2, 24), 0.0, -0.12)
+	player.zoom_target = 3.0; player.zoom = 3.0; player.snap_view()
+	await wait(1.2)
+	var wr: BoneAttachment3D = player.body.weapon_root
+	check("sh_starts_away", not player.armed and player.body.sheathed and wr != null and wr.bone_name == "chest" and player.body.offhand_root.bone_name == "chest")
+	await shot("sh_01_knight_back")
+	await tap("attack")
+	await wait(0.25)
+	check("sh_draws_to_fight", player.armed and player.body.weapon_root.bone_name == "handslot.r" and player.body.offhand_root.bone_name == "handslot.l")
+	await shot("sh_02_knight_drawn")
+	await wait(5.5)
+	check("sh_puts_it_away", not player.armed and player.body.weapon_root.bone_name == "chest")
+	Input.action_press("block")
+	await wait(0.3)
+	check("sh_block_draws", player.armed)
+	Input.action_release("block")
+	player.mount_up("chicken")
+	await wait(0.6)
+	check("sh_away_on_the_chicken", player.mounted and not player.armed)
+	await shot("sh_03_chicken")
+	player.dismount()
+	await wait(0.5)
+	for hero in ["Necromancer", "Barbarian", "Rogue", "Mage"]:
+		Game.profile.hero = hero
+		player.rebuild_body()
+		await wait(0.6)
+		check("sh_%s_away" % hero.to_lower(), player.body.sheathed and player.body.weapon_root.bone_name == "chest")
+		await shot("sh_04_%s_back" % hero.to_lower())
+	Game.profile.hero = "Necromancer"
+	player.rebuild_body()
+	player.mount_up("chicken")
+	await wait(0.6)
+	player.yaw += 2.4
+	await wait(0.4)
+	await shot("sh_05_necro_on_chicken")
 
 ## Face details on heroes and heroines: makeup and glitter for women only, the
 ## ninja mask that follows the face, and eye details on the long-hair heads.
@@ -4060,15 +4109,42 @@ func _castle5_test() -> bool:
 		if fish_n == 0:
 			await shot("c5_08_bite")
 		await tap("attack")
-		for k in 160:
+		var snapshots := 0
+		for k in 500:
 			if spot._state != "reel":
 				break
-			Input.action_press("attack"); await frames(1)
-			Input.action_release("attack"); await frames(1)
+			# keep the line in the green: reel when it's slack, ease off when it's tight
+			if spot._tension < spot._zone - spot._zone_w * 0.1:
+				await tap("attack")
+			await wait(0.08)
+			if fish_n == 0 and snapshots == 0 and k == 30:
+				snapshots = 1
+				await shot("c5_08b_fight")
 		await wait(0.6)
 		if fish_n == 0:
 			await shot("c5_09_catch")
 	check("c5_five_fish", Game.quest_state("fishing") == "ready" and Game.flags.get("ghost_pike", false), "%s %d" % [Game.quest_state("fishing"), spot.catches])
+	# the fight goes both ways: tapping like mad snaps the line, not reeling lets it go slack
+	for how in ["too_fast", "too_slow"]:
+		for k in 150:
+			await wait(0.1)
+			if spot._state == "bite":
+				break
+		if spot._state != "bite":
+			check("c5_fish_%s_loses_it" % how, false, "no bite")
+			continue
+		await tap("attack")
+		var c0 := spot.catches
+		var end := ""
+		for k in 400:
+			if spot._state != "reel":
+				break
+			if how == "too_fast":
+				await tap("attack")
+			await wait(0.04)
+			end = spot._label.text
+		end = spot._label.text
+		check("c5_fish_%s_loses_it" % how, spot.catches == c0 and spot._state != "reel", end)
 	await tap("jump")
 	await wait(0.5)
 	check("c5_stop_fishing", player.vehicle == null)
@@ -4877,7 +4953,7 @@ func _nov18b_test() -> void:
 	check("n18_tunnel_walls_masonry", wall_mat is ShaderMaterial and absf(hit.position.x + 2.46) < 0.05, str(hit.get("position", "miss")))
 	# --- the Necromancer: a long staff, no shield, and Raise Dead ---
 	var wr: Node = player.body.weapon_root
-	var staff := wr != null and wr.get_child_count() > 0 and String(wr.get_child(0).scene_file_path).contains("Skeleton_Staff")
+	var staff := wr != null and wr.find_children("*", "", true, false).any(func(n: Node) -> bool: return String(n.scene_file_path).contains("Skeleton_Staff"))
 	check("n18_necro_has_staff", staff and player.body.offhand_root == null)
 	await tp(Vector3(-4, 0.1, 14), PI)
 	player.posing = true

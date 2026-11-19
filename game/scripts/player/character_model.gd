@@ -29,6 +29,14 @@ var skel: Skeleton3D
 var flash_mat: StandardMaterial3D
 var weapon_root: BoneAttachment3D
 var offhand_root: BoneAttachment3D
+## Weapons away: the weapon and shield ride on the back (on the chest bone)
+## instead of in the hands. The player draws them to fight (Player.draw_weapon).
+var sheathed := false
+var _wpivot: Node3D          # the weapon (and its tip) under weapon_root
+var _spivot: Node3D          # the shield under offhand_root
+var _back_weapon := Transform3D.IDENTITY
+var _back_shield := Transform3D.IDENTITY
+var _shield_depth := 0.0     # a sheathed weapon rides on top of the shield
 var weapon_tip: Node3D
 var head_meshes: Array[MeshInstance3D] = []
 var hold_clip := ""
@@ -1005,8 +1013,10 @@ func set_weapon(id: String) -> void:
 	if id == "" or not WEAPON_SCENES.has(id):
 		return
 	weapon_root = _attach("handslot.r")
+	_wpivot = Node3D.new(); _wpivot.name = "Grip"
+	weapon_root.add_child(_wpivot)
 	var w: Node3D = (load(WEAPON_SCENES[id]) as PackedScene).instantiate()
-	weapon_root.add_child(w)
+	_wpivot.add_child(w)
 	var tip := Vector3(0, 0.9 * (HERO_WEAPON_LENGTH if kind == "hero" else 1.0), 0)
 	if id == "necro_staff":
 		# tilted 45 degrees in the hand: it stands up as you walk and run, and leans
@@ -1038,8 +1048,39 @@ func set_weapon(id: String) -> void:
 		elif id == "rusty_sword":
 			pass
 	weapon_tip = Node3D.new()
-	weapon_root.add_child(weapon_tip)
+	_wpivot.add_child(weapon_tip)
 	weapon_tip.position = tip
+	# on the back: a staff stands up over the right shoulder; a blade or an axe
+	# hangs hilt-up behind the right shoulder, slanting down to the left hip
+	var staff := id.contains("staff")
+	var d := Vector3(-0.42, 1.0, 0.0).normalized() if staff else Vector3(0.5, -1.0, 0.0).normalized()
+	var back := Basis(d.cross(Vector3.BACK), d, Vector3.BACK)
+	var grip := Vector3(0.16, -0.3, _back_z() - 0.07) if staff else Vector3(-0.24, 0.44, _back_z() - 0.08)
+	_back_weapon = Transform3D(back * w.basis.orthonormalized().inverse(), grip)
+	if sheathed:
+		set_sheathed(true)
+
+## How far back the body (and cape) reach, at the chest bone (skeleton space).
+func _back_z() -> float:
+	var z := -0.32
+	for m in all_meshes:
+		if is_instance_valid(m) and m.visible and m.mesh and (String(m.name).contains("Body") or String(m.name).contains("Cape") or String(m.name).contains("Cloak")):
+			var a: AABB = m.get_aabb()
+			if m.get_parent() != skel:
+				a = (skel.global_transform.affine_inverse() * m.global_transform) * a if m.is_inside_tree() and skel.is_inside_tree() else a
+			z = minf(z, a.position.z)
+	return maxf(z, -0.6)
+
+## Put the weapon and shield away on the back, or take them in hand.
+func set_sheathed(on: bool) -> void:
+	sheathed = on
+	if weapon_root and is_instance_valid(weapon_root) and _wpivot:
+		weapon_root.bone_name = "chest" if on else "handslot.r"
+		var over := _shield_depth if offhand_root and is_instance_valid(offhand_root) else 0.0
+		_wpivot.transform = _back_weapon.translated(Vector3(0, 0, -over)) if on else Transform3D.IDENTITY
+	if offhand_root and is_instance_valid(offhand_root) and _spivot:
+		offhand_root.bone_name = "chest" if on else "handslot.l"
+		_spivot.transform = _back_shield if on else Transform3D.IDENTITY
 
 func _offhand_for(cfg: Dictionary) -> String:
 	if kind == "hero" and CLASS_WEAPON.has(hero_name) and CLASS_WEAPON[hero_name] in TWO_HANDED:
@@ -1081,6 +1122,7 @@ func _staff_glow(parent: Node3D, at: Vector3) -> void:
 	parent.add_child(l)
 
 func set_offhand(id: String) -> void:
+	_shield_depth = 0.0
 	if offhand_root:
 		offhand_root.queue_free()
 		offhand_root = null
@@ -1090,10 +1132,35 @@ func set_offhand(id: String) -> void:
 	if not ResourceLoader.exists(p):
 		return
 	offhand_root = _attach("handslot.l")
+	_spivot = Node3D.new(); _spivot.name = "Grip"
+	offhand_root.add_child(_spivot)
 	var s: Node3D = (load(p) as PackedScene).instantiate()
-	offhand_root.add_child(s)
+	_spivot.add_child(s)
 	for mi in s.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = flash_mat
+	# on the back: flat against it, its thinnest side facing out, under the weapon
+	var a := Props.mesh_aabb(s)
+	if a.size != Vector3.ZERO:
+		a = s.transform * a
+		var sz := a.size
+		var thin := 0 if sz.x <= sz.y and sz.x <= sz.z else (1 if sz.y <= sz.z else 2)
+		var rest := [0, 1, 2]
+		rest.erase(thin)
+		var up: int = rest[0] if sz[rest[0]] >= sz[rest[1]] else rest[1]
+		var side: int = rest[1] if up == rest[0] else rest[0]
+		var cols := [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
+		cols[thin] = Vector3.BACK * -1.0
+		cols[up] = Vector3.UP
+		cols[side] = Vector3.RIGHT
+		var b := Basis(cols[0], cols[1], cols[2])
+		if b.determinant() < 0.0:
+			cols[side] = Vector3.LEFT
+			b = Basis(cols[0], cols[1], cols[2])
+		var at := Vector3(0.0, 0.08, _back_z() - sz[thin] * 0.5 - 0.01)
+		_shield_depth = sz[thin] + 0.02
+		_back_shield = Transform3D(b, at - b * a.get_center())
+	if sheathed:
+		set_sheathed(true)
 
 var _never_show: Array[MeshInstance3D] = []   # hidden hats and swapped-out heads
 

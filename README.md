@@ -73,6 +73,18 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### New in the Nov 19 notes
+- **Weapons away when you're not fighting.**
+  - Your weapon and shield ride on your back: a staff stands over your shoulder, a sword hangs hilt-up across your back, and a shield lies flat under it.
+  - They come out the moment you attack, block, cast, use a special or get hit.
+  - They go away again about five seconds after the fighting stops (they stay out while enemies are close).
+  - They're always away when you ride a mount or go fishing. No more staff in your face on the chicken!
+- **Fishing is a real fight now.** After you hook a fish, watch two bars:
+  - **Line tension** has a green "just right" zone that drifts about. Tap ATTACK/USE to reel; each tap tightens the line, and it slackens on its own.
+  - Too slack for too long and the fish spits out the hook. Too tight and the line **snaps**.
+  - The fish takes turns **running** (a splash, a tug, and it pulls the line tight by itself, so ease off) and **resting** (the line goes slack, so reel).
+  - **Reel it in** only fills while the line is in the green. Bigger fish fight harder and have a narrower green zone; the Ghost Pike is the toughest.
+
 ### New in the Nov 18 night notes
 - **Man or woman, for every class.** The Hero tab of the character creator has **Man** and **Woman** buttons. The two versions look clearly different:
   - **Women:** long or shoulder-length hair, eyelashes, rosy lips and cheeks, and a slimmer build. A woman in a knight's helm has a long braid hanging out the back.

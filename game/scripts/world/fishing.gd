@@ -3,8 +3,12 @@ class_name FishingSpot
 ## Fishing at the end of the pier on the Misty Mere (Ghost Knight Castle).
 ##   USE          start fishing (cast the line)
 ##   wait...      the bobber floats; then it dips and splashes: "!"
-##   ATTACK/USE   hook it, quick! Then tap ATTACK/USE fast to reel it in
-##                before it gets away (the fish pulls back the whole time)
+##   ATTACK/USE   hook it, quick! Then the fight: tap ATTACK/USE to reel.
+##                Keep the LINE TENSION in the green: too slack and the fish
+##                spits the hook, too tight and the line snaps. When the fish
+##                RUNS it pulls the line tight by itself (ease off!); when it
+##                rests the line goes slack (reel!). Hold it in the green to
+##                fill the REEL bar and land it. Bigger fish fight harder.
 ##   JUMP / move  stop fishing
 ## Five kinds of fish; the glowing Ghost Pike is the rare prize (and always the
 ## last catch of Old Gill's quest).
@@ -24,14 +28,42 @@ var _state := ""             # "", "cast", "wait", "bite", "reel", "caught"
 var _t := 0.0
 var _wait := 0.0
 var _fish: Dictionary = {}
-var _reel := 0.0
+var _reel := 0.0            # how far it's reeled in (0..1)
+var _tension := 0.5         # line tension (0 slack .. 1 snap)
+var _zone := 0.5            # middle of the green "just right" zone
+var _zone_w := 0.3
+var _run := 0.0             # > 0 while the fish is running
+var _phase_t := 0.0         # time to the fish's next change of mind
+var _slack_t := 0.0
+var _tight_t := 0.0
+var _tbar: TensionBar
 var _rod: Node3D
 var _bobber: MeshInstance3D
 var _line: MeshInstance3D
 var _ui: CanvasLayer
 var _bar: ProgressBar
 var _label: Label
+var _hint: Label
 var _excl: Label3D
+
+## The line-tension bar: red SLACK at the left, red SNAP at the right, the green
+## "just right" zone (it drifts about) and a white marker for the line.
+class TensionBar extends Control:
+	var tension := 0.5
+	var zone := 0.5
+	var zone_w := 0.3
+	var running := false
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color(0, 0, 0, 0.6))
+		draw_rect(Rect2(0, 0, size.x * 0.08, size.y), Color(0.85, 0.2, 0.15, 0.75))
+		draw_rect(Rect2(size.x * 0.95, 0, size.x * 0.05, size.y), Color(0.85, 0.2, 0.15, 0.75))
+		var z0 := clampf(zone - zone_w * 0.5, 0.0, 1.0); var z1 := clampf(zone + zone_w * 0.5, 0.0, 1.0)
+		var inside := tension >= z0 and tension <= z1
+		draw_rect(Rect2(size.x * z0, 0, size.x * (z1 - z0), size.y), Color(0.25, 0.9, 0.35, 0.85 if inside else 0.55))
+		var x := size.x * clampf(tension, 0.0, 1.0)
+		draw_rect(Rect2(x - 5, -8, 10, size.y + 16), Color(1, 1, 1) if not running else Color(1.0, 0.55, 0.3))
+		draw_rect(r, Color(1, 1, 1, 0.6), false, 2.0)
 var _rng := RandomNumberGenerator.new()
 var catches := 0
 
@@ -75,8 +107,7 @@ func interact(by: Node) -> void:
 	Game.say("Fishing! Wait for the bobber to dip, then press ATTACK to hook it. JUMP to stop.", Color(0.7, 0.9, 1.0))
 
 func _make_gear() -> void:
-	if _p.body.weapon_root:
-		_p.body.weapon_root.visible = false
+	_p.sheathe()      # (your weapon rides on your back while you fish)
 	_rod = Node3D.new()
 	var att := _p.body._attach("handslot.r")
 	att.add_child(_rod)
@@ -101,15 +132,33 @@ func _make_ui() -> void:
 	_ui = CanvasLayer.new(); _ui.layer = 15; add_child(_ui)
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	box.offset_top = -230; box.offset_bottom = -150; box.offset_left = -260; box.offset_right = 260
+	box.offset_top = -330; box.offset_bottom = -150; box.offset_left = -260; box.offset_right = 260
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ui.add_child(box)
 	_label = Label.new(); _label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.add_theme_font_size_override("font_size", 26)
 	_label.add_theme_color_override("font_outline_color", Color(0, 0, 0)); _label.add_theme_constant_override("outline_size", 8)
 	box.add_child(_label)
+	var tl := Label.new(); tl.text = "LINE TENSION   (slack  ·  just right  ·  snap!)"; tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tl.add_theme_font_size_override("font_size", 18)
+	tl.add_theme_color_override("font_outline_color", Color(0, 0, 0)); tl.add_theme_constant_override("outline_size", 6)
+	_tbar = TensionBar.new(); _tbar.custom_minimum_size = Vector2(520, 30)
+	_tbar.visible = false; tl.visible = false
+	_tbar.set_meta("label", tl)
+	box.add_child(tl)
+	box.add_child(_tbar)
+	_hint = Label.new(); _hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint.add_theme_font_size_override("font_size", 22)
+	_hint.add_theme_color_override("font_outline_color", Color(0, 0, 0)); _hint.add_theme_constant_override("outline_size", 8)
+	box.add_child(_hint)
+	var rl := Label.new(); rl.text = "REEL IT IN"; rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rl.add_theme_font_size_override("font_size", 18)
+	rl.add_theme_color_override("font_outline_color", Color(0, 0, 0)); rl.add_theme_constant_override("outline_size", 6)
+	box.add_child(rl)
+	rl.visible = false
 	_bar = ProgressBar.new(); _bar.min_value = 0.0; _bar.max_value = 1.0; _bar.show_percentage = false
 	_bar.custom_minimum_size = Vector2(520, 26)
+	_bar.set_meta("label", rl)
 	var fill := StyleBoxFlat.new(); fill.bg_color = Color(0.35, 0.8, 1.0); fill.set_corner_radius_all(6)
 	var bg := StyleBoxFlat.new(); bg.bg_color = Color(0, 0, 0, 0.55); bg.set_corner_radius_all(6)
 	_bar.add_theme_stylebox_override("fill", fill); _bar.add_theme_stylebox_override("background", bg)
@@ -119,10 +168,18 @@ func _make_ui() -> void:
 func _float_point() -> Vector3:
 	return global_position + cast_dir * 6.5 + Vector3(0, water_y - global_position.y + 0.05, 0)
 
+func _show_fight(on: bool) -> void:
+	for c in [_bar, _tbar]:
+		if c:
+			c.visible = on
+			(c.get_meta("label") as Control).visible = on
+	if _hint:
+		_hint.text = ""
+
 func _cast() -> void:
 	_state = "cast"; _t = 0.0
 	_label.text = "Casting..."
-	_bar.visible = false
+	_show_fight(false)
 	Sfx.play("swing", -6.0, 0.2)
 	_p.body.oneshot("a1", 0.5)
 
@@ -157,30 +214,29 @@ func _physics_process(delta: float) -> void:
 			_bobber.global_position = fp + Vector3(0, -absf(sin(_t * 18.0)) * 0.12, 0)
 			_excl.global_position = fp + Vector3(0, 1.0 + sin(_t * 10.0) * 0.05, 0)
 			if _hook_pressed():
-				_state = "reel"; _t = 0.0; _reel = 0.35
+				_state = "reel"; _t = 0.0; _reel = 0.15
+				_tension = 0.45; _run = 0.0; _phase_t = 1.0; _slack_t = 0.0; _tight_t = 0.0
+				var pull: float = _fish.pull
+				_zone_w = clampf(0.38 - (pull - 0.55) * 0.12, 0.2, 0.4)    # bigger fish: a narrower sweet spot
+				_zone = 0.5
 				_excl.visible = false
-				_bar.visible = true
-				_label.text = "Hooked! Tap ATTACK fast to reel it in!"
+				_show_fight(true)
+				_label.text = "Hooked a fish! Keep the line in the green!"
 				Sfx.play("whistle", -10.0, 0.2)
 			elif _t > 1.3:
 				_excl.visible = false
 				_label.text = "It got away! Waiting again..."
 				_state = "wait"; _t = 0.0; _wait = _rng.randf_range(2.0, 4.5)
 		"reel":
-			_reel -= delta * 0.16 * float(_fish.pull)
-			if _hook_pressed():
-				_reel += 0.11
-				Sfx.play("pickup", -16.0, 0.3)
-			_reel = clampf(_reel, 0.0, 1.0)
+			_fight(delta)
 			_bar.value = _reel
-			var shake := Vector3(sin(_t * 23.0), 0, cos(_t * 17.0)) * 0.25 * float(_fish.pull)
+			_tbar.tension = _tension; _tbar.zone = _zone; _tbar.zone_w = _zone_w; _tbar.running = _run > 0.0
+			_tbar.queue_redraw()
+			var pull: float = _fish.pull
+			var shake := Vector3(sin(_t * 23.0), 0, cos(_t * 17.0)) * (0.12 + (0.3 if _run > 0.0 else 0.0)) * pull
 			_bobber.global_position = fp.lerp(global_position + Vector3(0, water_y - global_position.y, 0), _reel * 0.6) + shake
 			if _reel >= 1.0:
 				_land_fish()
-			elif _reel <= 0.0 or _t > 9.0:
-				_label.text = "The %s got away! Waiting again..." % ("fish" if _fish.name != "Ghost Pike" else "GHOST PIKE")
-				_bar.visible = false
-				_state = "wait"; _t = 0.0; _wait = _rng.randf_range(2.0, 4.5)
 		"caught":
 			if _t > 1.8:
 				_cast()
@@ -194,6 +250,62 @@ func _physics_process(delta: float) -> void:
 	# stop fishing: jump or walk away
 	if Input.is_action_just_pressed("jump") or Input.get_vector("move_left", "move_right", "move_forward", "move_back").length() > 0.6:
 		_stop(true)
+
+## The fight with a hooked fish: every tap reels in and tightens the line; the
+## line slackens on its own; the fish takes turns running (it pulls the line
+## tight, and backwards) and resting. Only in the green does it come closer.
+func _fight(delta: float) -> void:
+	var pull: float = _fish.pull
+	_phase_t -= delta
+	if _phase_t <= 0.0:
+		if _run > 0.0:
+			_run = 0.0
+			_phase_t = _rng.randf_range(1.0, 2.2) / pull
+		else:
+			_run = 1.0
+			_phase_t = _rng.randf_range(0.6, 1.2) * (0.8 + pull * 0.25)
+			_tension += 0.04 * (1.0 + 0.5 * pull)      # a sudden tug on the line
+			Sfx.play_at("splash", _bobber.global_position, -10.0, 0.2)
+			FX.burst(_bobber.global_position, Color(0.8, 0.95, 1.0), 10, 2.5, 0.1, 0.4, -5.0)
+	_zone = 0.47 + sin(_t * (0.4 + pull * 0.3)) * (0.08 + pull * 0.03)
+	# the line slackens by itself, but not while the fish is running (it's
+	# pulling the other way): then every turn of the reel tightens it even more
+	_tension -= delta * (0.05 if _run > 0.0 else 0.3)
+	if _hook_pressed():
+		_tension += 0.085 * (1.2 if _run > 0.0 else 1.0)
+		Sfx.play("pickup", -18.0, 0.3)
+	_tension = clampf(_tension, 0.0, 1.0)
+	var z0 := _zone - _zone_w * 0.5
+	var z1 := _zone + _zone_w * 0.5
+	if _tension >= z0 and _tension <= z1:
+		_reel += delta * (0.13 if _run <= 0.0 else 0.06) / (0.6 + pull * 0.4)
+		_hint.text = "Just right... keep it there!" if _run <= 0.0 else "It's running! Ease off a bit..."
+		_hint.add_theme_color_override("font_color", Color(0.5, 1.0, 0.55))
+	else:
+		_reel -= delta * 0.05 * pull
+		var slack := _tension < z0
+		_hint.text = ("Too slack! Reel faster!" if slack else "Too tight! Slow down!")
+		_hint.add_theme_color_override("font_color", Color(1.0, 0.75, 0.3) if slack else Color(1.0, 0.45, 0.35))
+	_reel = clampf(_reel, 0.0, 1.0)
+	# too slack for too long: it spits the hook; pulled tight for a moment: SNAP
+	_slack_t = _slack_t + delta if _tension < 0.08 else 0.0
+	_tight_t = _tight_t + delta if _tension > 0.95 else maxf(0.0, _tight_t - delta)
+	var lost := ""
+	if _slack_t > 1.5:
+		lost = "The line went slack and the %s spat out the hook!" % _fish_word()
+	elif _tight_t > 0.6:
+		lost = "SNAP! The line broke. The %s got away!" % _fish_word()
+		Sfx.play("clang", -8.0, 0.2)
+	elif _t > 60.0:
+		lost = "The %s wriggled free!" % _fish_word()
+	if lost != "":
+		_label.text = lost + " Waiting again..."
+		Game.say(lost, Color(1.0, 0.7, 0.5))
+		_show_fight(false)
+		_state = "wait"; _t = 0.0; _wait = _rng.randf_range(2.0, 4.5)
+
+func _fish_word() -> String:
+	return "fish" if _fish.get("name", "") != "Ghost Pike" else "GHOST PIKE"
 
 func _hook_pressed() -> bool:
 	return Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("interact")
@@ -214,7 +326,7 @@ func _pick_fish() -> Dictionary:
 
 func _land_fish() -> void:
 	_state = "caught"; _t = 0.0
-	_bar.visible = false
+	_show_fight(false)
 	catches += 1
 	var f := _fish
 	_label.text = "You caught a %s!" % f.name
@@ -270,8 +382,6 @@ func _stop(by_choice: bool) -> void:
 		_ui.queue_free()
 	_bobber = null; _line = null; _excl = null; _rod = null; _ui = null
 	if _p and is_instance_valid(_p):
-		if _p.body.weapon_root:
-			_p.body.weapon_root.visible = true
 		if _p.vehicle == self:
 			_p.leave_vehicle()
 		if by_choice:

@@ -120,6 +120,48 @@ func _ready() -> void:
 	Game.leveled_up.connect(_on_level_up)
 	cam_yaw.global_position = global_position + Vector3(0, EYE_H, 0)
 
+## Weapons away when you're not fighting: they ride on your back (a staff over
+## your shoulder, a blade hilt-up, the shield flat) and come out the moment you
+## attack, block, cast, use a special or get hit. They go away again a few
+## seconds after the fighting stops, and whenever you mount up or go fishing.
+var armed := false
+var _armed_t := 0.0
+var _foe_check := 0.0
+
+func draw_weapon() -> void:
+	_armed_t = 0.0
+	if armed:
+		return
+	armed = true
+	if body:
+		body.set_sheathed(false)
+	Sfx.play("swing", -15.0, 0.25)
+
+func sheathe() -> void:
+	if not armed:
+		return
+	armed = false
+	if body:
+		body.set_sheathed(true)
+
+func _foe_near(r: float) -> bool:
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e is Node3D and e.get("dead") != true and (e as Node3D).global_position.distance_squared_to(global_position) < r * r:
+			return true
+	return false
+
+func _weapon_tick(delta: float) -> void:
+	if not armed:
+		return
+	_armed_t += delta
+	_foe_check -= delta
+	if _foe_check <= 0.0:
+		_foe_check = 0.5
+		if _foe_near(10.0):
+			_armed_t = 0.0        # keep it out while there's a fight on
+	if _armed_t > 4.5 and not attacking and not blocking and not casting and special_kind == "":
+		sheathe()
+
 func rebuild_body() -> void:
 	_headgear_hidden.clear()
 	var p := Game.profile
@@ -154,6 +196,7 @@ func rebuild_body() -> void:
 	elif Game.custom_look_on and not Game.custom_look.is_empty():
 		cfg["custom_look"] = Game.custom_look      # your own design from the Skin Designer
 	body.setup(cfg)
+	body.set_sheathed(not armed)
 	body.set_head_visible(not _head_hidden)
 	_equipped_sig = _equip_signature()
 	if mounted:
@@ -286,6 +329,7 @@ func mount_up(kind := "chicken") -> void:
 		return
 	if not owns_mount(kind) and kind != "chicken":
 		kind = "chicken"
+	sheathe()
 	mounted = true
 	mount_kind = kind
 	match kind:
@@ -697,6 +741,7 @@ func _update_timers(delta: float) -> void:
 		if hurt_time > 0.3:
 			hurt_time = -1.0
 	_attack_buffer -= delta
+	_weapon_tick(delta)
 	stamina_delay -= delta
 	if stamina_delay <= 0.0 and not blocking:
 		Game.stamina = minf(Game.max_stamina(), Game.stamina + 30.0 * delta * (1.7 if Game.has_buff("fed") else 1.0))
@@ -767,6 +812,7 @@ func _handle_actions() -> void:
 	if want_block and attacking:
 		attacking = false; combo = 0; combo_queued = false
 	if want_block and not blocking:
+		draw_weapon()
 		block_time = 0.0
 		Sfx.play("swing", -16.0, 0.1)
 	blocking = want_block
@@ -785,6 +831,7 @@ func _handle_actions() -> void:
 	if Input.is_action_just_pressed("spell") and not casting and not attacking and not dodging:
 		if Game.mana >= 20:
 			Game.mana -= 20
+			draw_weapon()
 			casting = true; cast_time = 0.0
 			Sfx.play("spell", -6.0)
 		else:
@@ -832,6 +879,7 @@ func _dizzy_say(text: String) -> void:
 		Game.say(text, Color.from_hsv(randf(), 0.5, 1.0))
 
 func _start_attack(kind: int) -> void:
+	draw_weapon()
 	swings += 1
 	combo = kind
 	attacking = true
@@ -1031,6 +1079,7 @@ func drink_stamina_potion() -> void:
 func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false) -> void:
 	if dead or invuln > 0.0:
 		return
+	draw_weapon()
 	var to_src := from_pos - global_position
 	to_src.y = 0
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
@@ -1085,6 +1134,7 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 ## around and zoom. `pose` is the body clip to hold (e.g. sitting).
 var vehicle: Node = null
 func ride_vehicle(v: Node, pose := "") -> void:
+	sheathe()
 	if mounted:
 		dismount()
 	set_auto_run(false)
@@ -1643,6 +1693,7 @@ func use_special() -> void:
 		Game.say("%s ready in %ds." % [ab.name, ceili(special_cd)], Color(0.75, 0.7, 1.0))
 		return
 	attacking = false; casting = false; dodging = false; combo_queued = false; blocking = false
+	draw_weapon()
 	var ok := false
 	match Game.profile.hero:
 		"Rogue": ok = _backstab()
@@ -1678,6 +1729,7 @@ func use_special2() -> void:
 		Game.say("%s ready in %ds." % [ab.name, ceili(special2_cd)], Color(0.75, 0.9, 1.0))
 		return
 	attacking = false; casting = false; dodging = false; combo_queued = false; blocking = false
+	draw_weapon()
 	match Game.profile.hero:
 		"Knight": _holy_ward()
 		"Barbarian": _earthshatter()
