@@ -14,9 +14,8 @@ const JUMP_V := 7.0          # a tap: a modest hop
 const DOUBLE_JUMP_V := 11.0  # tap again in the air: a big boosted jump
 # Cloud Island physics (set by the world every frame; 1 / 0 / none elsewhere)
 var gravity_mult := 1.0      # floaty < 1 < heavy
-# Insane mode's wild events (InsaneChaos): moon gravity, back-to-front steering, boing
+# Insane mode's wild events (InsaneChaos): moon gravity, boing
 var chaos_gravity := 1.0
-var mirror_t := 0.0
 var bouncy_t := 0.0
 var jump_mult := 1.0
 var fall_cap := 60.0         # fastest you can fall (floaty skins drift down)
@@ -609,8 +608,6 @@ func _physics_process(delta: float) -> void:
 		else:
 			_handle_actions()
 			var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-			if mirror_t > 0.0 and not mounted:
-				iv.x = -iv.x        # MIRROR WORLD: left is right! (on foot only: never on a mount)
 			if Input.is_action_just_pressed("auto_run"):
 				set_auto_run(not auto_run)
 			if auto_run:
@@ -787,7 +784,6 @@ func _update_timers(delta: float) -> void:
 			hurt_time = -1.0
 	_attack_buffer -= delta
 	_weapon_tick(delta)
-	mirror_t = maxf(0.0, mirror_t - delta)
 	if bouncy_t > 0.0:
 		bouncy_t -= delta
 		if is_on_floor() and not mounted and vehicle == null and velocity.y <= 0.5:

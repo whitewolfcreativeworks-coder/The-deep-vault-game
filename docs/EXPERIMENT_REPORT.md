@@ -988,3 +988,33 @@ Of the scenery meshes, 2,842 were built in code, each with its own mesh resource
 A new `tour` test takes a fixed screenshot tour of every level. Running it with `DEEPVAULT_NOBATCH=1` and without, and diffing the images, checks that nothing visible went missing.
 
 **Lesson:** on a tablet browser, draw calls are the budget. A level built from thousands of small primitives needs distance culling from day one, and "add more monsters" is the most expensive way to add excitement.
+
+## Follow-up 29: no more Mirror World; a living soundscape at the cabin (Nov 20)
+
+Jason: "I really don't like that mirror vision left is right, right is left thing... what it causes is stress, and this game is not supposed to be stressful". Also: "at the cabin... there's one repeating tweet from a bird that's constant... We should have more natural atmospheric sounds".
+
+**Mirror World is removed** from the events, the player (`mirror_t`) and the tests. A test now checks that right is right during Insane.
+
+**Soundscape** (`scripts/world/soundscape.gd`). It replaces the 9-second `loop_birds` loop in the valley, which is used by both the opening movie and home.
+
+| Layer | What it does |
+|---|---|
+| Breeze (`loop_breeze`, 24 s) | Non-positional; volume follows slow gusts |
+| Crickets (`loop_crickets`) | Non-positional |
+| Bees (`loop_bees`) | Positional, at the garden |
+| Calls (scheduled) | Every 1.6–5 s, a weighted pick from 16 synthesized one-shots |
+| Answers | Warbles, whistles and chips are answered 35% of the time from a second spot |
+
+- **The calls:**
+  - three warbles, two "fee-bee" whistles, two trills, two chip calls;
+  - a dove, a cuckoo, a woodpecker drum, a leaf rustle.
+- **How each call plays:** at a random spot 6–50 m around the listener (3–9 m up, in the trees), with ±8% pitch and a few dB of volume variation, from a pool of five players.
+- **Indoors** (`HomeCabin.is_inside` via `inside_fn`): calls are half as frequent and quieter. The cabin room sits 30 m below the valley, so the calls also sound distant.
+- **In the sky:** the soundscape fades out more than 90 m from the valley or 45 m above it, for the Sky Ride.
+- **Generation:** all new sounds were added at the end of `tools/make_audio.py`'s list, so the random sequence, and therefore every older sound, is unchanged. The generator's `only` mode wrote just the 16 new files. Spectrograms were checked, since the sounds couldn't be listened to here.
+
+New autotest `ambience`:
+- the soundscape layers are playing, and the old loop isn't;
+- indoors is recognised;
+- 30 s in the yard gives at least 7 calls of at least 4 kinds;
+- it's calmer indoors and quiet in the sky.

@@ -262,8 +262,11 @@ func _run() -> void:
 					if fi % 2 == 0:
 						await shot("f_%s_%03d" % [sh, fi])
 			var secs := (Time.get_ticks_msec() - t_start) / 1000.0
-			print("INTRO_LENGTH ", secs)
-			check("intro_short", secs < 60.0, "%.1f s" % secs)
+			# the movie's own length (game time): a slow test machine stretches the
+			# wall-clock time without the movie being any longer
+			var game_secs := t + 1.6 * seen.size()
+			print("INTRO_LENGTH ", secs, " (game time ", game_secs, ")")
+			check("intro_short", game_secs < 60.0, "%.1f s of game time (%.1f s on the clock)" % [game_secs, secs])
 			for sh2 in ["sunrise", "bed", "dress", "teeth", "kettle", "tea", "portal"]:
 				check("intro_shot_" + sh2, seen.has(sh2))
 			await wait(2.0)
@@ -329,6 +332,9 @@ func _run() -> void:
 			return
 	elif mode == "tour":
 		if await _tour_test():
+			return
+	elif mode == "ambience":
+		if await _ambience_test():
 			return
 	elif mode == "porthome":
 		if await _porthome_test():
@@ -4907,8 +4913,6 @@ func _modes_test() -> bool:
 			match ev:
 				"moon":
 					check("md_ev_moon", player.chaos_gravity < 0.5)
-				"mirror":
-					check("md_ev_mirror", player.mirror_t > 5.0)
 				"boing":
 					check("md_ev_boing", player.bouncy_t > 5.0)
 				"rainbow":
@@ -4927,23 +4931,14 @@ func _modes_test() -> bool:
 		await shot("md_ev_timers")
 		check("md_ev_chickens", get_tree().get_nodes_in_group("damageable").size() > fowl0, "%d" % get_tree().get_nodes_in_group("damageable").size())
 		check("md_events_count", ch.events_fired >= InsaneChaos.EVENTS.size())
-		# Mirror World swaps left and right on foot, but never on a mount
+		# Mirror World is gone for good (Jason: "it causes stress"): right is always right
+		check("md_no_mirror_world", not InsaneChaos.EVENTS.has("mirror") and player.get("mirror_t") == null)
 		await wait(13.0)          # (let the ice and the quake wear off)
-		player.mirror_t = 10.0
 		var right := Vector3(cos(player.view_yaw), 0, -sin(player.view_yaw))
 		var p0 := player.global_position
 		await press("move_right", 0.6)
 		var foot := (player.global_position - p0).dot(right)
-		player.mount_up("chicken")
-		await wait(0.6)
-		player.mirror_t = 10.0
-		right = Vector3(cos(player.view_yaw), 0, -sin(player.view_yaw))
-		p0 = player.global_position
-		await press("move_right", 0.6)
-		var mounted := (player.global_position - p0).dot(right)
-		player.dismount()
-		player.mirror_t = 0.0
-		check("md_mirror_on_foot_only", foot < -0.3 and mounted > 0.3, "on foot %.2f, mounted %.2f (right is +)" % [foot, mounted])
+		check("md_right_is_right", foot > 0.3, "%.2f (right is +)" % foot)
 	main.autosave()
 	check("md_mode_saved", String(Game.read_slot(Game.active_slot).get("mode", "")) == "insane")
 	return false
@@ -4999,6 +4994,58 @@ func _draws() -> Vector2:
 		d += Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 		o += Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)
 	return Vector2(d / 10.0, o / 10.0)
+
+## The cabin's sounds: a breeze, crickets, bees, and many different birds from
+## all around (never the old single bird loop); quieter indoors; silent in the sky.
+func _ambience_test() -> bool:
+	var phase := int(Game.get_meta("am_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("am_phase", 1)
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		Game.flags["adventure_done"] = true
+		Game.resume_pos = HomeCabin.arrival()
+		main._travel("home", HomeCabin.arrival(), 0.0)
+		return true
+	await wait(3.0)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	var sc: Soundscape = w._scen.soundscape if w._scen else null
+	check("am_soundscape", sc != null and sc._breeze.playing and sc._crickets.playing and sc._bees != null and sc._bees.playing)
+	var old_loop := 0
+	for a in get_tree().current_scene.find_children("*", "AudioStreamPlayer3D", true, false):
+		var st: AudioStream = (a as AudioStreamPlayer3D).stream
+		if st and String(st.resource_path).contains("loop_birds") and (a as AudioStreamPlayer3D).playing:
+			old_loop += 1
+	check("am_no_old_bird_loop", old_loop == 0, "%d" % old_loop)
+	check("am_indoors_known", w.cabin.is_inside(player.global_position) and bool(sc.inside_fn.call(get_viewport().get_camera_3d().global_position)))
+	var in0 := sc.calls_played
+	await wait(20.0)
+	var indoors := sc.calls_played - in0
+	# out into the yard
+	await tp(w.ground(-6.0, 10.0) + Vector3(0, 0.4, 0), 0.0)
+	await wait(1.0)
+	var out0 := sc.calls_played
+	var h0 := sc.heard.size()
+	await wait(30.0)
+	var outdoors := sc.calls_played - out0
+	var kinds := {}
+	for nm in sc.heard.slice(h0):
+		kinds[String(nm).trim_suffix("_1").trim_suffix("_2").trim_suffix("_3")] = true
+	print("AMBIENCE indoors %d calls in 20 s, outdoors %d calls in 30 s, kinds %s" % [indoors, outdoors, str(kinds.keys())])
+	check("am_lively_outside", outdoors >= 7, "%d calls in 30 s" % outdoors)
+	check("am_many_kinds", kinds.size() >= 4, str(kinds.keys()))
+	check("am_calmer_inside", float(indoors) / 20.0 < float(outdoors) / 30.0, "inside %d/20 s, outside %d/30 s" % [indoors, outdoors])
+	await shot("am_yard")
+	# up in the sky, the valley goes quiet
+	await tp(Vector3(0, 160, -400), 0.0)
+	await wait(3.0)
+	check("am_quiet_in_the_sky", sc._level < 0.1 and sc._breeze.volume_db < -40.0, "level %.2f breeze %.0f dB" % [sc._level, sc._breeze.volume_db])
+	return false
 
 ## A fixed screenshot tour of every level (used to compare rendering changes).
 func _tour_test() -> bool:

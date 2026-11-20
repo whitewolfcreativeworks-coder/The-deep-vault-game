@@ -52,6 +52,8 @@ func build() -> void:
 	_environment()
 	_valley()
 	cabin = HomeCabin.build_in(self)
+	if _scen and _scen.soundscape:
+		_scen.soundscape.inside_fn = cabin.is_inside      # calmer and further off indoors
 	_cloud_sea()
 	_cloud_island_behind()
 	ride = SkyRide.build_in(self)

@@ -18,6 +18,7 @@ const FOREST := "res://assets/kaykit/forest/%s.gltf"
 const ROOM := Vector3(400, 0, 0)       # the cabin interior set (filmed separately)
 
 var cam: Camera3D
+var soundscape: Soundscape
 var actor: CharacterModel
 var env: Environment
 var sun: DirectionalLight3D
@@ -159,8 +160,9 @@ func _valley() -> void:
 			continue
 		var nm: String = ["tree_single_A", "tree_single_B", "tree_pine_yellow_large", "tree_pine_orange_medium"][rng.randi() % 4]
 		_model(nm, g(p.x, p.y) - Vector3(0, 0.2, 0), rng.randf() * 360.0, 6.5 if nm.begins_with("tree_single") else 1.1)
-	var birds := Node3D.new(); add_child(birds); birds.position = g(0, 8)
-	Sfx.loop_on(birds, "loop_birds", -8.0, 30.0, 200.0)
+	# the valley's own sounds: a breeze, crickets, bees in the garden, and birds all
+	# around (many kinds, never the same loop: see Soundscape)
+	soundscape = Soundscape.make(self, g(0, 8), g(-3.2, 9.2))
 
 # --- the yard portal ------------------------------------------------------------
 var _portal_mat: ShaderMaterial

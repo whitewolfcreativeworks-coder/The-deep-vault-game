@@ -409,6 +409,97 @@ def chirp():
         out.append(np.zeros(int(0.04 * SR)))
     return np.concatenate(out)
 
+# --- the cabin's soundscape (see scripts/world/soundscape.gd) --------------------
+# Many short, varied calls that a script scatters around you at random times and
+# places, over a soft breeze, instead of one short loop of the same chirp.
+def _note(f0, f1, dur, vib=0.0, vib_hz=0.0, harm=0.12, shape=2.0):
+    seg = t(dur); n = len(seg)
+    f = np.linspace(f0, f1, n) * (1 + vib * np.sin(2 * np.pi * vib_hz * seg))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    w = np.sin(ph) + harm * np.sin(2 * ph)
+    return w * np.sin(np.linspace(0, np.pi, n)) ** shape
+def _cat(parts):
+    return np.concatenate([p if isinstance(p, np.ndarray) else np.zeros(int(p * SR)) for p in parts])
+def _warble(seed):
+    r = np.random.default_rng(seed); parts = []
+    base = r.uniform(2000, 3000)
+    for k in range(int(r.integers(5, 10))):
+        f0 = base * r.uniform(0.75, 1.45); f1 = f0 * r.uniform(0.8, 1.3)
+        parts += [_note(f0, f1, r.uniform(0.05, 0.14), r.uniform(0.0, 0.06), r.uniform(20, 45)) * r.uniform(0.5, 1.0), r.uniform(0.025, 0.09)]
+    return _cat(parts + [0.1])
+def _whistle(seed):
+    r = np.random.default_rng(seed); hi = r.uniform(3300, 3800)
+    return _cat([_note(hi, hi * 0.99, r.uniform(0.28, 0.38), 0.004, 6, 0.04, 1.2), r.uniform(0.08, 0.14),
+                 _note(hi * 0.84, hi * 0.82, r.uniform(0.3, 0.42), 0.004, 6, 0.04, 1.2) * 0.85, 0.15])
+def _trill(seed):
+    r = np.random.default_rng(seed); f = r.uniform(3800, 5200); rate = r.uniform(14, 22); parts = []
+    for k in range(int(r.integers(12, 24))):
+        parts += [_note(f * (1 - k * 0.006), f * (1 - k * 0.006) * 0.92, 0.6 / rate, 0, 0, 0.1, 1.5) * (0.6 + 0.4 * np.sin(np.pi * k / 20)), 0.4 / rate]
+    return _cat([_note(f * 0.8, f * 1.05, 0.12) * 0.7, 0.05] + parts + [0.1])
+def _chip(seed):
+    r = np.random.default_rng(seed); f = r.uniform(4200, 5600); parts = []
+    for k in range(int(r.integers(2, 5))):
+        parts += [_note(f * 1.1, f * 0.8, 0.035, 0, 0, 0.2, 1.0), r.uniform(0.12, 0.3)]
+    return _cat(parts)
+def bird_warble_1(): return _warble(101)
+def bird_warble_2(): return _warble(102)
+def bird_warble_3(): return _warble(103)
+def bird_whistle_1(): return _whistle(201)
+def bird_whistle_2(): return _whistle(202)
+def bird_trill_1(): return _trill(301)
+def bird_trill_2(): return _trill(302)
+def bird_chip_1(): return _chip(401)
+def bird_chip_2(): return _chip(402)
+def dove():
+    # a soft, low "coo-OOO-oo-oo" from far off
+    body = lambda f, d, a: _note(f, f * 0.97, d, 0.02, 7, 0.35, 1.0) * a
+    x = _cat([body(500, 0.28, 0.6), 0.06, body(560, 0.55, 1.0), 0.1, body(470, 0.3, 0.7), 0.08, body(470, 0.3, 0.6), 0.2])
+    return lowpass(x, 1400)
+def cuckoo():
+    x = _cat([_note(760, 740, 0.22, 0.0, 0, 0.3, 1.0), 0.07, _note(610, 590, 0.32, 0.0, 0, 0.3, 1.0), 0.25])
+    return lowpass(x, 2000)
+def woodpecker():
+    r = np.random.default_rng(501); n = int(r.integers(12, 18)); rate = 17.0; x = np.zeros(int((n / rate + 0.3) * SR))
+    for k in range(n):
+        o = int(k / rate * SR); k_len = int(0.025 * SR)
+        knock = highpass(noise(0.025), 600) * env(k_len, 0.001, 0.02, 6) + np.sin(2 * np.pi * 900 * t(0.025)) * env(k_len, 0.001, 0.015, 6) * 0.6
+        x[o:o + k_len] += knock * (1 - 0.4 * k / n)
+    return x
+def leaves_rustle():
+    d = 1.8; seg = t(d)
+    gust = np.sin(np.pi * seg / d) ** 1.5
+    grains = (rng.uniform(0, 1, len(seg)) > 0.985).astype(float)
+    crackle = lowpass(grains * rng.uniform(-1, 1, len(seg)), 5000)
+    hiss = highpass(lowpass(noise(d), 6000), 1800)
+    return (hiss * 0.5 + crackle * 1.4) * gust
+def loop_breeze():
+    # soft wind in the trees: a low swell with leafy hiss riding the gusts
+    d = 24.0; seg = t(d)
+    gust = 0.55 + 0.25 * np.sin(2 * np.pi * seg / 8.0) + 0.15 * np.sin(2 * np.pi * seg / 3.0 + 1.3) + 0.05 * np.sin(2 * np.pi * seg / 1.3)
+    low = lowpass(noise(d), 420) * 1.6
+    leaves = highpass(lowpass(noise(d), 4500), 1500) * 0.35
+    return loopify((low + leaves * gust) * gust, 2.0)
+def loop_crickets():
+    # a few crickets in the grass, each with its own rhythm and pitch
+    d = 16.0; x = np.zeros(int(d * SR))
+    for f, rate, gap in [(4300, 3.1, 0.9), (4700, 2.6, 1.4), (3900, 3.7, 2.2)]:
+        tt = rng.uniform(0, 0.5)
+        while tt < d - 0.4:
+            for p in range(3):
+                o = int((tt + p * 0.045) * SR); n = int(0.028 * SR)
+                if o + n < len(x): x[o:o + n] += np.sin(2 * np.pi * f * t(0.028)) * np.sin(np.linspace(0, np.pi, n)) * 0.5
+            tt += 1.0 / rate + (gap * rng.uniform(0.6, 1.4) if rng.uniform() < 0.25 else 0)
+    return loopify(x, 0.3)
+def loop_bees():
+    # bees busy in the garden: a buzzing hum that drifts up and down
+    d = 12.0; seg = t(d); x = np.zeros(len(seg))
+    for f0, a in [(205, 1.0), (232, 0.7), (188, 0.6)]:
+        f = f0 * (1 + 0.04 * np.sin(2 * np.pi * rng.uniform(0.2, 0.5) * seg + rng.uniform(0, 6)))
+        ph = 2 * np.pi * np.cumsum(f) / SR
+        saw = 2 * ((ph / (2 * np.pi)) % 1) - 1
+        x += lowpass(saw, 1200) * a * (0.6 + 0.4 * np.sin(2 * np.pi * rng.uniform(0.1, 0.3) * seg + rng.uniform(0, 6)) ** 2)
+    return loopify(x, 1.0)
+
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
     "pickup": pickup, "coins": coins, "levelup": levelup, "spell": spell, "spell_hit": spell_hit,
@@ -422,6 +513,11 @@ SOUNDS = {
     "loop_moped": moped_loop, "beep": beep,
     "pop": pop, "thunder": thunder,
     "loop_wings": wings_loop, "chirp": chirp,
+    # the cabin's soundscape (added last so every older sound comes out the same)
+    "bird_warble_1": bird_warble_1, "bird_warble_2": bird_warble_2, "bird_warble_3": bird_warble_3,
+    "bird_whistle_1": bird_whistle_1, "bird_whistle_2": bird_whistle_2, "bird_trill_1": bird_trill_1, "bird_trill_2": bird_trill_2,
+    "bird_chip_1": bird_chip_1, "bird_chip_2": bird_chip_2, "dove": dove, "cuckoo": cuckoo, "woodpecker": woodpecker,
+    "leaves_rustle": leaves_rustle, "loop_breeze": loop_breeze, "loop_crickets": loop_crickets, "loop_bees": loop_bees,
 }
 
 if __name__ == "__main__":

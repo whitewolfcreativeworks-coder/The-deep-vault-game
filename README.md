@@ -103,7 +103,6 @@ A level or a new adventure then asks for a mode, and **With my gear** (keep ever
 - **Something wild** happens within seconds of arriving and then every 12–20 seconds, sometimes two at once (**DOUBLE TROUBLE!**). It's announced in big rainbow letters, and anything that lasts shows a countdown at the top of the screen. None of these add monsters:
   - **Rainbow Storm** (rainbow vision without the mushrooms)
   - **Moon Gravity**
-  - **Mirror World** (left is right! On foot only, never on a mount)
   - **Boing Boing** (you bounce on every landing)
   - **Speed Freak**
   - **Meteor Shower** (get out of the red circles)
@@ -118,6 +117,16 @@ A level or a new adventure then asks for a mode, and **With my gear** (keep ever
   - **Ghost Monsters** (they flicker in and out of sight)
 
 Your mode shows next to your level, and it's saved with your game. Port Home works in every mode.
+
+**Mirror World is gone (Nov 20).** It swapped left and right for 10 seconds, and Jason found it stressful ("this game is not supposed to be stressful"). Right is always right now.
+
+**The cabin sounds alive (Nov 20).** The old cabin sound was one 9-second loop of the same chirp. Now a soundscape plays:
+- a breeze that swells and dies in the trees;
+- crickets in the grass, and bees by the garden;
+- every few seconds, a different bird from somewhere up in the trees around you, at its own pitch. There are warbling songs, "fee-bee" whistles, trills and chips, and sometimes another bird answers from across the clearing;
+- now and then a dove coos far off, a cuckoo calls, a woodpecker drums or a gust rustles the leaves.
+
+It's calmer inside the cabin and silent up in the sky. Every sound is synthesized by `tools/make_audio.py`, like the rest of the game's audio.
 
 **Keeping it smooth (Nov 19–20):** the first Insane build was very laggy on the iPad, so:
 - **Monsters sleep** when you're far away: no thinking, physics or animation until you come within about 50 m.

@@ -7,7 +7,6 @@ class_name InsaneChaos
 ## that are already there.
 ##   RAINBOW STORM   rainbow vision without the mushrooms
 ##   MOON GRAVITY    huge floaty jumps (and falls)
-##   MIRROR WORLD    left is right and right is left! (on foot; never on a mount)
 ##   BOING BOING     you bounce every time you land
 ##   SPEED FREAK     you run super fast
 ##   METEOR SHOWER   fireballs crash down: watch for the red circles
@@ -21,19 +20,19 @@ class_name InsaneChaos
 ##   SLIPPERY ICE    the ground turns to ice: you slide everywhere
 ##   GHOST MONSTERS  the monsters flicker in and out of sight
 
-const EVENTS := ["rainbow", "moon", "mirror", "boing", "speed", "meteors", "chickens", "rage", "disco", "gold", "giants",
+const EVENTS := ["rainbow", "moon", "boing", "speed", "meteors", "chickens", "rage", "disco", "gold", "giants",
 	"quake", "slowmo", "slippery", "ghosts"]
-const NAMES := {"rainbow": "RAINBOW STORM!", "moon": "MOON GRAVITY!", "mirror": "MIRROR WORLD!", "boing": "BOING BOING!",
+const NAMES := {"rainbow": "RAINBOW STORM!", "moon": "MOON GRAVITY!", "boing": "BOING BOING!",
 	"speed": "SPEED FREAK!", "meteors": "METEOR SHOWER!", "chickens": "CHICKEN PARTY!", "rage": "MONSTER RAGE!",
 	"disco": "DISCO TIME!", "gold": "GOLD RAIN!", "giants": "GIANT FOES!", "quake": "EARTHQUAKE!", "slowmo": "BULLET TIME!",
 	"slippery": "SLIPPERY ICE!", "ghosts": "GHOST MONSTERS!"}
-const HINTS := {"rainbow": "Everything's gone wobbly...", "moon": "Jump! Wheee!", "mirror": "Left is right and right is left!",
+const HINTS := {"rainbow": "Everything's gone wobbly...", "moon": "Jump! Wheee!",
 	"boing": "You can't stop bouncing!", "speed": "Zoom zoom!", "meteors": "Get out of the red circles!",
 	"chickens": "Bawk bawk BAWK!", "rage": "They're ALL coming for you!", "disco": "Dance while you fight!",
 	"gold": "Grab the coins!", "giants": "Everything near you got BIG!", "quake": "Hold on tight!",
 	"slowmo": "The monsters are in slow motion. Get 'em!", "slippery": "Whoa! Careful...", "ghosts": "Now you see them, now you don't!"}
 ## The little countdown names.
-const SHORT := {"moon": "MOON GRAVITY", "mirror": "MIRROR WORLD", "boing": "BOING", "speed": "SPEED", "disco": "DISCO",
+const SHORT := {"moon": "MOON GRAVITY", "boing": "BOING", "speed": "SPEED", "disco": "DISCO",
 	"quake": "EARTHQUAKE", "slowmo": "BULLET TIME", "slippery": "ICE", "ghosts": "GHOSTS"}
 
 var player: Player
@@ -106,8 +105,9 @@ func _process(delta: float) -> void:
 		if _rng.randf() < 0.3:      # double trouble!
 			fire(_pick(pick), true)
 
-## A random event that makes sense right now (no Mirror World on a mount, no
-## monster events with no monsters about...).
+## A random event that makes sense right now (no monster events with no
+## monsters about...). (Mirror World, which swapped left and right, was taken out
+## for good: it made the game stressful.)
 func _pick(not_this: String) -> String:
 	for tries in 30:
 		var ev: String = EVENTS[_rng.randi() % EVENTS.size()]
@@ -117,8 +117,6 @@ func _pick(not_this: String) -> String:
 
 func _makes_sense(ev: String) -> bool:
 	match ev:
-		"mirror":
-			return not player.mounted and player.mirror_t <= 0.0
 		"slippery":
 			return Game.zone != "cloud" and _slip_t <= 0.0      # (Cloud Island has its own ice)
 		"rage":
@@ -186,7 +184,7 @@ func _tick_effects(delta: float) -> void:
 
 func _show_timers() -> void:
 	var parts: Array = []
-	var vals := {"moon": _moon_t, "mirror": player.mirror_t if not player.mounted else 0.0, "boing": player.bouncy_t,
+	var vals := {"moon": _moon_t, "boing": player.bouncy_t,
 		"speed": player.haste_t, "disco": _disco_t, "quake": _quake_t, "slowmo": _slow_t, "slippery": _slip_t, "ghosts": _ghost_t}
 	for k in vals:
 		if float(vals[k]) > 0.05:
@@ -221,8 +219,6 @@ func fire(ev: String, also := false) -> void:
 		"moon":
 			p.chaos_gravity = 0.3
 			_moon_t = 16.0
-		"mirror":
-			p.mirror_t = 10.0
 		"boing":
 			p.bouncy_t = 12.0
 		"speed":
