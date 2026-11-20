@@ -249,6 +249,10 @@ func _ready() -> void:
 	home = global_position
 	if oddity != "":
 		_oddity_look.call_deferred()
+	# far away, ordinary monsters aren't drawn at all (saves a lot on tablets in a
+	# forest full of them); big bosses can still be seen from afar
+	if not boss and not t.has("look_size"):
+		_far_cull.call_deferred()
 	# Hard and Insane: more monsters (a twin turns up beside many of them; in
 	# Insane most come in a pack of three)
 	if Game.mode != "normal" and not boss and not mini and uid != "" and not uid.ends_with("+"):
@@ -390,6 +394,36 @@ func _go(s: S) -> void:
 	state = s
 	state_time = 0.0
 
+## Far away and not doing anything: a monster sleeps. No thinking, no physics, no
+## animation, just a quick look every half second to see if you've come close.
+## (A forest full of Insane packs is ~180 monsters; only the ones near you need to
+## be awake.)
+var asleep := false
+var _sleep_check := 0.0
+
+func _sleep_dist() -> float:
+	return maxf(48.0, maxf(float(t.aggro), dormant_wake) + 14.0)
+
+func _set_asleep(on: bool) -> void:
+	asleep = on
+	if on:
+		velocity = Vector3.ZERO
+	if body:
+		body.process_mode = Node.PROCESS_MODE_DISABLED if on else Node.PROCESS_MODE_INHERIT
+
+## The monsters that are awake this physics frame (shared, built once per frame).
+static var _awake_frame := -1
+static var _awake_list: Array = []
+func _awake_enemies() -> Array:
+	var f := Engine.get_physics_frames()
+	if f != _awake_frame:
+		_awake_frame = f
+		_awake_list.clear()
+		for o in get_tree().get_nodes_in_group("enemy"):
+			if is_instance_valid(o) and not o.dead and not (o is Enemy and (o as Enemy).asleep):
+				_awake_list.append(o)
+	return _awake_list
+
 func _physics_process(delta: float) -> void:
 	if dead:
 		if t.has("fly") and not is_on_floor():
@@ -401,6 +435,27 @@ func _physics_process(delta: float) -> void:
 		player = get_tree().get_first_node_in_group("player")
 		if player == null:
 			return
+	if asleep:
+		if state != S.IDLE and state != S.DORMANT:
+			_set_asleep(false)          # something woke it (a hit, a world event...)
+		else:
+			_sleep_check -= delta
+			if _sleep_check > 0.0:
+				return
+			_sleep_check = 0.4 + randf() * 0.2
+			var sd := _sleep_dist()
+			if global_position.distance_squared_to(player.global_position) > sd * sd:
+				return
+			_set_asleep(false)
+	elif state == S.IDLE or state == S.DORMANT:
+		_sleep_check -= delta
+		if _sleep_check <= 0.0:
+			_sleep_check = 0.5 + randf() * 0.3
+			var sd2 := _sleep_dist() + 6.0
+			if global_position.distance_squared_to(player.global_position) > sd2 * sd2 \
+					and (state == S.DORMANT or t.has("fly") or is_on_floor()) and _frozen_t <= 0.0 and not _move_busy:
+				_set_asleep(true)
+				return
 	state_time += delta
 	cooldown -= delta
 	_blind_t -= delta
@@ -537,15 +592,16 @@ func _physics_process(delta: float) -> void:
 			if not pdead and dist < t.aggro * 0.7 and global_position.distance_to(home) < leash * 0.6 and _can_engage(delta):
 				_go(S.CHASE)
 
-	# separation from other enemies
-	for o in get_tree().get_nodes_in_group("enemy"):
-		if o == self or not is_instance_valid(o) or o.dead:
-			continue
-		var d: Vector3 = global_position - o.global_position
-		d.y = 0
-		var l := d.length()
-		if l < 1.3 and l > 0.01:
-			move += d / l * (1.3 - l) * 1.5
+	# separation from other enemies (only the awake ones, and only while moving)
+	if state == S.CHASE or state == S.RETURN or (state == S.IDLE and dist < 30.0):
+		for o in _awake_enemies():
+			if o == self or not is_instance_valid(o) or o.dead:
+				continue
+			var d: Vector3 = global_position - o.global_position
+			d.y = 0
+			var l := d.length()
+			if l < 1.3 and l > 0.01:
+				move += d / l * (1.3 - l) * 1.5
 	if move.length() > 1.0:
 		move = move.normalized()
 	if state in [S.WINDUP, S.STRIKE, S.RECOVER, S.STAGGER, S.AWAKEN]:
@@ -1228,18 +1284,25 @@ func _spawn_twin(tag := "+") -> void:
 	e.global_position = home + off + Vector3(0, 0.2, 0)
 	e.rotation.y = facing
 
+func _far_cull() -> void:
+	if not is_instance_valid(body):
+		return
+	for g in body.find_children("*", "GeometryInstance3D", true, false):
+		(g as GeometryInstance3D).visibility_range_end = 80.0
+		(g as GeometryInstance3D).visibility_range_end_margin = 4.0
+
 ## Insane oddities show: sparkles in yellow (speedy) or pink (splitter).
 func _oddity_look() -> void:
 	if oddity == "giant":
 		return
 	var col := Color(1.0, 0.9, 0.2) if oddity == "speedy" else Color(1.0, 0.3, 0.9)
-	var p := CPUParticles3D.new(); p.amount = 16; p.lifetime = 0.8
+	var p := CPUParticles3D.new(); p.amount = 8; p.lifetime = 0.8
 	p.mesh = FX.quad(0.14); p.material_override = FX.glow_material(col, 2.0)
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; p.emission_sphere_radius = 0.6 * float(t.scale)
 	p.direction = Vector3.UP; p.spread = 40; p.gravity = Vector3(0, 0.5, 0)
 	p.initial_velocity_min = 0.3; p.initial_velocity_max = 0.8
 	p.position.y = 1.0 * float(t.scale)
-	add_child(p)
+	body.add_child(p)      # (on the body: it rests while the monster sleeps)
 
 ## Cloud Island creatures: hide the stand-in skeleton and show the shape-built look.
 var look: CreatureLook

@@ -87,11 +87,11 @@ A level or a new adventure then asks for a mode, and **With my gear** (keep ever
 |---|---|---|---|---|---|---|
 | **Normal** | no (a little if you out-level the zone) | as usual | as usual | as usual | as usual | no |
 | **Hard** | your level | x2 (bosses x1.7) | x1.6 | 12% faster | x1.6, loot at your level | about half get a twin |
-| **INSANE** | your level, and with your gear: your gear too, plus 15% | x2.8 (bosses x2.3) | x2.1 | 25% faster | x2.5, loot above your level | packs: every one gets a twin, most a third |
+| **INSANE** | your level, and with your gear: your gear too, plus 15% | x2.8 (bosses x2.3) | x2.1 | 25% faster | x2.5, loot above your level | packs: most get a twin, about a third come in threes |
 
 **Growing to match you** means a level-20 hero in the Deep Vault gets a real fight: the monsters' health grows as much as your hitting power has grown since that level, and their hits grow as much as your toughness (health and armor) has. Hard and Insane both match your level. **Insane with your gear** also matches the gear you carry, so bringing your best gear makes it *harder*. **Insane, starting fresh** doesn't count your gear: you're underpowered at first and get stronger as you find loot along the way.
 
-**INSANE is the kitchen sink.** Some monsters are odd: **Giant** (huge and tough), **Speedy** (yellow sparkles) or **Splitting** (pink sparkles; it bursts into two little ones). Something wild happens within seconds of arriving and then every 15–25 seconds, sometimes two at once (**DOUBLE TROUBLE!**), announced in big rainbow letters:
+**INSANE is the kitchen sink.** Some monsters are odd: **Giant** (huge and tough), **Speedy** (yellow sparkles) or **Splitting** (pink sparkles; it bursts into two little ones). Something wild happens within seconds of arriving and then every 16–26 seconds, sometimes two at once (**DOUBLE TROUBLE!**), announced in big rainbow letters:
 - **Rainbow Storm** (rainbow vision without the mushrooms)
 - **Moon Gravity**
 - **Mirror World** (left is right!)
@@ -99,12 +99,14 @@ A level or a new adventure then asks for a mode, and **With my gear** (keep ever
 - **Speed Freak**
 - **Meteor Shower** (get out of the red circles)
 - **Chicken Party**
-- **Monster Party** (four more monsters climb out of the ground)
+- **Monster Party** (three more monsters climb out of the ground; never more than nine of them at once)
 - **Disco Time**
 - **Gold Rain**
 - **Giant Foes**
 
 Your mode shows next to your level, and it's saved with your game. Port Home works in every mode.
+
+**Keeping it smooth (Nov 19, night):** the first Insane build was very laggy on the iPad. An Insane forest has about 155 monsters. Monsters now **sleep** when you're far away (no thinking, physics or animation until you come within about 50 m), ordinary monsters aren't drawn beyond 80 m, and monsters only steer around their awake neighbours (that check used to compare every monster with every other one, every tick). Measured on the web renderer, the Insane forest went from 12,809 draw calls and 30 ms of script time per tick to 4,783 and 3.5 ms. That's lighter than the old Normal forest, and Normal got faster too. `tools/run_tests.sh perf` measures it.
 
 ### New in the Nov 19 afternoon notes
 - **The Sky Ride: the flight home is its own arcade game.** Your dragonfly now flies itself along the course, about a minute and a half home.

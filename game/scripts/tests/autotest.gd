@@ -321,6 +321,9 @@ func _run() -> void:
 	elif mode == "levels":
 		if await _levels_test():
 			return
+	elif mode == "perf":
+		if await _perf_test():
+			return
 	elif mode == "porthome":
 		if await _porthome_test():
 			return
@@ -4913,6 +4916,98 @@ func _modes_test() -> bool:
 		check("md_events_count", ch.events_fired >= InsaneChaos.EVENTS.size())
 	main.autosave()
 	check("md_mode_saved", String(Game.read_slot(Game.active_slot).get("mode", "")) == "insane")
+	return false
+
+## How heavy is a level? Average script + physics time per physics tick and
+## process (animation, effects) time per frame, with the counts behind them.
+func _measure(label: String, secs: float) -> Dictionary:
+	var n := 0
+	var phys := 0.0
+	var proc := 0.0
+	var worst := 0.0
+	var frames := 0
+	var t0 := Time.get_ticks_msec()
+	var last_f := Engine.get_process_frames()
+	while Time.get_ticks_msec() - t0 < int(secs * 1000.0):
+		await get_tree().physics_frame
+		var p := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+		phys += p
+		worst = maxf(worst, p)
+		n += 1
+		if Engine.get_process_frames() != last_f:
+			last_f = Engine.get_process_frames()
+			proc += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+			frames += 1
+	var en := 0
+	var awake := 0
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e is Enemy and not (e as Enemy).dead:
+			en += 1
+			if not (e as Enemy).get("asleep"):
+				awake += 1
+	var parts := 0
+	for c in main.world.find_children("*", "CPUParticles3D", true, false):
+		if (c as CPUParticles3D).emitting and (c as CPUParticles3D).is_visible_in_tree():
+			parts += 1
+	var lights := 0
+	for c in get_tree().current_scene.find_children("*", "Light3D", true, false):
+		if (c as Light3D).is_visible_in_tree() and not c is DirectionalLight3D:
+			lights += 1
+	var draws := Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+	var objs := Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)
+	var r := {"phys": phys / maxf(1, n), "worst": worst, "proc": proc / maxf(1, frames), "enemies": en, "awake": awake, "particles": parts, "lights": lights, "draws": draws}
+	print("PERF %-24s physics %6.2f ms/tick (worst %6.1f)  process %6.2f ms/frame  enemies %3d awake %3d  particle emitters %3d  lights %3d  draw calls %5d objects %5d" % [label, r.phys, r.worst, r.proc, en, awake, parts, lights, draws, objs])
+	Game.set_meta("perf_" + label, r)
+	return r
+
+func _perf_test() -> bool:
+	var phase := int(Game.get_meta("pf_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("pf_phase", 1)
+		Game.level = 20
+		Game.flags["adventure_done"] = true
+		for slot in ["weapon", "armor"]:
+			Game.add_item(Loot.make_random(20, 0.8, 3, slot), true)
+		Game.mode = "normal"
+		main._travel("forest")
+		return true
+	var plan := [["forest", "normal"], ["forest", "insane"], ["vault", "insane"], ["vault", "normal"]]
+	if phase <= plan.size():
+		var cur: Array = plan[phase - 1]
+		await wait(4.0)
+		player = main.player
+		god = true
+		if main.chaos:
+			main.chaos.next_t = 9999.0       # events measured separately
+		await _measure("%s_%s" % [cur[0], cur[1]], 8.0)
+		if cur[1] == "insane" and main.chaos:
+			if OS.get_environment("PERF_EACH") != "":
+				for ev in InsaneChaos.EVENTS:
+					main.chaos.fire(ev)
+					await _measure("%s_ev_%s" % [cur[0], ev], 4.0)
+			for ev in ["meteors", "chickens", "monsters", "disco", "gold"]:
+				main.chaos.fire(ev)
+			await _measure("%s_insane_events" % cur[0], 8.0)
+		Game.set_meta("pf_phase", phase + 1)
+		if phase < plan.size():
+			var nxt: Array = plan[phase]
+			Game.mode = nxt[1]
+			Game.mode_geared = true
+			main._travel(nxt[0])
+			return true
+	for k in ["forest", "vault"]:
+		var nm: Dictionary = Game.get_meta("perf_%s_normal" % k, {})
+		var ins: Dictionary = Game.get_meta("perf_%s_insane" % k, {})
+		var ev: Dictionary = Game.get_meta("perf_%s_insane_events" % k, {})
+		if nm.is_empty() or ins.is_empty():
+			continue
+		var base := float(nm.phys) + float(nm.proc)
+		print("PERF %s: insane %.2fx normal, with events %.2fx" % [k, (float(ins.phys) + float(ins.proc)) / base, (float(ev.get("phys", 0)) + float(ev.get("proc", 0))) / base])
+		check("pf_%s_insane_within_budget" % k, (float(ins.phys) + float(ins.proc)) < base * 1.35, "%.2f vs normal %.2f ms" % [float(ins.phys) + float(ins.proc), base])
+		check("pf_%s_events_within_budget" % k, (float(ev.get("phys", 0)) + float(ev.get("proc", 0))) < base * 1.6, "%.2f vs normal %.2f ms" % [float(ev.get("phys", 0)) + float(ev.get("proc", 0)), base])
 	return false
 
 ## Every uid-bearing thing a level builds must belong to that level (so a level

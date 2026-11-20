@@ -1,6 +1,6 @@
 extends Node
 class_name InsaneChaos
-## INSANE MODE's kitchen sink: every 15-25 seconds something wild happens (and
+## INSANE MODE's kitchen sink: every 16-26 seconds something wild happens (and
 ## sometimes two things at once), announced in big rainbow letters. Most last a few seconds; you can still play
 ## through all of them, but they make an already hard mode crazy.
 ##   RAINBOW STORM   rainbow vision without the mushrooms
@@ -80,12 +80,12 @@ func _process(delta: float) -> void:
 		return
 	next_t -= delta
 	if next_t <= 0.0:
-		next_t = _rng.randf_range(14.0, 24.0)
+		next_t = _rng.randf_range(16.0, 26.0)
 		var pick := last
 		while pick == last:
 			pick = EVENTS[_rng.randi() % EVENTS.size()]
 		fire(pick)
-		if _rng.randf() < 0.3:       # double trouble!
+		if _rng.randf() < 0.25:      # double trouble!
 			var two := pick
 			while two == pick:
 				two = EVENTS[_rng.randi() % EVENTS.size()]
@@ -125,28 +125,36 @@ func fire(ev: String, also := false) -> void:
 		"speed":
 			p.haste_t = maxf(p.haste_t, 14.0)
 		"meteors":
-			for k in 14:
-				get_tree().create_timer(0.35 + k * 0.55).timeout.connect(_meteor)
+			for k in 10:
+				get_tree().create_timer(0.35 + k * 0.6).timeout.connect(_meteor)
 		"chickens":
-			for k in 9:
-				var a := k * TAU / 9.0
-				var at := p.global_position + Vector3(cos(a), 0.5, sin(a)) * 3.0
-				Fowl.make(world, at, "turkey" if k % 3 == 0 else "chicken", 9.0)
+			# (the oldest party birds poof away so there are never more than 12)
+			_birds = _birds.filter(func(x: Variant) -> bool: return is_instance_valid(x))
+			while _birds.size() > 6:
+				var old: Node3D = _birds.pop_front()
+				FX.burst(old.global_position + Vector3(0, 0.5, 0), Color(1, 1, 1), 10, 2.0, 0.1, 0.5, 0.0)
+				old.queue_free()
+			for k in 6:
+				var a := k * TAU / 6.0
+				get_tree().create_timer(k * 0.12).timeout.connect(func() -> void:
+					if is_instance_valid(p) and is_instance_valid(world):
+						var at := p.global_position + Vector3(cos(a), 0.5, sin(a)) * 4.5
+						_birds.append(Fowl.make(world, at, "turkey" if k % 3 == 0 else "chicken", 9.0)))
 			Sfx.play("cluck", -2.0, 0.2)
 		"monsters":
 			_monster_party()
 		"disco":
 			_disco_t = 14.0
-			for k in 4:
-				var l := OmniLight3D.new(); l.light_energy = 3.0; l.omni_range = 9.0
+			for k in 3:
+				var l := OmniLight3D.new(); l.light_energy = 3.5; l.omni_range = 9.0
 				world.add_child(l)
 				_disco.append(l)
 		"gold":
-			for k in 16:
-				get_tree().create_timer(k * 0.18).timeout.connect(func() -> void:
+			for k in 12:
+				get_tree().create_timer(k * 0.2).timeout.connect(func() -> void:
 					if is_instance_valid(p):
 						var at2 := p.global_position + Vector3(_rng.randf_range(-5, 5), 0.6, _rng.randf_range(-5, 5))
-						Pickup.spawn(at2, "gold", _rng.randi_range(3, 9))
+						Pickup.spawn(at2, "gold", _rng.randi_range(3, 9), "", true)
 						FX.burst(at2 + Vector3(0, 3, 0), Color(1.0, 0.85, 0.3), 8, 3.0, 0.1, 0.5, -6.0))
 		"giants":
 			for e in get_tree().get_nodes_in_group("enemy"):
@@ -174,7 +182,7 @@ func _meteor() -> void:
 	var tw := rock.create_tween()
 	tw.tween_property(rock, "global_position", at, 1.1).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 	tw.tween_callback(func() -> void:
-		FX.burst(at + Vector3(0, 0.5, 0), Color(1.0, 0.5, 0.15), 50, 7.0, 0.25, 0.8, -6.0)
+		FX.burst(at + Vector3(0, 0.5, 0), Color(1.0, 0.5, 0.15), 28, 7.0, 0.25, 0.8, -6.0)
 		Sfx.play_at("fire_burst", at, -2.0, 0.2)
 		if is_instance_valid(player) and Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length() < 2.4 and absf(player.global_position.y - at.y) < 2.5:
 			player.take_damage(16.0 * Game.foe_scale().y, at, 5.0)
@@ -184,7 +192,10 @@ func _meteor() -> void:
 		ring.queue_free()
 		rock.queue_free())
 
-## Four more of whatever monster lives nearest climb out of the ground.
+## Three more of whatever monster lives nearest climb out of the ground (never
+## more than nine of the party's monsters at once).
+var _party: Array = []
+var _birds: Array = []
 func _monster_party() -> void:
 	var best: Enemy = null
 	var bd := INF
@@ -194,9 +205,14 @@ func _monster_party() -> void:
 			if d < bd:
 				bd = d; best = e
 	var kind := best.type_id if best and bd < 80.0 else "minion"
-	for k in 4:
-		var a := k * TAU / 4.0 + 0.4
-		var e2 := Enemy.new()
-		e2.configure(kind, "", 6.0)
-		world.add_child(e2)
-		e2.global_position = player.global_position + Vector3(cos(a) * 4.5, 0.2, sin(a) * 4.5)
+	_party = _party.filter(func(x: Variant) -> bool: return is_instance_valid(x) and not (x as Enemy).dead)
+	for k in mini(3, 9 - _party.size()):
+		var a := k * TAU / 3.0 + 0.4
+		get_tree().create_timer(k * 0.35).timeout.connect(func() -> void:
+			if not is_instance_valid(player) or not is_instance_valid(world):
+				return
+			var e2 := Enemy.new()
+			e2.configure(kind, "", 6.0)
+			world.add_child(e2)
+			e2.global_position = player.global_position + Vector3(cos(a) * 4.5, 0.2, sin(a) * 4.5)
+			_party.append(e2))

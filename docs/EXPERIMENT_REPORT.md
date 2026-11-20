@@ -900,3 +900,39 @@ New autotest `levels`:
 - the Vault replay in Hard, starting fresh;
 - the Sky Ride replay on the dragonfly;
 - uid ownership for all four levels.
+
+## Follow-up 27: Insane was laggy, so make crowds cheap (Nov 19, night)
+
+Jason: "insane mode is definitely out of control, which is what we wanted... It's very laggy."
+
+**Measurement first.** A new autotest, `perf`, stands in the forest and the Vault in Normal and Insane. It averages script and physics time per physics tick, frame time and draw calls, and counts monsters (awake and total), particle emitters and lights. It runs headless (CPU only) and under xvfb with `--rendering-method gl_compatibility` (the web/iPad renderer). The build Jason played was measured with the same test by checking out 89408bd in a worktree.
+
+**Causes:**
+1. **Quadratic separation.** Every monster looped over every other monster each physics tick (`get_nodes_in_group("enemy")`, which allocates a fresh array each time). That's about 33,000 iterations per tick with Insane's ~180 forest monsters, against ~6,000 in Normal.
+2. **Everyone awake.** Monsters 100 m away still ran AI, `move_and_slide` and full skeletal animation.
+3. **Everyone drawn.** About 13,000 draw calls in the Insane forest.
+4. **Events.** Monster Party and Chicken Party built all their spawns in one frame (spikes). Every Gold Rain coin carried its own OmniLight.
+
+**Fixes:**
+- **Monsters sleep.** An idle or dormant monster beyond max(48 m, aggro or wake range + 14 m) sleeps: physics returns early (with a check every ~0.5 s), and its `CharacterModel` gets `PROCESS_MODE_DISABLED`, which stops the AnimationPlayer and the oddity sparkles parented to it. Any state change (a hit, a world event) or the player coming close wakes it.
+- **Separation is cheap.** It uses a per-physics-frame shared list of awake monsters (a static cache), and only for moving monsters.
+- **Far monsters aren't drawn.** Ordinary monsters' geometry gets `visibility_range_end` 80 m; bosses (`look_size`) stay visible.
+- **Insane is toned down a little:**
+  - twins 1.0 → 0.85, triplets 0.6 → 0.35;
+  - events every 16–26 s (was 14–24), Double Trouble 25% (was 30%);
+  - Monster Party is 3 at a time (at most 9 alive); Chicken Party at most 12 birds;
+  - meteors 10 (was 14) with smaller bursts; disco 3 lights;
+  - Gold Rain coins have no light;
+  - spawns are staggered over a fraction of a second.
+
+**Results** (Insane forest, same test):
+
+| | Before (89408bd) | After |
+|---|---|---|
+| Script and physics per tick (CPU only) | 30.4 ms | 3.5 ms |
+| Five events at once | 33.7 ms (worst 82) | 7.1 ms (worst 22) |
+| Draw calls (compatibility renderer) | 12,809 | 4,783 |
+
+For reference, the old Normal forest was 8.8 ms and 7,203 draw calls. The new Normal forest is 4.0 ms and 4,694.
+
+**Lesson:** "more monsters" multiplies every per-monster cost. Anything that loops over all monsters inside a per-monster update is quadratic and must use a shared, filtered list. Distance-based sleeping should have been there from the start for an open valley full of monsters.

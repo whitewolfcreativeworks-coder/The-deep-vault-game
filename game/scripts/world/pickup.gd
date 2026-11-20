@@ -12,9 +12,13 @@ var _vel := Vector3.ZERO
 var _settled := false
 var _collected := false
 
-static func spawn(pos: Vector3, k: String, amt := 1, id := "") -> Pickup:
+## no_light: lots of coins at once (Insane's Gold Rain) skip their little glow
+## light, which is costly on tablets when there are dozens of them.
+var no_light := false
+
+static func spawn(pos: Vector3, k: String, amt := 1, id := "", lightless := false) -> Pickup:
 	var p := Pickup.new()
-	p.kind = k; p.amount = amt; p.item_id = id
+	p.kind = k; p.amount = amt; p.item_id = id; p.no_light = lightless
 	var root := FX.scene_root()
 	root.add_child(p)
 	p.global_position = pos
@@ -95,9 +99,10 @@ func _ready() -> void:
 			_vis.add_child(_item_model(it, col))
 			if r >= 2:
 				_add_beam(col, r)
-	var l := OmniLight3D.new()
-	l.light_color = col; l.light_energy = 0.8; l.omni_range = 2.2
-	_vis.add_child(l)
+	if not no_light:
+		var l := OmniLight3D.new()
+		l.light_color = col; l.light_energy = 0.8; l.omni_range = 2.2
+		_vis.add_child(l)
 	body_entered.connect(_on_body)
 
 func _physics_process(delta: float) -> void:
