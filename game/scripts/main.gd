@@ -43,7 +43,11 @@ func _ready() -> void:
 	var w: Node3D = world
 	get_tree().create_timer(0.15).timeout.connect(func() -> void:
 		if is_instance_valid(w) and w.is_inside_tree():
-			Props.snap_torches(w))
+			Props.snap_torches(w)
+			# then draw identical scenery props together (far fewer draw calls)
+			if not OS.has_environment("DEEPVAULT_NOBATCH"):
+				batch_stats = StaticBatcher.batch(w)
+				batch_stats["far_culled"] = StaticBatcher.cull_small(w))
 	player = Player.new()
 	player.name = "Player"
 	player.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -495,6 +499,7 @@ func hide_boss_bar() -> void:
 # --- Port Home ----------------------------------------------------------------------
 var _ask_cancel: Callable      # what Esc does on a question
 var chaos: InsaneChaos
+var batch_stats := {}
 ## The HOME button (or Y): once unlocked, back to your cabin from anywhere. The
 ## family portal in the yard can then take you back to where you were.
 func ask_port_home() -> void:

@@ -928,14 +928,19 @@ func _setup_anims() -> void:
 		if a:
 			a.loop_mode = Animation.LOOP_LINEAR
 
+## Slow motion (Insane's Bullet Time): every animation plays at this rate.
+var slow := 1.0
+var _raw_speed := 1.0
+
 func _play(clip: String, blend := 0.15, speed := 1.0) -> void:
 	if anim == null or not anim.has_animation(clip):
 		return
+	_raw_speed = speed
 	if anim.current_animation == clip and anim.is_playing():
-		anim.speed_scale = speed
+		anim.speed_scale = speed * slow
 		return
 	anim.play(clip, blend)
-	anim.speed_scale = speed
+	anim.speed_scale = speed * slow
 
 ## Play a non-looping clip, compressed/stretched to `duration` seconds.
 func oneshot(role: String, duration := -1.0, blend := 0.08) -> void:
@@ -946,7 +951,8 @@ func oneshot(role: String, duration := -1.0, blend := 0.08) -> void:
 	var spd := 1.0 if duration <= 0.0 else length / duration
 	anim.play(clip, blend)
 	anim.seek(0.0, true)
-	anim.speed_scale = spd
+	_raw_speed = spd
+	anim.speed_scale = spd * slow
 	_oneshot = clip
 	_oneshot_until = _clock + (length / spd) - 0.05
 
@@ -955,7 +961,7 @@ func clip_length(role: String) -> float:
 	return anim.get_animation(clip).length if anim and anim.has_animation(clip) else 1.0
 
 func _process(delta: float) -> void:
-	_clock += delta
+	_clock += delta * slow
 	if anim == null or dead:
 		return
 	# edge-triggered actions written by the controller
@@ -1311,7 +1317,7 @@ func _locomotion(delta: float) -> void:
 			_loco = clip
 	else:
 		_pend = ""
-	_play(_loco, 0.24, w[1] if clip == _loco else anim.speed_scale)
+	_play(_loco, 0.24, w[1] if clip == _loco else _raw_speed)
 
 # ---------------------------------------------------------------------------
 # Character-creator looks: hair styles and face details are small meshes on the

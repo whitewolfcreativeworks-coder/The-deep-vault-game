@@ -148,6 +148,10 @@ var dmg_mult := 1.0
 ## "splitter" (bursts into two little ones). mini = one of those little ones.
 var oddity := ""
 var mini := false
+var fierce := false          # Insane: aggressive (see _ready)
+var slow_t := 0.0            # Insane's Bullet Time: everything about this monster runs slow
+var _rallied := false
+var _blink_cd := 3.0
 var _base_hp_mult := 1.0
 var _base_dmg_mult := 1.0
 var _enraged := false
@@ -160,7 +164,7 @@ var _side_t := 0.0
 var _side_dir := Vector3.ZERO
 var _dodge_cd := 0.0
 func _skill() -> float:
-	return clampf(0.04 * float(Game.zone_level()) - 0.06, 0.08, 0.38)
+	return clampf(0.04 * float(Game.zone_level()) - 0.06, 0.08, 0.38) + (0.12 if fierce else 0.0)
 
 func configure(type_name: String, id: String, wake_range := 0.0) -> void:
 	type_id = type_name
@@ -172,8 +176,9 @@ func _ready() -> void:
 	_base_hp_mult = hp_mult
 	var boss := bool(t.get("heavy", false)) or int(t.xp) >= 900
 	hp_mult *= Game.mode_value("boss_hp" if boss else "hp")
-	if Game.mode == "insane" and not boss and not mini and oddity == "" and randf() < 0.3:
-		oddity = ["giant", "speedy", "splitter"].pick_random()
+	fierce = Game.mode == "insane"
+	if fierce and not boss and not mini and oddity == "" and randf() < 0.3:
+		oddity = ["giant", "speedy", "splitter", "vampire", "blinker", "bomber", "vampire", "blinker", "bomber", "giant", "speedy"].pick_random()
 	if oddity == "giant":
 		hp_mult *= 1.6
 	if mini:
@@ -210,7 +215,17 @@ func _ready() -> void:
 			t.scale = float(t.scale) * 1.4
 		elif mini:
 			t.scale = float(t.scale) * 0.6
-	display_name = {"giant": "Giant ", "speedy": "Speedy ", "splitter": "Splitting "}.get(oddity, "Little " if mini else "") + String(t.name)
+	display_name = {"giant": "Giant ", "speedy": "Speedy ", "splitter": "Splitting ", "vampire": "Vampire ", "blinker": "Blinking ",
+		"bomber": "Exploding "}.get(oddity, "Little " if mini else "") + String(t.name)
+	# INSANE: fewer monsters than you might fear, but every one of them means it.
+	# They spot you from further away, attack sooner and more often, chase you
+	# further, dodge more, call their friends, and rage when badly hurt.
+	if fierce and not boss:
+		t.aggro = minf(float(t.aggro) * 1.6, 30.0)
+		t.cooldown = float(t.cooldown) * 0.6
+		t.windup = float(t.windup) * 0.85
+	elif fierce:
+		t.cooldown = float(t.cooldown) * 0.8
 	add_to_group("enemy")
 	add_to_group("damageable")
 	collision_layer = 4
@@ -245,7 +260,7 @@ func _ready() -> void:
 		_creature.call_deferred()
 	if t.get("skin_look", t.get("look", {}).get("skin_look", "")) == "spectral":
 		_spectral.call_deferred()
-	leash = t.get("leash", leash)
+	leash = t.get("leash", leash) * (2.0 if fierce and not boss else 1.0)
 	home = global_position
 	if oddity != "":
 		_oddity_look.call_deferred()
@@ -391,8 +406,26 @@ func lose_target(sec := 3.0) -> void:
 	_blind_t = sec
 
 func _go(s: S) -> void:
+	var was := state
 	state = s
 	state_time = 0.0
+	if s == S.IDLE:
+		_rallied = false
+	elif s == S.CHASE and fierce and not _rallied and was in [S.IDLE, S.RETURN, S.AWAKEN]:
+		_rally()
+
+## Insane: a monster that spots you shouts, and its friends nearby come running.
+func _rally() -> void:
+	_rallied = true
+	for o in _awake_enemies():
+		if o == self or not (o is Enemy):
+			continue
+		var en := o as Enemy
+		if en.dead or en.state not in [S.IDLE, S.RETURN] or bool(en.t.get("heavy", false)):
+			continue
+		if en.global_position.distance_to(global_position) < 18.0 and absf(en.global_position.y - global_position.y) < 5.0:
+			en._rallied = true
+			en._go(S.CHASE)
 
 ## Far away and not doing anything: a monster sleeps. No thinking, no physics, no
 ## animation, just a quick look every half second to see if you've come close.
@@ -456,6 +489,11 @@ func _physics_process(delta: float) -> void:
 					and (state == S.DORMANT or t.has("fly") or is_on_floor()) and _frozen_t <= 0.0 and not _move_busy:
 				_set_asleep(true)
 				return
+	if slow_t > 0.0:
+		slow_t -= delta
+		delta *= 0.35
+		if slow_t <= 0.0 and body:
+			body.slow = 1.0
 	state_time += delta
 	cooldown -= delta
 	_blind_t -= delta
@@ -476,7 +514,13 @@ func _physics_process(delta: float) -> void:
 	var dist := to_p.length()
 	var pdead: bool = player.get("dead") == true or _blind_t > 0.0
 	var move := Vector3.ZERO
-	var spd: float = t.speed
+	var spd: float = t.speed * (0.35 if slow_t > 0.0 else 1.0)
+	if oddity == "blinker" and state == S.CHASE and not pdead:
+		_blink_cd -= delta
+		if _blink_cd <= 0.0 and dist > 4.0 and dist < 16.0:
+			_blink_cd = randf_range(4.5, 7.0)
+			if _champ_blink():
+				return
 
 	_dodge_cd -= delta
 	if _side_t > 0.0:
@@ -615,7 +659,10 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= 22.0 * delta
 	else:
 		velocity.y = -0.5
-	move_and_slide()
+	if state == S.IDLE and move == Vector3.ZERO and is_on_floor() and not t.has("fly") and Vector2(velocity.x, velocity.z).length() < 0.05:
+		velocity.x = 0.0; velocity.z = 0.0     # standing still on the ground: nothing to slide
+	else:
+		move_and_slide()
 
 	# face the player while engaged; face movement otherwise
 	var want_face := facing
@@ -1175,7 +1222,12 @@ func _strike(dist: float, to_p: Vector3) -> void:
 	if dy > 2.6 + float(t.get("fly", 0.0)) or not _has_los():
 		return       # a wall or floor in the way: the blow can't land
 	if dist < reach and (dist < 0.6 or fwd.dot(to_p.normalized()) > 0.35) and player.get("dead") != true:
+		var d0: float = float(player.get("damage_taken")) if player.get("damage_taken") != null else 0.0
 		player.take_damage(t.dmg * randf_range(0.9, 1.1), global_position, 5.0 if t.get("heavy", false) else 3.0)
+		if oddity == "vampire" and player.get("damage_taken") != null and float(player.get("damage_taken")) > d0 and hp < max_hp:
+			hp = minf(max_hp, hp + max_hp * 0.08)        # a Vampire drinks your health
+			body.flash(Color(1.0, 0.1, 0.2), 0.5)
+			FX.burst(global_position + Vector3(0, 1.4, 0), Color(1.0, 0.15, 0.25), 10, 2.0, 0.12, 0.5, 1.0)
 
 func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) -> void:
 	if dead:
@@ -1206,6 +1258,8 @@ func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) 
 			get_parent().summon_for(self)
 	if t.get("enrage", false) and not _enraged and hp < max_hp * 0.35 and hp > 0.0:
 		_enrage()
+	elif fierce and not _enraged and not t.get("enrage", false) and hp < max_hp * 0.4 and hp > 0.0:
+		_rage()
 	body.flash(Color(1, 1, 1), 0.85)
 	Sfx.play_at("hit", global_position + Vector3(0, 1, 0), -3.0, 0.15)
 	FX.hit(global_position + Vector3(0, 1.1, 0), Color(1.0, 0.9, 0.7))
@@ -1234,6 +1288,8 @@ func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) 
 func _die(away: Vector3) -> void:
 	_frozen_t = 0.0
 	_thaw()
+	if oddity == "bomber":
+		_bomb(global_position)
 	if _dive_mark and is_instance_valid(_dive_mark):
 		_dive_mark.queue_free()
 	if look:
@@ -1288,21 +1344,98 @@ func _far_cull() -> void:
 	if not is_instance_valid(body):
 		return
 	for g in body.find_children("*", "GeometryInstance3D", true, false):
-		(g as GeometryInstance3D).visibility_range_end = 80.0
-		(g as GeometryInstance3D).visibility_range_end_margin = 4.0
+		var gi := g as GeometryInstance3D
+		var r := StaticBatcher.draw_distance(gi)
+		gi.visibility_range_end = minf(80.0, r) if r > 0.0 else 80.0
+		gi.visibility_range_end_margin = 4.0
 
-## Insane oddities show: sparkles in yellow (speedy) or pink (splitter).
-func _oddity_look() -> void:
-	if oddity == "giant":
+## Insane champions wear a glowing ring at their feet (one cheap mesh, no
+## particles): yellow Speedy, pink Splitting, red Vampire, purple Blinking, orange
+## Exploding. (Giants are just big.) Raging monsters get a red one.
+const CHAMP_COLORS := {"speedy": Color(1.0, 0.9, 0.2), "splitter": Color(1.0, 0.3, 0.9), "vampire": Color(1.0, 0.1, 0.2),
+	"blinker": Color(0.65, 0.35, 1.0), "bomber": Color(1.0, 0.5, 0.1), "rage": Color(1.0, 0.15, 0.05)}
+static var _ring_mesh: TorusMesh
+static var _ring_mats := {}
+var _ring: MeshInstance3D
+
+func _champ_ring(kind: String) -> void:
+	if not CHAMP_COLORS.has(kind) or not is_instance_valid(body):
 		return
-	var col := Color(1.0, 0.9, 0.2) if oddity == "speedy" else Color(1.0, 0.3, 0.9)
-	var p := CPUParticles3D.new(); p.amount = 8; p.lifetime = 0.8
-	p.mesh = FX.quad(0.14); p.material_override = FX.glow_material(col, 2.0)
-	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; p.emission_sphere_radius = 0.6 * float(t.scale)
-	p.direction = Vector3.UP; p.spread = 40; p.gravity = Vector3(0, 0.5, 0)
-	p.initial_velocity_min = 0.3; p.initial_velocity_max = 0.8
-	p.position.y = 1.0 * float(t.scale)
-	body.add_child(p)      # (on the body: it rests while the monster sleeps)
+	if _ring_mesh == null:
+		_ring_mesh = TorusMesh.new(); _ring_mesh.inner_radius = 0.62; _ring_mesh.outer_radius = 0.78
+		_ring_mesh.rings = 12; _ring_mesh.ring_segments = 6
+	if not _ring_mats.has(kind):
+		_ring_mats[kind] = FX.glow_material(CHAMP_COLORS[kind], 2.5)
+	if _ring == null:
+		_ring = MeshInstance3D.new()
+		_ring.mesh = _ring_mesh
+		_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		body.add_child(_ring)
+	_ring.material_override = _ring_mats[kind]
+	var r := float(t.get("radius", 0.45 * float(t.scale) / 0.84)) / 0.55
+	_ring.scale = Vector3(r, 0.4, r)
+	_ring.position.y = 0.06
+
+func _oddity_look() -> void:
+	_champ_ring(oddity)
+
+## Insane: badly hurt, a monster flies into a rage (faster, fiercer, sooner).
+func _rage() -> void:
+	_enraged = true
+	t.speed = float(t.speed) * 1.3
+	t.cooldown = float(t.cooldown) * 0.7
+	t.dmg = float(t.dmg) * 1.2
+	body.flash(Color(1.0, 0.2, 0.1), 0.8)
+	FX.burst(global_position + Vector3(0, 1.3, 0), Color(1.0, 0.25, 0.1), 18, 3.5, 0.2, 0.6, 0.5)
+	Sfx.play_at("roar_big", global_position, -9.0, 0.15)
+	if _ring == null or oddity == "":
+		_champ_ring("rage")
+	if state in [S.IDLE, S.RETURN]:
+		_go(S.CHASE)
+
+## Blinking champion: pops out of sight and reappears just behind you (only where
+## there's floor and no wall in between).
+func _champ_blink() -> bool:
+	var fwd := -Vector3(sin(float(player.get("facing"))), 0, cos(float(player.get("facing"))))
+	var to := player.global_position - fwd * 2.2
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(player.global_position + Vector3(0, 1.0, 0), to + Vector3(0, 1.0, 0), 1)
+	if not space.intersect_ray(q).is_empty():
+		return false
+	var dq := PhysicsRayQueryParameters3D.create(to + Vector3(0, 2.0, 0), to - Vector3(0, 3.0, 0), 1)
+	var hit := space.intersect_ray(dq)
+	if hit.is_empty():
+		return false
+	FX.burst(global_position + Vector3(0, 1.2, 0), CHAMP_COLORS.blinker, 14, 3.0, 0.2, 0.5, 0.5)
+	Sfx.play_at("portal", global_position, -10.0, 0.2)
+	global_position = (hit.position as Vector3) + Vector3(0, 0.1, 0)
+	velocity = Vector3.ZERO
+	reset_physics_interpolation()
+	FX.burst(global_position + Vector3(0, 1.2, 0), CHAMP_COLORS.blinker, 14, 3.0, 0.2, 0.5, 0.5)
+	_face_player()
+	body.rotation.y = facing
+	cooldown = minf(cooldown, 0.35)
+	return true
+
+## Exploding champion: when it falls, a ring glows on the ground... then BOOM.
+func _bomb(at: Vector3) -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var ring := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 3.2; cm.bottom_radius = 3.2; cm.height = 0.04
+	ring.mesh = cm; ring.material_override = FX.beam_material(CHAMP_COLORS.bomber, 1.0, 0.45, false)
+	parent.add_child(ring); ring.global_position = at + Vector3(0, 0.05, 0)
+	var dmg := float(t.dmg) * 1.6
+	var pl := player
+	get_tree().create_timer(1.1, false).timeout.connect(func() -> void:
+		if is_instance_valid(ring):
+			ring.queue_free()
+		FX.burst(at + Vector3(0, 0.6, 0), CHAMP_COLORS.bomber, 30, 7.0, 0.25, 0.8, -4.0)
+		Sfx.play_at("fire_burst", at, -2.0, 0.2)
+		if is_instance_valid(pl) and pl.get("dead") != true:
+			var d := Vector2(pl.global_position.x - at.x, pl.global_position.z - at.z).length()
+			if d < 3.2 and absf(pl.global_position.y - at.y) < 2.5:
+				pl.take_damage(dmg, at, 7.0))
 
 ## Cloud Island creatures: hide the stand-in skeleton and show the shape-built look.
 var look: CreatureLook

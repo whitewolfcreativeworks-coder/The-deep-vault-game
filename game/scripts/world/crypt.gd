@@ -91,7 +91,7 @@ func _build() -> void:
 		_bells.append(bell)
 	# the Ossuary gate (a portcullis of bones) in the passage east
 	b.room(-90, -84, -89, -83, Y, 4.5, wm, fm, {"w": [[-89.0, -83.0, 4.5]], "e": [[-89.0, -83.0, 4.5]]})
-	_gate = Node3D.new(); add_child(_gate); _gate.position = Vector3(-87.0, Y, -86.0)
+	_gate = Node3D.new(); _gate.add_to_group("no_batch"); add_child(_gate); _gate.position = Vector3(-87.0, Y, -86.0)
 	for i in 7:
 		var bar := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(0.18, 4.6, 0.18)
 		bar.mesh = bm; bar.material_override = bone; bar.position = Vector3(0, 2.3, -2.7 + i * 0.9); _gate.add_child(bar)
@@ -338,7 +338,7 @@ class GhostBell extends Node3D:
 			post.mesh = cm; post.material_override = bone; post.position = Vector3(sx, 2.0, 0); add_child(post)
 		var beam := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(2.8, 0.25, 0.25)
 		beam.mesh = bm; beam.material_override = bone; beam.position.y = 4.0; add_child(beam)
-		_bell = Node3D.new(); _bell.position.y = 3.9; add_child(_bell)
+		_bell = Node3D.new(); _bell.position.y = 3.9; _bell.add_to_group("no_batch"); add_child(_bell)
 		var metal := StandardMaterial3D.new(); metal.albedo_color = COLS[idx].darkened(0.55); metal.metallic = 0.85; metal.roughness = 0.3
 		metal.emission_enabled = true; metal.emission = COLS[idx]; metal.emission_energy_multiplier = 0.3
 		var shell := MeshInstance3D.new(); var sc := CylinderMesh.new(); sc.top_radius = 0.35; sc.bottom_radius = 0.75; sc.height = 1.1

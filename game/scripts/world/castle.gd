@@ -509,7 +509,7 @@ func _castle() -> void:
 	for sx in [-5.0, 5.0]:
 		Props.torch(self, Vector3(sx, KY + 3.0, GATE_Z + 1.1), 0.0, true, false, Color(0.5, 0.75, 1.0))
 	# the portcullis
-	portcullis = Node3D.new(); add_child(portcullis)
+	portcullis = Node3D.new(); portcullis.add_to_group("no_batch"); add_child(portcullis)
 	var iron := StandardMaterial3D.new(); iron.albedo_color = Color(0.22, 0.22, 0.25); iron.metallic = 0.85; iron.roughness = 0.4
 	for k in 9:
 		var bar := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(0.18, 8.5, 0.18)

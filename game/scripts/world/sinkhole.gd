@@ -294,7 +294,7 @@ func _caverns() -> void:
 		w._model("skull", Vector3(X0 + sd * 2.0, Y + 6.4, ISLAND.position.y + 1.6), 0.0, 2.2)
 		w._campfire(Vector3(X0 + sd * 6.5, Y, ISLAND.position.y + 5.0))
 	# the Obsidian Bridge (sunk in the lava until both sluices are open)
-	_bridge = Node3D.new(); add_child(_bridge)
+	_bridge = Node3D.new(); _bridge.add_to_group("no_batch"); add_child(_bridge)
 	var obs := StandardMaterial3D.new(); obs.albedo_color = Color(0.08, 0.06, 0.08); obs.roughness = 0.15; obs.metallic = 0.4
 	obs.emission_enabled = true; obs.emission = Color(0.4, 0.06, 0.02); obs.emission_energy_multiplier = 0.6
 	var deck := MeshInstance3D.new(); var dbm := BoxMesh.new(); dbm.size = Vector3(5.0, 1.2, LAKE.end.y - ISLAND.end.y + 1.0)

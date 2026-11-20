@@ -609,8 +609,8 @@ func _physics_process(delta: float) -> void:
 		else:
 			_handle_actions()
 			var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-			if mirror_t > 0.0:
-				iv.x = -iv.x        # MIRROR WORLD: left is right!
+			if mirror_t > 0.0 and not mounted:
+				iv.x = -iv.x        # MIRROR WORLD: left is right! (on foot only: never on a mount)
 			if Input.is_action_just_pressed("auto_run"):
 				set_auto_run(not auto_run)
 			if auto_run:

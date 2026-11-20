@@ -324,6 +324,12 @@ func _run() -> void:
 	elif mode == "perf":
 		if await _perf_test():
 			return
+	elif mode == "perfdiag":
+		if await _perfdiag_test():
+			return
+	elif mode == "tour":
+		if await _tour_test():
+			return
 	elif mode == "porthome":
 		if await _porthome_test():
 			return
@@ -538,6 +544,7 @@ func _flow() -> void:
 	check("chest_loot_pickup", Game.potions > pot0 or Game.gold > 0, "potions %d gold %d" % [Game.potions, Game.gold])
 	# entry hall: skeletons rise and are defeated in real combat
 	await tp(Vector3(0, -5.9, -13.5), 0.0)
+	await wait(0.8)          # (a teleport: give far-away monsters a moment to wake, as walking in would)
 	await shot("03_entry_hall")
 	Input.action_press("move_forward"); await wait(1.2); Input.action_release("move_forward")
 	await wait(1.8)
@@ -4906,14 +4913,37 @@ func _modes_test() -> bool:
 					check("md_ev_boing", player.bouncy_t > 5.0)
 				"rainbow":
 					check("md_ev_rainbow", Game.shroom > 3.0)
-			if ev in ["meteors", "chickens", "disco", "giants", "monsters"]:
+				"quake":
+					check("md_ev_quake", ch._quake_t > 5.0)
+				"slippery":
+					check("md_ev_slippery", player.grip < 0.5, "%.2f" % player.grip)
+			if ev in ["meteors", "chickens", "disco", "giants", "quake"]:
 				await wait(1.2)
 				await shot("md_ev_" + ev)
 		await wait(3.5)
 		check("md_ev_gold", Game.gold > gold0 or get_tree().get_nodes_in_group("pickup").size() > 0, "%d -> %d" % [gold0, Game.gold])
-		check("md_ev_monsters", get_tree().get_nodes_in_group("enemy").size() > enemies0, "%d -> %d" % [enemies0, get_tree().get_nodes_in_group("enemy").size()])
+		check("md_events_add_no_monsters", get_tree().get_nodes_in_group("enemy").size() <= enemies0, "%d -> %d" % [enemies0, get_tree().get_nodes_in_group("enemy").size()])
+		check("md_effect_countdown", ch._timers.visible and ch._timers.text.contains("ICE"), ch._timers.text)
+		await shot("md_ev_timers")
 		check("md_ev_chickens", get_tree().get_nodes_in_group("damageable").size() > fowl0, "%d" % get_tree().get_nodes_in_group("damageable").size())
 		check("md_events_count", ch.events_fired >= InsaneChaos.EVENTS.size())
+		# Mirror World swaps left and right on foot, but never on a mount
+		await wait(13.0)          # (let the ice and the quake wear off)
+		player.mirror_t = 10.0
+		var right := Vector3(cos(player.view_yaw), 0, -sin(player.view_yaw))
+		var p0 := player.global_position
+		await press("move_right", 0.6)
+		var foot := (player.global_position - p0).dot(right)
+		player.mount_up("chicken")
+		await wait(0.6)
+		player.mirror_t = 10.0
+		right = Vector3(cos(player.view_yaw), 0, -sin(player.view_yaw))
+		p0 = player.global_position
+		await press("move_right", 0.6)
+		var mounted := (player.global_position - p0).dot(right)
+		player.dismount()
+		player.mirror_t = 0.0
+		check("md_mirror_on_foot_only", foot < -0.3 and mounted > 0.3, "on foot %.2f, mounted %.2f (right is +)" % [foot, mounted])
 	main.autosave()
 	check("md_mode_saved", String(Game.read_slot(Game.active_slot).get("mode", "")) == "insane")
 	return false
@@ -4960,6 +4990,118 @@ func _measure(label: String, secs: float) -> Dictionary:
 	Game.set_meta("perf_" + label, r)
 	return r
 
+## Where do the forest's draw calls come from? Switch things off one at a time.
+func _draws() -> Vector2:
+	var d := 0.0
+	var o := 0.0
+	for k in 10:
+		await get_tree().process_frame
+		d += Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+		o += Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)
+	return Vector2(d / 10.0, o / 10.0)
+
+## A fixed screenshot tour of every level (used to compare rendering changes).
+func _tour_test() -> bool:
+	var zones := ["vault", "forest", "castle", "cloud", "home"]
+	var phase := int(Game.get_meta("tr_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("tr_phase", 1)
+		Game.level = 12
+		Game.flags["adventure_done"] = true
+		main._travel("vault")
+		return true
+	var z: String = zones[phase - 1]
+	await wait(4.0)
+	player = main.player
+	god = true
+	var sp: Vector3 = main.world.spawn_point
+	var spots: Array = [sp]
+	match z:
+		"vault": spots += [Vector3(0, -6, -24), Vector3(0, -6, -72), Vector3(0, -6, -112), Vector3(0, -6, -150)]
+		"forest": spots += [Vector3(0, 0, -60), Vector3(56, 1.4, -48), Vector3(-40, 0, 20)]
+		"castle": spots += [sp + Vector3(0, 0, -40), sp + Vector3(30, 0, -80)]
+		"cloud": spots += [sp + Vector3(0, 0, -30), sp + Vector3(25, 0, 25)]
+		"home": spots = [HomeCabin.arrival(), HomeCabin.arrival() + Vector3(0, 0, 14)]
+	var k := 0
+	for at in spots:
+		for yaw in [0.0, PI * 0.5, PI, PI * 1.5]:
+			await tp(at + Vector3(0, 0.6, 0), yaw)
+			player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = -0.1; player.snap_view()
+			await wait(0.6)
+			await shot("tour_%s_%02d" % [z, k])
+			k += 1
+	if phase < zones.size():
+		Game.set_meta("tr_phase", phase + 1)
+		var nz: String = zones[phase]
+		if nz == "home":
+			main._travel("home", HomeCabin.arrival(), 0.0)
+		else:
+			main._travel(nz)
+		return true
+	return false
+
+func _perfdiag_test() -> bool:
+	var phase := int(Game.get_meta("pd_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("pd_phase", 1)
+		Game.level = 20
+		Game.mode = "normal"
+		main._travel("forest")
+		return true
+	await wait(5.0)
+	player = main.player
+	god = true
+	var views := [["arrival", Vector3.ZERO, 0.0], ["valley", Vector3(0, 0, -60), PI], ["camp", Vector3(56, 1.4, -48), 0.0]]
+	for v in views:
+		if v[1] != Vector3.ZERO:
+			await tp(v[1] + Vector3(0, 0.5, 0), v[2])
+			await wait(2.0)
+		player.zoom_target = 5.0; player.zoom = 5.0; player.pitch = -0.12; player.snap_view()
+		await wait(0.5)
+		await shot("pd_" + String(v[0]))
+		var base := await _draws()
+		var sun: DirectionalLight3D = null
+		for l in main.world.find_children("*", "DirectionalLight3D", true, false):
+			sun = l
+		var sh := sun.shadow_enabled if sun else false
+		if sun:
+			sun.shadow_enabled = false
+		var no_shadow := await _draws()
+		if sun:
+			sun.shadow_enabled = sh
+		var hidden: Array = []
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Node3D and (e as Node3D).visible:
+				(e as Node3D).visible = false; hidden.append(e)
+		var no_foes := await _draws()
+		for e in hidden:
+			(e as Node3D).visible = true
+		var lights: Array = []
+		for l in main.world.find_children("*", "Light3D", true, false):
+			if not l is DirectionalLight3D and (l as Light3D).visible:
+				(l as Light3D).visible = false; lights.append(l)
+		var no_lights := await _draws()
+		for l in lights:
+			(l as Light3D).visible = true
+		var parts: Array = []
+		for c in main.world.find_children("*", "GPUParticles3D", true, false) + main.world.find_children("*", "CPUParticles3D", true, false):
+			if (c as Node3D).visible:
+				(c as Node3D).visible = false; parts.append(c)
+		var no_parts := await _draws()
+		for c in parts:
+			(c as Node3D).visible = true
+		if v[0] == "arrival":
+			print("PERFDIAG batched: ", main.batch_stats)
+			print("PERFDIAG reasons: ", StaticBatcher.reasons(main.world))
+		print("PERFDIAG %-8s draws %5d (objects %5d) | no sun shadow %5d | no monsters %5d | no omni/spot lights %5d (%d lights) | no particles %5d (%d)" % [v[0], base.x, base.y, no_shadow.x, no_foes.x, no_lights.x, lights.size(), no_parts.x, parts.size()])
+	return false
+
 func _perf_test() -> bool:
 	var phase := int(Game.get_meta("pf_phase", 0))
 	if phase == 0:
@@ -4983,12 +5125,35 @@ func _perf_test() -> bool:
 		if main.chaos:
 			main.chaos.next_t = 9999.0       # events measured separately
 		await _measure("%s_%s" % [cur[0], cur[1]], 8.0)
+		# a real fight: stand in the biggest camp (the same spot in every mode) and let
+		# them all come at you
+		var best := Vector3.ZERO
+		var bn := -1
+		var camp: Array = []
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and (e as Enemy).uid != "" and not (e as Enemy).uid.ends_with("+") and not bool((e as Enemy).t.get("heavy", false)):
+				camp.append((e as Enemy).global_position)
+		for a in camp:
+			var nn := 0
+			for b in camp:
+				if (a as Vector3).distance_to(b) < 16.0:
+					nn += 1
+			if nn > bn or (nn == bn and (a as Vector3).length() < best.length()):
+				bn = nn; best = a
+		await tp(best + Vector3(0, 0.5, 0), 0.0)
+		await wait(4.0)
+		await _measure("%s_%s_fight" % [cur[0], cur[1]], 8.0)
+		var hunting := 0
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and not (e as Enemy).dead and (e as Enemy).state in [Enemy.S.CHASE, Enemy.S.WINDUP, Enemy.S.STRIKE, Enemy.S.RECOVER]:
+				hunting += 1
+		print("PERF %s_%s_fight: %d monsters after you (camp of %d at %s)" % [cur[0], cur[1], hunting, bn, best])
 		if cur[1] == "insane" and main.chaos:
 			if OS.get_environment("PERF_EACH") != "":
 				for ev in InsaneChaos.EVENTS:
 					main.chaos.fire(ev)
 					await _measure("%s_ev_%s" % [cur[0], ev], 4.0)
-			for ev in ["meteors", "chickens", "monsters", "disco", "gold"]:
+			for ev in ["meteors", "chickens", "rage", "disco", "gold"]:
 				main.chaos.fire(ev)
 			await _measure("%s_insane_events" % cur[0], 8.0)
 		Game.set_meta("pf_phase", phase + 1)
@@ -5140,15 +5305,84 @@ func _levels_test() -> bool:
 		await wait(1.0)
 		var cen := _enemy_census()
 		print("LEVELS forest insane census: ", cen)
-		check("lv_insane_packs", cen.twins >= 4 and cen.triplets >= 2, str(cen))
+		check("lv_insane_fewer_but_pairs", cen.twins >= 4 and cen.triplets == 0, str(cen))
 		var gob: Dictionary = Enemy.TYPES["goblin"]
 		check("lv_insane_monsters_grown", cen.minion_hp > float(gob.hp) * 2.8 * 2.0, "%.0f vs base %.0f" % [cen.minion_hp, float(gob.hp)])
 		check("lv_chaos_soon", main.chaos != null and main.chaos.next_t <= 8.5, str(main.chaos.next_t if main.chaos else -1.0))
+		# fierce monsters and champions
+		var fierce_n := 0
+		var champs := 0
+		var rings := 0
+		var gob_t: Dictionary = Enemy.TYPES["goblin"]
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and not (e as Enemy).dead:
+				var en := e as Enemy
+				if en.fierce and en.type_id == "goblin" and float(en.t.aggro) > float(gob_t.aggro) * 1.4 and float(en.t.cooldown) < float(gob_t.cooldown) * 0.7:
+					fierce_n += 1
+				if en.oddity in ["vampire", "blinker", "bomber"]:
+					champs += 1
+				if en._ring != null:
+					rings += 1
+		check("lv_insane_fierce", fierce_n >= 5, "%d fierce goblins" % fierce_n)
+		check("lv_insane_champions", champs >= 3 and rings >= champs, "%d new champions, %d rings" % [champs, rings])
 		await shot("lv_04_forest_insane")
 		_uid_zone_check("forest")
 		await wait(9.0)
 		check("lv_chaos_fired", main.chaos.events_fired >= 1, str(main.chaos.events_fired))
 		await shot("lv_05_forest_event")
+		# into a goblin camp: one spots you and the whole camp comes running
+		var camp_at := Vector3.ZERO
+		var cbest := -1
+		for e in get_tree().get_nodes_in_group("enemy"):
+			# (a camp up on the surface, not down in the Warren or the Sinkhole)
+			if e is Enemy and (e as Enemy).type_id in ["goblin", "goblin_archer"] and not (e as Enemy).dead and (e as Enemy).uid != "" \
+					and (e as Enemy).global_position.y > -3.0 and (e as Enemy).global_position.y < 12.0:
+				var nn := 0
+				for f in get_tree().get_nodes_in_group("enemy"):
+					if f is Enemy and (f as Enemy).global_position.distance_to((e as Enemy).global_position) < 12.0:
+						nn += 1
+				if nn > cbest:
+					cbest = nn; camp_at = (e as Enemy).global_position
+		main.chaos.next_t = 9999.0
+		var sp0: Vector3 = main.world.spawn_point
+		var dir_in: Vector3 = (sp0 - camp_at) * Vector3(1, 0, 1)
+		dir_in = dir_in.normalized() if dir_in.length() > 0.1 else Vector3(1, 0, 0)
+		var stand := camp_at + dir_in * 9.0
+		if main.world.has_method("ground"):
+			stand = main.world.ground(stand.x, stand.z)
+		await tp(stand + Vector3(0, 0.6, 0), atan2(dir_in.x, dir_in.z))
+		await wait(3.0)
+		var hunting := 0
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and not (e as Enemy).dead and (e as Enemy).state in [Enemy.S.CHASE, Enemy.S.WINDUP, Enemy.S.STRIKE, Enemy.S.RECOVER] \
+					and (e as Enemy).global_position.distance_to(camp_at) < 20.0:
+				hunting += 1
+		check("lv_camp_comes_running", hunting >= 3, "%d of a camp of %d after you from 9 m (camp at %s)" % [hunting, cbest, camp_at])
+		main.chaos.fire("slowmo")
+		await wait(0.3)
+		var slowed := 0
+		for e in main.chaos._foes_near(50.0):
+			if (e as Enemy).slow_t > 0.0 and (e as Enemy).body.slow < 0.5:
+				slowed += 1
+		check("lv_ev_bullet_time", slowed >= 2, "%d slowed" % slowed)
+		await shot("lv_05b_bullet_time")
+		main.chaos.fire("rage")
+		await wait(0.3)
+		var raging := 0
+		for e in main.chaos._foes_near(45.0):
+			if (e as Enemy)._enraged:
+				raging += 1
+		check("lv_ev_rage", raging >= 2, "%d raging" % raging)
+		main.chaos.fire("ghosts")
+		await wait(0.5)
+		var hidden := 0
+		for k in 6:
+			for e in main.chaos._ghosted:
+				if is_instance_valid(e) and not (e as Enemy).body.visible:
+					hidden += 1
+			await wait(0.15)
+		check("lv_ev_ghosts_flicker", main.chaos._ghosted.size() >= 2 and hidden >= 2, "%d ghosts, %d hidden glimpses" % [main.chaos._ghosted.size(), hidden])
+		await shot("lv_05c_rage_ghosts")
 		main.start_level("vault", "hard", false)
 		return true
 	if phase == 3:

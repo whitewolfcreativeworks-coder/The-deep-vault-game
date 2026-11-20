@@ -957,7 +957,7 @@ func _warren_wings() -> void:
 		ml.position = lp; add_child(ml)
 		_model("lantern_standing", lp - Vector3(0, 0.9, 0), 0.0, 1.2)
 	# the barred mine gate and its lever
-	_mine_gate = Node3D.new(); add_child(_mine_gate); _mine_gate.position = Vector3(37.0, Y, -153.0)
+	_mine_gate = Node3D.new(); _mine_gate.add_to_group("no_batch"); add_child(_mine_gate); _mine_gate.position = Vector3(37.0, Y, -153.0)
 	for k in 7:
 		var bar := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(0.16, 4.5, 0.16)
 		bar.mesh = bm; bar.material_override = iron; bar.position = Vector3(0, 2.25, -2.7 + k * 0.9); _mine_gate.add_child(bar)
@@ -993,7 +993,7 @@ func _warren_wings() -> void:
 		n += 1
 	Interactable.create(self, "chest", Vector3(51.0, Y, -133.0), -90.0, "w_chest_mines", [{"roll": "big", "ilvl": 5}])
 	# --- Gruk's gate between the den and his hall
-	_gruk_gate = Node3D.new(); add_child(_gruk_gate); _gruk_gate.position = Vector3(0, Y, -164.0)
+	_gruk_gate = Node3D.new(); _gruk_gate.add_to_group("no_batch"); add_child(_gruk_gate); _gruk_gate.position = Vector3(0, Y, -164.0)
 	var bone := StandardMaterial3D.new(); bone.albedo_color = Color(0.85, 0.8, 0.65)
 	for k in 7:
 		var gbar := MeshInstance3D.new(); var gbm2 := BoxMesh.new(); gbm2.size = Vector3(0.22, 5.0, 0.22)

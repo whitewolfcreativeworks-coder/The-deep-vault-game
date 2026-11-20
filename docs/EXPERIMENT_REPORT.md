@@ -936,3 +936,55 @@ Jason: "insane mode is definitely out of control, which is what we wanted... It'
 For reference, the old Normal forest was 8.8 ms and 7,203 draw calls. The new Normal forest is 4.0 ms and 4,694.
 
 **Lesson:** "more monsters" multiplies every per-monster cost. Anything that loops over all monsters inside a per-monster update is quadratic and must use a shared, filtered list. Distance-based sleeping should have been there from the start for an open valley full of monsters.
+
+## Follow-up 28: Insane 2.0, fewer and fiercer monsters, and the draw-call diet (Nov 20)
+
+Jason, after the sleeping-monsters build: "definitely better, but there's still some slight lag... let's just rethink insane mode... make them more aggressive where they really come after you... there's other workarounds instead of just generating more NPCs". He also reported moped steering going the wrong way.
+
+**The moped.** Not a moped bug: it was Insane's Mirror World event (left/right swapped for 10 s), which applied on mounts too, with only the banner to explain it. Now it applies on foot only and isn't chosen while you're mounted. Every lasting effect shows a countdown at the top of the screen. A test drives right on foot and on a mount under Mirror World and checks the direction.
+
+**Insane 2.0:**
+- **Monster numbers:**
+  - Twins 0.35 (was 0.85), no triplets. Hard is 0.4.
+  - Health x3.4 (was 2.8), bosses x2.6, speed x1.3.
+- **Fierce AI** (`Enemy.fierce`):
+  - aggro x1.6, attack cooldown x0.6, windup x0.85, leash x2, dodge/block skill +0.12;
+  - `_rally()`: a monster that starts chasing calls awake friends within 18 m (one level deep);
+  - `_rage()` below 40% health: x1.3 speed, x1.2 damage, x0.7 cooldown, red ring.
+- **Champions** (30%): Giant, Speedy, Splitting, plus three new ones:
+  - **Vampire:** heals 8% of max health per landed hit.
+  - **Blinking:** teleports behind the player every 4.5–7 s, checked with rays for floor and walls.
+  - **Exploding:** a telegraphed blast on death.
+  - Marked by a shared torus ring mesh, with no particles (the old CPU sparkles cost every frame).
+- **Events:** Monster Party, which spawned monsters, is replaced by spawn-free events:
+  - **Monster Rage**, **Earthquake** (trauma plus shoves);
+  - **Bullet Time:** per-monster `slow_t` scales its delta and speed, and `CharacterModel.slow` scales its animations;
+  - **Slippery Ice:** `player.grip`;
+  - **Ghost Monsters:** flickering `body.visible`.
+  - Events come every 12–20 s, Double Trouble 30%, and `_makes_sense()` filters out pointless picks (for example Rage with nobody around).
+
+**Where the remaining lag was.** The `perf` test gained a fight scenario (standing in the biggest camp), and a new `perfdiag` test switches things off one at a time while counting draw calls on the compatibility renderer.
+
+In the forest (Normal) there were about 4,400 draw calls:
+- monsters: about 900–1,500 (about 30 per character);
+- scenery: the rest;
+- lights, shadows and particles: almost nothing.
+
+Of the scenery meshes, 2,842 were built in code, each with its own mesh resource: character bits, mushroom spots, chicken parts, fences. Only 149 were batchable imported meshes.
+
+**Fixes:**
+- `StaticBatcher.cull_small` gives every mesh a draw distance by its world size: under 0.6 m, 40 m; under 2 m, 65 m; under 5 m, 110 m; anything bigger has none. It runs once after a level loads; monsters do the same for their parts.
+- `StaticBatcher.batch` turns identical imported props in a 40 m cell (14 m for props with their own draw distance) into MultiMeshes and hides the originals. It only touches imported, unscripted, unanimated meshes not on moving bodies. Gates, portcullis, bells and the drawbridge containers are in a `no_batch` group.
+
+**Results** (compatibility renderer):
+
+| Forest view | Draw calls before | After |
+|---|---|---|
+| Arrival | 4,439 | 1,289 |
+| Valley | 2,385 | 735 |
+| Camp | 4,245 | 1,859 |
+| Insane fight | (about 4,800 just standing in the forest, previous build) | 2,293 |
+
+A new `tour` test takes a fixed screenshot tour of every level. Running it with `DEEPVAULT_NOBATCH=1` and without, and diffing the images, checks that nothing visible went missing.
+
+**Lesson:** on a tablet browser, draw calls are the budget. A level built from thousands of small primitives needs distance culling from day one, and "add more monsters" is the most expensive way to add excitement.

@@ -1098,7 +1098,7 @@ func _build_modes() -> void:
 	var rows := [
 		["normal", "NORMAL", "The adventure as you know it.", Color(0.55, 0.9, 0.55)],
 		["hard", "HARD", "The monsters grow to match your level, then get twice the health, hit harder, move faster, and many come in pairs. Better rewards and loot at your level.", Color(1.0, 0.7, 0.3)],
-		["insane", "INSANE", "The monsters match your level AND your gear (bring your best gear and they get even tougher; start fresh and they only match your level). Packs of three, giants, speedy ones, ones that split in two, and something crazy every 15 seconds or so: meteor showers, mirror world, moon gravity... Extremely hard!", Color(1.0, 0.4, 0.8)],
+		["insane", "INSANE", "The monsters match your level AND your gear (start fresh and they only match your level), they're very tough, and they're FIERCE: they spot you from far away, call their friends, chase you down and rage when hurt. Champions (giant, speedy, vampire, blinking, exploding...) and something crazy every 15 seconds or so: earthquakes, bullet time, ghost monsters, slippery ice... Extremely hard!", Color(1.0, 0.4, 0.8)],
 	]
 	for r in rows:
 		var m: String = r[0]

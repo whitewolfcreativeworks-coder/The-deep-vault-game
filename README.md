@@ -87,26 +87,46 @@ A level or a new adventure then asks for a mode, and **With my gear** (keep ever
 |---|---|---|---|---|---|---|
 | **Normal** | no (a little if you out-level the zone) | as usual | as usual | as usual | as usual | no |
 | **Hard** | your level | x2 (bosses x1.7) | x1.6 | 12% faster | x1.6, loot at your level | about half get a twin |
-| **INSANE** | your level, and with your gear: your gear too, plus 15% | x2.8 (bosses x2.3) | x2.1 | 25% faster | x2.5, loot above your level | packs: most get a twin, about a third come in threes |
+| **INSANE** | your level, and with your gear: your gear too, plus 15% | x3.4 (bosses x2.6) | x2.1 | 30% faster | x2.5, loot above your level | about a third get a twin, but they're **fierce** (below) |
 
 **Growing to match you** means a level-20 hero in the Deep Vault gets a real fight: the monsters' health grows as much as your hitting power has grown since that level, and their hits grow as much as your toughness (health and armor) has. Hard and Insane both match your level. **Insane with your gear** also matches the gear you carry, so bringing your best gear makes it *harder*. **Insane, starting fresh** doesn't count your gear: you're underpowered at first and get stronger as you find loot along the way.
 
-**INSANE is the kitchen sink.** Some monsters are odd: **Giant** (huge and tough), **Speedy** (yellow sparkles) or **Splitting** (pink sparkles; it bursts into two little ones). Something wild happens within seconds of arriving and then every 16–26 seconds, sometimes two at once (**DOUBLE TROUBLE!**), announced in big rainbow letters:
-- **Rainbow Storm** (rainbow vision without the mushrooms)
-- **Moon Gravity**
-- **Mirror World** (left is right!)
-- **Boing Boing** (you bounce on every landing)
-- **Speed Freak**
-- **Meteor Shower** (get out of the red circles)
-- **Chicken Party**
-- **Monster Party** (three more monsters climb out of the ground; never more than nine of them at once)
-- **Disco Time**
-- **Gold Rain**
-- **Giant Foes**
+**INSANE is the kitchen sink, without the lag.** Rather than piling on more monsters (which made the iPad lag), Insane makes the monsters that are there much nastier:
+- **Fierce:** they spot you from much further away, attack sooner and more often, dodge and block more, and chase you twice as far. When one spots you, it **calls its friends** within 18 m, and the whole camp comes running. Badly hurt, a monster flies into a **rage**: faster, harder hits, quicker attacks, with a red ring at its feet.
+- **Champions** (about 3 in 10), each marked by a glowing ring:
+  - **Giant** (huge and tough, no ring);
+  - **Speedy** (yellow ring);
+  - **Splitting** (pink; bursts into two little ones);
+  - **Vampire** (red; heals itself whenever it hits you);
+  - **Blinking** (purple; vanishes and reappears right behind you);
+  - **Exploding** (orange; when it falls, a ring glows on the ground, then BOOM).
+- **Something wild** happens within seconds of arriving and then every 12–20 seconds, sometimes two at once (**DOUBLE TROUBLE!**). It's announced in big rainbow letters, and anything that lasts shows a countdown at the top of the screen. None of these add monsters:
+  - **Rainbow Storm** (rainbow vision without the mushrooms)
+  - **Moon Gravity**
+  - **Mirror World** (left is right! On foot only, never on a mount)
+  - **Boing Boing** (you bounce on every landing)
+  - **Speed Freak**
+  - **Meteor Shower** (get out of the red circles)
+  - **Chicken Party**
+  - **Monster Rage** (every monster near you rages and comes for you)
+  - **Disco Time**
+  - **Gold Rain**
+  - **Giant Foes**
+  - **Earthquake** (the ground shakes and shoves you about)
+  - **Bullet Time** (the monsters go into slow motion; you don't)
+  - **Slippery Ice**
+  - **Ghost Monsters** (they flicker in and out of sight)
 
 Your mode shows next to your level, and it's saved with your game. Port Home works in every mode.
 
-**Keeping it smooth (Nov 19, night):** the first Insane build was very laggy on the iPad. An Insane forest has about 155 monsters. Monsters now **sleep** when you're far away (no thinking, physics or animation until you come within about 50 m), ordinary monsters aren't drawn beyond 80 m, and monsters only steer around their awake neighbours (that check used to compare every monster with every other one, every tick). Measured on the web renderer, the Insane forest went from 12,809 draw calls and 30 ms of script time per tick to 4,783 and 3.5 ms. That's lighter than the old Normal forest, and Normal got faster too. `tools/run_tests.sh perf` measures it.
+**Keeping it smooth (Nov 19–20):** the first Insane build was very laggy on the iPad, so:
+- **Monsters sleep** when you're far away: no thinking, physics or animation until you come within about 50 m.
+- Monsters only steer around their **awake** neighbours (that check used to compare every monster with every other one, every tick).
+- Insane has **fewer, fiercer** monsters (above).
+- **Small things far away aren't drawn:** pieces under 0.6 m beyond 40 m, under 2 m beyond 65 m, under 5 m beyond 110 m.
+- **Identical scenery props** in each 40 m patch are drawn together in one go.
+
+Measured on the web renderer, the Goblin Forest went from about 4,400 draw calls to about 1,300, and an Insane forest fight from 12,800 (the first Insane build) to about 2,300. Normal mode got the same savings. `tools/run_tests.sh perf` measures it; `tour` takes a fixed screenshot tour of every level for before/after comparisons.
 
 ### New in the Nov 19 afternoon notes
 - **The Sky Ride: the flight home is its own arcade game.** Your dragonfly now flies itself along the course, about a minute and a half home.
