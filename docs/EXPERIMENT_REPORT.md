@@ -1039,3 +1039,26 @@ The performance work in follow-ups 27–28 had been applied globally and reporte
   - Insane still culls (over 500 meshes).
 
 **Lesson:** when a stakeholder has signed off a mode, global optimizations need explicit permission. A mode switch makes that cheap: one flag per subsystem.
+
+## Follow-up 31: a peaceful soundscape, and gentle statue fires (Nov 20)
+
+Jason, on the first soundscape: "too much noise now at the cabin... sounds like waves crashing... the winds blowing really hard... it has to be a very peaceful environment". On the Vault outpost: the fire bowls by the Rogue statue are "like too loud torches on full blast... should be like just like a crackling fire".
+
+**Diagnosis (measured, since the audio couldn't be heard here):** the old `loop_breeze` swung 16.5 dB in loudness on an 8-second cycle over a low rumble (17% of its energy below 400 Hz), which is literally the envelope of surf. The `leaves_rustle` one-shot was a swelling hiss burst, which sounds like a breaking wave.
+
+**Fixes:**
+- `loop_breeze` is now a quiet airy whisper with a faint patter of leaves: about 4 dB of swing and 1% of its energy below 400 Hz. It uses its own random generator so it can't shift other sounds.
+- The leaf rustle is removed from the calls.
+- Calls are now every 4–9 s (was 1.6–5), 10–50 m away, 3–4 dB quieter. Answers come 20% of the time (was 35%), and the woodpecker is rarer.
+- Breeze −30 dB (was about −20 ± 5), crickets −32 dB, bees −18 dB.
+
+**Statue fires:**
+- A new `loop_campfire`: a soft bed with crackles in bursts and the odd pop, 7 dB less average energy than `loop_fire` at the same peak.
+- It's used only for the two `giant_brazier`s, at −9 dB with unit size 3.5 (was `loop_fire` at −4 dB with unit size 6).
+- Each bowl starts at a random point, so the two don't stack in phase.
+- Other fires are unchanged.
+
+The `ambience` test now checks:
+- 3–14 calls in 45 s (peaceful, not silent), of at least 3 kinds;
+- the breeze below −26 dB;
+- both statue fires use the gentle crackle, out of step.

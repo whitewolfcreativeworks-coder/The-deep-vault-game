@@ -4999,6 +4999,9 @@ func _draws() -> Vector2:
 ## all around (never the old single bird loop); quieter indoors; silent in the sky.
 func _ambience_test() -> bool:
 	var phase := int(Game.get_meta("am_phase", 0))
+	if phase == 2:
+		await _ambience_vault()
+		return false
 	if phase == 0:
 		for i in Game.SAVE_SLOTS:
 			Game.delete_slot(i)
@@ -5031,21 +5034,39 @@ func _ambience_test() -> bool:
 	await wait(1.0)
 	var out0 := sc.calls_played
 	var h0 := sc.heard.size()
-	await wait(30.0)
+	await wait(45.0)
 	var outdoors := sc.calls_played - out0
 	var kinds := {}
 	for nm in sc.heard.slice(h0):
 		kinds[String(nm).trim_suffix("_1").trim_suffix("_2").trim_suffix("_3")] = true
-	print("AMBIENCE indoors %d calls in 20 s, outdoors %d calls in 30 s, kinds %s" % [indoors, outdoors, str(kinds.keys())])
-	check("am_lively_outside", outdoors >= 7, "%d calls in 30 s" % outdoors)
-	check("am_many_kinds", kinds.size() >= 4, str(kinds.keys()))
-	check("am_calmer_inside", float(indoors) / 20.0 < float(outdoors) / 30.0, "inside %d/20 s, outside %d/30 s" % [indoors, outdoors])
+	print("AMBIENCE indoors %d calls in 20 s, outdoors %d calls in 45 s, kinds %s" % [indoors, outdoors, str(kinds.keys())])
+	# peaceful: a bird every several seconds, never a racket
+	check("am_peaceful_outside", outdoors >= 3 and outdoors <= 14, "%d calls in 45 s" % outdoors)
+	check("am_many_kinds", kinds.size() >= 3, str(kinds.keys()))
+	check("am_calmer_inside", float(indoors) / 20.0 <= float(outdoors) / 45.0 + 0.01, "inside %d/20 s, outside %d/45 s" % [indoors, outdoors])
+	check("am_soft_breeze", sc._breeze.volume_db < -26.0, "%.0f dB" % sc._breeze.volume_db)
 	await shot("am_yard")
 	# up in the sky, the valley goes quiet
 	await tp(Vector3(0, 160, -400), 0.0)
 	await wait(3.0)
 	check("am_quiet_in_the_sky", sc._level < 0.1 and sc._breeze.volume_db < -40.0, "level %.2f breeze %.0f dB" % [sc._level, sc._breeze.volume_db])
-	return false
+	Game.set_meta("am_phase", 2)
+	main._travel("vault")
+	return true
+
+func _ambience_vault() -> void:
+	# the two fire bowls by the Rogue statue: a gentle crackle, out of step
+	await wait(3.0)
+	var pos: Array = []
+	var ok := 0
+	for b in get_tree().get_nodes_in_group("giant_brazier"):
+		for a in (b as Node).find_children("*", "AudioStreamPlayer3D", true, false):
+			var p := a as AudioStreamPlayer3D
+			if p.stream and String(p.stream.resource_path).contains("loop_campfire") and p.playing and p.volume_db <= -8.0:
+				ok += 1
+				pos.append(p.get_playback_position())
+	check("am_statue_fires_crackle", ok >= 2, "%d gentle fire sounds" % ok)
+	check("am_statue_fires_out_of_step", pos.size() >= 2 and absf(float(pos[0]) - float(pos[1])) > 0.2, str(pos))
 
 ## A fixed screenshot tour of every level (used to compare rendering changes).
 func _tour_test() -> bool:

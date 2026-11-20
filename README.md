@@ -120,13 +120,14 @@ Your mode shows next to your level, and it's saved with your game. Port Home wor
 
 **Mirror World is gone (Nov 20).** It swapped left and right for 10 seconds, and Jason found it stressful ("this game is not supposed to be stressful"). Right is always right now.
 
-**The cabin sounds alive (Nov 20).** The old cabin sound was one 9-second loop of the same chirp. Now a soundscape plays:
-- a breeze that swells and dies in the trees;
-- crickets in the grass, and bees by the garden;
-- every few seconds, a different bird from somewhere up in the trees around you, at its own pitch. There are warbling songs, "fee-bee" whistles, trills and chips, and sometimes another bird answers from across the clearing;
-- now and then a dove coos far off, a cuckoo calls, a woodpecker drums or a gust rustles the leaves.
+**The cabin sounds peaceful and alive (Nov 20).** The old cabin sound was one 9-second loop of the same chirp. Now it's a calm, unhurried soundscape:
+- a quiet whisper of leaves, soft crickets, and bees humming by the garden;
+- every several seconds, a different bird somewhere off in the trees: a warbling song, a "fee-bee" whistle, a trill, a few chips. Now and then another answers;
+- once in a while, a dove coos far off, a cuckoo calls or a woodpecker drums.
 
-It's calmer inside the cabin and silent up in the sky. Every sound is synthesized by `tools/make_audio.py`, like the rest of the game's audio.
+The first version was too busy (its breeze swelled like surf), so it was toned right down the same day. It's calmer inside the cabin and silent up in the sky.
+
+**The fire bowls by the Rogue statue** now crackle gently instead of roaring, and the two play out of step. Every sound is synthesized by `tools/make_audio.py`, like the rest of the game's audio.
 
 **Keeping Insane smooth (Nov 19–20).** The first Insane build was very laggy on the iPad. These savings apply **in Insane only**: Normal and Hard run and look exactly as they always have (Jason: "normal mode was perfect").
 - **Monsters sleep** when you're far away: no thinking, physics or animation until you come within about 50 m.

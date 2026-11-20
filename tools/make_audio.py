@@ -473,12 +473,16 @@ def leaves_rustle():
     hiss = highpass(lowpass(noise(d), 6000), 1800)
     return (hiss * 0.5 + crackle * 1.4) * gust
 def loop_breeze():
-    # soft wind in the trees: a low swell with leafy hiss riding the gusts
-    d = 24.0; seg = t(d)
-    gust = 0.55 + 0.25 * np.sin(2 * np.pi * seg / 8.0) + 0.15 * np.sin(2 * np.pi * seg / 3.0 + 1.3) + 0.05 * np.sin(2 * np.pi * seg / 1.3)
-    low = lowpass(noise(d), 420) * 1.6
-    leaves = highpass(lowpass(noise(d), 4500), 1500) * 0.35
-    return loopify((low + leaves * gust) * gust, 2.0)
+    # a gentle breeze in the leaves: a quiet, airy whisper with the faint patter of
+    # leaves, barely rising and falling (no low rumble and no big swells: those
+    # sound like surf). Its own random generator, so it never changes other sounds.
+    r = np.random.default_rng(611)
+    d = 24.0; seg = t(d); n = len(seg)
+    sway = 0.85 + 0.08 * np.sin(2 * np.pi * seg / 12.0) + 0.07 * np.sin(2 * np.pi * seg / 8.0 + 1.7)
+    hush = highpass(lowpass(r.uniform(-1, 1, n), 3200), 900) * 0.5
+    pat = (r.uniform(0, 1, n) > 0.9965).astype(float) * r.uniform(-1, 1, n)
+    patter = highpass(lowpass(pat, 4200), 1500) * 0.9
+    return loopify((hush + patter * (0.6 + 0.4 * np.sin(2 * np.pi * seg / 6.0) ** 2)) * sway, 2.0)
 def loop_crickets():
     # a few crickets in the grass, each with its own rhythm and pitch
     d = 16.0; x = np.zeros(int(d * SR))
@@ -500,6 +504,26 @@ def loop_bees():
         x += lowpass(saw, 1200) * a * (0.6 + 0.4 * np.sin(2 * np.pi * rng.uniform(0.1, 0.3) * seg + rng.uniform(0, 6)) ** 2)
     return loopify(x, 1.0)
 
+def loop_campfire():
+    # a gentle crackling fire (the fire bowls by the Rogue statue): a soft, breathy
+    # glow with little crackles in bursts and the odd pop, not a roar
+    r = np.random.default_rng(733); d = 9.0; n = int(d * SR); seg = t(d)
+    x = lowpass(r.uniform(-1, 1, n), 300) * 0.22 * (0.85 + 0.15 * np.sin(2 * np.pi * seg / 3.1))
+    x += highpass(lowpass(r.uniform(-1, 1, n), 5000), 2500) * 0.02
+    k = 0.0
+    while k < d - 0.2:
+        burst = int(r.integers(2, 9))
+        for i in range(burst):
+            s0 = int((k + i * r.uniform(0.01, 0.05)) * SR); L = int(r.uniform(0.002, 0.007) * SR)
+            if s0 + L >= n: break
+            click = r.uniform(-1, 1, L) * np.exp(-np.arange(L) / SR * r.uniform(700, 1600))
+            x[s0:s0 + L] += click * r.uniform(0.12, 0.5)
+        k += r.uniform(0.08, 0.6)
+    for i in range(10):
+        s0 = int(r.uniform(0, d - 0.05) * SR); L = int(0.03 * SR)
+        x[s0:s0 + L] += lowpass(r.uniform(-1, 1, L) * np.exp(-np.arange(L) / SR * 160), 2200) * r.uniform(0.5, 0.9)
+    return loopify(x, 0.5)
+
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
     "pickup": pickup, "coins": coins, "levelup": levelup, "spell": spell, "spell_hit": spell_hit,
@@ -518,6 +542,7 @@ SOUNDS = {
     "bird_whistle_1": bird_whistle_1, "bird_whistle_2": bird_whistle_2, "bird_trill_1": bird_trill_1, "bird_trill_2": bird_trill_2,
     "bird_chip_1": bird_chip_1, "bird_chip_2": bird_chip_2, "dove": dove, "cuckoo": cuckoo, "woodpecker": woodpecker,
     "leaves_rustle": leaves_rustle, "loop_breeze": loop_breeze, "loop_crickets": loop_crickets, "loop_bees": loop_bees,
+    "loop_campfire": loop_campfire,
 }
 
 if __name__ == "__main__":

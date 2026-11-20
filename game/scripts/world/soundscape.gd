@@ -1,27 +1,28 @@
 extends Node3D
 class_name Soundscape
-## The sounds of the valley around the cabin. Instead of one short loop of the
-## same chirp, it plays a soft breeze in the trees and crickets in the grass, and
-## every few seconds a different bird somewhere around you: a warbling song, a
-## "fee-bee" whistle, a fast trill, a few chips, sometimes answered by another of
-## its kind from across the clearing. Now and then a dove coos far off, a cuckoo
-## calls, a woodpecker drums or a gust rustles the leaves. Each call comes from
-## its own spot (up in the trees, 8-40 m away), at a slightly different pitch, so
-## it never sounds like a loop. Bees buzz by the garden.
+## The sounds of the valley around the cabin: peaceful and unhurried. A quiet
+## whisper of leaves and soft crickets underneath, and every several seconds a
+## different bird somewhere off in the trees: a warbling song, a "fee-bee"
+## whistle, a trill, a few chips, now and then answered by another of its kind.
+## Once in a while a dove coos far off, a cuckoo calls or a woodpecker drums. Each
+## call comes from its own spot (up in the trees, 10-50 m away), at a slightly
+## different pitch, so it never sounds like a loop. Bees hum by the garden.
+## (Nov 20: toned right down; the first version was too busy and its breeze
+## swelled like surf.)
 ##
 ## It only plays near the valley (not up in the sky on the Sky Ride), and indoors
 ## it's quieter and calmer (inside_fn).
 
 const CALLS := [
 	# [sounds, weight, volume dB, min dist, max dist, answers?]
-	[["bird_warble_1", "bird_warble_2", "bird_warble_3"], 30, -9.0, 8.0, 32.0, true],
-	[["bird_whistle_1", "bird_whistle_2"], 16, -11.0, 10.0, 36.0, true],
-	[["bird_trill_1", "bird_trill_2"], 14, -11.0, 8.0, 30.0, false],
-	[["bird_chip_1", "bird_chip_2"], 18, -10.0, 6.0, 24.0, true],
-	[["dove"], 6, -15.0, 25.0, 45.0, false],
-	[["cuckoo"], 4, -17.0, 30.0, 50.0, false],
-	[["woodpecker"], 5, -14.0, 18.0, 40.0, false],
-	[["leaves_rustle"], 9, -17.0, 6.0, 18.0, false],
+	# (peaceful above all: soft, unhurried, never right in your ear)
+	[["bird_warble_1", "bird_warble_2", "bird_warble_3"], 32, -13.0, 12.0, 36.0, true],
+	[["bird_whistle_1", "bird_whistle_2"], 18, -14.0, 14.0, 40.0, true],
+	[["bird_trill_1", "bird_trill_2"], 12, -15.0, 12.0, 34.0, false],
+	[["bird_chip_1", "bird_chip_2"], 16, -14.0, 10.0, 28.0, false],
+	[["dove"], 8, -17.0, 25.0, 45.0, false],
+	[["cuckoo"], 4, -19.0, 30.0, 50.0, false],
+	[["woodpecker"], 2, -18.0, 22.0, 42.0, false],
 ]
 
 var radius := 90.0                 # beyond this (or high above), the valley goes quiet
@@ -63,7 +64,7 @@ func _ready() -> void:
 	_crickets.play(_rng.randf() * 14.0)
 	if bees_at != Vector3.INF:
 		_bees = AudioStreamPlayer3D.new(); _bees.stream = Sfx.get_stream("loop_bees")
-		_bees.unit_size = 2.5; _bees.max_distance = 14.0; _bees.volume_db = -12.0
+		_bees.unit_size = 2.0; _bees.max_distance = 10.0; _bees.volume_db = -18.0
 		add_child(_bees)
 		_bees.global_position = bees_at + Vector3(0, 0.6, 0)
 		_bees.play(_rng.randf() * 10.0)
@@ -80,12 +81,12 @@ func _process(delta: float) -> void:
 	var inside := inside_fn.is_valid() and bool(inside_fn.call(at))
 	_level = move_toward(_level, 1.0 if near else 0.0, delta * 0.5)
 	# the breeze swells and dies away in slow gusts; indoors you only just hear it
-	var gust := 0.5 + 0.5 * sin(_t * 0.23) * sin(_t * 0.071 + 1.0)
+	var sway := sin(_t * 0.11) * sin(_t * 0.037 + 1.0)
 	var room := -9.0 if inside else 0.0
-	_breeze.volume_db = _db(_level) + room - 20.0 + gust * 5.0
-	_crickets.volume_db = _db(_level) + room - 27.0
+	_breeze.volume_db = _db(_level) + room - 30.0 + sway * 1.5
+	_crickets.volume_db = _db(_level) + room - 32.0
 	if _bees:
-		_bees.volume_db = -12.0 if near else -80.0
+		_bees.volume_db = -18.0 if near else -80.0
 	if not near:
 		return
 	for a in _answers.duplicate():
@@ -97,7 +98,7 @@ func _process(delta: float) -> void:
 	if _next > 0.0:
 		return
 	# indoors, birds are fewer and further between
-	_next = _rng.randf_range(1.6, 5.0) * (2.2 if inside else 1.0)
+	_next = _rng.randf_range(4.0, 9.0) * (1.8 if inside else 1.0)
 	var c := _pick()
 	var names: Array = c[0]
 	var nm: String = names[_rng.randi() % names.size()]
@@ -109,7 +110,7 @@ func _process(delta: float) -> void:
 	var vol := float(c[2]) + _rng.randf_range(-3.0, 1.5) + room
 	_play(nm, pos, pitch, vol)
 	# sometimes another bird of the same kind answers from across the clearing
-	if bool(c[5]) and _rng.randf() < 0.35:
+	if bool(c[5]) and _rng.randf() < 0.2:
 		_answers.append([_rng.randf_range(0.8, 2.2), nm, _spot(at, float(c[3]), float(c[4])), pitch * _rng.randf_range(0.95, 1.05), vol - 2.0])
 
 func _db(lv: float) -> float:
