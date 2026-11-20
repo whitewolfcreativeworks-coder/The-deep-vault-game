@@ -1124,15 +1124,19 @@ func drink_stamina_potion() -> void:
 # ---------------------------------------------------------------------------
 func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false) -> void:
 	if dead or invuln > 0.0:
+		_pure_hit = false
 		return
-	amount *= Game.mode_value("dmg")       # Hard and Insane hit harder
+	var pure := _pure_hit
+	_pure_hit = false
+	if not pure:
+		amount *= Game.mode_value("dmg")       # Hard and Insane hit harder
 	draw_weapon()
 	var to_src := from_pos - global_position
 	to_src.y = 0
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
 	# the shield covers everything but your back (about 240 degrees)
 	var blocked := blocking and (to_src.length() < 0.01 or fwd.dot(to_src.normalized()) > -0.5)
-	var dmg := Game.mitigate(amount)
+	var dmg := amount if pure else Game.mitigate(amount)      # (fire and lava in Hard/Insane: armor can't help)
 	if ward_t > 0.0:
 		dmg *= 0.3        # Holy Ward
 		FX.sparks(global_position + Vector3(0, 1.2, 0), Color(1.0, 0.9, 0.45))
@@ -1214,6 +1218,28 @@ func _vehicle_look(delta: float) -> void:
 var _burn_t := 0.0
 var _burn_dps := 0.0
 var _burn_fx: CPUParticles3D
+## Fire and lava in HARD and INSANE (Game.HAZARDS): they take a share of your
+## health, and armor doesn't help. (Normal keeps its own gentler numbers.)
+## Hard: a fire vent takes about a third of your health; Insane: nearly all of it.
+var _pure_hit := false
+var _hazard_until := 0          # (ms) still burning from fire or lava: an Insane death is a silly one
+var funny_deaths := 0           # (for the tests)
+func hazard_hit(frac: float, burn_secs := 0.0, burn_frac := 0.0) -> void:
+	if dead or invuln > 0.0:
+		return
+	_hazard_until = Time.get_ticks_msec() + int((burn_secs + 0.4) * 1000.0)
+	var mh := Game.max_hp()
+	_pure_hit = true
+	if burn_secs > 0.0:
+		burn(mh * frac, burn_secs, mh * burn_frac)
+	else:
+		var was := blocking
+		blocking = false
+		take_damage(mh * frac, global_position, 0.0)
+		blocking = was
+		FX.screen_flash(Color(1.0, 0.4, 0.1), 0.4, 0.4)
+	_pure_hit = false
+
 func burn(amount: float, secs: float, dps: float) -> void:
 	if dead or invuln > 0.0:
 		return
@@ -1263,7 +1289,15 @@ func die() -> void:
 	attacking = false; blocking = false; casting = false; dodging = false
 	body.collapse()
 	zoom_target = maxf(zoom_target, 4.5)
-	Sfx.play("death", -2.0, 0.0)
+	if Game.mode == "insane" and Time.get_ticks_msec() < _hazard_until:
+		# INSANE: fire or lava got you... a sad trombone or a slide whistle and a
+		# BONK, and a puff of soot (Jason: "it should make a funny sound")
+		funny_deaths += 1
+		Sfx.play(["funny_trombone", "funny_whistle"].pick_random(), -1.0, 0.0)
+		FX.burst(global_position + Vector3(0, 1.2, 0), Color(0.12, 0.1, 0.1), 40, 3.5, 0.5, 1.4, 1.5)
+		FX.burst(global_position + Vector3(0, 0.8, 0), Color(1.0, 0.55, 0.15), 16, 3.0, 0.15, 0.6, 0.5)
+	else:
+		Sfx.play("death", -2.0, 0.0)
 	Game.player_died.emit()
 
 func respawn_at(pos: Vector3, yaw_r: float) -> void:

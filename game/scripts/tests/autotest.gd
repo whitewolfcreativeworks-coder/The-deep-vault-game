@@ -336,6 +336,9 @@ func _run() -> void:
 	elif mode == "ambience":
 		if await _ambience_test():
 			return
+	elif mode == "hazards":
+		if await _hazards_test():
+			return
 	elif mode == "porthome":
 		if await _porthome_test():
 			return
@@ -4994,6 +4997,82 @@ func _draws() -> Vector2:
 		d += Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 		o += Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)
 	return Vector2(d / 10.0, o / 10.0)
+
+## Fire and lava by mode: Normal as it always was; Hard burns much harder; in
+## Insane a fire vent nearly kills you and lava takes a huge bite (armor no help).
+func _hazards_test() -> bool:
+	var modes := ["normal", "hard", "insane"]
+	var phase := int(Game.get_meta("hz_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("hz_phase", 1)
+		Game.level = 20
+		Game.flags["adventure_done"] = true
+		for slot in ["weapon", "armor"]:
+			Game.add_item(Loot.make_random(20, 0.8, 3, slot), true)
+		Game.mode = "normal"
+		main._travel("vault")
+		return true
+	var m: String = modes[phase - 1]
+	if main.chaos:
+		main.chaos.next_t = 9999.0
+	await wait(2.5)
+	player = main.player
+	for e in get_tree().get_nodes_in_group("enemy"):
+		(e as Node).queue_free()
+	await wait(0.3)
+	# a fire vent in the corridor: step in until it catches you, then step out
+	god = false
+	Game.hp = Game.max_hp()
+	var mh := Game.max_hp()
+	await tp(Vector3(0, -5.9, -38.5), 0.0)
+	for i in 80:
+		await wait(0.05)
+		if Game.hp < mh - 0.5:
+			break
+	await tp(Vector3(0, -5.9, -30.0), 0.0)
+	await wait(3.4)                  # the burn runs its course
+	var fire := (mh - Game.hp) / mh
+	var died_f := player.dead
+	# lava: a pool right under you, one tick
+	if player.dead:
+		await wait(3.0)
+	Game.hp = mh
+	var at := player.global_position
+	var pool := GlowRiver.create(main.world, Rect2(at.x - 3.0, at.z - 3.0, 6.0, 6.0), at.y + 0.3, Vector2(0, 1), Color(1.0, 0.35, 0.05), true, true)
+	await wait(0.3)
+	var lava := (mh - Game.hp) / mh
+	pool.queue_free()
+	god = true
+	Game.hp = mh
+	print("HAZARDS %s: a fire vent took %.0f%% of %d hp%s, one lava tick %.0f%% (defense %.0f)" % [m, fire * 100.0, int(mh), " (died)" if died_f else "", lava * 100.0, Game.defense()])
+	Game.set_meta("hz_" + m, Vector2(fire, lava))
+	if phase < modes.size():
+		Game.set_meta("hz_phase", phase + 1)
+		Game.mode = modes[phase]
+		Game.mode_geared = true
+		main._travel("vault")
+		return true
+	var n: Vector2 = Game.get_meta("hz_normal")
+	var h: Vector2 = Game.get_meta("hz_hard")
+	var i2: Vector2 = Game.get_meta("hz_insane")
+	check("hz_normal_as_before", n.x > 0.01 and n.x < 0.25 and n.y > 0.0 and n.y < 0.08, "fire %.0f%%, lava %.0f%%" % [n.x * 100, n.y * 100])
+	check("hz_hard_burns_harder", h.x > 0.28 and h.x < 0.45 and h.x > n.x * 1.8 and h.y > 0.12, "fire %.0f%% (normal %.0f%%), lava %.0f%%" % [h.x * 100, n.x * 100, h.y * 100])
+	check("hz_insane_nearly_kills", i2.x > 0.8 and i2.y > 0.4, "fire %.0f%%, lava %.0f%%" % [i2.x * 100, i2.y * 100])
+	# and if lava finishes you off in Insane, it's a funny death
+	god = false
+	var f0 := player.funny_deaths
+	Game.hp = Game.max_hp() * 0.3
+	var at2 := player.global_position
+	var pool2 := GlowRiver.create(main.world, Rect2(at2.x - 3.0, at2.z - 3.0, 6.0, 6.0), at2.y + 0.3, Vector2(0, 1), Color(1.0, 0.35, 0.05), true, true)
+	await wait(0.6)
+	pool2.queue_free()
+	check("hz_insane_funny_death", player.dead and player.funny_deaths == f0 + 1, "dead %s, funny %d" % [player.dead, player.funny_deaths - f0])
+	await shot("hz_funny_death")
+	god = true
+	return false
 
 ## The cabin's sounds: a breeze, crickets, bees, and many different birds from
 ## all around (never the old single bird loop); quieter indoors; silent in the sky.

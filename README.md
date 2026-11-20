@@ -89,6 +89,17 @@ A level or a new adventure then asks for a mode, and **With my gear** (keep ever
 | **Hard** | your level | x2 (bosses x1.7) | x1.6 | 12% faster | x1.6, loot at your level | about half get a twin |
 | **INSANE** | your level, and with your gear: your gear too, plus 15% | x3.4 (bosses x2.6) | x2.1 | 30% faster | x2.5, loot above your level | about a third get a twin, but they're **fierce** (below) |
 
+**Fire and lava by mode (Nov 20).**
+- **Normal:** fire vents, fire geysers and lava are as they always were.
+- **Hard and Insane:** they take a share of your health, and armor doesn't help against fire.
+
+| | Fire vent or geyser (plus burning) | Lava (each half second) |
+|---|---|---|
+| Hard | about a third of your health | 15% |
+| Insane | about 90%: touch it and you're nearly dead | 45% |
+
+And if fire or lava finishes you off in Insane, you get a **sad trombone** (wah-wah-wah-waaah) or a **slide whistle and a BONK**, with a puff of soot.
+
 **Growing to match you** means a level-20 hero in the Deep Vault gets a real fight: the monsters' health grows as much as your hitting power has grown since that level, and their hits grow as much as your toughness (health and armor) has. Hard and Insane both match your level. **Insane with your gear** also matches the gear you carry, so bringing your best gear makes it *harder*. **Insane, starting fresh** doesn't count your gear: you're underpowered at first and get stronger as you find loot along the way.
 
 **INSANE is the kitchen sink, without the lag.** Rather than piling on more monsters (which made the iPad lag), Insane makes the monsters that are there much nastier:

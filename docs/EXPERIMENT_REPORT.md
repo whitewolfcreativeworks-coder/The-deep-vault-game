@@ -1062,3 +1062,33 @@ The `ambience` test now checks:
 - 3–14 calls in 45 s (peaceful, not silent), of at least 3 kinds;
 - the breeze below −26 dB;
 - both statue fires use the gentle crackle, out of step.
+
+## Follow-up 32: fire and lava scale with the mode; funny Insane deaths (Nov 20)
+
+Jason: "Insane mode works great now. It's actually fun." Then: "the fire and the lava portions... didn't get upgraded, so in hard mode, the fire should burn you more than it does in normal mode. And insane mode, if the fire touches you, you usually pretty much die." Then: "in insane mode when the fire or the lava kill you, it should make a funny sound".
+
+**Why they barely hurt:**
+- **Hazard size:** the fire vents (`FireTrap`) and Sinkhole geysers used fixed hits plus a small share of max health. The lava (`GlowRiver` with `lava`) dealt a fixed 22/s.
+- **Armor:** fire went through `take_damage`, so armor mitigated it. A level-20 hero with defense of about 170 shrugged off most of it.
+- **Mode:** Hard's and Insane's monster scaling never touched hazards.
+
+**Fix (Normal untouched; it keeps the exact old calls):**
+- `Game.HAZARDS` sets shares of max health:
+
+  | Mode | fire | burn per second | lava per 0.5 s tick |
+  |---|---|---|---|
+  | Hard | 22% | 4% | 15% |
+  | Insane | 60% | 10% | 45% |
+
+- `Player.hazard_hit()` applies them as a "pure" hit: no mode multiplier and no armor (the Holy Ward still helps).
+- Vents burn for 3 s, geysers for 1.5 s.
+
+**Measured** by the new `hazards` test (level 20, defense 166–179):
+
+| Mode | Fire vent | Lava tick |
+|---|---|---|
+| Normal | 11% | 2% (as before) |
+| Hard | 34% | 15% |
+| Insane | 90% | 45% |
+
+**Funny deaths:** a death within a hazard's burn window in Insane plays `funny_trombone` (the sad trombone: three falling "wah"s and a long wobbling one, a sawtooth through a moving low-pass "mute") or `funny_whistle` (a slide whistle down into a cartoon bonk), with a puff of soot, instead of the usual death sting. The test lets lava finish the hero off in Insane and checks for it.

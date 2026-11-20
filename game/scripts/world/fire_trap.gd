@@ -133,7 +133,9 @@ func _process(delta: float) -> void:
 				if b.is_in_group("player"):
 					# a real burn: a big hit that grows with your level, and you keep burning a moment
 					# (Nov 18: hotter again: a harder hit, and you keep burning for 3 s)
-					if b.has_method("burn"):
+					if Game.mode != "normal" and b.has_method("hazard_hit"):
+						b.hazard_hit(Game.hazard("fire"), 3.0, Game.hazard("fire_burn"))     # Hard and Insane: it really burns
+					elif b.has_method("burn"):
 						b.burn(20.0 + Game.max_hp() * 0.085, 3.0, 5.0 + Game.max_hp() * 0.02)
 					else:
 						b.take_damage(20.0 + Game.max_hp() * 0.085, global_position + Vector3(0, 0, 3.0), 2.0)

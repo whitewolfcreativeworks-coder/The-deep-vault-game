@@ -73,6 +73,21 @@ func foe_scale() -> Vector2:
 		extra = 1.15
 	return Vector2(clampf(you_dmg / ref_dmg, 1.0, 12.0) * extra, clampf(you_ehp / ref_ehp, 1.0, 12.0) * extra)
 
+## Fire and lava by mode (Normal uses each hazard's own numbers, unchanged).
+## A share of your max health, and armor doesn't help: "in hard mode, the fire
+## should burn you more... in insane mode, if the fire touches you, you usually
+## pretty much die" (Jason, Nov 20).
+##   fire       the hit when a fire vent or geyser catches you
+##   fire_burn  then you keep burning, this much per second (3 s for vents, 1.5 s for geysers)
+##   lava       every half second you're in lava
+const HAZARDS := {
+	"hard": {"fire": 0.22, "fire_burn": 0.04, "lava": 0.15},
+	"insane": {"fire": 0.6, "fire_burn": 0.1, "lava": 0.45},
+}
+
+func hazard(key: String) -> float:
+	return float((HAZARDS.get(mode, {}) as Dictionary).get(key, 0.0))
+
 ## Loot in Hard and Insane is worth having at your level.
 func mode_ilvl(ilvl: int) -> int:
 	if mode == "normal":

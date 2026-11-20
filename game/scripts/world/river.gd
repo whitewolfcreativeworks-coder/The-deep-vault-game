@@ -176,7 +176,10 @@ func _physics_process(delta: float) -> void:
 			_warned = true
 			Game.say("The amulet sings. The river's light mends you.", Color(0.4, 1.0, 0.6))
 	else:
-		_player.take_damage(damage_per_sec * 0.5 / maxf(0.2, 1.0 - Game.defense() / (Game.defense() + 45.0)), _player.global_position, 0.0)
+		if lava and Game.mode != "normal" and _player.has_method("hazard_hit"):
+			_player.hazard_hit(Game.hazard("lava"))       # Hard and Insane: lava really hurts
+		else:
+			_player.take_damage(damage_per_sec * 0.5 / maxf(0.2, 1.0 - Game.defense() / (Game.defense() + 45.0)), _player.global_position, 0.0)
 		_pulse = 0.8
 		if not _warned:
 			_warned = true

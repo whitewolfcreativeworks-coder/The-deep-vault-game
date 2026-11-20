@@ -524,6 +524,30 @@ def loop_campfire():
         x[s0:s0 + L] += lowpass(r.uniform(-1, 1, L) * np.exp(-np.arange(L) / SR * 160), 2200) * r.uniform(0.5, 0.9)
     return loopify(x, 0.5)
 
+# --- Insane: when fire or lava gets you, something silly instead of the sad sting ---
+def _brass(f0, f1, dur, wobble=0.0):
+    seg = t(dur); n = len(seg)
+    f = np.linspace(f0, f1, n) * (1 + wobble * np.sin(2 * np.pi * 6.5 * seg))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    saw = 2 * ((ph / (2 * np.pi)) % 1) - 1
+    wah = 400 + 1600 * np.sin(np.linspace(0, np.pi, n)) ** 0.7       # the mute opening and closing
+    y = lowpass(saw, wah)
+    return y * np.clip(seg / 0.03, 0, 1) * np.clip((dur - seg) / 0.06, 0, 1)
+def funny_trombone():
+    # the "sad trombone": wah... wah... wah... waaaahhh
+    parts = [_brass(233, 229, 0.42), np.zeros(int(0.06 * SR)), _brass(220, 216, 0.42), np.zeros(int(0.06 * SR)),
+             _brass(208, 204, 0.42), np.zeros(int(0.06 * SR)), _brass(196, 186, 1.5, 0.035)]
+    return np.concatenate(parts)
+def funny_whistle():
+    # a slide whistle all the way down... and a cartoon BONK
+    d = 1.1; seg = t(d)
+    f = 1900 * np.exp(-seg * 1.6) + 350
+    ph = 2 * np.pi * np.cumsum(f * (1 + 0.01 * np.sin(2 * np.pi * 7 * seg))) / SR
+    whistle = (np.sin(ph) + 0.08 * np.random.default_rng(91).uniform(-1, 1, len(seg))) * np.clip(seg / 0.05, 0, 1) * np.clip((d - seg) / 0.05, 0, 1)
+    b = t(0.35)
+    bonk = np.sin(2 * np.pi * (520 * np.exp(-b * 9) + 180) * b) * np.exp(-b * 12) + np.sin(2 * np.pi * 1300 * b) * np.exp(-b * 30) * 0.3
+    return np.concatenate([whistle * 0.7, np.zeros(int(0.05 * SR)), bonk])
+
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
     "pickup": pickup, "coins": coins, "levelup": levelup, "spell": spell, "spell_hit": spell_hit,
@@ -542,7 +566,7 @@ SOUNDS = {
     "bird_whistle_1": bird_whistle_1, "bird_whistle_2": bird_whistle_2, "bird_trill_1": bird_trill_1, "bird_trill_2": bird_trill_2,
     "bird_chip_1": bird_chip_1, "bird_chip_2": bird_chip_2, "dove": dove, "cuckoo": cuckoo, "woodpecker": woodpecker,
     "leaves_rustle": leaves_rustle, "loop_breeze": loop_breeze, "loop_crickets": loop_crickets, "loop_bees": loop_bees,
-    "loop_campfire": loop_campfire,
+    "loop_campfire": loop_campfire, "funny_trombone": funny_trombone, "funny_whistle": funny_whistle,
 }
 
 if __name__ == "__main__":

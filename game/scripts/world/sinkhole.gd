@@ -531,7 +531,10 @@ func _geyser_tick() -> void:
 	Sfx.play_at("fire_burst", g, -6.0, 0.2)
 	var player := w.player
 	if player and not player.dead and Vector2(player.global_position.x - g.x, player.global_position.z - g.z).length() < 2.4 and player.global_position.y < SY + 4.0:
-		player.burn(22.0 + Game.max_hp() * 0.06, 1.5, 5.0 + Game.max_hp() * 0.015)
+		if Game.mode != "normal":
+			player.hazard_hit(Game.hazard("fire"), 1.5, Game.hazard("fire_burn"))     # Hard and Insane: it really burns
+		else:
+			player.burn(22.0 + Game.max_hp() * 0.06, 1.5, 5.0 + Game.max_hp() * 0.015)
 		player.velocity.y = 8.0
 
 func _on_cyclops_dead(_e: Enemy) -> void:
