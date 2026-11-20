@@ -128,7 +128,14 @@ Your mode shows next to your level, and it's saved with your game. Port Home wor
 
 It's calmer inside the cabin and silent up in the sky. Every sound is synthesized by `tools/make_audio.py`, like the rest of the game's audio.
 
-**Keeping it smooth (Nov 19–20):** the first Insane build was very laggy on the iPad, so:
+**Keeping Insane smooth (Nov 19–20).** The first Insane build was very laggy on the iPad. These savings apply **in Insane only**: Normal and Hard run and look exactly as they always have (Jason: "normal mode was perfect").
+- **Monsters sleep** when you're far away: no thinking, physics or animation until you come within about 50 m.
+- Monsters only steer around their **awake** neighbours.
+- Insane has **fewer, fiercer** monsters (above).
+- **Small things far away aren't drawn:** pieces under 0.6 m beyond 40 m, under 2 m beyond 65 m, under 5 m beyond 110 m; monsters beyond 80 m.
+- **Identical scenery props** in each 40 m patch are drawn together.
+
+Measured on the web renderer, an Insane forest fight went from about 12,800 draw calls (the first Insane build) to about 2,300. Normal's forest stays at its original ~7,300, which was smooth on the iPad. `tools/run_tests.sh perf` measures it; `tour` takes a fixed screenshot tour of every level for before/after comparisons.
 - **Monsters sleep** when you're far away: no thinking, physics or animation until you come within about 50 m.
 - Monsters only steer around their **awake** neighbours (that check used to compare every monster with every other one, every tick).
 - Insane has **fewer, fiercer** monsters (above).

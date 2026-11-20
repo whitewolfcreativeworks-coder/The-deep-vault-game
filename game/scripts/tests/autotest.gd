@@ -5353,6 +5353,7 @@ func _levels_test() -> bool:
 		var cen := _enemy_census()
 		print("LEVELS forest insane census: ", cen)
 		check("lv_insane_fewer_but_pairs", cen.twins >= 4 and cen.triplets == 0, str(cen))
+		check("lv_insane_lean", int(main.batch_stats.get("far_culled", 0)) > 500, str(main.batch_stats))
 		var gob: Dictionary = Enemy.TYPES["goblin"]
 		check("lv_insane_monsters_grown", cen.minion_hp > float(gob.hp) * 2.8 * 2.0, "%.0f vs base %.0f" % [cen.minion_hp, float(gob.hp)])
 		check("lv_chaos_soon", main.chaos != null and main.chaos.next_t <= 8.5, str(main.chaos.next_t if main.chaos else -1.0))
@@ -5451,6 +5452,23 @@ func _levels_test() -> bool:
 		var mn: Dictionary = Enemy.TYPES["minion"]
 		check("lv_hard_monsters_grown", cen.minion_hp > float(mn.hp) * 2.0 * 2.0 and cen.minion_dmg > float(mn.dmg) * 2.0, "%s base hp %.0f dmg %.0f" % [str(cen), float(mn.hp), float(mn.dmg)])
 		check("lv_hard_no_chaos", main.chaos == null)
+		# Normal and Hard run exactly as they always did: none of Insane's speed savings
+		var culled := 0
+		for g in main.world.find_children("*", "GeometryInstance3D", true, false):
+			if (g as GeometryInstance3D).visibility_range_end > 0.0:
+				culled += 1
+		var sleepers := 0
+		var leans := 0
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy:
+				if (e as Enemy).asleep:
+					sleepers += 1
+				if (e as Enemy).lean:
+					leans += 1
+		var batches: int = main.world.find_children("Batch*", "MultiMeshInstance3D", true, false).size()
+		check("lv_hard_untouched", main.batch_stats.is_empty() and batches == 0 and sleepers == 0 and leans == 0,
+			"batches %d, stats %s, sleeping %d, lean %d, meshes with a draw distance %d" % [batches, str(main.batch_stats), sleepers, leans, culled])
+		print("LEVELS hard: meshes with their own draw distance (built that way by the level): %d" % culled)
 		_uid_zone_check("vault")
 		await shot("lv_06_vault_hard")
 		main.start_sky_ride()

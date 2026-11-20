@@ -44,8 +44,9 @@ func _ready() -> void:
 	get_tree().create_timer(0.15).timeout.connect(func() -> void:
 		if is_instance_valid(w) and w.is_inside_tree():
 			Props.snap_torches(w)
-			# then draw identical scenery props together (far fewer draw calls)
-			if not OS.has_environment("DEEPVAULT_NOBATCH"):
+			# INSANE only: draw identical scenery props together and skip tiny far-off
+			# details (far fewer draw calls). Normal and Hard look exactly as always.
+			if Game.mode == "insane" and not OS.has_environment("DEEPVAULT_NOBATCH"):
 				batch_stats = StaticBatcher.batch(w)
 				batch_stats["far_culled"] = StaticBatcher.cull_small(w))
 	player = Player.new()

@@ -930,12 +930,10 @@ func _setup_anims() -> void:
 
 ## Slow motion (Insane's Bullet Time): every animation plays at this rate.
 var slow := 1.0
-var _raw_speed := 1.0
 
 func _play(clip: String, blend := 0.15, speed := 1.0) -> void:
 	if anim == null or not anim.has_animation(clip):
 		return
-	_raw_speed = speed
 	if anim.current_animation == clip and anim.is_playing():
 		anim.speed_scale = speed * slow
 		return
@@ -951,7 +949,6 @@ func oneshot(role: String, duration := -1.0, blend := 0.08) -> void:
 	var spd := 1.0 if duration <= 0.0 else length / duration
 	anim.play(clip, blend)
 	anim.seek(0.0, true)
-	_raw_speed = spd
 	anim.speed_scale = spd * slow
 	_oneshot = clip
 	_oneshot_until = _clock + (length / spd) - 0.05
@@ -1317,7 +1314,7 @@ func _locomotion(delta: float) -> void:
 			_loco = clip
 	else:
 		_pend = ""
-	_play(_loco, 0.24, w[1] if clip == _loco else _raw_speed)
+	_play(_loco, 0.24, w[1] if clip == _loco else anim.speed_scale / maxf(slow, 0.01))
 
 # ---------------------------------------------------------------------------
 # Character-creator looks: hair styles and face details are small meshes on the

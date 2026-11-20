@@ -38,7 +38,7 @@ func can_port_home() -> bool:
 var mode := "normal"
 const MODES := {
 	"normal": {"name": "Normal", "hp": 1.0, "boss_hp": 1.0, "dmg": 1.0, "speed": 1.0, "reward": 1.0, "twins": 0.0, "triplets": 0.0},
-	"hard": {"name": "Hard", "hp": 2.0, "boss_hp": 1.7, "dmg": 1.6, "speed": 1.12, "reward": 1.6, "twins": 0.4, "triplets": 0.0},
+	"hard": {"name": "Hard", "hp": 2.0, "boss_hp": 1.7, "dmg": 1.6, "speed": 1.12, "reward": 1.6, "twins": 0.5, "triplets": 0.0},
 	"insane": {"name": "INSANE", "hp": 3.4, "boss_hp": 2.6, "dmg": 2.1, "speed": 1.3, "reward": 2.5, "twins": 0.35, "triplets": 0.0},
 }
 

@@ -1018,3 +1018,24 @@ New autotest `ambience`:
 - indoors is recognised;
 - 30 s in the yard gives at least 7 calls of at least 4 kinds;
 - it's calmer indoors and quiet in the sky.
+
+## Follow-up 30: Normal and Hard put back exactly; speed savings are Insane-only (Nov 20)
+
+Jason, after the soundscape build: "I'm just really hoping you didn't apply the changes that had to happen to insane mode to normal mode, because normal mode was perfect... I thought we were done with normal mode." His process is to tune Insane first, then Hard (not yet played), and to leave Normal alone because it was already good.
+
+The performance work in follow-ups 27–28 had been applied globally and reported as "Normal got faster too". That was a judgement call I should have asked about, because it moved a mode the designer had signed off. The fix:
+- **`Enemy.lean`** (true only in Insane) gates the monster changes. In Normal and Hard the original code runs:
+  - sleeping;
+  - the awake-list separation (Normal and Hard use the original all-monsters loop);
+  - the standing-still `move_and_slide` skip;
+  - monster draw distances.
+- `StaticBatcher.batch`/`cull_small` run only when the level loads in Insane.
+- `CharacterModel`: the slow-motion change had altered one locomotion line (it passed a stored speed instead of `anim.speed_scale`). That could let a frozen monster (speed 0) animate in any mode. It's restored to `anim.speed_scale / slow`, which is identical to the original when `slow` is 1.
+- Hard's twin chance is back to 0.5.
+- A review of every script diff since 89408bd (the build Normal was signed off on) found nothing else that runs outside Insane, apart from the cabin soundscape (requested for all modes) and test changes.
+- **Measured:** the Normal forest is back to 7,362 draw calls (89408bd: 7,203).
+- **The `levels` test now checks:**
+  - Hard has no batches, no sleeping monsters, no `lean` monsters and no detail culling;
+  - Insane still culls (over 500 meshes).
+
+**Lesson:** when a stakeholder has signed off a mode, global optimizations need explicit permission. A mode switch makes that cheap: one flag per subsystem.

@@ -149,6 +149,9 @@ var dmg_mult := 1.0
 var oddity := ""
 var mini := false
 var fierce := false          # Insane: aggressive (see _ready)
+## Insane only: the speed savings (far-away monsters sleep, cheaper crowding
+## checks, far monsters not drawn). Normal and Hard run exactly as they always did.
+var lean := false
 var slow_t := 0.0            # Insane's Bullet Time: everything about this monster runs slow
 var _rallied := false
 var _blink_cd := 3.0
@@ -177,6 +180,7 @@ func _ready() -> void:
 	var boss := bool(t.get("heavy", false)) or int(t.xp) >= 900
 	hp_mult *= Game.mode_value("boss_hp" if boss else "hp")
 	fierce = Game.mode == "insane"
+	lean = Game.mode == "insane"
 	if fierce and not boss and not mini and oddity == "" and randf() < 0.3:
 		oddity = ["giant", "speedy", "splitter", "vampire", "blinker", "bomber", "vampire", "blinker", "bomber", "giant", "speedy"].pick_random()
 	if oddity == "giant":
@@ -266,7 +270,7 @@ func _ready() -> void:
 		_oddity_look.call_deferred()
 	# far away, ordinary monsters aren't drawn at all (saves a lot on tablets in a
 	# forest full of them); big bosses can still be seen from afar
-	if not boss and not t.has("look_size"):
+	if lean and not boss and not t.has("look_size"):
 		_far_cull.call_deferred()
 	# Hard and Insane: more monsters (a twin turns up beside many of them; in
 	# Insane most come in a pack of three)
@@ -468,7 +472,9 @@ func _physics_process(delta: float) -> void:
 		player = get_tree().get_first_node_in_group("player")
 		if player == null:
 			return
-	if asleep:
+	if not lean:
+		pass
+	elif asleep:
 		if state != S.IDLE and state != S.DORMANT:
 			_set_asleep(false)          # something woke it (a hit, a world event...)
 		else:
@@ -637,7 +643,16 @@ func _physics_process(delta: float) -> void:
 				_go(S.CHASE)
 
 	# separation from other enemies (only the awake ones, and only while moving)
-	if state == S.CHASE or state == S.RETURN or (state == S.IDLE and dist < 30.0):
+	if not lean:
+		for o in get_tree().get_nodes_in_group("enemy"):
+			if o == self or not is_instance_valid(o) or o.dead:
+				continue
+			var d: Vector3 = global_position - o.global_position
+			d.y = 0
+			var l := d.length()
+			if l < 1.3 and l > 0.01:
+				move += d / l * (1.3 - l) * 1.5
+	elif state == S.CHASE or state == S.RETURN or (state == S.IDLE and dist < 30.0):
 		for o in _awake_enemies():
 			if o == self or not is_instance_valid(o) or o.dead:
 				continue
@@ -659,7 +674,7 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= 22.0 * delta
 	else:
 		velocity.y = -0.5
-	if state == S.IDLE and move == Vector3.ZERO and is_on_floor() and not t.has("fly") and Vector2(velocity.x, velocity.z).length() < 0.05:
+	if lean and state == S.IDLE and move == Vector3.ZERO and is_on_floor() and not t.has("fly") and Vector2(velocity.x, velocity.z).length() < 0.05:
 		velocity.x = 0.0; velocity.z = 0.0     # standing still on the ground: nothing to slide
 	else:
 		move_and_slide()
