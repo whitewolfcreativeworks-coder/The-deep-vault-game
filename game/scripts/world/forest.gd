@@ -512,6 +512,7 @@ func _campfire(p: Vector3) -> void:
 	l.set_script(load("res://scripts/world/flicker.gd"))
 	fire.add_child(l)
 	Sfx.loop_on(fire, "loop_fire", -10.0, 4.0, 22.0)
+	FireHurt.attach(fire, 0.95, 1.0, Vector3(0, 0.6, 0))      # (Insane only: any fire hurts)
 
 func _goblin_camp(c: Vector2, tag: String) -> void:
 	for k in 4:

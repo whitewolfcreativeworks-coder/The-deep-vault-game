@@ -98,7 +98,11 @@ A level or a new adventure then asks for a mode, and **With my gear** (keep ever
 | Hard | about a third of your health | 15% |
 | Insane | about 90%: touch it and you're nearly dead | 45% |
 
-And if fire or lava finishes you off in Insane, you get a **sad trombone** (wah-wah-wah-waaah) or a **slide whistle and a BONK**, with a puff of soot.
+In **Insane, any fire hurts**: campfires, braziers, fire bowls and torches you can reach burn like a fire vent.
+
+If fire or lava finishes you off in Insane, a cute little voice says **"oh no!"** or **"uh-oh!"**:
+- **by fire**, it trails off into crackles, with a puff of soot;
+- **in lava**, you sink out of sight with a blub, blub, blub... GLOOP.
 
 **Growing to match you** means a level-20 hero in the Deep Vault gets a real fight: the monsters' health grows as much as your hitting power has grown since that level, and their hits grow as much as your toughness (health and armor) has. Hard and Insane both match your level. **Insane with your gear** also matches the gear you carry, so bringing your best gear makes it *harder*. **Insane, starting fresh** doesn't count your gear: you're underpowered at first and get stronger as you find loot along the way.
 

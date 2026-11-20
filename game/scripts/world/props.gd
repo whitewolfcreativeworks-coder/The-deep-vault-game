@@ -131,7 +131,9 @@ static func snap_torches(world: Node3D) -> int:
 		moved += 1
 	return moved
 
-static func fire_particles(parent: Node3D, size := 1.0, color := Color(1.0, 0.6, 0.25), embers := true) -> void:
+static func fire_particles(parent: Node3D, size := 1.0, color := Color(1.0, 0.6, 0.25), embers := true, hurts := true) -> void:
+	if hurts:
+		FireHurt.attach(parent, 0.25 + 0.3 * size, 0.3 + 0.35 * size)      # (Insane only: any fire hurts)
 	var f := CPUParticles3D.new()
 	f.amount = int(24 * size) + 8
 	f.lifetime = 0.55

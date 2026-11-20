@@ -5023,6 +5023,31 @@ func _hazards_test() -> bool:
 	for e in get_tree().get_nodes_in_group("enemy"):
 		(e as Node).queue_free()
 	await wait(0.3)
+	# any fire hurts in Insane (and only in Insane): sensors on the campfires, braziers, torches...
+	var sensors: Array = main.world.find_children("FireHurt", "FireHurt", true, false)
+	Game.set_meta("hz_sensors_" + m, sensors.size())
+	if m == "insane":
+		var camp: FireHurt = null
+		for f in sensors:
+			if (f as FireHurt).radius > 0.8 and (f as FireHurt).global_position.y < 3.0:
+				camp = f
+		if camp:
+			god = false
+			Game.hp = Game.max_hp()
+			var mh0 := Game.max_hp()
+			await tp(Vector3(camp.global_position.x, camp.global_position.y - 0.2, camp.global_position.z + 0.3), 0.0)
+			await wait(0.3)
+			var campfire_loss := (mh0 - Game.hp) / mh0
+			await tp(Vector3(0, 0.3, 20.0), 0.0)
+			await wait(2.5)
+			god = true
+			if player.dead:
+				await wait(1.0)
+				main._respawn()
+			await wait(2.5)          # (out of the 2 s grace after a respawn)
+			Game.hp = mh0
+			Game.set_meta("hz_campfire", campfire_loss)
+			print("HAZARDS insane: a campfire took %.0f%% at the first touch" % (campfire_loss * 100.0))
 	# a fire vent in the corridor: step in until it catches you, then step out
 	god = false
 	Game.hp = Game.max_hp()
@@ -5069,8 +5094,13 @@ func _hazards_test() -> bool:
 	var pool2 := GlowRiver.create(main.world, Rect2(at2.x - 3.0, at2.z - 3.0, 6.0, 6.0), at2.y + 0.3, Vector2(0, 1), Color(1.0, 0.35, 0.05), true, true)
 	await wait(0.6)
 	pool2.queue_free()
-	check("hz_insane_funny_death", player.dead and player.funny_deaths == f0 + 1, "dead %s, funny %d" % [player.dead, player.funny_deaths - f0])
-	await shot("hz_funny_death")
+	await wait(2.6)
+	check("hz_insane_lava_death", player.dead and player.funny_deaths == f0 + 1 and player.last_death_sound.begins_with("death_lava") and player.body.position.y < -0.8,
+		"dead %s, sound %s, sank to %.1f" % [player.dead, player.last_death_sound, player.body.position.y])
+	await shot("hz_lava_death")
+	check("hz_any_fire_hurts_in_insane_only", int(Game.get_meta("hz_sensors_insane", 0)) >= 10 and int(Game.get_meta("hz_sensors_normal", -1)) == 0 and int(Game.get_meta("hz_sensors_hard", -1)) == 0,
+		"sensors: normal %d, hard %d, insane %d" % [int(Game.get_meta("hz_sensors_normal", -1)), int(Game.get_meta("hz_sensors_hard", -1)), int(Game.get_meta("hz_sensors_insane", 0))])
+	check("hz_insane_campfire_burns", float(Game.get_meta("hz_campfire", 0.0)) > 0.5, "%.0f%% at the first touch" % (float(Game.get_meta("hz_campfire", 0.0)) * 100.0))
 	god = true
 	return false
 

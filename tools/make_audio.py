@@ -524,29 +524,83 @@ def loop_campfire():
         x[s0:s0 + L] += lowpass(r.uniform(-1, 1, L) * np.exp(-np.arange(L) / SR * 160), 2200) * r.uniform(0.5, 0.9)
     return loopify(x, 0.5)
 
-# --- Insane: when fire or lava gets you, something silly instead of the sad sting ---
-def _brass(f0, f1, dur, wobble=0.0):
-    seg = t(dur); n = len(seg)
-    f = np.linspace(f0, f1, n) * (1 + wobble * np.sin(2 * np.pi * 6.5 * seg))
-    ph = 2 * np.pi * np.cumsum(f) / SR
-    saw = 2 * ((ph / (2 * np.pi)) % 1) - 1
-    wah = 400 + 1600 * np.sin(np.linspace(0, np.pi, n)) ** 0.7       # the mute opening and closing
-    y = lowpass(saw, wah)
-    return y * np.clip(seg / 0.03, 0, 1) * np.clip((dur - seg) / 0.06, 0, 1)
-def funny_trombone():
-    # the "sad trombone": wah... wah... wah... waaaahhh
-    parts = [_brass(233, 229, 0.42), np.zeros(int(0.06 * SR)), _brass(220, 216, 0.42), np.zeros(int(0.06 * SR)),
-             _brass(208, 204, 0.42), np.zeros(int(0.06 * SR)), _brass(196, 186, 1.5, 0.035)]
-    return np.concatenate(parts)
-def funny_whistle():
-    # a slide whistle all the way down... and a cartoon BONK
-    d = 1.1; seg = t(d)
-    f = 1900 * np.exp(-seg * 1.6) + 350
-    ph = 2 * np.pi * np.cumsum(f * (1 + 0.01 * np.sin(2 * np.pi * 7 * seg))) / SR
-    whistle = (np.sin(ph) + 0.08 * np.random.default_rng(91).uniform(-1, 1, len(seg))) * np.clip(seg / 0.05, 0, 1) * np.clip((d - seg) / 0.05, 0, 1)
+# --- a cute little cartoon voice: "oh no!" / "uh-oh!" (formant synthesis) ----------
+# A buzzy source at a high, falling pitch, shaped by three resonances (the vowel
+# formants), raised like a child's or a cartoon character's voice.
+def _voice(segs, seed=5):
+    # segs: (dur, f0_a, f0_b, F1_a, F1_b, F2_a, F2_b, amp_a, amp_b); amp 0 = a little stop
+    f0 = []; F1 = []; F2 = []; amp = []
+    for d, fa, fb, f1a, f1b, f2a, f2b, aa, ab in segs:
+        n = int(d * SR)
+        f0.append(np.linspace(fa, fb, n)); F1.append(np.linspace(f1a, f1b, n)); F2.append(np.linspace(f2a, f2b, n))
+        a = np.linspace(aa, ab, n)
+        ramp = min(n // 2, int(0.02 * SR))
+        if ramp > 0 and aa > 0: a[:ramp] *= np.linspace(0, 1, ramp)
+        if ramp > 0 and ab > 0: a[-ramp:] *= np.linspace(1, 0.6, ramp)
+        amp.append(a)
+    f0 = np.concatenate(f0); F1 = np.concatenate(F1); F2 = np.concatenate(F2); amp = np.concatenate(amp)
+    n = len(f0); tt = np.arange(n) / SR
+    f0 = f0 * (1 + 0.012 * np.sin(2 * np.pi * 5.5 * tt))
+    ph = 2 * np.pi * np.cumsum(f0) / SR
+    src = np.zeros(n)
+    for k in range(1, 26):
+        src += np.sin(k * ph) / k ** 1.1 * (k * f0 < SR * 0.45)
+    src += np.random.default_rng(seed).uniform(-1, 1, n) * 0.02      # a little breath
+    out = np.zeros(n)
+    for F, bw, g in [(F1, 110.0, 1.0), (F2, 140.0, 0.6), (np.full(n, 3300.0), 220.0, 0.25)]:
+        r = np.exp(-np.pi * bw / SR); y1 = y2 = 0.0; y = np.zeros(n)
+        for i in range(n):
+            a1 = 2 * r * np.cos(2 * np.pi * F[i] / SR)
+            v = (1 - r) * src[i] + a1 * y1 - r * r * y2
+            y[i] = v; y2 = y1; y1 = v
+        out += y * g
+    return out * amp
+def _say_oh_no(pitch=1.0):
+    # "oh... no-o-o!" : rising "oh", a little "n", then a long falling, wobbling "noooo"
+    p = pitch
+    return _voice([
+        (0.20, 520 * p, 600 * p, 620, 560, 1100, 950, 0.9, 1.0),     # oh
+        (0.05, 600 * p, 600 * p, 560, 560, 950, 950, 0.0, 0.0),      # (breath)
+        (0.06, 640 * p, 640 * p, 320, 320, 1700, 1700, 0.35, 0.4),   # n
+        (0.55, 660 * p, 330 * p, 640, 520, 1150, 900, 1.0, 0.0),     # nooooo
+    ])
+def _say_uh_oh(pitch=1.0):
+    p = pitch
+    return _voice([
+        (0.16, 620 * p, 640 * p, 820, 800, 1500, 1450, 0.9, 1.0),    # uh
+        (0.07, 640 * p, 640 * p, 800, 800, 1450, 1450, 0.0, 0.0),    # (catch)
+        (0.45, 520 * p, 340 * p, 620, 520, 1050, 880, 1.0, 0.0),     # oh
+    ], seed=6)
+def _crackle_tail(d, seed):
+    r = np.random.default_rng(seed); n = int(d * SR); x = np.zeros(n); k = 0.0
+    while k < d - 0.1:
+        for i in range(int(r.integers(2, 7))):
+            s0 = int((k + i * r.uniform(0.01, 0.04)) * SR); L = int(r.uniform(0.002, 0.006) * SR)
+            if s0 + L >= n: break
+            x[s0:s0 + L] += r.uniform(-1, 1, L) * np.exp(-np.arange(L) / SR * 1200) * r.uniform(0.3, 0.9) * (1 - k / d)
+        k += r.uniform(0.06, 0.25)
+    whoosh = lowpass(r.uniform(-1, 1, n), 900) * np.sin(np.linspace(0, np.pi, n)) ** 2 * 0.35
+    return x + whoosh
+def _bubbles(d, seed, sink=True):
+    r = np.random.default_rng(seed); n = int(d * SR); x = np.zeros(n)
+    for i in range(int(r.integers(7, 11))):
+        s0 = int(r.uniform(0.0, d - 0.2) * SR); L = int(r.uniform(0.05, 0.1) * SR); b = np.arange(L) / SR
+        f0 = r.uniform(140, 320) * (0.8 if sink and s0 > n / 2 else 1.0)
+        blub = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 3.0 * b / b[-1])) / SR) * np.exp(-b * 25)
+        x[s0:s0 + L] += blub * r.uniform(0.4, 0.9)
     b = t(0.35)
-    bonk = np.sin(2 * np.pi * (520 * np.exp(-b * 9) + 180) * b) * np.exp(-b * 12) + np.sin(2 * np.pi * 1300 * b) * np.exp(-b * 30) * 0.3
-    return np.concatenate([whistle * 0.7, np.zeros(int(0.05 * SR)), bonk])
+    gloop = np.sin(2 * np.pi * np.cumsum(90 + 260 * (b / 0.35) ** 1.5) / SR) * np.exp(-b * 7) * 1.2
+    sizzle = highpass(lowpass(r.uniform(-1, 1, n), 4000), 1500) * 0.06 * np.linspace(1, 0.3, n)
+    return np.concatenate([x + sizzle, gloop])
+def _mix(voice, tail, at):
+    n = max(len(voice), int(at * SR) + len(tail)); x = np.zeros(n)
+    x[:len(voice)] += voice / (np.max(np.abs(voice)) or 1)
+    s0 = int(at * SR); x[s0:s0 + len(tail)] += tail / (np.max(np.abs(tail)) or 1) * 0.6
+    return x
+def death_fire_1(): return _mix(_say_oh_no(1.0), _crackle_tail(1.4, 811), 0.55)
+def death_fire_2(): return _mix(_say_uh_oh(1.08), _crackle_tail(1.4, 812), 0.4)
+def death_lava_1(): return _mix(_say_oh_no(0.95), _bubbles(1.6, 821), 0.6)
+def death_lava_2(): return _mix(_say_uh_oh(1.0), _bubbles(1.6, 822), 0.45)
 
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
@@ -566,7 +620,8 @@ SOUNDS = {
     "bird_whistle_1": bird_whistle_1, "bird_whistle_2": bird_whistle_2, "bird_trill_1": bird_trill_1, "bird_trill_2": bird_trill_2,
     "bird_chip_1": bird_chip_1, "bird_chip_2": bird_chip_2, "dove": dove, "cuckoo": cuckoo, "woodpecker": woodpecker,
     "leaves_rustle": leaves_rustle, "loop_breeze": loop_breeze, "loop_crickets": loop_crickets, "loop_bees": loop_bees,
-    "loop_campfire": loop_campfire, "funny_trombone": funny_trombone, "funny_whistle": funny_whistle,
+    "loop_campfire": loop_campfire,
+    "death_fire_1": death_fire_1, "death_fire_2": death_fire_2, "death_lava_1": death_lava_1, "death_lava_2": death_lava_2,
 }
 
 if __name__ == "__main__":

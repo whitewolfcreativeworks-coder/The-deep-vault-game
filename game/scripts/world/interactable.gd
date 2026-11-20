@@ -160,7 +160,7 @@ func _build_heart() -> void:
 	_light = OmniLight3D.new(); _light.light_color = Color(1.0, 0.65, 0.3); _light.light_energy = 4.0; _light.omni_range = 12.0
 	_light.shadow_enabled = true
 	_vis.add_child(_light)
-	Props.fire_particles(_crystal, 0.5, Color(1.0, 0.7, 0.35), true)
+	Props.fire_particles(_crystal, 0.5, Color(1.0, 0.7, 0.35), true, false)      # (the Heart's glow: not a fire)
 	_vis.visible = Game.flags.get("warden_dead", false) and not Game.flags.get(uid, false)
 
 ## The Warden has fallen: a pillar of light, and the Heart descends onto the altar.

@@ -1092,3 +1092,22 @@ Jason: "Insane mode works great now. It's actually fun." Then: "the fire and the
 | Insane | 90% | 45% |
 
 **Funny deaths:** a death within a hazard's burn window in Insane plays `funny_trombone` (the sad trombone: three falling "wah"s and a long wobbling one, a sawtooth through a moving low-pass "mute") or `funny_whistle` (a slide whistle down into a cartoon bonk), with a puff of soot, instead of the usual death sting. The test lets lava finish the hero off in Insane and checks for it.
+
+## Follow-up 33: any fire hurts in Insane; cute death voices (Nov 20)
+
+Jason: "even the campfires should burn you in insane mode... any fire at all should hurt you in insane mode". On the death sounds: "one's better than the other, but they're just okay... it should sound like somebody dying, like oh no... but it should be cute... the fire one could have a little crackles of fire in it, like oh no, crackle, crackle, crackle. The lava could have bubbling sounds as you're sinking into it".
+
+**Any fire hurts (Insane only):**
+- `FireHurt` is a small sensor attached by `Props.fire_particles` (every torch, brazier and campfire flame), plus the forest campfires and the statue braziers. In Normal and Hard `attach()` returns immediately, so nothing exists there; the test checks for 0 sensors in Normal and Hard against 25 in the Insane Vault.
+- It checks the player's distance every 0.12 s. On touch it calls `hazard_hit("fire")`: 60% of max health and 10%/s burning, no armor.
+- A shared static cooldown means overlapping flames can't double-hit.
+- The Heart of the Vault's glow is excluded.
+- **Measured:** a campfire takes 68% at the first touch (about 80% once the burn finishes). Standing in it longer than 0.8 s is fatal.
+
+**Death voices:**
+- The trombone and slide whistle are gone. The replacement is a tiny formant synthesizer in `make_audio.py`: a harmonic source with spectral tilt, a falling pitch with vibrato, and three time-varying two-pole resonators for F1/F2/F3, with formants raised like a child's or cartoon voice.
+- It says "oh... no-o-o!" (rising "oh", a short "n" murmur, a long falling "noooo") or "uh-oh!" (an "uh", a glottal catch, a falling "oh").
+- **Fire versions** (`death_fire_1/2`) add a crackle tail and a soft whoosh.
+- **Lava versions** (`death_lava_1/2`) add rising "blub" bubbles, a sizzle and a final low "gloop". The hero's body sinks 1.6 m into the lava (the tween is cancelled on respawn).
+- `hazard_hit()` records the hazard kind, so `die()` knows which to play.
+- The spectrograms show the intended structure, but the sounds can't be listened to here; Jason's ears are the test.

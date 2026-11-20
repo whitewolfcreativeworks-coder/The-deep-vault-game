@@ -226,6 +226,7 @@ static func giant_brazier(parent: Node3D, at: Vector3) -> Node3D:
 	l.omni_attenuation = 1.1; l.position = Vector3(0, 3.0, 0)
 	l.set_script(load("res://scripts/world/flicker.gd"))
 	n.add_child(l)
+	FireHurt.attach(n, 1.3, 1.2, Vector3(0, 2.2, 0))      # (Insane only: any fire hurts)
 	# a gentle crackle, not a roar (Jason, Nov 20: "like a crackling fire"); the two
 	# bowls start at different points so they don't double up
 	var snd := Sfx.loop_on(n, "loop_campfire", -9.0, 3.5, 20.0)

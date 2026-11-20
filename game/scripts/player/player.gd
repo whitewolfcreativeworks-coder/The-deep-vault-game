@@ -1222,12 +1222,16 @@ var _burn_fx: CPUParticles3D
 ## health, and armor doesn't help. (Normal keeps its own gentler numbers.)
 ## Hard: a fire vent takes about a third of your health; Insane: nearly all of it.
 var _pure_hit := false
-var _hazard_until := 0          # (ms) still burning from fire or lava: an Insane death is a silly one
+var _hazard_until := 0          # (ms) still burning from fire or lava: an Insane death gets its own sound
+var _hazard_kind := "fire"
 var funny_deaths := 0           # (for the tests)
-func hazard_hit(frac: float, burn_secs := 0.0, burn_frac := 0.0) -> void:
+var last_death_sound := ""      # (for the tests)
+var _sink_tw: Tween
+func hazard_hit(frac: float, burn_secs := 0.0, burn_frac := 0.0, kind := "fire") -> void:
 	if dead or invuln > 0.0:
 		return
 	_hazard_until = Time.get_ticks_msec() + int((burn_secs + 0.4) * 1000.0)
+	_hazard_kind = kind
 	var mh := Game.max_hp()
 	_pure_hit = true
 	if burn_secs > 0.0:
@@ -1290,12 +1294,21 @@ func die() -> void:
 	body.collapse()
 	zoom_target = maxf(zoom_target, 4.5)
 	if Game.mode == "insane" and Time.get_ticks_msec() < _hazard_until:
-		# INSANE: fire or lava got you... a sad trombone or a slide whistle and a
-		# BONK, and a puff of soot (Jason: "it should make a funny sound")
+		# INSANE: fire or lava got you. A cute little "oh no!" / "uh-oh!": by fire
+		# it trails off in crackles with a puff of soot; in lava you sink with a
+		# blub, blub, blub... GLOOP. (Jason: "cute sounds of dying")
 		funny_deaths += 1
-		Sfx.play(["funny_trombone", "funny_whistle"].pick_random(), -1.0, 0.0)
-		FX.burst(global_position + Vector3(0, 1.2, 0), Color(0.12, 0.1, 0.1), 40, 3.5, 0.5, 1.4, 1.5)
-		FX.burst(global_position + Vector3(0, 0.8, 0), Color(1.0, 0.55, 0.15), 16, 3.0, 0.15, 0.6, 0.5)
+		if _hazard_kind == "lava":
+			last_death_sound = ["death_lava_1", "death_lava_2"].pick_random()
+			FX.burst(global_position + Vector3(0, 0.4, 0), Color(1.0, 0.45, 0.1), 24, 2.5, 0.2, 0.9, 1.0)
+			_sink_tw = body.create_tween()
+			_sink_tw.tween_interval(0.5)
+			_sink_tw.tween_property(body, "position:y", -1.6, 2.2).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
+		else:
+			last_death_sound = ["death_fire_1", "death_fire_2"].pick_random()
+			FX.burst(global_position + Vector3(0, 1.2, 0), Color(0.12, 0.1, 0.1), 40, 3.5, 0.5, 1.4, 1.5)
+			FX.burst(global_position + Vector3(0, 0.8, 0), Color(1.0, 0.55, 0.15), 16, 3.0, 0.15, 0.6, 0.5)
+		Sfx.play(last_death_sound, 0.0, 0.0)
 	else:
 		Sfx.play("death", -2.0, 0.0)
 	Game.player_died.emit()
@@ -1309,6 +1322,9 @@ func respawn_at(pos: Vector3, yaw_r: float) -> void:
 	velocity = Vector3.ZERO
 	yaw = yaw_r; facing = yaw_r; pitch = -0.2
 	body.revive()
+	if _sink_tw and _sink_tw.is_valid():
+		_sink_tw.kill()
+	body.position.y = 0.0          # (back up out of the lava)
 	body.rotation.y = facing
 	Game.hp = Game.max_hp(); Game.stamina = Game.max_stamina(); Game.mana = Game.max_mana()
 	invuln = 2.0
