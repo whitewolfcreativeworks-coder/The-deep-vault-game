@@ -976,6 +976,11 @@ func _build_inventory() -> void:
 	var head := HBoxContainer.new()
 	head.add_child(UIKit.label("Equipped", 26, UIKit.GOLD, true))
 	var spacer := Control.new(); spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL; head.add_child(spacer)
+	var best := _button("★  Wear my best", func() -> void:
+		Game.wear_best(false)
+		_refresh_inventory(); _refresh_stats(), 220)
+	best.name = "WearBest"
+	head.add_child(best)
 	head.add_child(_button("✂  Skin Designer", func() -> void: show_panel("designer"), 230))
 	var x := Button.new(); x.text = "✕  Close"; x.custom_minimum_size = Vector2(150, 50)
 	x.pressed.connect(func() -> void: resume_requested.emit())
@@ -1253,6 +1258,11 @@ func _build_stash() -> void:
 				_refresh_stash(), 520))
 		else:
 			_stash_box = list; _stash_head = hl
+			var wb := _button("★  Wear my best gear (from my bag and the chest)", func() -> void:
+				Game.wear_best(true)
+				_refresh_stash(), 560)
+			wb.name = "WearBestChest"
+			c.add_child(wb)
 
 func _stash_row(id: String, in_chest: bool) -> Control:
 	var it: Dictionary = Game.item(id)

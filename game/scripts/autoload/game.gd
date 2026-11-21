@@ -678,6 +678,48 @@ func score(uid: String) -> float:
 		+ float(it.get("mana", 0)) * 0.12 + float(it.get("regen", 0)) * 1.5 + float(it.get("crit", 0)) * 0.9 \
 		+ float(it.get("lifesteal", 0)) * 1.4 + float(it.get("spell", 0)) * 0.18 + float(it.get("rarity", 0)) * 0.5
 
+## "Wear my best gear" (Jason, Nov 20): your best weapon, armor and trinket, by
+## the same worth the bag uses for "better / weaker" (a forge power counts for a
+## bit extra). With include_chest (at the gear chest at home) it looks in the
+## chest too, and anything it takes off goes into the chest if your bag is full.
+## Skins are a look, so they're left as they are. Returns how many it changed.
+func best_score(uid: String) -> float:
+	var it := item(uid)
+	return score(uid) + (12.0 if String(it.get("power", "")) != "" else 0.0) + (12.0 if String(it.get("power2", "")) != "" else 0.0)
+
+func wear_best(include_chest := false) -> int:
+	var changed := 0
+	for slot in ["weapon", "armor", "artifact"]:
+		var cur: String = equipped.get(slot, "")
+		if slot == "artifact" and zone == "vault" and item(cur).get("special", "") == "river":
+			continue           # (in the Vault, the river amulet stays on: the river heals you)
+		var best := cur
+		var bs := best_score(cur) if cur != "" else -INF
+		var pool: Array = Array(inventory) + (Array(stash) if include_chest else [])
+		for id in pool:
+			var it := item(String(id))
+			if it.get("slot", "") != slot or id == cur:
+				continue
+			var sc := best_score(String(id))
+			if sc > bs + 0.01:
+				bs = sc; best = String(id)
+		if best == cur:
+			continue
+		if stash.has(best):
+			stash.erase(best)
+			inventory.append(best)
+		equip(best)
+		changed += 1
+		if inventory.size() > BAG_SIZE and cur != "" and include_chest and stash.size() < STASH_SIZE and not ITEMS.has(cur):
+			inventory.erase(cur)       # (no room in the bag: what you took off goes in the chest)
+			stash.append(cur)
+	if changed > 0:
+		message.emit("You're wearing your best gear!", Color(1.0, 0.85, 0.4))
+	else:
+		message.emit("You're already wearing your best gear.", Color(0.8, 0.8, 0.8))
+	inventory_changed.emit(); stats_changed.emit()
+	return changed
+
 func equip(id: String) -> void:
 	var it := item(id)
 	if it.is_empty() or not it.slot in SLOTS:

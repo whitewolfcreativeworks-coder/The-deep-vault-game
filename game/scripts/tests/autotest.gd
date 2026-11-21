@@ -319,6 +319,8 @@ func _run() -> void:
 	elif mode == "homeview":
 		if await _homeview_test():
 			return
+	elif mode == "bestgear":
+		await _bestgear_test()
 	elif mode == "arrival":
 		if await _arrival_test():
 			return
@@ -6657,3 +6659,53 @@ func _arrival_test() -> bool:
 	check("ar_pet_fights_on_foot", not is_instance_valid(e) or e.hp < hp0, "hp %.0f -> %.0f" % [hp0, e.hp if is_instance_valid(e) else -1.0])
 	_finish()
 	return true
+
+# --- "Wear my best gear" -------------------------------------------------------------
+func _bestgear_test() -> void:
+	await _start()
+	player = main.player
+	god = true
+	Game.level = 10
+	var weak := _mk("weapon", {}, "Test Weak")
+	Game.items[weak]["damage"] = 5.0
+	var strong := _mk("weapon", {"crit": 6.0}, "Test Strong")
+	Game.items[strong]["damage"] = 60.0
+	var arm := _mk("armor", {"hp": 30.0}, "Test Armor")
+	var charm := _mk("artifact", {"crit": 5.0}, "Test Charm")
+	Game.inventory_changed.emit()
+	main._open("inventory")
+	await wait(0.3)
+	var btn: Button = main.menus._panels["inventory"].find_child("WearBest", true, false)
+	check("bg_button", btn != null and btn.is_visible_in_tree())
+	await shot("bg_01_inventory")
+	if btn:
+		btn.pressed.emit()
+	await wait(0.3)
+	check("bg_best_weapon", Game.equipped.weapon == strong, Game.equipped.weapon)
+	check("bg_best_armor", Game.equipped.armor == arm, Game.equipped.armor)
+	check("bg_best_trinket", Game.equipped.artifact == charm, Game.equipped.artifact)
+	await shot("bg_02_wearing_best")
+	check("bg_already", Game.wear_best(false) == 0)
+	# forged gear with a power wins a close call
+	var forged := _mk("weapon", {"crit": 6.0}, "Test Forged")
+	Game.items[forged]["damage"] = 58.0
+	Game.items[forged]["power"] = "burn_hit"
+	Game.wear_best(false)
+	check("bg_power_counts", Game.equipped.weapon == forged, Game.equipped.weapon)
+	# from the gear chest, with a full bag: what comes off goes in the chest
+	var big := _mk("armor", {"hp": 200.0}, "Test Big Armor")
+	Game.inventory.erase(big)
+	Game.stash.append(big)
+	while Game.inventory.size() < Game.BAG_SIZE:
+		_mk("artifact", {}, "Test Filler")
+	check("bg_bag_only_ignores_chest", Game.wear_best(false) == 0 and Game.equipped.armor == arm)
+	Game.wear_best(true)
+	check("bg_from_chest", Game.equipped.armor == big and Game.inventory.has(big) and not Game.stash.has(big), Game.equipped.armor)
+	check("bg_old_to_chest", Game.stash.has(arm) and Game.inventory.size() <= Game.BAG_SIZE, "bag %d" % Game.inventory.size())
+	# in the Vault the river amulet stays on
+	Game.add_item("amulet_deep", false)
+	Game.equip("amulet_deep")
+	Game.wear_best(false)
+	check("bg_river_amulet_stays", Game.zone == "vault" and Game.equipped.artifact == "amulet_deep", Game.equipped.artifact)
+	main._resume()
+	_finish()

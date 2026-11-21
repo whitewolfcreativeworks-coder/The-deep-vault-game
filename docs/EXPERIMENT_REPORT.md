@@ -1212,3 +1212,21 @@ Jason, testing on his son's iPad: Normal is fine, but "hard mode on his iPad in 
 - **`arrival`:** the hold happens with the world paused, it's titled "The Goblin Forest · HARD", it lasts 2 s or more and ends, and the game fades in. Then, as a Beastmaster on a dragonfly, the pet leaves a goblin alone and no special or summon goes off. Once back on foot, the pet attacks.
 - **`levels`:** Hard has no twin monsters, and its minions have more than 3× their base health.
 
+## Follow-up 36: "Wear my best gear" (Nov 20, night)
+
+Jason: "How about a button that allows you to wear all your best gear, your best weapon, your best armor".
+
+**How it works:**
+- `Game.wear_best()` picks, for the weapon, armor and trinket slots, the piece with the highest `score()`. That's the worth behind the bag's "▲ better / ▼ weaker" labels; a forge power adds 12 and a second power 12 more.
+- **Bag:** the button sits in the bag's header and uses the bag only.
+- **Gear chest:** its button also searches the chest. If taking a piece out would overfill the bag, the piece it replaces goes into the chest instead of being auto-salvaged.
+- **Exceptions:** skins are left alone (they're mostly a look), and in the Deep Vault the river amulet stays on (the river heals you while you wear it).
+
+**Tested** by the new `bestgear` test (10 checks):
+- the button appears;
+- the best weapon, armor and trinket go on;
+- pressing again changes nothing;
+- a forge power wins a close call;
+- the bag-only button ignores the chest, and the chest button takes from the chest and moves the old piece into it when the bag is full;
+- the river amulet stays on in the Vault.
+

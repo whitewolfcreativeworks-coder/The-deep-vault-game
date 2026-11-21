@@ -117,6 +117,11 @@ Elixirs, enchantments and blessings only count down while you play, and they sho
 
 Forged gear is stronger than found gear and gets stronger with every tier, so it's the way to gear up for Hard and Insane. In **Insane with your gear**, though, the monsters match your gear's numbers, so there the forge's real edge is its **powers**.
 
+### Wear my best gear (Nov 20, night)
+- **Bag (I):** the **★ Wear my best** button puts on your best weapon, armor and trinket from your bag. It uses the same "better / weaker" worth the bag shows, and a forge power counts a little extra.
+- **Gear chest at home:** its button also looks in the chest, and if your bag is full, whatever you take off goes into the chest.
+- **Left alone:** skins (they're a look), and in the Deep Vault the river amulet.
+
 ### Getting ready, Hard mode, and riding rules (Nov 20, evening)
 - **Getting ready.** When you arrive somewhere (through a portal, Port Home, a level from the family portal, or Continue), the screen stays dark for a moment with the place's name and "Getting ready...". Behind it:
   - a camera turns once all the way round where you'll appear, so the graphics for everything around you are ready before you see it;
