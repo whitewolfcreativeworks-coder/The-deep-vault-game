@@ -20,6 +20,8 @@ var _death_timer := -1.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# (the autotests always draw on High unless a test says otherwise)
+	Graphics.testing = OS.get_cmdline_user_args().size() > 0 or OS.has_environment("DEEPVAULT_AUTOTEST") or _web_autotest() != ""
 	# Only the player opts in to physics interpolation (see Player._ready);
 	# everything else keeps its exact per-tick transforms.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
@@ -44,11 +46,13 @@ func _ready() -> void:
 	get_tree().create_timer(0.15).timeout.connect(func() -> void:
 		if is_instance_valid(w) and w.is_inside_tree():
 			Props.snap_torches(w)
-			# INSANE only: draw identical scenery props together and skip tiny far-off
-			# details (far fewer draw calls). Normal and Hard look exactly as always.
-			if Game.mode == "insane" and not OS.has_environment("DEEPVAULT_NOBATCH"):
+			# INSANE (and the Medium and Low graphics settings): draw identical scenery
+			# props together and skip tiny far-off details (far fewer draw calls).
+			# Normal and Hard on High look exactly as always.
+			if (Game.mode == "insane" or Graphics.lean()) and not OS.has_environment("DEEPVAULT_NOBATCH"):
 				batch_stats = StaticBatcher.batch(w)
-				batch_stats["far_culled"] = StaticBatcher.cull_small(w))
+				batch_stats["far_culled"] = StaticBatcher.cull_small(w)
+			Graphics.apply(w))
 	player = Player.new()
 	player.name = "Player"
 	player.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -270,6 +274,7 @@ func _get_ready() -> void:
 	player.camera.current = true
 	player.snap_view()
 	menus.show_getting_ready("")
+	Graphics.arrived()
 	state = prev_state if prev_state != "arriving" else "play"
 	get_tree().paused = false
 
@@ -504,6 +509,12 @@ func _track_save(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_track_save(delta)
+	# Auto graphics: keep an eye on how smoothly it runs while you play
+	if state == "play" and menus.current == "" and not get_tree().paused and is_instance_valid(world):
+		if Graphics.watch(world) == "down":
+			Game.say("Graphics set to %s so the game runs smoothly on this device (change it in the pause menu)." % Graphics.NAMES[Graphics.level()], Color(0.75, 0.8, 0.9))
+	else:
+		Graphics.idle()
 	if state == "title" or menus.current == "creator":
 		_orbit += delta * 0.05
 		var c := Vector3(0, 2.0, 12.0)

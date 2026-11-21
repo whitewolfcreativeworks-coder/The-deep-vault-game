@@ -1325,3 +1325,34 @@ Jason: "there's like this one kind of whistle. It's more like a flute sound that
 
 **Tested:** the `ambience` test now draws 6000 calls and checks the whistle's share (0.062).
 
+## Follow-up 41: a graphics setting (Nov 21)
+
+Jason, after the device-tiers discussion: "I like the wheel idea for mobile, the low medium high settings for graphics. These are all great, and we should definitely do those." Agreed: **one game on every device**, with an automatic graphics level and (next) a control layout by screen size, instead of separate versions. The plan and his answers (test phones, App Store direction, keep playing across devices) are in the project roadmap, section 4.
+
+**`Graphics`** (`game/scripts/world/graphics.gd`), kept in `user://settings.cfg` on the device:
+- **High:** exactly as before. A test checks that switching back restores every value, and that Normal on High doesn't batch scenery or put monsters to sleep.
+- **Medium:**
+  - 3D at 85% resolution (FSR on desktop, bilinear in the browser);
+  - 75% of the particles, and `FX.burst` scales with it;
+  - sun shadows in 2 layers at 60% distance;
+  - lamps fade beyond 50 m (or twice their own range);
+  - Insane's `StaticBatcher` and far-culling, and far monsters asleep (`Enemy.lean`).
+- **Low:**
+  - 70% resolution and half the particles;
+  - sun shadows in 1 layer at 40% distance;
+  - lamps fade beyond 28 m (or 1.5× their range).
+
+  A first version turned the sun shadows off, but the screenshots showed it flattened the look too much, so they stay, just cheaper.
+- **Auto:**
+  - It measures real frame times in 4-second windows while you play (not in menus, and not in the first 3 s after arriving).
+  - Two slow windows in a row (under 28 fps) step it down one level, saved, with a message.
+  - Eight windows at 55 fps or more try one level up, once per session.
+  - It starts from the last level it settled on. Phones start on Medium.
+- **Pause menu:** a "Graphics: Auto (High)" button cycles through Auto, High, Medium and Low.
+- **Tests:** the autotests always draw on High, so earlier screenshots and checks are unchanged. The new `graphics` test runs on both renderers:
+  - Low, Medium and High values on the Vault, and High restores exactly;
+  - the menu button cycles;
+  - Auto with made-up frame times: 30 fps stays, 18 fps steps down, 60 fps tries one up once, and no flip-flop;
+  - Medium's scenery savings and sleeping monsters in the forest.
+- **Not measured on real devices.** The thresholds and the size of each saving are educated guesses until we try it on the iPad Pro, the iPhone 15 and the iPhone 12 mini. Resolution should matter most on those high-density screens.
+

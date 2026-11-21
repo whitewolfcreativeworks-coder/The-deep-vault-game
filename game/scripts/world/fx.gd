@@ -90,7 +90,7 @@ static func burst(pos: Vector3, color: Color, amount := 20, speed := 3.0, size :
 	var p := CPUParticles3D.new()
 	p.one_shot = true
 	p.emitting = false
-	p.amount = amount
+	p.amount = maxi(1, int(round(amount * Graphics.particles())))     # (fewer on Medium and Low graphics)
 	p.lifetime = life
 	p.explosiveness = 0.95
 	p.mesh = quad(size)

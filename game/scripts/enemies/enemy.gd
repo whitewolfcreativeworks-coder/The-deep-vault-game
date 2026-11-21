@@ -180,7 +180,7 @@ func _ready() -> void:
 	var boss := bool(t.get("heavy", false)) or int(t.xp) >= 900
 	hp_mult *= Game.mode_value("boss_hp" if boss else "hp")
 	fierce = Game.mode == "insane"
-	lean = Game.mode == "insane"
+	lean = Game.mode == "insane" or Graphics.lean()      # (Medium and Low graphics too)
 	if fierce and not boss and not mini and oddity == "" and randf() < 0.3:
 		oddity = ["giant", "speedy", "splitter", "vampire", "blinker", "bomber", "vampire", "blinker", "bomber", "giant", "speedy"].pick_random()
 	if oddity == "giant":

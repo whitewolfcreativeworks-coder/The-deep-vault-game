@@ -126,6 +126,7 @@ func show_panel(n: String) -> void:
 	if n == "pause" and _arrange_btn:
 		_arrange_btn.visible = Game.touch_active
 		_reset_btn.visible = Game.touch_active
+		_gfx_btn.text = Graphics.label()
 
 func is_open() -> bool:
 	return current != ""
@@ -904,8 +905,9 @@ func _refresh_slots() -> void:
 
 var _arrange_btn: Button
 var _reset_btn: Button
+var _gfx_btn: Button
 func _build_pause() -> void:
-	var p := _center_panel("pause", 420, 760)
+	var p := _center_panel("pause", 420, 820)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.alignment = BoxContainer.ALIGNMENT_CENTER
 	p.add_child(v)
 	var t := UIKit.label("Paused", 40, UIKit.GOLD, true); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -928,6 +930,12 @@ func _build_pause() -> void:
 		Game.strafe_mode = not Game.strafe_mode
 		mv.text = "Movement: Strafe (face camera)" if Game.strafe_mode else "Movement: Free (face where you run)")
 	v.add_child(mv)
+	_gfx_btn = _button(Graphics.label(), func() -> void: pass, 360)
+	_gfx_btn.pressed.connect(func() -> void:
+		var m := get_parent()
+		Graphics.cycle(m.world if m and m.get("world") else null)
+		_gfx_btn.text = Graphics.label())
+	v.add_child(_gfx_btn)
 	var sl_row := HBoxContainer.new(); sl_row.add_theme_constant_override("separation", 10)
 	sl_row.add_child(UIKit.label("Mouse", 17, UIKit.DIM))
 	var sl := HSlider.new(); sl.min_value = 0.0006; sl.max_value = 0.006; sl.step = 0.0002

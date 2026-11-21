@@ -73,6 +73,18 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### Graphics: Auto, High, Medium or Low (Nov 21)
+The same game on every device. Only how much it draws changes, never the levels, heroes, quests or monsters. Change it with the **Graphics** button in the pause menu; it's remembered on that device, not in the save.
+
+| Setting | What it does |
+|---|---|
+| **High** | The game exactly as it always looked. |
+| **Medium** | A slightly lower 3D resolution, and a quarter fewer sparks and embers. Sun shadows are drawn in two layers instead of four and reach a little less far. Lamps and torches stop lighting things far away. Insane's smoothness savings everywhere: identical scenery drawn together, tiny far details and far monsters not drawn, far monsters asleep. |
+| **Low** | All that, plus a lower 3D resolution again, half the sparks, sun shadows in one layer just around you, and lamps that stop lighting sooner (big braziers still reach). Menus and text stay sharp. |
+| **Auto** (default) | Starts on whatever last ran smoothly on this device (phones start on Medium). If the game keeps running slowly (under about 28 frames a second for 8 seconds), it steps down one level and says so. If it runs smoothly with room to spare for about half a minute, it tries one level up, once per session so it never flip-flops. An iPhone in Low Power Mode (30 frames a second) counts as smooth. |
+
+Resolution, shadows, lamps and sparks change straight away; the scenery savings and sleeping monsters start from the next place you arrive.
+
 ### Tobble's Trading Post and the Forge (Nov 20)
 Two new buildings at home, for spending your gold and making better gear.
 

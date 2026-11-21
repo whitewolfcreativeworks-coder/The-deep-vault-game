@@ -343,6 +343,9 @@ func _run() -> void:
 	elif mode == "replaybosses":
 		if await _replaybosses_test():
 			return
+	elif mode == "graphics":
+		if await _graphics_test():
+			return
 	elif mode == "perf":
 		if await _perf_test():
 			return
@@ -5429,6 +5432,148 @@ func _enemy_census() -> Dictionary:
 				out.minion_hp = maxf(out.minion_hp, en.max_hp)
 				out.minion_dmg = maxf(out.minion_dmg, float(en.t.dmg))
 	return out
+
+## The graphics setting (Nov 21): Auto / High / Medium / Low. High is the game exactly
+## as it always was; Medium and Low draw less (resolution, sun shadows, lamps, sparks,
+## Insane's scenery savings and sleeping far monsters). Auto steps down when the game
+## runs slowly and tries one up when it has room to spare, once per session.
+func _gfx_totals(w: Node) -> Dictionary:
+	var out := {"particles": 0, "lamps": 0, "lamps_fading": 0, "sun_shadow": false, "sun_dist": 0.0, "lamp_reach": 999.0, "sun_layers": 0}
+	for n in w.find_children("*", "CPUParticles3D", true, false):
+		out.particles += int((n as CPUParticles3D).amount)
+	for n in w.find_children("*", "Light3D", true, false):
+		if n is DirectionalLight3D:
+			if (n as DirectionalLight3D).light_energy > 0.0 and (n as Light3D).visible:
+				out.sun_shadow = out.sun_shadow or (n as Light3D).shadow_enabled
+				out.sun_dist = maxf(out.sun_dist, (n as DirectionalLight3D).directional_shadow_max_distance)
+				out.sun_layers = maxi(out.sun_layers, [1, 2, 4][int((n as DirectionalLight3D).directional_shadow_mode)])
+		else:
+			out.lamps += 1
+			if (n as Light3D).distance_fade_enabled:
+				out.lamps_fading += 1
+				out.lamp_reach = minf(out.lamp_reach, (n as Light3D).distance_fade_begin)
+	out["scale"] = get_viewport().scaling_3d_scale
+	return out
+
+func _graphics_test() -> bool:
+	var phase := int(Game.get_meta("gfx_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("gfx_phase", 1)
+		god = true
+		var w: Node = main.world
+		check("gfx_tests_draw_on_high", Graphics.testing and Graphics.level() == 2 and Graphics.label() == "Graphics: High", Graphics.label())
+		await wait(1.0)
+		var hi := _gfx_totals(w)
+		print("GRAPHICS high: ", hi)
+		await shot("gfx_01_high")
+		Graphics.set_choice("low", w)
+		await wait(0.6)
+		var lo := _gfx_totals(w)
+		print("GRAPHICS low: ", lo)
+		await shot("gfx_02_low")
+		check("gfx_low_resolution", is_equal_approx(float(lo.scale), 0.7), str(lo.scale))
+		check("gfx_low_sun_shadows_one_layer_close_by", hi.sun_shadow and lo.sun_shadow and lo.sun_layers == 1 and lo.sun_dist < hi.sun_dist * 0.5, str(lo))
+		check("gfx_low_half_the_sparks", lo.particles <= hi.particles * 0.55 + 5 and lo.particles > 0, "%d -> %d" % [hi.particles, lo.particles])
+		check("gfx_low_lamps_reach_less", lo.lamps > 0 and lo.lamps_fading == lo.lamps and lo.lamp_reach <= 28.0, str(lo))
+		var big_ok := true
+		for n in w.find_children("*", "OmniLight3D", true, false):
+			if (n as OmniLight3D).omni_range > 25.0 and (n as OmniLight3D).distance_fade_begin < (n as OmniLight3D).omni_range * 1.5 - 0.01:
+				big_ok = false
+		check("gfx_low_big_lamps_still_reach", big_ok)
+		check("gfx_low_fewer_burst_sparks", is_equal_approx(Graphics.particles(), 0.5))
+		Graphics.set_choice("medium", w)
+		await wait(0.6)
+		var md := _gfx_totals(w)
+		print("GRAPHICS medium: ", md)
+		await shot("gfx_03_medium")
+		check("gfx_medium", is_equal_approx(float(md.scale), 0.85) and md.sun_shadow and md.sun_dist < hi.sun_dist * 0.7 and md.sun_layers == 2
+			and md.particles < hi.particles and md.particles > lo.particles and md.lamp_reach <= 50.0, str(md))
+		Graphics.set_choice("high", w)
+		await wait(0.6)
+		var back := _gfx_totals(w)
+		check("gfx_high_exactly_as_before", back.scale == 1.0 and back.sun_shadow == hi.sun_shadow and back.sun_dist == hi.sun_dist and back.sun_layers == hi.sun_layers
+			and back.particles == hi.particles and back.lamps_fading == hi.lamps_fading, "%s vs %s" % [back, hi])
+		# the pause menu button: High -> Medium -> Low -> Auto -> High
+		main._open("pause")
+		await wait(0.4)
+		var b: Button = main.menus._gfx_btn
+		var seen: Array = [b.text]
+		for k in 4:
+			b.pressed.emit()
+			await wait(0.1)
+			seen.append(b.text)
+		print("GRAPHICS menu: ", seen)
+		check("gfx_menu_cycles", seen == ["Graphics: High", "Graphics: Medium", "Graphics: Low", "Graphics: Auto (High)", "Graphics: High"], str(seen))
+		Graphics.set_choice("low", w)
+		b.text = Graphics.label()
+		# with the touch buttons on, the pause menu (two more buttons) still fits on screen
+		main.touch._set_active(true)
+		main.menus.show_panel("pause")
+		await wait(0.3)
+		var pr: Rect2 = (main.menus._panels["pause"] as Control).get_global_rect()
+		var vr := Rect2(Vector2.ZERO, main.menus.root.get_viewport_rect().size)
+		check("gfx_pause_menu_fits", vr.encloses(pr), "%s in %s" % [pr, vr])
+		await shot("gfx_04_pause_menu")
+		main.touch._set_active(false)
+		main._resume()
+		# Auto: slow for a while -> a step down; smooth with room to spare -> one step up, once
+		Graphics.set_choice("auto", w)
+		Graphics.reset_auto(2)
+		var steps: Array = []
+		var feed := func(fps: float, secs: float) -> void:
+			var n := int(secs * fps)
+			for k in n:
+				var r := Graphics.feed(w, 1.0 / fps)
+				if r != "":
+					steps.append("%s->%s" % [r, Graphics.NAMES[Graphics.level()]])
+		feed.call(30.0, 20.0)                    # an iPhone in Low Power Mode: fine
+		check("gfx_auto_30fps_is_fine", steps.is_empty() and Graphics.level() == 2, str(steps))
+		feed.call(18.0, 12.0)
+		check("gfx_auto_steps_down", steps == ["down->Medium"] and is_equal_approx(get_viewport().scaling_3d_scale, 0.85), str(steps))
+		feed.call(18.0, 12.0)
+		feed.call(60.0, 40.0)
+		check("gfx_auto_tries_one_up", steps == ["down->Medium", "down->Low", "up->Medium"], str(steps))
+		feed.call(18.0, 12.0)
+		feed.call(60.0, 60.0)
+		check("gfx_auto_no_flip_flop", steps == ["down->Medium", "down->Low", "up->Medium", "down->Low"] and Graphics.level() == 0, str(steps))
+		# on to the forest on Medium: Insane's scenery savings and sleepy far monsters
+		Graphics.set_choice("medium", w)
+		main._travel("forest")
+		return true
+	if phase == 1:
+		Game.set_meta("gfx_phase", 2)
+		await wait(3.0)
+		player = main.player
+		god = true
+		var lean := 0
+		var n := 0
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy:
+				n += 1
+				if (e as Enemy).lean:
+					lean += 1
+		print("GRAPHICS forest medium: ", main.batch_stats, " lean ", lean, "/", n)
+		check("gfx_medium_scenery_savings", int(main.batch_stats.get("far_culled", 0)) > 100, str(main.batch_stats))
+		check("gfx_medium_far_monsters_sleep", n > 0 and lean == n, "%d/%d" % [lean, n])
+		check("gfx_medium_forest_res", is_equal_approx(get_viewport().scaling_3d_scale, 0.85))
+		await shot("gfx_05_forest_medium")
+		Graphics.set_choice("high", main.world)
+		main._travel("forest")
+		return true
+	if phase == 2:
+		await wait(3.0)
+		var lean := 0
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and (e as Enemy).lean:
+				lean += 1
+		check("gfx_high_normal_as_always", main.batch_stats.is_empty() and lean == 0 and get_viewport().scaling_3d_scale == 1.0,
+			"%s lean %d" % [main.batch_stats, lean])
+		await shot("gfx_06_forest_high")
+		return false
+	return false
 
 ## Nov 21: "My son just played the goblin forest on hard mode... he did all the
 ## quests, but... he was never able to get into the castle area to get to the warden."
