@@ -5189,6 +5189,13 @@ func _ambience_test() -> bool:
 	# peaceful: a bird every several seconds, never a racket
 	check("am_peaceful_outside", outdoors >= 3 and outdoors <= 14, "%d calls in 45 s" % outdoors)
 	check("am_many_kinds", kinds.size() >= 3, str(kinds.keys()))
+	# the flute-like "fee-bee" whistle: a third as often as before (it was about 1 call in 5)
+	var whistles := 0
+	for k in 6000:
+		if (sc._pick()[0] as Array).has("bird_whistle_1"):
+			whistles += 1
+	var share := whistles / 6000.0
+	check("am_whistle_a_third_as_often", share > 0.045 and share < 0.08, "%.3f of calls (was 0.196)" % share)
 	check("am_calmer_inside", float(indoors) / 20.0 <= float(outdoors) / 45.0 + 0.01, "inside %d/20 s, outside %d/45 s" % [indoors, outdoors])
 	check("am_soft_breeze", sc._breeze.volume_db < -26.0, "%.0f dB" % sc._breeze.volume_db)
 	await shot("am_yard")

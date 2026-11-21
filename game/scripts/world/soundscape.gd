@@ -2,8 +2,8 @@ extends Node3D
 class_name Soundscape
 ## The sounds of the valley around the cabin: peaceful and unhurried. A quiet
 ## whisper of leaves and soft crickets underneath, and every several seconds a
-## different bird somewhere off in the trees: a warbling song, a "fee-bee"
-## whistle, a trill, a few chips, now and then answered by another of its kind.
+## different bird somewhere off in the trees: a warbling song, now and then a
+## "fee-bee" whistle, a trill, a few chips, now and then answered by another of its kind.
 ## Once in a while a dove coos far off, a cuckoo calls or a woodpecker drums. Each
 ## call comes from its own spot (up in the trees, 10-50 m away), at a slightly
 ## different pitch, so it never sounds like a loop. Bees hum by the garden.
@@ -17,7 +17,9 @@ const CALLS := [
 	# [sounds, weight, volume dB, min dist, max dist, answers?]
 	# (peaceful above all: soft, unhurried, never right in your ear)
 	[["bird_warble_1", "bird_warble_2", "bird_warble_3"], 32, -13.0, 12.0, 36.0, true],
-	[["bird_whistle_1", "bird_whistle_2"], 18, -14.0, 14.0, 40.0, true],
+	# (the "fee-bee" whistle sounds like a little flute: lovely, but it came round
+	#  too often, so a third as often as it was; Jason, Nov 21)
+	[["bird_whistle_1", "bird_whistle_2"], 5, -14.0, 14.0, 40.0, true],
 	[["bird_trill_1", "bird_trill_2"], 12, -15.0, 12.0, 34.0, false],
 	[["bird_chip_1", "bird_chip_2"], 16, -14.0, 10.0, 28.0, false],
 	[["dove"], 8, -17.0, 25.0, 45.0, false],

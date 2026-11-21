@@ -1314,3 +1314,14 @@ Two bugs could each cause this. Both are fixed, and saves already stuck either w
 
 **BLOCK button:** it can now be moved by holding it still for about three seconds (other buttons take about one), and only when no monster is within 12 m. That way, blocking in a fight never picks it up. A yellow ring starts filling after the first second. ATTACK still only moves in Arrange mode.
 - **Tested:** the `touch` test checks that BLOCK isn't picked up at 1.5 s (it's blocking), is picked up at 3.3 s, and can be dragged to a new spot.
+
+## Follow-up 40: the little flute comes round a third as often (Nov 21)
+
+Jason: "there's like this one kind of whistle. It's more like a flute sound that reoccurs throughout the game... We really like the sound. It just is happening all the time. We would like to only hear that a third of the time."
+
+**Which sound:** the yard's "fee-bee" bird whistle. It's two long, pure, high notes with a gentle wobble, so it sounds like a little flute. It was about 1 bird call in 5 (every half minute or so, more with the bird bath), and other birds often answered it with the same call. No other sound in the game repeats on its own like that; the other whistles only play when you do something.
+
+**The change:** its share of the bird calls is cut from 18 parts to 5, which is 6% of calls instead of 20%, or 0.32 of what it was. The other birds fill the gap, so the yard is just as lively.
+
+**Tested:** the `ambience` test now draws 6000 calls and checks the whistle's share (0.062).
+
