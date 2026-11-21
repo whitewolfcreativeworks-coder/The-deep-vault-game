@@ -1288,3 +1288,29 @@ Jason: "the disco party should have like a disco ball that appears and disco mus
 - **Disco:** the ball is up, the 49-square floor is down, it beats, the music plays and the level music ducks, and when it ends the party goes and the music comes back.
 - **Chickens:** 8–26 are in the air at once, 15 or more have landed after a few seconds, the real ones arrive, and the rain cleans itself up.
 
+## Follow-up 39: stuck before the castle on Hard, and a movable BLOCK button (Nov 21)
+
+Jason: "My son just played the goblin forest on hard mode, and he couldn't get to the warden. He said he did all the quests, but for some reason he was never able to get into the castle area."
+
+Two bugs could each cause this. Both are fixed, and saves already stuck either way are repaired when they load.
+
+**1. Chief Gruk beaten too early.**
+- **The bug:** the Goblin Warren is open to anyone, but Captain Aldric only gives "The Warren" after Ranger Fenn's goblin quest. A player who knows the way (as on a replay) can beat Gruk first. Gruk stays beaten, so Aldric's quest could never be finished. Then the forest was never "complete", and the Moonlit Portal to the castle never woke.
+- **The fix:** if Gruk is already beaten when Aldric asks, the quest counts it straight away ("return to Captain Aldric"). He is the only boss you can reach before his quest.
+
+**2. Bosses that never came back.**
+- **The bug:** playing a level again resets that level's saved marks (monsters, chests, quest items). Four bosses were missing from that list: the Gatehouse Warden and the Ghost Lord (castle), and the Hail Golem and Mr. Bubbles (clouds). After any replay of the castle, the Warden stayed "beaten", so he never rose. "The Gatehouse" quest could never be finished, and the castle gate never opened.
+- **The fix:** they're on the list now.
+- **Guard:** a new check makes sure every boss belongs to its own level.
+
+**Old saves:** when a save loads, a quest that can't be finished is put right:
+- Gruk beaten with the Warren quest open: the quest counts it.
+- A castle or cloud boss marked beaten while its quest isn't finished: that mark is left over from an earlier visit, so the boss rises again.
+
+**Tested** by a new `replaybosses` test that plays it through:
+- **Setup:** a hero who has beaten everything; an old stuck save is loaded and checked.
+- **Forest:** on Hard from the level picker, beat Gruk before anyone asks, then do Fenn's goblins (real goblins killed), Aldric (counts at once) and the other quests.
+- **Castle:** the Moonlit Portal wakes and carries you to the castle on Hard. The Gatehouse Warden rises, falls, the gate opens, and the Ghost Lord waits.
+
+**BLOCK button:** it can now be moved by holding it still for about three seconds (other buttons take about one), and only when no monster is within 12 m. That way, blocking in a fight never picks it up. A yellow ring starts filling after the first second. ATTACK still only moves in Arrange mode.
+- **Tested:** the `touch` test checks that BLOCK isn't picked up at 1.5 s (it's blocking), is picked up at 3.3 s, and can be dragged to a new spot.

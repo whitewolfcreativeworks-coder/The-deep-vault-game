@@ -110,9 +110,13 @@ const LEVELS := [
 const ZONE_FLAGS := {
 	"vault": ["e_", "chest_", "gate_corridor", "lever_corridor", "altar", "warden_dead", "victory"],
 	"forest": ["f_", "w_", "s_", "qi_axe", "qi_petal", "qi_strongbox", "sinkhole_", "warren_", "disc_", "gruk", "cyclops", "forest_won"],
-	"castle": ["c_", "qi_beacon", "qi_musicbox", "qi_holy", "qi_locket", "crypt_", "bone_colossus", "ghost_pike", "castle_won"],
-	"cloud": ["cl_", "qi_feather", "qi_sbub", "qi_updraft", "qi_vent", "cloud_won"],
+	"castle": ["c_", "qi_beacon", "qi_musicbox", "qi_holy", "qi_locket", "crypt_", "bone_colossus", "ghost_pike", "castle_won",
+		"gatekeeper", "ghost_lord"],
+	"cloud": ["cl_", "qi_feather", "qi_sbub", "qi_updraft", "qi_vent", "cloud_won", "hail_golem", "mr_bubbles"],
 }
+## Bosses you can meet before anyone gives you their quest (the Warren is open to
+## anyone, so Chief Gruk can be beaten first). The others only rise once you have it.
+const BOSS_ANYTIME := ["gruk"]
 
 func flag_zone(k: String) -> String:
 	var key := k.rstrip("+")
@@ -989,6 +993,7 @@ func load_slot(i: int) -> bool:
 	var fb: Dictionary = d.get("forge_book", {})
 	forge_book = {"found": (fb.get("found", []) as Array).duplicate(), "hints": (fb.get("hints", []) as Array).duplicate()}
 	Loot._next = maxi(Loot._next, int(d.get("loot_next", 1)))
+	mend_boss_quests()
 	hp = clampf(float(d.get("hp", max_hp())), max_hp() * 0.5, max_hp())
 	mana = clampf(float(d.get("mana", max_mana())), 0.0, max_mana())
 	stamina = max_stamina()
@@ -1271,8 +1276,31 @@ func quest_accept(id: String) -> void:
 	set_objective(forest_objective())
 	quest_event.emit("New quest: %s" % QUESTS[id].title)
 	message.emit("New quest: %s" % QUESTS[id].title, Color(1.0, 0.85, 0.35))
+	# already beaten that boss on the way? It counts.
+	var g: Dictionary = QUESTS[id].goal
+	if g.type == "boss" and String(g.uid) in BOSS_ANYTIME and flags.get(g.uid, false):
+		_advance(id, int(g.count))
 	quests_changed.emit()
 	save_slot()
+
+## Boss quests that couldn't be finished any more are put right (Nov 21: in the
+## Goblin Forest on Hard, the Moonlit Portal never woke, so the castle and its
+## Warden were out of reach):
+##  - Chief Gruk beaten BEFORE Captain Aldric asked you to: the quest counts it;
+##  - the castle's and the clouds' bosses only rise once you have their quest, so
+##    one marked beaten while its quest isn't finished is a leftover from an earlier
+##    visit (playing a level again didn't use to clear them): it rises again.
+func mend_boss_quests() -> void:
+	for id in QUESTS:
+		var g: Dictionary = QUESTS[id].goal
+		if g.type != "boss" or not flags.get(g.uid, false):
+			continue
+		var st := quest_state(id)
+		if String(g.uid) in BOSS_ANYTIME:
+			if st == "active":
+				quests[id] = {"state": "ready", "n": int(g.count)}
+		elif st in ["available", "locked", "active"]:
+			flags.erase(g.uid)
 
 func _advance(id: String, n := 1) -> void:
 	var q: Dictionary = QUESTS[id]

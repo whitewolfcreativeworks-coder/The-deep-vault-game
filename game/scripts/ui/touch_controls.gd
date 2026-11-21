@@ -8,8 +8,10 @@ class_name TouchControls
 ##  - buttons: the combat cluster sits tight in the bottom-right corner so the
 ##    middle of the right side stays free for steering the camera
 ##  - hold a button still for LONG_PRESS seconds: it turns yellow and can be slid
-##    anywhere; let go and it stays there (saved). The pause menu also has
-##    "Arrange buttons" (move any button, incl. ATTACK and BLOCK) and "Reset".
+##    anywhere; let go and it stays there (saved). BLOCK (which you hold down to
+##    block) needs BLOCK_PRESS seconds, and only with no monster close by (Jason,
+##    Nov 21). ATTACK only moves in "Arrange buttons" (pause menu), which moves
+##    any button; "Reset" puts them all back.
 
 var player: Player
 var main: Node
@@ -19,6 +21,7 @@ var active := false
 const LOOK_SENS := 1.35
 const LOOK_VERTICAL := 0.6   # vertical swipes move the view less than horizontal ones
 const LONG_PRESS := 1.2      # seconds holding a button still to pick it up
+const BLOCK_PRESS := 3.0     # ...and for BLOCK, which you also hold down to block
 const SAVE_PATH := "user://touch_layout.cfg"
 var _stick_id := -1
 var _stick_origin := Vector2.ZERO
@@ -433,12 +436,19 @@ func _process(d: float) -> void:
 	if not active:
 		return
 	pad.visible = _playing() or arrange
-	# hold a (non-combat) button still to pick it up and move it; ATTACK and BLOCK are
-	# held down in normal play, so they move only in Arrange mode
+	# hold a button still to pick it up and move it. ATTACK is held down all the
+	# time in a fight, so it moves only in Arrange mode; BLOCK needs a long still
+	# hold with no monster near (so blocking in a fight never picks it up)
 	for idx in _press_info.keys():
 		var info: Dictionary = _press_info[idx]
 		info.t += d
-		if info.t >= LONG_PRESS and not (info.name in ["attack", "block"]) and not (info.name == "jump" and _flying()):
+		var need := LONG_PRESS
+		if info.name == "block":
+			need = BLOCK_PRESS
+			if player and player._foe_near(12.0):
+				info.t = 0.0           # (fighting: that's a block, not a move)
+				continue
+		if info.t >= need and info.name != "attack" and not (info.name == "jump" and _flying()):
 			_press_info.erase(idx)
 			_btn_touch.erase(idx)
 			_held.erase(info.name)
@@ -523,8 +533,11 @@ func _draw_pad() -> void:
 			ring = yellow; ring_w = 4.0
 		# a filling ring while a button is being held down to pick it up
 		for info in _press_info.values():
-			if info.name == b.name and info.t > 0.3 and not (b.name in ["attack", "block"]):
-				var k: float = clampf((info.t - 0.3) / (LONG_PRESS - 0.3), 0.0, 1.0)
+			# (BLOCK's ring only starts after a second: a quick block shows nothing)
+			var t0 := 1.0 if b.name == "block" else 0.3
+			var need := BLOCK_PRESS if b.name == "block" else LONG_PRESS
+			if info.name == b.name and info.t > t0 and b.name != "attack":
+				var k: float = clampf((info.t - t0) / (need - t0), 0.0, 1.0)
 				pad.draw_arc(b.center, b.radius + 8.0, -PI / 2, -PI / 2 + TAU * k, 40, yellow, 6.0)
 		pad.draw_circle(b.center, rad, fill)
 		pad.draw_arc(b.center, rad, 0, TAU, 40, ring if not interact_ready else Color(1.0, 0.95, 0.6), ring_w if not interact_ready else 5.0)

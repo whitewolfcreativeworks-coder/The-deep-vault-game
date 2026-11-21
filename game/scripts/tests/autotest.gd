@@ -340,6 +340,9 @@ func _run() -> void:
 	elif mode == "levels":
 		if await _levels_test():
 			return
+	elif mode == "replaybosses":
+		if await _replaybosses_test():
+			return
 	elif mode == "perf":
 		if await _perf_test():
 			return
@@ -962,6 +965,22 @@ func _touch_test() -> void:
 	tc._layout()   # positions survive a relayout (and are saved to disk)
 	check("moved_button_saved", tc.button("jump").center.distance_to(dest) < 30.0 and FileAccess.file_exists(TouchControls.SAVE_PATH))
 	await shot("t6_button_moved")
+	# BLOCK moves too, with a longer still hold (3 s) and no monster close by;
+	# a short hold is just a block
+	var bb0: Vector2 = tc.button("block").center
+	var near_foe: bool = player._foe_near(12.0)
+	await touch_ev(12, bb0, true)
+	await wait(1.5)
+	var early: bool = tc._moving.values().has("block")
+	var blocking_meanwhile: bool = player.blocking
+	await wait(1.8)
+	var picked_b: bool = tc._moving.values().has("block")
+	var bdest := Vector2(r.x * 0.7, r.y * 0.3)
+	await drag_ev(12, bb0, bdest)
+	await touch_ev(12, bdest, false)
+	await wait(0.2)
+	check("block_hold_to_move", not near_foe and not early and blocking_meanwhile and picked_b and tc.button("block").center.distance_to(bdest) < 30.0 and not player.blocking,
+		"foe near %s, early %s, blocking %s, picked %s, at %s" % [near_foe, early, blocking_meanwhile, picked_b, tc.button("block").center])
 	# arrange mode from the pause menu moves ATTACK too; reset restores everything
 	tc.set_arrange(true)
 	var a1: Vector2 = tc.button("attack").center
@@ -5403,6 +5422,147 @@ func _enemy_census() -> Dictionary:
 				out.minion_hp = maxf(out.minion_hp, en.max_hp)
 				out.minion_dmg = maxf(out.minion_dmg, float(en.t.dmg))
 	return out
+
+## Nov 21: "My son just played the goblin forest on hard mode... he did all the
+## quests, but... he was never able to get into the castle area to get to the warden."
+## Two ways that could happen, both played through here:
+##  - Chief Gruk beaten before Captain Aldric gives you the Warren quest (the Warren
+##    is open to anyone): the quest could never be finished, so the Moonlit Portal
+##    never woke;
+##  - playing the castle (or the clouds) again didn't bring its bosses back, so the
+##    Gatehouse Warden never rose and the castle gate never opened.
+## And old saves stuck that way are put right when they're loaded.
+func _replaybosses_test() -> bool:
+	var phase := int(Game.get_meta("rb_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("rb_phase", 1)
+		# every boss belongs to its own level (so playing that level again brings it back)
+		var strays: Array = []
+		for id in Game.QUESTS:
+			var g: Dictionary = Game.QUESTS[id].goal
+			var z := String(Game.QUESTS[id].get("zone", "forest"))
+			if g.type == "boss" and z != "home" and Game.flag_zone(String(g.uid)) != z:
+				strays.append("%s (%s)" % [g.uid, z])
+		check("rb_bosses_belong_to_their_level", strays.is_empty(), str(strays))
+		# a hero who has beaten the whole adventure
+		Game.level = 20
+		for z in ["forest", "castle", "cloud", "home"]:
+			for q in Game.zone_quests(z):
+				Game.quests[q] = {"state": "done", "n": 1}
+		for k in ["adventure_done", "forest_won", "castle_won", "cloud_won", "gruk", "cyclops", "gatekeeper", "ghost_lord", "hail_golem", "mr_bubbles"]:
+			Game.flags[k] = true
+		Game.replay_level("castle", "hard", true)
+		check("rb_castle_again_brings_bosses_back", not Game.flags.has("gatekeeper") and not Game.flags.has("ghost_lord")
+			and Game.quest_state("the_gatehouse") == "locked", str(Game.flags.keys()))
+		Game.replay_level("cloud", "hard", true)
+		check("rb_clouds_again_bring_bosses_back", not Game.flags.has("hail_golem") and not Game.flags.has("mr_bubbles"), str(Game.flags.keys()))
+		# an old save stuck the way it used to be: boss marks left over from the first time
+		for z in ["castle", "cloud"]:
+			for q in Game.zone_quests(z):
+				Game.quests.erase(q)
+		Game.quests["light_beacons"] = {"state": "done", "n": 3}
+		Game.quests["the_gatehouse"] = {"state": "active", "n": 0}
+		Game.quests["bubble_lifts"] = {"state": "done", "n": 3}
+		Game.quests["storm_gate"] = {"state": "active", "n": 0}
+		Game.quests["warren"] = {"state": "active", "n": 0}
+		for k in ["gatekeeper", "ghost_lord", "hail_golem", "mr_bubbles", "gruk"]:
+			Game.flags[k] = true
+		Game.save_slot()
+		Game.load_slot(Game.active_slot)
+		check("rb_old_save_warden_rises_again", not Game.flags.has("gatekeeper") and not Game.flags.has("ghost_lord")
+			and Game.quest_state("the_gatehouse") == "active", str(Game.flags.keys()))
+		check("rb_old_save_cloud_bosses_rise_again", not Game.flags.has("hail_golem") and not Game.flags.has("mr_bubbles"))
+		check("rb_old_save_gruk_counts", Game.quest_state("warren") == "ready" and Game.flags.get("gruk", false), Game.quest_state("warren"))
+		check("rb_old_save_done_bosses_kept", Game.flags.get("cyclops", false) and Game.quest_state("sinkhole") == "done")
+		# now the Goblin Forest again, on Hard, from the family portal
+		main.start_level("forest", "hard", true)
+		return true
+	if phase == 1:
+		Game.set_meta("rb_phase", 2)
+		await wait(2.5)
+		player = main.player
+		god = true
+		var w = main.world
+		check("rb_forest_hard", Game.zone == "forest" and Game.mode == "hard" and Game.quest_state("warren") == "locked"
+			and not Game.flags.has("gruk"), "%s %s %s" % [Game.zone, Game.mode, Game.quest_state("warren")])
+		var gobs := 0
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and (e as Enemy).type_id in Game.GOBLINS and not (e as Enemy).dead:
+				gobs += 1
+		print("REPLAYBOSSES goblins in the forest: ", gobs)
+		# straight down the Warren to Chief Gruk, before anyone asks
+		var gruk: Enemy = w.gruk
+		check("rb_gruk_there", gruk != null and is_instance_valid(gruk))
+		await tp(gruk.global_position + Vector3(0, 0.3, 5.0), 0.0)
+		await wait(0.3)
+		gruk.take_damage(99999.0, player.global_position)
+		await wait(1.0)
+		check("rb_gruk_beaten_first", Game.flags.get("gruk", false) and Game.quest_state("warren") == "locked")
+		# Ranger Fenn's goblins
+		Game.quest_accept("goblin_trouble")
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if Game.quest_state("goblin_trouble") != "active":
+				break
+			if e is Enemy and (e as Enemy).type_id in Game.GOBLINS and not (e as Enemy).dead:
+				(e as Enemy).take_damage(99999.0, (e as Enemy).global_position + Vector3(0, 0, 1))
+				await wait(0.05)
+		check("rb_goblins_counted", Game.quest_state("goblin_trouble") == "ready", "%d" % Game.quest_progress("goblin_trouble"))
+		Game.quest_turn_in("goblin_trouble")
+		# Captain Aldric: Gruk is already beaten, and that counts
+		Game.quest_accept("warren")
+		check("rb_warren_counts_gruk", Game.quest_state("warren") == "ready", Game.quest_state("warren"))
+		Game.quest_turn_in("warren")
+		# the rest of the forest folk
+		for q in [["stolen_axes", "axe", 3], ["moonpetals", "moonpetal", 7], ["strongbox", "strongbox", 1]]:
+			Game.quest_accept(q[0])
+			for k in int(q[2]):
+				Game.on_quest_item(q[1])
+			Game.quest_turn_in(q[0])
+		Game.quest_accept("sinkhole")
+		Game.flags["cyclops"] = true
+		Game.on_enemy_killed("cyclops", "cyclops")
+		Game.quest_turn_in("sinkhole")
+		await wait(0.5)
+		check("rb_forest_complete", Game.zone_complete("forest"))
+		check("rb_moon_portal_awake", w._moon_area.monitoring and w._moon_fx.visible)
+		# into the Moonlit Portal
+		var c: Vector3 = w._moon_area.global_position
+		await tp(c - Vector3(0, 1.9, 0) + w._moon_area.global_transform.basis.z * 3.0, 0.0)
+		await wait(0.4)
+		player.global_position = c - Vector3(0, 1.5, 0)
+		await wait(2.0)
+		check("rb_portal_took_us", Game.zone == "castle", Game.zone)
+		return Game.zone == "castle"
+	if phase == 2:
+		await wait(2.5)
+		player = main.player
+		god = true
+		var w = main.world
+		check("rb_castle_hard", Game.zone == "castle" and Game.mode == "hard", "%s %s" % [Game.zone, Game.mode])
+		await wait(0.5)
+		var wd: Enemy = w.warden
+		check("rb_warden_rises", wd != null and is_instance_valid(wd) and not wd.dead)
+		if wd == null or not is_instance_valid(wd):
+			return false
+		await tp(wd.global_position + Vector3(0, 0.3, 6.0), 0.0)
+		player.yaw = 0.0; player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.1; player.snap_view()
+		await wait(0.8)
+		await shot("rb_01_gatehouse_warden_hard")
+		wd.take_damage(99999.0, player.global_position)
+		await wait(1.0)
+		check("rb_warden_beaten", Game.quest_state("the_gatehouse") == "ready", Game.quest_state("the_gatehouse"))
+		check("rb_castle_gate_opens", w._gate_open)
+		Game.quest_turn_in("the_gatehouse")
+		Game.quest_accept("ghost_lord")
+		await wait(0.5)
+		check("rb_ghost_lord_waits", w.lord != null and is_instance_valid(w.lord))
+		await wait(4.0)
+		await shot("rb_02_gate_open")
+		return false
+	return false
 
 ## The family portal's level picker: choose any one level again, fresh, in a mode;
 ## only that level resets. Hard and Insane grow the monsters to match the hero
