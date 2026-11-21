@@ -184,7 +184,7 @@ If fire or lava finishes you off in Insane, a cute little voice says **"oh no!"*
   - **Rainbow Storm** (rainbow vision without the mushrooms)
   - **Moon Gravity**
   - **Boing Boing** (you bounce on every landing)
-  - **Speed Freak**
+  - **Speed Freak** (twice as fast in every direction, forwards, backwards and sideways, with legs to match and a streak behind you)
   - **Meteor Shower** (get out of the red circles)
   - **Chicken Party**
   - **Monster Rage** (every monster near you rages and comes for you)
@@ -193,7 +193,7 @@ If fire or lava finishes you off in Insane, a cute little voice says **"oh no!"*
   - **Giant Foes**
   - **Earthquake** (the ground shakes and shoves you about)
   - **Bullet Time** (the monsters go into slow motion; you don't)
-  - **Slippery Ice**
+  - **Slippery Ice** (getting going is easy, but turn or stop and you keep sliding the way you were going until your feet catch: real ice, not mud)
   - **Ghost Monsters** (they flicker in and out of sight)
 
 Your mode shows next to your level, and it's saved with your game. Port Home works in every mode.

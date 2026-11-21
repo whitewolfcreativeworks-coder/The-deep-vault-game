@@ -50,6 +50,7 @@ var _quake_t := 0.0
 var _quake_kick := 0.0
 var _slow_t := 0.0
 var _slip_t := 0.0
+var _speed_t := 0.0
 var _ghost_t := 0.0
 var _ghosted: Array = []
 var _birds: Array = []
@@ -87,6 +88,8 @@ func _exit_tree() -> void:
 	if is_instance_valid(player):
 		player.grip = 1.0
 		player.chaos_gravity = 1.0
+		player.chaos_speed = 1.0
+		player.ice = false
 
 func _process(delta: float) -> void:
 	if player == null or not is_instance_valid(player) or get_tree().paused:
@@ -170,7 +173,10 @@ func _tick_effects(delta: float) -> void:
 		_slow_t -= delta
 	if _slip_t > 0.0:
 		_slip_t -= delta
-		player.grip = 0.12 if _slip_t > 0.0 else 1.0
+		player.ice = _slip_t > 0.0
+	if _speed_t > 0.0:
+		_speed_t -= delta
+		player.chaos_speed = 2.0 if _speed_t > 0.0 else 1.0
 	if _ghost_t > 0.0:
 		_ghost_t -= delta
 		var now := Time.get_ticks_msec() * 0.001
@@ -185,7 +191,7 @@ func _tick_effects(delta: float) -> void:
 func _show_timers() -> void:
 	var parts: Array = []
 	var vals := {"moon": _moon_t, "boing": player.bouncy_t,
-		"speed": player.haste_t, "disco": _disco_t, "quake": _quake_t, "slowmo": _slow_t, "slippery": _slip_t, "ghosts": _ghost_t}
+		"speed": _speed_t, "disco": _disco_t, "quake": _quake_t, "slowmo": _slow_t, "slippery": _slip_t, "ghosts": _ghost_t}
 	for k in vals:
 		if float(vals[k]) > 0.05:
 			parts.append("%s %d" % [SHORT[k], ceili(float(vals[k]))])
@@ -222,7 +228,8 @@ func fire(ev: String, also := false) -> void:
 		"boing":
 			p.bouncy_t = 12.0
 		"speed":
-			p.haste_t = maxf(p.haste_t, 14.0)
+			_speed_t = 14.0            # twice as fast every way you go (see Player.chaos_speed)
+			p.chaos_speed = 2.0
 		"meteors":
 			for k in 8:
 				get_tree().create_timer(0.35 + k * 0.6).timeout.connect(_meteor)
@@ -285,6 +292,7 @@ func fire(ev: String, also := false) -> void:
 				en.body.slow = 0.35
 		"slippery":
 			_slip_t = 12.0
+			p.ice = true
 		"ghosts":
 			_ghost_t = 10.0
 			_ghosted = _foes_near(45.0)

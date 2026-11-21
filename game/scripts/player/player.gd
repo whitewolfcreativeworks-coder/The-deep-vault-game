@@ -22,6 +22,9 @@ var fall_cap := 60.0         # fastest you can fall (floaty skins drift down)
 var lift := -999.0           # a bubble carrying you: target vertical speed (none below -100)
 var wind := Vector3.ZERO     # a push from the wind (m/s), already scaled by your weight
 var grip := 1.0              # 1 = normal footing; lower = slippery (wet cloud, ice): you slide
+## Insane's wild events (see InsaneChaos):
+var chaos_speed := 1.0       # SPEED FREAK: this many times as fast, every direction
+var ice := false             # SLIPPERY ICE: you keep sliding the way you were going
 var float_hold: Node = null  # a bubble that's floating you (it owns `lift` until it pops)
 var free_flight := false     # the flight home: no ceiling, no turning back at the map edge
 const EYE_H := 1.62
@@ -673,7 +676,8 @@ func _physics_process(delta: float) -> void:
 		stamina_delay = 0.5
 	# strafing: backpedal and sidestep a bit slower than running forward
 	var strafe := Game.strafe_mode or first_person
-	if strafe and dir.length() > 0.1:
+	speed *= chaos_speed
+	if strafe and dir.length() > 0.1 and chaos_speed <= 1.0:
 		var local_in := dir.rotated(Vector3.UP, -yaw)
 		var back := clampf(local_in.z, 0.0, 1.0)
 		var side := absf(local_in.x)
@@ -686,8 +690,18 @@ func _physics_process(delta: float) -> void:
 	if dodging:
 		target_v = dodge_dir * 10.5 * (1.0 - dodge_time / 0.42 * 0.5)
 	var a := ACCEL * (maxf(grip, 1.0) if Game.has_power("sure_feet") else grip) if is_on_floor() else AIR_ACCEL
-	velocity.x = lerpf(velocity.x, target_v.x + wind.x, 1.0 - exp(-a * delta))
-	velocity.z = lerpf(velocity.z, target_v.z + wind.z, 1.0 - exp(-a * delta))
+	if chaos_speed > 1.0:
+		a *= 1.6             # (snappy, so the speed is right there when you push)
+	if ice and is_on_floor() and not dodging and special_kind == "" and not Game.has_power("sure_feet"):
+		_ice_step(target_v, delta)
+	else:
+		velocity.x = lerpf(velocity.x, target_v.x + wind.x, 1.0 - exp(-a * delta))
+		velocity.z = lerpf(velocity.z, target_v.z + wind.z, 1.0 - exp(-a * delta))
+		if _ice_fx and _ice_fx.emitting:
+			_ice_fx.emitting = false
+	if body.loco_boost != chaos_speed:
+		body.loco_boost = chaos_speed
+	_speed_trail(delta)
 	if mounted and mount_kind == "dragonfly":
 		_dragonfly_move(delta, target_v)
 	elif lift > -100.0:
@@ -1711,11 +1725,61 @@ func _update_camera(delta: float) -> void:
 	var trip_on := smoothstep(0.0, 0.6, Game.shroom)
 	camera.rotation.z = sin(tt * 23.0) * 0.04 * sh + sin(tt * 0.8) * deg_to_rad(1.5 + 4.5 * trip) * trip_on
 	var trip_fov := sin(tt * 1.3) * (3.0 + 8.0 * trip) * trip_on
-	var sprint_kick := 5.0 if hspeed > WALK + 0.8 else 0.0
+	var sprint_kick := (5.0 if hspeed > WALK + 0.8 else 0.0) + (14.0 if chaos_speed > 1.0 and hspeed > WALK else 0.0)
 	fov_kick = maxf(0.0, fov_kick - delta * 30.0)
 	camera.fov = lerpf(camera.fov, (80.0 if fp else 74.0) + sprint_kick + fov_kick + trip_fov, 1.0 - exp(-(5.0 if fov_kick < 0.5 else 14.0) * delta))
 
 var _head_hidden := false
+
+## SLIPPERY ICE (Insane; Jason: "if you try and change directions, you keep slipping
+## the direction you were going until you gain traction for the next direction").
+## Getting going the way you push is quick; whatever you were already doing in
+## other directions only wears off slowly, and with nothing pushed you glide to a stop.
+const ICE_PUSH := 10.0       # m/s² towards where you push (when already going that way)
+const ICE_TURN := 4.0        # m/s² when pushing against the way you're sliding
+const ICE_SLIDE := 3.5       # m/s²: how fast sideways sliding wears off
+const ICE_COAST := 2.5       # m/s²: gliding to a stop with nothing pushed
+var _ice_fx: CPUParticles3D
+func _ice_step(target_v: Vector3, delta: float) -> void:
+	var v := Vector2(velocity.x, velocity.z)
+	var t := Vector2(target_v.x, target_v.z)
+	if t.length() < 0.1:
+		v = v.move_toward(Vector2.ZERO, ICE_COAST * delta)
+	else:
+		var d := t.normalized()
+		var along := v.dot(d)
+		var side := v - d * along
+		along = move_toward(along, t.length(), (ICE_PUSH if along >= 0.0 else ICE_TURN) * delta)
+		side = side.move_toward(Vector2.ZERO, ICE_SLIDE * delta)
+		v = d * along + side
+	velocity.x = v.x; velocity.z = v.y
+	# little ice sparkles at your feet while you skid
+	var skid := v.length() > 1.0 and (t.length() < 0.1 or v.normalized().dot(t.normalized()) < 0.9)
+	if skid and _ice_fx == null:
+		_ice_fx = CPUParticles3D.new(); _ice_fx.amount = 16; _ice_fx.lifetime = 0.5
+		_ice_fx.mesh = FX.quad(0.07); _ice_fx.material_override = FX.glow_material(Color(0.8, 0.95, 1.0), 1.6)
+		_ice_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; _ice_fx.emission_sphere_radius = 0.25
+		_ice_fx.direction = Vector3.UP; _ice_fx.spread = 60; _ice_fx.initial_velocity_min = 0.6; _ice_fx.initial_velocity_max = 1.4
+		_ice_fx.gravity = Vector3(0, -4, 0); _ice_fx.position.y = 0.08
+		add_child(_ice_fx)
+	if _ice_fx:
+		_ice_fx.emitting = skid
+
+## SPEED FREAK: a streak of wind and dust behind you.
+var _speed_fx: CPUParticles3D
+func _speed_trail(_delta: float) -> void:
+	var on := chaos_speed > 1.0 and Vector2(velocity.x, velocity.z).length() > WALK
+	if on and _speed_fx == null:
+		_speed_fx = CPUParticles3D.new(); _speed_fx.amount = 20; _speed_fx.lifetime = 0.45
+		_speed_fx.mesh = FX.quad(0.12); _speed_fx.material_override = FX.glow_material(Color(1.0, 0.95, 0.75), 1.2)
+		_speed_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX; _speed_fx.emission_box_extents = Vector3(0.25, 0.6, 0.25)
+		_speed_fx.direction = Vector3.UP; _speed_fx.spread = 20; _speed_fx.initial_velocity_min = 0.2; _speed_fx.initial_velocity_max = 0.6
+		_speed_fx.gravity = Vector3.ZERO; _speed_fx.position.y = 0.7
+		_speed_fx.local_coords = false
+		add_child(_speed_fx)
+	if _speed_fx and _speed_fx.emitting != on:
+		_speed_fx.emitting = on
+
 var kill_y := -40.0      # falling below this is death (the forest Warren sits deeper)
 var _crane := 0.0
 var _crane_pick := 0.0

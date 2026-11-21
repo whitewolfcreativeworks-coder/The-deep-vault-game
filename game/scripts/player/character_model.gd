@@ -935,6 +935,8 @@ func _setup_anims() -> void:
 
 ## Slow motion (Insane's Bullet Time): every animation plays at this rate.
 var slow := 1.0
+## Insane's Speed Freak: the legs run this much faster (so they keep up with you).
+var loco_boost := 1.0
 
 func _play(clip: String, blend := 0.15, speed := 1.0) -> void:
 	if anim == null or not anim.has_animation(clip):
@@ -1319,7 +1321,7 @@ func _locomotion(delta: float) -> void:
 			_loco = clip
 	else:
 		_pend = ""
-	_play(_loco, 0.24, w[1] if clip == _loco else anim.speed_scale / maxf(slow, 0.01))
+	_play(_loco, 0.24, w[1] * loco_boost if clip == _loco else anim.speed_scale / maxf(slow, 0.01))
 
 # ---------------------------------------------------------------------------
 # Character-creator looks: hair styles and face details are small meshes on the

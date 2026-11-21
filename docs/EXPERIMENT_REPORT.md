@@ -1230,3 +1230,35 @@ Jason: "How about a button that allows you to wear all your best gear, your best
 - the bag-only button ignores the chest, and the chest button takes from the chest and moves the old piece into it when the bag is full;
 - the river amulet stays on in the Vault.
 
+## Follow-up 37: Speed Freak and Slippery Ice that feel like it (Nov 21)
+
+Jason, after a session of Insane in the Goblin Forest: Speed Freak "doesn't really feel like there's any speed going on... should move you very fast forward, very fast back, very fast left, very fast right". And Slippery Ice "feels more like mud, like it's hard to turn... if you try and change directions, you keep slipping the direction you were going until you gain traction for the next direction".
+
+**Why:**
+- **Speed Freak** reused the Rogue's Smoke Bomb dash: ×1.45 speed. The backpedal and sidestep penalties still applied, and the run animation is capped at 1.3× its normal rate, so the legs looked the same.
+- **Slippery Ice** cut the acceleration constant to 12% (`grip = 0.12`). That made everything sluggish, including getting going: mud, as Jason said.
+
+**Now:**
+- **Speed Freak:** `Player.chaos_speed = 2.0`. Speed doubles in every direction with no backpedal or sidestep penalty, and acceleration is 1.6× snappier. The legs run faster (`CharacterModel.loco_boost`), the view widens, and a streak of light trails behind you.
+- **Slippery Ice:** `Player.ice` switches to a sliding model.
+  - Pushing the way you're already going accelerates at 10 m/s², so starting is easy.
+  - Pushing against your slide only manages 4 m/s².
+  - Sideways momentum wears off at 3.5 m/s².
+  - With nothing pushed, you glide to a stop at 2.5 m/s².
+  - Ice sparkles fly from your feet while you skid.
+  - Dodges and class powers still move normally, and Starstride Boots keep you upright.
+- **Cloud Island's own wet-cloud and glaze ice** still use `grip`, so Normal is unchanged there.
+
+**Measured** by the new `chaosfeel` test:
+
+| | Forward | Backwards | Sideways |
+|---|---|---|---|
+| Normal | 4.4 m/s | 3.2 m/s | 4.0 m/s |
+| Speed Freak | 8.8 m/s | 8.8 m/s | 8.8 m/s |
+
+| On ice | Ice | Normal ground |
+|---|---|---|
+| Top speed reached | 4.4 m/s | 4.4 m/s |
+| Still going forward after 0.4 s of pushing right | 3.0 m/s | 0 |
+| Still gliding 0.5 s after letting go | 3.3 m/s | 0 |
+

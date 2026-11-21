@@ -319,6 +319,8 @@ func _run() -> void:
 	elif mode == "homeview":
 		if await _homeview_test():
 			return
+	elif mode == "chaosfeel":
+		await _chaosfeel_test()
 	elif mode == "bestgear":
 		await _bestgear_test()
 	elif mode == "arrival":
@@ -4934,7 +4936,9 @@ func _modes_test() -> bool:
 				"quake":
 					check("md_ev_quake", ch._quake_t > 5.0)
 				"slippery":
-					check("md_ev_slippery", player.grip < 0.5, "%.2f" % player.grip)
+					check("md_ev_slippery", player.ice, str(player.ice))
+				"speed":
+					check("md_ev_speed", player.chaos_speed >= 2.0, "%.1f" % player.chaos_speed)
 			if ev in ["meteors", "chickens", "disco", "giants", "quake"]:
 				await wait(1.2)
 				await shot("md_ev_" + ev)
@@ -6708,4 +6712,72 @@ func _bestgear_test() -> void:
 	Game.wear_best(false)
 	check("bg_river_amulet_stays", Game.zone == "vault" and Game.equipped.artifact == "amulet_deep", Game.equipped.artifact)
 	main._resume()
+	_finish()
+
+# --- how Speed Freak and Slippery Ice feel (Insane's wild events) ----------------------
+func _hspeed() -> float:
+	return Vector2(player.velocity.x, player.velocity.z).length()
+
+func _fwd_part() -> float:
+	return Vector2(player.velocity.x, player.velocity.z).dot(Vector2(-sin(player.yaw), -cos(player.yaw)))
+
+func _chaosfeel_test() -> void:
+	await _start()
+	player = main.player
+	god = true
+	var at := player.global_position
+	var yaw0 := player.yaw
+	var walk := {}
+	for k in [["normal", 1.0], ["speed", 2.0]]:
+		player.chaos_speed = float(k[1])
+		for dirn in ["move_forward", "move_back", "move_right"]:
+			await tp(at + Vector3(0, 0.2, 0), yaw0, -0.2)
+			await wait(0.3)
+			Input.action_press(dirn)
+			var top := 0.0
+			for i in 50:            # (the fastest it got, before anything in the way)
+				await frames(1)
+				top = maxf(top, _hspeed())
+			walk["%s_%s" % [k[0], dirn]] = top
+			Input.action_release(dirn)
+			await wait(0.4)
+	player.chaos_speed = 1.0
+	print("FEEL speeds: ", walk)
+	check("fl_speed_forward", float(walk.speed_move_forward) >= float(walk.normal_move_forward) * 1.8, "%.1f vs %.1f" % [walk.speed_move_forward, walk.normal_move_forward])
+	check("fl_speed_back", float(walk.speed_move_back) >= Player.WALK * 1.8, "%.1f" % walk.speed_move_back)
+	check("fl_speed_side", float(walk.speed_move_right) >= Player.WALK * 1.8, "%.1f" % walk.speed_move_right)
+	# a quick look at the trail
+	player.chaos_speed = 2.0
+	Input.action_press("move_forward")
+	await wait(0.6)
+	await shot("fl_01_speed_freak")
+	Input.action_release("move_forward")
+	player.chaos_speed = 1.0
+	await wait(0.6)
+	# ice: getting going is fine; changing direction you keep sliding the old way
+	for k in [["grip", false], ["ice", true]]:
+		player.ice = bool(k[1])
+		await tp(at + Vector3(0, 0.2, 0), yaw0, -0.2)
+		await wait(0.3)
+		Input.action_press("move_forward")
+		await wait(1.0)
+		var up := _hspeed()
+		Input.action_release("move_forward")
+		Input.action_press("move_right")
+		await wait(0.4)
+		var still := _fwd_part()
+		if bool(k[1]):
+			await shot("fl_02_ice_skid")
+		Input.action_release("move_right")
+		await wait(0.5)
+		var coast := _hspeed()
+		walk[String(k[0]) + "_up"] = up
+		walk[String(k[0]) + "_still_forward"] = still
+		walk[String(k[0]) + "_coast"] = coast
+		await wait(2.5)
+	player.ice = false
+	print("FEEL ice: ", walk)
+	check("fl_ice_gets_going", float(walk.ice_up) > Player.WALK * 0.85, "%.1f" % walk.ice_up)
+	check("fl_ice_keeps_sliding", float(walk.ice_still_forward) > 1.5 and float(walk.grip_still_forward) < 0.6, "ice %.1f, normal %.1f m/s still going forward" % [walk.ice_still_forward, walk.grip_still_forward])
+	check("fl_ice_glides", float(walk.ice_coast) > 1.0 and float(walk.grip_coast) < 0.5, "ice %.1f, normal %.1f" % [walk.ice_coast, walk.grip_coast])
 	_finish()
