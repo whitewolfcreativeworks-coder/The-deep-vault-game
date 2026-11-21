@@ -28,6 +28,7 @@ const CALLS := [
 var radius := 90.0                 # beyond this (or high above), the valley goes quiet
 var inside_fn: Callable            # optional: returns true when the listener is indoors
 var bees_at := Vector3.INF         # optional: where the garden is
+var more_birds := false            # a bird bath in the yard: the birds come more often
 var calls_played := 0              # (for the tests)
 var heard: Array = []              # the last calls played (for the tests)
 
@@ -98,7 +99,7 @@ func _process(delta: float) -> void:
 	if _next > 0.0:
 		return
 	# indoors, birds are fewer and further between
-	_next = _rng.randf_range(4.0, 9.0) * (1.8 if inside else 1.0)
+	_next = _rng.randf_range(4.0, 9.0) * (1.8 if inside else 1.0) * (0.75 if more_birds else 1.0)
 	var c := _pick()
 	var names: Array = c[0]
 	var nm: String = names[_rng.randi() % names.size()]

@@ -10,6 +10,7 @@ signal message(text: String, color: Color)
 signal objective_changed(text: String)
 signal player_died
 signal victory
+signal foe_down(pos: Vector3)       # any monster beaten (forge powers listen for it)
 
 # --- Character profile (set by the character creator) ----------------------
 var profile := {
@@ -372,6 +373,7 @@ func _init() -> void:
 	_reset_items()
 
 func _ready() -> void:
+	inventory_changed.connect(_refresh_powers)
 	# every 3D label (signs, name tags, damage numbers) uses the friendly sign font
 	get_tree().node_added.connect(func(n: Node) -> void:
 		if n is Label3D and (n as Label3D).font == null:
@@ -380,6 +382,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if in_game and not get_tree().paused:
 		play_time += delta
+		tick_boons(delta)
 		if not costume.is_empty() and costume_left() <= 0.0:
 			var nm: String = Loot.COSTUMES.get(costume.get("id", ""), {}).get("name", "costume")
 			clear_costume()
@@ -416,10 +419,11 @@ func grant_dragonfly() -> void:
 	Sfx.play("chirp", 0.0, 0.0)
 	say("You got the DRAGONFLY! Press G (or RIDE) to fly.", Color(0.5, 1.0, 0.85))
 
-func wear_costume(id: String) -> void:
+func wear_costume(id: String, t: Array = []) -> void:
 	if not Loot.COSTUMES.has(id):
 		return
-	var t: Array = Loot.roll_costume_time()
+	if t.is_empty():
+		t = Loot.roll_costume_time()      # (the shop's costumes come with a set time)
 	var real: bool = t[2]
 	costume = {"id": id, "real": real, "until": (Time.get_unix_time_from_system() if real else play_time) + float(t[1])}
 	var c: Dictionary = Loot.COSTUMES[id]
@@ -476,10 +480,68 @@ func max_stamina() -> float:
 	return 100.0 + (level - 1) * 5.0
 
 func attack_damage() -> float:
-	return (BASE_DAMAGE + (level - 1) * 3.5 + gear("damage")) * (1.25 if has_buff("strong") else 1.0)
+	return (BASE_DAMAGE + (level - 1) * 3.5 + gear("damage")) * (1.25 if has_buff("strong") else 1.0) * (1.3 if has_boon("giant_strength") else 1.0)
 
 func spell_damage() -> float:
 	return (24.0 + (level - 1) * 6.5) * (1.0 + gear("spell") / 100.0) * (1.25 if has_buff("strong") else 1.0)
+
+## Tobble's Trading Post (see ShopCatalog): elixirs, weapon enchantments and armor
+## blessings you bought. id -> seconds of play left. Saved, and kept through new
+## adventures and level replays (you paid for them); they fade as you play.
+var boons := {}
+## Yard decorations you've bought for home (ShopCatalog ids). Saved, kept forever.
+var decor: Array = []
+## The Forge Journal: recipes you've discovered and riddles the smith has told you.
+var forge_book := {"found": [], "hints": []}
+## Forge powers on the gear you wear ("power" on forged items: see ForgeRecipes),
+## kept up to date whenever your gear changes.
+var _powers := {}
+
+func has_boon(id: String) -> bool:
+	return boons.has(id)
+
+func has_power(tag: String) -> bool:
+	return _powers.has(tag)
+
+func _refresh_powers() -> void:
+	_powers.clear()
+	for slot in SLOTS:
+		var p := String(item(equipped.get(slot, "")).get("power", ""))
+		if p != "":
+			_powers[p] = true
+
+## Buy (or top up) a boon. A weapon holds one enchantment and armor one blessing,
+## so a new one of those replaces the old; elixirs mix freely.
+func add_boon(id: String, secs: float) -> void:
+	var w: Dictionary = ShopCatalog.ware(id)
+	var kind := String(w.get("kind", ""))
+	if kind in ["enchant", "bless"]:
+		for k in boons.keys():
+			if k != id and String(ShopCatalog.ware(k).get("kind", "")) == kind:
+				boons.erase(k)
+	boons[id] = minf(float(boons.get(id, 0.0)) + secs, 3600.0)
+	stats_changed.emit()
+
+func tick_boons(delta: float) -> void:
+	if boons.is_empty():
+		return
+	for k in boons.keys():
+		boons[k] = float(boons[k]) - delta
+		if float(boons[k]) <= 0.0:
+			boons.erase(k)
+			message.emit("Your %s wears off." % String(ShopCatalog.ware(k).get("name", k)), Color(1.0, 0.8, 0.55))
+			stats_changed.emit()
+
+func boons_text() -> String:
+	var out := ""
+	var n := 0
+	for k in boons:
+		var s := int(ceilf(float(boons[k])))
+		if n > 0:
+			out += "\n" if n % 3 == 0 else "   "      # (three to a line on the HUD)
+		out += "%s %d:%02d" % [String(ShopCatalog.ware(k).get("short", k)), s / 60, s % 60]
+		n += 1
+	return out
 
 ## Short buffs from food (see scripts/world/food.gd): name -> seconds left. Not saved.
 var buffs := {}
@@ -531,7 +593,7 @@ func xp_to_next() -> int:
 
 func mitigate(raw: float) -> float:
 	var d := defense()
-	return raw * (1.0 - d / (d + 45.0)) * (0.75 if has_buff("tough") else 1.0)
+	return raw * (1.0 - d / (d + 45.0)) * (0.75 if has_buff("tough") else 1.0) * (0.75 if has_boon("stoneskin") else 1.0)
 
 # ---------------------------------------------------------------------------
 func reset_run() -> void:
@@ -551,6 +613,7 @@ func reset_run() -> void:
 	day_clock = 150.0
 	costume = {}
 	unlocked_looks = []; custom_look = {}; custom_look_on = false
+	boons = {}; decor = []; forge_book = {"found": [], "hints": []}
 	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
 	game_over = false
@@ -581,7 +644,7 @@ func add_item(id: String, auto_equip := true) -> void:
 	if not inventory.has(id):
 		inventory.append(id)
 	var r: int = it.get("rarity", 0)
-	var tag := "" if r == 0 else "[%s] " % Loot.RARITY_NAMES[r].to_upper()
+	var tag := "" if r == 0 else "[%s] " % Loot.rarity_label(it).to_upper()
 	message.emit("Found: %s%s" % [tag, it.name], it.color)
 	loot_found.emit(id)
 	if it.has("outfit"):
@@ -695,6 +758,8 @@ func item_lines(uid: String) -> PackedStringArray:
 			out.append(("+%.1f%% %s" if a[3] else "+%.0f %s") % [float(it[k]), a[0]] if k != "regen" else "+%.1f %s" % [float(it[k]), a[0]])
 	if it.get("special", "") == "river":
 		out.append("river heals you")
+	if String(it.get("power", "")) != "":
+		out.append("★ " + ForgeRecipes.power_text(String(it.power)))
 	return out
 
 func set_objective(text: String) -> void:
@@ -806,6 +871,8 @@ func save_slot(i := -1) -> bool:
 		"resume_pos": resume_pos, "resume_yaw": resume_yaw,
 		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual, "day_clock": day_clock, "costume": costume.duplicate(),
 		"unlocked_looks": unlocked_looks.duplicate(), "custom_look": custom_look.duplicate(true), "custom_look_on": custom_look_on,
+		"boons": boons.duplicate(), "decor": decor.duplicate(), "forge_book": forge_book.duplicate(true),
+		"loot_next": Loot._next,
 	}
 	var f := FileAccess.open(_slot_path(i), FileAccess.WRITE)
 	if f == null:
@@ -872,6 +939,11 @@ func load_slot(i: int) -> bool:
 	unlocked_looks = (d.get("unlocked_looks", []) as Array).duplicate()
 	custom_look = (d.get("custom_look", {}) as Dictionary).duplicate(true)
 	custom_look_on = bool(d.get("custom_look_on", false))
+	boons = (d.get("boons", {}) as Dictionary).duplicate()
+	decor = (d.get("decor", []) as Array).duplicate()
+	var fb: Dictionary = d.get("forge_book", {})
+	forge_book = {"found": (fb.get("found", []) as Array).duplicate(), "hints": (fb.get("hints", []) as Array).duplicate()}
+	Loot._next = maxi(Loot._next, int(d.get("loot_next", 1)))
 	hp = clampf(float(d.get("hp", max_hp())), max_hp() * 0.5, max_hp())
 	mana = clampf(float(d.get("mana", max_mana())), 0.0, max_mana())
 	stamina = max_stamina()
@@ -1224,7 +1296,9 @@ func quest_turn_in(id: String) -> Array:
 
 const NPC_NAMES := {"fenn": "Ranger Fenn", "bram": "Bram the Woodcutter", "maera": "Old Maera", "tobble": "Tobble the Merchant", "aldric": "Captain Aldric", "dunstan": "Digger Dunstan",
 	"elowen": "Sister Elowen", "mott": "Old Mott", "brannoc": "Captain Brannoc", "holt": "Sergeant Holt", "ansel": "Brother Ansel", "pip": "Pip the Stablehand", "wren": "Lady Wren", "gill": "Old Gill the Fisher", "adad": "Adad the Weather-Keeper",
-	"ninlil": "Ninlil of the Winds", "nanshe": "Nanshe the Keeper", "enki": "Enki the Rainmaker", "utu": "Utu the Gate-Warden", "anu": "Anu, Eldest of the Sky"}
+	"ninlil": "Ninlil of the Winds", "nanshe": "Nanshe the Keeper", "enki": "Enki the Rainmaker", "utu": "Utu the Gate-Warden", "anu": "Anu, Eldest of the Sky",
+	# at home (the smith's name is a placeholder: Jason's son gets to name them)
+	"tobble_shop": "Tobble the Merchant", "smith": "Ironbeard the Smith"}
 
 ## Quests listed in the tracker: active and ready ones.
 ## Item level of the current zone: the Vault starts low, the castle is tougher.

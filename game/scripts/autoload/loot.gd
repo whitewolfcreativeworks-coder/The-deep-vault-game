@@ -118,6 +118,12 @@ const COSTUMES := {
 	"goblin": {"name": "Goblin", "look": "goblin", "line": "You turn into a goblin! The goblins are VERY confused."},
 	"ember_goblin": {"name": "Ember Goblin", "look": "ember_goblin", "line": "A fiery goblin from the Sinkhole of Death!"},
 	"gruk": {"name": "Chief Gruk", "look": "gruk", "line": "You're Chief Gruk! GRUK SMASH!"},
+	# only at Tobble's Trading Post (never found in chests: see ShopCatalog)
+	"golden_knight": {"name": "Golden Knight", "file": "costumes/Paladin", "fx": "golden", "shop": true, "line": "Shining gold from head to toe. A true champion!"},
+	"star_mage": {"name": "Star Mage", "file": "adv2/Mage", "fx": "starlight", "shop": true, "line": "Starlight swirls around you. The Star Mage has arrived!"},
+	"frost_ninja": {"name": "Frost Ninja", "file": "Ninja", "fx": "frost", "shop": true, "line": "Silent as snowfall. The Frost Ninja!"},
+	"candy_clown": {"name": "Candy Clown", "file": "Clown", "fx": "candy", "shop": true, "line": "Pink, sparkly and very silly. Honk honk!"},
+	"golden_dino": {"name": "Golden Dino", "file": "MonsterCostume", "fx": "golden", "shop": true, "line": "RAWR! A dinosaur made of solid GOLD!"},
 }
 ## How long a costume lasts: [weight, seconds, real_time?, label]
 const COSTUME_TIMES := [
@@ -233,7 +239,7 @@ static func make_armor_skin(ilvl: int, rarity: int) -> String:
 		if int(a.get("min", 0)) <= rarity:
 			pool.append(a)
 	var a: Dictionary = pool[rng.randi() % pool.size()]
-	var it := {"slot": "skin", "rarity": rarity, "base": "Armor Skin", "outfit": a.outfit, "name": a.name,
+	var it := {"slot": "skin", "rarity": rarity, "base": "Armor Skin", "outfit": a.outfit, "name": a.name, "ilvl": ilvl,
 		"desc": "A new look for your armour. A small upgrade, too."}
 	if a.has("fx"):
 		it["fx"] = a.fx
@@ -268,6 +274,12 @@ static var _next := 1
 
 static func rarity_color(r: int) -> Color:
 	return RARITY_COLORS[clampi(r, 0, 4)]
+
+## "Legendary", or a forged item's tier ("Forged", "Starforged"...).
+static func rarity_label(it: Dictionary) -> String:
+	if int(it.get("tier", 0)) > 0:
+		return ForgeRecipes.TIER_NAMES[clampi(int(it.tier), 1, 4)]
+	return RARITY_NAMES[clampi(int(it.get("rarity", 0)), 0, 4)]
 
 ## Item level from how deep in the dungeon (z) the loot appears.
 static func area_level(z: float) -> int:
@@ -314,6 +326,10 @@ static func _add_affixes(it: Dictionary, pool: Array, n: int, ilvl: int) -> Stri
 	return first
 
 static func _register(it: Dictionary) -> String:
+	# (never reuse an id: after loading a saved game the counter starts low again,
+	# and a new find must not replace something you already have)
+	while Game.items.has("g%d" % _next):
+		_next += 1
 	var uid := "g%d" % _next
 	_next += 1
 	it["uid"] = uid
@@ -324,7 +340,7 @@ static func _register(it: Dictionary) -> String:
 static func make_weapon(ilvl: int, rarity: int) -> String:
 	var pool: Array = CASTLE_WEAPONS if Game.zone == "castle" else (CLOUD_WEAPONS if Game.zone == "cloud" else WEAPON_BASES)
 	var b: Dictionary = pool[rng.randi() % pool.size()]
-	var it := {"slot": "weapon", "rarity": rarity, "model": b.model, "base": b.base}
+	var it := {"slot": "weapon", "rarity": rarity, "model": b.model, "base": b.base, "ilvl": ilvl}
 	it["damage"] = roundf((2.0 + ilvl * 2.2) * RARITY_MULT[rarity] * b.dmg * rng.randf_range(0.85, 1.15))
 	if b.spell > 0:
 		it["spell"] = float(b.spell) * (0.8 + 0.2 * rarity)
@@ -346,7 +362,7 @@ static func make_ghost_armor(ilvl: int, rarity: int) -> String:
 	return _armor_from(CASTLE_ARMOR[rng.randi() % CASTLE_ARMOR.size()], ilvl, rarity)
 
 static func _armor_from(b: Dictionary, ilvl: int, rarity: int) -> String:
-	var it := {"slot": "armor", "rarity": rarity, "shield": b.shield, "tint": b.tint, "base": b.base}
+	var it := {"slot": "armor", "rarity": rarity, "shield": b.shield, "tint": b.tint, "base": b.base, "ilvl": ilvl}
 	var wardrobe: Array = OUTFITS.get(b.base, [])
 	if not wardrobe.is_empty():
 		it["outfit"] = wardrobe[rng.randi() % wardrobe.size()]
@@ -358,7 +374,7 @@ static func _armor_from(b: Dictionary, ilvl: int, rarity: int) -> String:
 
 static func make_trinket(ilvl: int, rarity: int) -> String:
 	var base: String = TRINKET_BASES[rng.randi() % TRINKET_BASES.size()]
-	var it := {"slot": "artifact", "rarity": rarity, "base": base}
+	var it := {"slot": "artifact", "rarity": rarity, "base": base, "ilvl": ilvl}
 	var first := _add_affixes(it, ["crit", "lifesteal", "mana", "spell", "regen", "hp", "damage", "defense"], RARITY_AFFIXES[rarity] + 1, ilvl)
 	it["name"] = _name(it, base, first, "artifact")
 	it["desc"] = "A %s %s, humming faintly." % [RARITY_NAMES[rarity].to_lower(), base.to_lower()]
@@ -373,7 +389,7 @@ static func make_skin(ilvl: int, rarity: int, which := "") -> String:
 		which = keys[rng.randi() % keys.size()]
 	var s: Dictionary = SKINS[which]
 	rarity = maxi(rarity, s.min)
-	var it := {"slot": "skin", "rarity": rarity, "skin": which, "base": "Skin", "name": s.name, "desc": s.desc}
+	var it := {"slot": "skin", "rarity": rarity, "skin": which, "base": "Skin", "name": s.name, "desc": s.desc, "ilvl": ilvl}
 	it[s.affix] = _affix_value(s.affix, ilvl, rarity)
 	_add_affixes(it, ["hp", "mana", "regen", "crit"], rarity - 2, ilvl)
 	return _register(it)

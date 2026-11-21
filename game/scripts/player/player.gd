@@ -122,6 +122,10 @@ func _ready() -> void:
 	Game.inventory_changed.connect(_on_inventory_changed)
 	Game.leveled_up.connect(_on_level_up)
 	cam_yaw.global_position = global_position + Vector3(0, EYE_H, 0)
+	powers = Powers.attach(self)
+
+## Forge powers and the shop's magic (see Powers).
+var powers: Powers
 
 ## Weapons away when you're not fighting: they ride on your back (a staff over
 ## your shoulder, a blade hilt-up, the shield flat) and come out the moment you
@@ -185,7 +189,8 @@ func rebuild_body() -> void:
 	# epic / legendary gear gives a glowing aura in its rarity colour
 	var best := maxi(int(weapon.get("rarity", 0)), int(armor.get("rarity", 0)))
 	if best >= 3:
-		cfg["aura"] = Loot.rarity_color(best)
+		var top: Dictionary = weapon if int(weapon.get("rarity", 0)) >= int(armor.get("rarity", 0)) else armor
+		cfg["aura"] = top.get("color", Loot.rarity_color(best))     # (forged gear glows in its tier colour)
 		cfg["aura_level"] = best
 	# armour you can see, and magic costumes on top of everything
 	if armor.has("outfit"):
@@ -649,8 +654,10 @@ func _physics_process(delta: float) -> void:
 				_air_jumps = 1
 			elif _air_jumps == 1:
 				_double_jump()
+			elif _air_jumps == 2 and (Game.has_boon("triple_jump") or Game.has_power("sure_feet")):
+				_triple_jump()
 	var sprinting := input_enabled and Input.is_action_pressed("sprint") and dir.length() > 0.1 and Game.stamina > 1 and not blocking
-	var speed := (SPRINT if sprinting else WALK) * (1.15 if Game.has_buff("quick") else 1.0)
+	var speed := (SPRINT if sprinting else WALK) * (1.15 if Game.has_buff("quick") else 1.0) * (1.25 if Game.has_boon("swift_feet") else 1.0)
 	if mounted:
 		speed *= _mount_speed()
 	if haste_t > 0.0:
@@ -678,7 +685,7 @@ func _physics_process(delta: float) -> void:
 		target_v *= 0.6
 	if dodging:
 		target_v = dodge_dir * 10.5 * (1.0 - dodge_time / 0.42 * 0.5)
-	var a := ACCEL * grip if is_on_floor() else AIR_ACCEL
+	var a := ACCEL * (maxf(grip, 1.0) if Game.has_power("sure_feet") else grip) if is_on_floor() else AIR_ACCEL
 	velocity.x = lerpf(velocity.x, target_v.x + wind.x, 1.0 - exp(-a * delta))
 	velocity.z = lerpf(velocity.z, target_v.z + wind.z, 1.0 - exp(-a * delta))
 	if mounted and mount_kind == "dragonfly":
@@ -871,6 +878,8 @@ func _handle_actions() -> void:
 			d = Vector3(0, 0, 1).rotated(Vector3.UP, facing)  # roll backward
 		dodge_dir = d.normalized()
 		dodging = true; dodge_time = 0.0; invuln = 0.36
+		if powers:
+			powers.on_dodge()
 		attacking = false; casting = false; combo = 0; combo_queued = false
 		_use_stamina(22)
 		Sfx.play("swing", -12.0, 0.2)
@@ -950,7 +959,7 @@ func _melee_hit() -> void:
 	var trail_c := Color(0.9, 0.92, 1.0)
 	var wit := Game.item(Game.equipped.weapon)
 	if int(wit.get("rarity", 0)) >= 2:
-		trail_c = Loot.rarity_color(int(wit.rarity)).lightened(0.3)
+		trail_c = (wit.get("color", Loot.rarity_color(int(wit.rarity))) as Color).lightened(0.3)     # (forged gear: its tier colour)
 	if Game.equipped.weapon == "vault_blade":
 		trail_c = Color(0.4, 0.85, 1.0)
 	var tilt: float = [0.95, -0.95, 1.45][combo % 3]   # diagonal slashes, then an overhead chop
@@ -974,6 +983,8 @@ func _melee_hit() -> void:
 		if crit:
 			dmg *= 1.75
 		e.take_damage(dmg, global_position, 5.0 if combo == 2 else 2.5, crit)
+		if powers:
+			powers.on_hit(e, dmg)
 		hit_any = true
 		dealt += dmg
 	if hit_any:
@@ -1152,6 +1163,8 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 			var big := 40.0 * (Game.mode_value("dmg") * Game.foe_scale().y if Game.mode != "normal" else 1.0)
 			dmg = 0.0 if amount < big else dmg * 0.15
 			blocks += 1
+			if powers:
+				powers.on_block(from_pos)
 			Sfx.play("clang", -3.0)
 			_guard_hit = 1.0
 			FX.sparks(global_position + Vector3(0, 1.2, 0) + fwd * 0.6, Color(1.0, 0.85, 0.5))
@@ -1180,6 +1193,8 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 		velocity.x += k.x; velocity.z += k.z
 	FX.damage_number(global_position + Vector3(0, 2.0, 0), dmg, Color(1.0, 0.35, 0.3), false)
 	Game.stats_changed.emit()
+	if powers and not pure and to_src.length() > 0.05 and dmg > 0.0:
+		powers.on_hurt(dmg, from_pos)
 	if Game.hp <= 0.0:
 		die()
 
@@ -1233,6 +1248,8 @@ func hazard_hit(frac: float, burn_secs := 0.0, burn_frac := 0.0, kind := "fire")
 	_hazard_until = Time.get_ticks_msec() + int((burn_secs + 0.4) * 1000.0)
 	_hazard_kind = kind
 	var mh := Game.max_hp()
+	if Game.has_boon("fireproof") and burn_secs <= 0.0:
+		frac *= 0.5           # (a burn is halved in burn())
 	_pure_hit = true
 	if burn_secs > 0.0:
 		burn(mh * frac, burn_secs, mh * burn_frac)
@@ -1247,6 +1264,8 @@ func hazard_hit(frac: float, burn_secs := 0.0, burn_frac := 0.0, kind := "fire")
 func burn(amount: float, secs: float, dps: float) -> void:
 	if dead or invuln > 0.0:
 		return
+	if Game.has_boon("fireproof"):
+		amount *= 0.5; dps *= 0.5
 	var was := blocking
 	blocking = false
 	take_damage(amount, global_position, 0.0)
@@ -1287,6 +1306,9 @@ func heal(v: float) -> void:
 
 func die() -> void:
 	if dead:
+		return
+	# the Phoenix power: rise from the ashes instead (once per level; not when falling off the world)
+	if powers and global_position.y > kill_y + 1.0 and powers.save_from_death():
 		return
 	dead = true
 	Game.hp = 0
@@ -2566,6 +2588,18 @@ func _double_jump() -> void:
 		velocity.x = hv.x; velocity.z = hv.y
 	double_jumps += 1
 	var c := Color(0.75, 0.9, 1.0)
+	_jump_fx(c)
+
+## A third jump at the top of the double jump (the Triple Jump Elixir, or Starstride gear).
+var triple_jumps := 0
+func _triple_jump() -> void:
+	_air_jumps = 3
+	_jump_buffer = 0.0
+	velocity.y = DOUBLE_JUMP_V * 0.85 * jump_mult
+	triple_jumps += 1
+	_jump_fx(Color(1.0, 0.9, 0.5))
+
+func _jump_fx(c: Color) -> void:
 	FX.shockwave(global_position - Vector3(0, 0.1, 0), c, 2.2, 0.35)
 	FX.burst(global_position + Vector3(0, 0.2, 0), c, 30, 4.0, 0.2, 0.5, -4.0)
 	FX.flash_light(global_position, c, 3.0, 4.0, 0.25)

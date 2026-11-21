@@ -288,6 +288,7 @@ func take_damage(amount: float, from_pos: Vector3, _knock := 0.0, crit := false)
 
 func _die(from_pos: Vector3) -> void:
 	dead = true
+	Game.foe_down.emit(global_position)
 	_go(S.DEAD)
 	_telegraph.visible = false
 	remove_from_group("enemy")

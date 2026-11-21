@@ -125,6 +125,11 @@ func _physics_process(delta: float) -> void:
 	var p := get_tree().get_first_node_in_group("player") as Node3D
 	if p and _t > 0.5 and p.get("dead") != true:
 		var to := (p.global_position + Vector3(0, 0.9, 0)) - global_position
+		if _keeps_shop_costume():
+			if to.length() < 1.2 and not _told:
+				_told = true
+				Game.say("You're wearing your %s from Tobble's. Take it off (in your bag) to try this costume." % Loot.COSTUMES[Game.costume_id()].name, Color(1.0, 0.75, 1.0))
+			return
 		if to.length() < 2.6:
 			global_position += to.normalized() * minf(to.length(), (9.0 / maxf(to.length(), 0.4)) * delta)
 			_settled = true
@@ -132,8 +137,14 @@ func _physics_process(delta: float) -> void:
 			_collect()
 
 func _on_body(b: Node) -> void:
-	if b.is_in_group("player") and _t > 0.5:
+	if b.is_in_group("player") and _t > 0.5 and not _keeps_shop_costume():
 		_collect()
+
+## A costume you bought at Tobble's (a whole day's worth) isn't swapped for one you
+## walk over by accident: the found one waits on the ground until you take yours off.
+var _told := false
+func _keeps_shop_costume() -> bool:
+	return kind == "costume" and Game.costume_id() != "" and bool(Loot.COSTUMES.get(Game.costume_id(), {}).get("shop", false))
 
 func _collect() -> void:
 	if _collected:
@@ -141,7 +152,7 @@ func _collect() -> void:
 	_collected = true
 	match kind:
 		"gold":
-			Game.add_gold(amount)
+			Game.add_gold(int(round(amount * 1.5)) if Game.has_boon("lucky_coin") else amount)
 			Sfx.play("coins", -6.0)
 		"potion":
 			Game.potions += amount

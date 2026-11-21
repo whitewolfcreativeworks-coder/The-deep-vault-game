@@ -316,6 +316,12 @@ func _run() -> void:
 	elif mode == "cabin":
 		if await _cabin_test():
 			return
+	elif mode == "homeview":
+		if await _homeview_test():
+			return
+	elif mode == "outbuildings":
+		if await _outbuildings_test():
+			return
 	elif mode == "shroomvis":
 		await _shroomvis_test()
 	elif mode == "modes":
@@ -6056,3 +6062,522 @@ func _forest18_test() -> bool:
 		var n1 := get_tree().get_nodes_in_group("enemy").size()
 		check("f18_war_horn_calls_goblins", n1 > n0, "%d -> %d" % [n0, n1])
 	return false
+
+# --- a look around the yard (for planning and screenshots) -----------------------
+func _cam_shot(name: String, from: Vector3, at: Vector3, fov := 60.0) -> void:
+	var c := Camera3D.new(); c.fov = fov; c.far = 2000.0
+	get_tree().current_scene.add_child(c)
+	c.global_position = from
+	c.look_at(at)
+	c.current = true
+	await frames(4)
+	await shot(name)
+	c.current = false
+	c.queue_free()
+	if player and player.camera:
+		player.camera.current = true
+
+func _homeview_test() -> bool:
+	if not Game.get_meta("hv_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("hv_phase", true)
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		Game.flags["adventure_done"] = true
+		Game.decor = ["flower_garden", "twinkle_lights", "gnome", "bench", "bird_bath", "statue"]
+		main._travel("home", Vector3(4, 1, 10))
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	check("hv_landed", w.landed)
+	var sc: IntroMovie = w._scen
+	await wait(0.5)
+	await _cam_shot("hv_01_top", Vector3(-4, 46, 30), Vector3(-5, 0, 8), 60.0)
+	await _cam_shot("hv_02_from_portal", Vector3(14, 6, 24), Vector3(-6, 1, 2))
+	await _cam_shot("hv_03_west", Vector3(4, 4, 9), Vector3(-17, 1.5, 9.5))
+	await _cam_shot("hv_04_shop_front", Vector3(3, 3.5, 6), Vector3(-6, 3, 19))
+	await _cam_shot("hv_05_forge_front", Vector3(-8.5, 2.6, 10.5), Vector3(-17, 1.3, 9.5))
+	await _cam_shot("hv_06_statue", Vector3(4, 3, 12), Vector3(7.6, 2.5, 3.4))
+	await _cam_shot("hv_07_yard_lights", Vector3(-2, 3.0, 16), Vector3(4, 1.0, 6))
+	await _cam_shot("hv_07b_birdbath", Vector3(6, 2.5, 12), Vector3(11, 0.8, 7.5))
+	await _cam_shot("hv_07c_shop_door", w.shop.door_out() + Vector3(0, 2.2, 0) + w.shop._fwd() * 3.0, w.shop.door_out() + Vector3(0, 1.2, 0) - w.shop._fwd() * 2.0)
+	var sp: TradingPost = w.shop
+	sp.room.visible = true
+	await _cam_shot("hv_08_shop_inside", sp.IN + Vector3(0, 2.4, 4.6), sp.IN + Vector3(0, 0.8, -2.5), 75.0)
+	await _cam_shot("hv_09_shop_left", sp.IN + Vector3(2.5, 2.0, 2.0), sp.IN + Vector3(-4.5, 1.0, -1.0), 70.0)
+	await _cam_shot("hv_10_shop_right", sp.IN + Vector3(-2.5, 2.0, 2.0), sp.IN + Vector3(4.5, 1.0, -1.0), 70.0)
+	await _cam_shot("hv_11_forge_inside", w.forge.w(Vector3(2.0, 1.8, 4.5)), w.forge.w(Vector3(-0.5, 1.0, -1.5)), 70.0)
+	_finish()
+	return true
+
+# --- Tobble's Trading Post, the Forge and forge powers ------------------------------------
+## A piece of gear with exactly these bonuses (and a name with no essence words in it).
+func _mk(slot: String, keys: Dictionary, nm := "") -> String:
+	var it := {"slot": slot, "rarity": 2, "ilvl": 10, "base": "Thing"}
+	if slot == "weapon":
+		it["model"] = "sword_1handed"; it["damage"] = 30.0; it["base"] = "Longsword"
+	elif slot == "armor":
+		it["defense"] = 25.0; it["shield"] = "shield_round"; it["base"] = "Coat"
+	for k in keys:
+		it[k] = keys[k]
+	it["name"] = nm if nm != "" else "Test %s" % slot
+	var uid := Loot._register(it)
+	Game.inventory.append(uid)
+	return uid
+
+func _near_use(target: Node3D, part: String, back := Vector3(0, 0, 1.0)) -> bool:
+	var at := target.global_position + back
+	at.y = target.global_position.y - 0.9
+	player.global_position = at
+	player.velocity = Vector3.ZERO
+	face(target.global_position)
+	player.facing = player.yaw
+	await wait(0.4)
+	var it = player.interact_target
+	var ok: bool = it != null and String(it.get_prompt()).contains(part)
+	check("ob_prompt_" + part.to_lower().replace(" ", "_").replace("'", ""), ok, str(it.get_prompt()) if it else "none")
+	if ok:
+		it.interact(player)
+		await wait(0.5)
+	return ok
+
+func _usable(root: Node, part: String) -> Node3D:
+	for n in root.find_children("*", "", true, false):
+		if n.is_in_group("interactable") and n.has_method("get_prompt") and String(n.get_prompt()).contains(part):
+			return n
+	return null
+
+func _outbuildings_test() -> bool:
+	if Game.get_meta("ob_phase2", false):
+		await _outbuildings_test_2()
+		return false
+	if not Game.get_meta("ob_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		Game.profile.hero = "Knight"
+		await _start()
+		Game.set_meta("ob_phase", true)
+		Game.level = 14
+		Game.gold = 60000
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		Game.flags["adventure_done"] = true
+		for k in 6:
+			Game.add_item(Loot.make_random(10, 0.3, 1), false)
+		main._travel("home", Vector3(4, 1, 10))
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	var m = main.menus
+	var ui: ShopUI = m.shop_ui
+	check("ob_built", w.shop != null and w.forge != null and w.decor != null)
+	check("ob_landed_home", w.landed)
+	# --- the Trading Post, from outside
+	var door := _usable(w.shop, "Go into")
+	check("ob_shop_door", door != null)
+	var f := w.shop._fwd()
+	await tp(w.shop.door_out() + Vector3(0, 0.3, 0), atan2(f.x, f.z), -0.1)
+	player.zoom_target = 7.0; player.zoom = 7.0; player.snap_view()
+	await wait(0.8)
+	await shot("ob_01_shop_outside")
+	var it = player.interact_target
+	check("ob_shop_door_prompt", it != null and String(it.get_prompt()).contains("Trading Post"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(2.5)
+	check("ob_in_shop", w.shop.is_inside(player.global_position) and w.shop.room.visible and not w.sun.visible, str(player.global_position))
+	check("ob_shop_floor_solid", player.is_on_floor() and player.global_position.y > TradingPost.IN.y - 0.3, str(player.global_position))
+	player.zoom_target = 4.5; player.zoom = 4.5; player.pitch = -0.2; player.snap_view()
+	await wait(0.5)
+	await shot("ob_02_shop_inside")
+	# walking about: the walls hold
+	Input.action_press("move_forward")
+	await wait(2.5)
+	Input.action_release("move_forward")
+	check("ob_shop_walls_hold", w.shop.is_inside(player.global_position) and player.global_position.y > TradingPost.IN.y - 0.3, str(player.global_position))
+	# --- every display opens its own part of the shop
+	var shows := [["Look at the elixirs", "elixir", Vector3(1.0, 0, 0)], ["Enchant your weapon", "enchant", Vector3(0, 0, 1.0)],
+		["Bless your armor", "bless", Vector3(0, 0, 1.0)], ["Look at the costumes", "costume", Vector3(-1.0, 0, 0)],
+		["Things for your yard", "deco", Vector3(0, 0, -1.0)], ["Today's Special", "special", Vector3(0, 0, -1.0)],
+		["Talk to Tobble", "sell", Vector3(0, 0, 1.4)]]
+	for sh in shows:
+		var u := _usable(w.shop, String(sh[0])) if String(sh[0]) != "Talk to Tobble" else (w.shop.tobble as Node3D)
+		if u == null:
+			check("ob_display_" + String(sh[1]), false, "missing")
+			continue
+		if await _near_use(u, String(sh[0]), sh[2]):
+			check("ob_display_opens_" + String(sh[1]), m.current == "shop" and ui._tab == String(sh[1]) and get_tree().paused, "%s %s" % [m.current, ui._tab])
+			if String(sh[1]) == "elixir":
+				await shot("ob_03_shop_elixirs")
+			main._resume()
+			await wait(0.3)
+	# --- buying
+	var g0 := Game.gold
+	main.open_shop("elixir")
+	await wait(0.3)
+	check("ob_buy_triple", ShopCatalog.buy("triple_jump") and Game.has_boon("triple_jump") and Game.gold == g0 - ShopCatalog.price("triple_jump"), "%d -> %d" % [g0, Game.gold])
+	ui.refresh_shop()
+	await wait(0.2)
+	await shot("ob_04_shop_bought")
+	var ad0 := Game.attack_damage()
+	ShopCatalog.buy("giant_strength")
+	check("ob_giant_strength", absf(Game.attack_damage() - ad0 * 1.3) < 0.01, "%.1f -> %.1f" % [ad0, Game.attack_damage()])
+	ShopCatalog.buy("swift_feet"); ShopCatalog.buy("lucky_coin")
+	ShopCatalog.buy("flame_edge")
+	ShopCatalog.buy("frost_edge")
+	check("ob_one_enchant", Game.has_boon("frost_edge") and not Game.has_boon("flame_edge"), str(Game.boons.keys()))
+	var mit0 := Game.mitigate(100.0)
+	ShopCatalog.buy("stoneskin")
+	check("ob_stoneskin", absf(Game.mitigate(100.0) - mit0 * 0.75) < 0.01, "%.1f -> %.1f" % [mit0, Game.mitigate(100.0)])
+	ShopCatalog.buy("fireproof")
+	check("ob_one_blessing", Game.has_boon("fireproof") and not Game.has_boon("stoneskin"), str(Game.boons.keys()))
+	var sp_id := ShopCatalog.special_id()
+	check("ob_special_half", ShopCatalog.price(sp_id) == int(ShopCatalog.ware(sp_id).price) / 2, sp_id)
+	check("ob_special_changes_daily", ShopCatalog.special_id(100) != ShopCatalog.special_id(101))
+	ShopCatalog.buy("golden_knight")
+	check("ob_costume", Game.costume_id() == "golden_knight" and Game.costume_left() > 80000.0, "%s %.0f" % [Game.costume_id(), Game.costume_left()])
+	for d in ["flower_garden", "twinkle_lights", "gnome", "bench", "bird_bath", "statue"]:
+		ShopCatalog.buy(d)
+	await wait(0.3)
+	check("ob_decor_built", w.decor.built.size() == 6 and Game.decor.size() == 6, str(w.decor.built.keys()))
+	check("ob_decor_only_once", not ShopCatalog.buy("statue") and ShopCatalog.why_not("statue") == "In your yard")
+	ui.show_tab("deco")
+	await wait(0.2)
+	await shot("ob_05_shop_deco")
+	ui.show_tab("costume")
+	await wait(0.2)
+	await shot("ob_05b_shop_costumes")
+	var bt := Game.boons_text()
+	check("ob_hud_boons", bt.contains("Triple Jump") and bt.contains("Frost Edge"), bt)
+	# --- selling
+	ui.show_tab("sell")
+	await wait(0.2)
+	await shot("ob_06_shop_sell")
+	var junk := ShopCatalog.junk()
+	var one: String = junk[0] if junk.size() > 0 else ""
+	var g1 := Game.gold
+	var got := ShopCatalog.sell(one) if one != "" else 0
+	check("ob_sell_one", got > 0 and Game.gold == g1 + got and not Game.inventory.has(one), "%d" % got)
+	var keep_leg := _mk("weapon", {"crit": 5.0}, "Test Legend")
+	Game.items[keep_leg]["rarity"] = 4
+	var worn: String = Game.equipped.weapon
+	var g2 := Game.gold
+	var n_junk := ShopCatalog.junk().size()
+	var total := 0
+	for u in ShopCatalog.junk():
+		total += ShopCatalog.sell(String(u))
+	check("ob_sell_all", n_junk > 0 and Game.gold == g2 + total and ShopCatalog.junk().is_empty() and Game.inventory.has(keep_leg) and Game.inventory.has(worn), "%d sold for %d" % [n_junk, total])
+	main._resume()
+	await wait(0.3)
+	# --- the elixirs and blessings in play
+	await tp(TradingPost.IN + Vector3(0, 0.1, 1.5), 0.0, -0.2)
+	await wait(0.4)
+	Game.hp = Game.max_hp()
+	god = false
+	var hp0 := Game.hp
+	player.invuln = 0.0
+	player.hazard_hit(0.6, 0.0, 0.0, "fire")
+	check("ob_fireproof_halves", absf((hp0 - Game.hp) - Game.max_hp() * 0.3) < 1.0, "%.1f of %.1f" % [hp0 - Game.hp, Game.max_hp()])
+	Game.hp = Game.max_hp()
+	god = true
+	var gp := Game.gold
+	Pickup.place(main.world, player.global_position + Vector3(0, 0.6, 0), "gold", 100)
+	await wait(1.2)
+	check("ob_lucky_coin", Game.gold == gp + 150, "%d -> %d" % [gp, Game.gold])
+	var cp := Pickup.place(main.world, player.global_position + Vector3(0, 0.6, 0), "costume", 1, "dino")
+	await wait(1.2)
+	check("ob_bought_costume_kept", Game.costume_id() == "golden_knight" and is_instance_valid(cp), Game.costume_id())
+	if is_instance_valid(cp):
+		cp.queue_free()
+	main.autosave()
+	var d: Dictionary = Game.read_slot(Game.active_slot)
+	check("ob_boons_saved", (d.get("boons", {}) as Dictionary).has("triple_jump") and (d.get("decor", []) as Array).size() == 6, str((d.get("boons", {}) as Dictionary).keys()))
+	var left0 := float(Game.boons.get("triple_jump", 0.0))
+	await wait(1.5)
+	check("ob_boons_tick", float(Game.boons.get("triple_jump", 0.0)) < left0 - 1.0, "%.1f -> %.1f" % [left0, float(Game.boons.get("triple_jump", 0.0))])
+	# --- out of the shop, over to the Forge
+	var out := _usable(w.shop, "Go back out")
+	check("ob_shop_exit", out != null)
+	if out:
+		out.interact(player)
+	await wait(2.5)
+	check("ob_out_of_shop", not w.shop.is_inside(player.global_position) and w.sun.visible and player.global_position.distance_to(w.shop.door_out()) < 3.0, str(player.global_position))
+	# the Triple Jump Elixir, out in the yard
+	await tp(w.ground(4, 10) + Vector3(0, 0.3, 0), 0.0, -0.1)
+	await wait(0.6)
+	var ty0 := player.global_position.y
+	var ttop := ty0
+	await press("jump", 0.07)
+	await wait(0.18)
+	await press("jump", 0.07)
+	await wait(0.3)
+	await press("jump", 0.07)
+	for i in 80:
+		await frames(1)
+		ttop = maxf(ttop, player.global_position.y)
+	check("ob_triple_jump", player.triple_jumps >= 1 and player.double_jumps >= 1, "triple %d double %d, %.1f m up" % [player.triple_jumps, player.double_jumps, ttop - ty0])
+	await wait(0.6)
+	var anvil := _usable(w.forge, "Use the anvil")
+	check("ob_anvil", anvil != null)
+	var fa: Vector3 = w.forge.w(Vector3(0.4, 0, 3.6))
+	await tp(fa + Vector3(0, 0.3, 0), 0.0, -0.15)
+	face(w.forge.anvil_top)
+	player.facing = player.yaw
+	player.zoom_target = 5.0; player.zoom = 5.0; player.snap_view()
+	await wait(0.8)
+	await shot("ob_07_forge_outside")
+	it = player.interact_target
+	check("ob_anvil_prompt", it != null and String(it.get_prompt()).contains("anvil"), str(it.get_prompt()) if it else "none")
+	check("ob_forge_floor", player.is_on_floor(), str(player.global_position))
+	# the smith's riddle
+	var h0: int = (Game.forge_book.hints as Array).size()
+	w.forge.talk()
+	check("ob_smith_hint", (Game.forge_book.hints as Array).size() == h0 + 1)
+	# --- forging: three fiery weapons make an Emberblade
+	var e1 := _mk("weapon", {"spell": 10.0}); var e2 := _mk("weapon", {"spell": 10.0}); var e3 := _mk("weapon", {"spell": 10.0})
+	var rd := ForgeRecipes.reading([e1, e2, e3])
+	check("ob_reading_fire", rd.a == "fire" and rd.b == "fire", str(rd))
+	if it:
+		it.interact(player)
+	await wait(0.5)
+	check("ob_forge_opens", m.current == "forge" and get_tree().paused, m.current)
+	ui.anvil = [e1, e2, e3]
+	ui.refresh_forge()
+	await wait(0.2)
+	await shot("ob_08_anvil_loaded")
+	check("ob_whisper", ui._whisper.text.contains("smoke"), ui._whisper.text)
+	var g3 := Game.gold
+	ui._forge_btn.pressed.emit()
+	await wait(0.4)
+	check("ob_forge_watch", m.current == "" and not get_tree().paused)
+	await shot("ob_09_forging")
+	await wait(2.2)
+	var fx: String = ui.last_forged
+	var fi := Game.item(fx)
+	check("ob_forged", fi.get("name", "") == "Emberblade" and int(fi.get("tier", 0)) == 1 and fi.get("power", "") == "burn_hit", str(fi.get("name", "")) + " " + str(fi.get("power", "")))
+	check("ob_forge_used_inputs", not Game.inventory.has(e1) and not Game.inventory.has(e2) and not Game.inventory.has(e3) and Game.inventory.has(fx))
+	check("ob_forge_fee", Game.gold == g3 - ForgeRecipes.FEE[1], "%d -> %d" % [g3, Game.gold])
+	check("ob_forge_found", (Game.forge_book.found as Array).has("emberblade"))
+	check("ob_forge_back", m.current == "forge", m.current)
+	await shot("ob_10_forged_result")
+	# the same three again: the same kind of thing (only the numbers change)
+	var e4 := _mk("weapon", {"spell": 10.0}); var e5 := _mk("weapon", {"spell": 10.0}); var e6 := _mk("weapon", {"spell": 10.0})
+	var fx2 := ForgeRecipes.forge([e4, e5, e6])
+	check("ob_same_in_same_out", Game.item(fx2).get("name", "") == "Emberblade" and Game.item(fx2).get("power", "") == "burn_hit")
+	# a plain mix at tier 1 has no power yet; at Reforged everything gets one
+	var x1 := _mk("armor", {"hp": 10.0, "crit": 2.0}); var x2 := _mk("armor", {"crit": 2.0}); var x3 := _mk("armor", {"hp": 5.0})
+	var fx3 := ForgeRecipes.forge([x1, x2, x3])
+	check("ob_plain_mix", int(Game.item(fx3).get("tier", 0)) == 1 and Game.item(fx3).get("slot", "") == "armor" and not Game.item(fx3).has("recipe"), str(Game.item(fx3).get("name", "")))
+	var fx4 := ForgeRecipes.forge([fx, fx2, _forged_like("fire", "fire", 1, "weapon")])
+	check("ob_reforged", int(Game.item(fx4).get("tier", 0)) == 2 and String(Game.item(fx4).get("power", "")) != "", "%s %s" % [Game.item(fx4).get("name", ""), Game.item(fx4).get("power", "")])
+	# deep tiers: fire and light at Masterforged is a PHOENIX
+	var ph := ForgeRecipes.forge([_forged_like("fire", "light", 2, "armor"), _forged_like("fire", "light", 2, "armor"), _forged_like("fire", "light", 2, "armor")])
+	var phi := Game.item(ph)
+	check("ob_phoenix", phi.get("name", "") == "Phoenix Plate" and phi.get("power", "") == "phoenix" and int(phi.get("tier", 0)) == 3, str(phi.get("name", "")))
+	check("ob_grand", ForgeRecipes.is_grand(ph))
+	var st := ForgeRecipes.forge([_forged_like("storm", "light", 3, "weapon"), _forged_like("storm", "light", 3, "weapon"), _forged_like("storm", "light", 3, "weapon")])
+	var sti := Game.item(st)
+	check("ob_starforged", int(sti.get("tier", 0)) == 4 and sti.get("power", "") == "thunderking" and sti.has("power2") and Loot.rarity_label(sti) == "Starforged", "%s %s %s" % [sti.get("name", ""), sti.get("power", ""), sti.get("power2", "")])
+	var sb := ForgeRecipes.forge([_forged_like("light", "stone", 1, "artifact"), _forged_like("light", "stone", 1, "artifact"), _forged_like("light", "stone", 1, "artifact")])
+	check("ob_star_boots", Game.item(sb).get("name", "") == "Starstride Boots" and Game.item(sb).get("power", "") == "sure_feet", str(Game.item(sb).get("name", "")))
+	check("ob_forged_stronger", Game.score(st) > Game.score(fx) * 1.5, "%.0f vs %.0f" % [Game.score(st), Game.score(fx)])
+	ui.refresh_forge()
+	await wait(0.2)
+	await shot("ob_11_forge_after")
+	ui.open_journal()
+	await wait(0.3)
+	check("ob_journal", m.current == "journal" and ui._journal_count.text.contains("Discovered: 4"), ui._journal_count.text)
+	await shot("ob_12_journal")
+	main._resume()
+	await wait(0.3)
+	# --- forge powers in a fight
+	Game.boons.clear()
+	var spot: Vector3 = w.ground(-2.0, -11.0) + Vector3(0, 0.2, 0)        # (behind the cabin, well away from the portal)
+	await tp(spot, 0.0, -0.2)
+	var dmy: Array = []
+	for k in 3:
+		dmy.append(_home_dummy(spot + Vector3(-1.2 + k * 1.2, 0.1, -2.0)))
+	await wait(0.6)
+	Game.equip(fx)                    # Emberblade: burning hits
+	await wait(0.2)
+	check("ob_power_on", Game.has_power("burn_hit"))
+	var e0: Enemy = dmy[1]
+	face(e0.global_position); player.facing = player.yaw
+	await tap("attack")
+	await wait(0.7)
+	check("ob_burn_hit", e0._dot_t > 0.0 or player.powers.fired.get("burn_hit", 0) > 0, "dot %.1f fired %s" % [e0._dot_t, str(player.powers.fired)])
+	Game.equip(st)                    # Starforged Thunderking: lightning from the sky
+	var hpb := 0.0
+	for e in dmy:
+		hpb += (e as Enemy).hp
+	await wait(7.0)
+	var hpa := 0.0
+	for e in dmy:
+		if is_instance_valid(e):
+			hpa += (e as Enemy).hp
+	check("ob_thunderking", int(player.powers.fired.get("thunderking", 0)) >= 1 and hpa < hpb, "fired %s, %.0f -> %.0f" % [str(player.powers.fired.get("thunderking", 0)), hpb, hpa])
+	await shot("ob_13_thunderking")
+	Game.equip(ph)                    # Phoenix Plate: up again once
+	await wait(0.2)
+	god = false
+	player.invuln = 0.0
+	Game.hp = 5.0
+	player.take_damage(500.0, player.global_position + Vector3(0, 0, -2.0), 0.0)
+	await wait(0.2)
+	check("ob_phoenix_saves", not player.dead and Game.hp > Game.max_hp() * 0.4 and player.powers.phoenix_used, "dead %s hp %.0f" % [player.dead, Game.hp])
+	await shot("ob_14_phoenix")
+	player.invuln = 0.0
+	Game.hp = 5.0
+	player.take_damage(500.0, player.global_position + Vector3(0, 0, -2.0), 0.0)
+	await wait(0.2)
+	check("ob_phoenix_once", player.dead)
+	for k in 50:                      # (the death screen comes up; then "rise again")
+		if main.state == "dead":
+			break
+		await wait(0.1)
+	main._respawn()
+	await wait(1.5)
+	player = main.player
+	god = true
+	print("OB respawned at %s (checkpoint %s) state %s captured %s" % [player.global_position, Game.checkpoint_pos, main.state, player.mouse_captured])
+	await tp(spot, 0.0, -0.2)
+	await wait(0.5)
+	# the rest, one by one
+	var pw: Powers = player.powers
+	Game.equip("rusty_sword"); Game.equip("traveler_garb")
+	var charm := _mk("artifact", {}, "Test Charm")
+	Game.equip(charm)
+	for tag in ["chain_lightning", "shockwave", "steam", "frost_nova", "radiance", "wild_heart", "shadow_veil", "raise_dead", "fire_trail", "sure_feet"]:
+		Game.items[charm]["power"] = tag          # (a charm with just this one power)
+		Game.inventory_changed.emit()
+		pw.fired.erase(tag)
+		var tj := player.triple_jumps
+		await _try_power(pw, tag, dmy, spot)
+		check("ob_power_" + tag, int(pw.fired.get(tag, 0)) > 0 or (tag == "sure_feet" and player.triple_jumps > tj and Game.has_power("sure_feet")), str(pw.fired))
+	Game.items[charm].erase("power")
+	Game.inventory_changed.emit()
+	for e in dmy:
+		if is_instance_valid(e):
+			e.queue_free()
+	# --- save, and continue: everything's still there
+	await tp(w.ground(4, 10) + Vector3(0, 0.3, 0), 0.0, -0.1)
+	await wait(0.5)
+	main.autosave()
+	Game.set_meta("ob_forged", [fx4, ph, st])
+	Game.set_meta("ob_costume", Game.costume_id())
+	Game.set_meta("ob_items_n", Game.items.size())
+	Game.set_meta("ob_phase2", true)
+	main._continue_slot(Game.active_slot)
+	return true
+
+## A forged piece with these essences (as if made from earlier forging).
+func _forged_like(a: String, b: String, tier: int, slot: String) -> String:
+	var uid := _mk(slot, {}, "Test Forged")
+	var it: Dictionary = Game.items[uid]
+	it["tier"] = tier
+	it["ess"] = {a: 2.0} if a == b else {a: 2.0, b: 1.0}
+	return uid
+
+func _home_dummy(pos: Vector3) -> Enemy:
+	var e := Enemy.new(); e.configure("revenant", "dummy"); e.position = pos
+	main.world.add_child(e)
+	e.dmg_mult = 0.0
+	return e
+
+func _try_power(pw: Powers, tag: String, dmy: Array, spot: Vector3) -> void:
+	var live: Array = dmy.filter(func(e) -> bool: return is_instance_valid(e) and not e.dead)
+	var near: Enemy = live[0] if live.size() > 0 else null
+	if near == null:
+		near = _home_dummy(spot + Vector3(0, 0.1, -2.0))
+		dmy.append(near)
+		await wait(0.4)
+	player.invuln = 0.0
+	print("OB try %s: floor %s captured %s input %s dead %s stamina %.0f menu '%s' state %s dodging %s attacking %s pos %s" % [tag, player.is_on_floor(), player.mouse_captured,
+		player.input_enabled, player.dead, Game.stamina, main.menus.current, main.state, player.dodging, player.attacking, player.global_position])
+	match tag:
+		"chain_lightning":
+			for k in range(live.size(), 3):
+				dmy.append(_home_dummy(spot + Vector3(-1.5 + k * 1.5, 0.1, -2.0)))
+			await wait(1.0)
+			live = dmy.filter(func(e) -> bool: return is_instance_valid(e) and not e.dead)
+			near = live[0]
+			for k in 3:
+				player.global_position = near.global_position + Vector3(0, 0.2, 1.6)
+				await wait(0.1)
+				face(near.global_position); player.facing = player.yaw
+				await tap("attack")
+				await wait(0.7)
+				if int(pw.fired.get(tag, 0)) > 0:
+					break
+			print("OB chain: %d live, near %.1f m" % [live.size(), player.global_position.distance_to(near.global_position)])
+		"shockwave":
+			player.blocking = true
+			player.block_time = 1.0
+			Game.stamina = Game.max_stamina()
+			player.take_damage(10.0, player.global_position - Vector3(sin(player.facing), 0, cos(player.facing)) * 2.0, 1.0)
+			player.blocking = false
+			await wait(0.2)
+		"steam", "frost_nova":
+			Game.hp = Game.max_hp()
+			player.take_damage(Game.max_hp() * 0.6, near.global_position, 1.0)
+			await wait(0.2)
+			Game.hp = Game.max_hp()
+		"radiance", "raise_dead":
+			Game.hp = Game.max_hp() * 0.5
+			for k in 12:
+				Game.foe_down.emit(spot + Vector3(1, 0, 1))
+			await wait(0.3)
+		"wild_heart":
+			god = false
+			Game.hp = Game.max_hp() * 0.5
+			var h0 := Game.hp
+			await wait(1.0)
+			if Game.hp > h0:
+				pw.fired[tag] = 1
+			god = true
+		"shadow_veil":
+			Game.stamina = Game.max_stamina()
+			await tap("dodge")
+			await wait(0.6)
+		"fire_trail":
+			Input.action_press("sprint"); Input.action_press("move_forward")
+			await wait(1.5)
+			Input.action_release("sprint"); Input.action_release("move_forward")
+			if pw._trail.size() > 0:
+				pw.fired[tag] = int(pw.fired.get(tag, 0)) + 1
+			await tp(spot, 0.0, -0.2)
+		"sure_feet":
+			player.grip = 0.1
+			await press("jump", 0.07)
+			await wait(0.18)
+			await press("jump", 0.07)
+			await wait(0.3)
+			await press("jump", 0.07)
+			await wait(1.5)
+
+func _outbuildings_test_2() -> void:
+	await wait(3.0)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	var forged: Array = Game.get_meta("ob_forged", [])
+	check("ob2_home", w is HomeWorld and w.landed)
+	check("ob2_forged_kept", forged.size() == 3 and forged.all(func(u) -> bool: return Game.inventory.has(u) and int(Game.item(u).get("tier", 0)) > 0), str(forged))
+	check("ob2_decor_kept", Game.decor.size() == 6 and w.decor.built.size() == 6)
+	check("ob2_journal_kept", (Game.forge_book.found as Array).size() >= 4)
+	check("ob2_costume_kept", Game.costume_id() != "" and Game.costume_id() == String(Game.get_meta("ob_costume", "")), Game.costume_id())
+	# a new find after loading never replaces something you have
+	var n0 := Game.items.size()
+	var nu := Loot.make_random(10, 0.0, 0)
+	check("ob2_new_id", Game.items.size() == n0 + 1 and not forged.has(nu), "%s (%d -> %d)" % [nu, n0, Game.items.size()])
+	await _cam_shot("ob_15_yard", Vector3(2, 7, 24), Vector3(-6, 1, 6), 65.0)
+	await _cam_shot("ob_16_statue", Vector3(4.5, 2.6, 10), Vector3(7.6, 2.6, 3.4), 60.0)
+	_finish()

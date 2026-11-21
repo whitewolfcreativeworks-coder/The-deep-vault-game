@@ -1111,3 +1111,73 @@ Jason: "even the campfires should burn you in insane mode... any fire at all sho
 - **Lava versions** (`death_lava_1/2`) add rising "blub" bubbles, a sizzle and a final low "gloop". The hero's body sinks 1.6 m into the lava (the tween is cancelled on respawn).
 - `hazard_hit()` records the hazard kind, so `die()` knows which to play.
 - The spectrograms show the intended structure, but the sounds can't be listened to here; Jason's ears are the test.
+
+## Follow-up 34: Tobble's Trading Post and the Forge (Nov 20)
+
+Jason, talking it through with his son: gold should buy "weapon or armor temporary buffs and enhancements... certain skins that only exist there... but these have to be temporary. They fade". The shop should be "a cool little outbuilding near the cabin". Then a forge: "different combinations of forging together different gear produces certain classes of gear that you can only get from the forge... there will be a system behind it, but we won't tell them", and "you can re-forge forged items... occasionally some fantastic armor with some fantastic abilities". Mid-build he added: "you need that top-level gear to even think about completing the insane mode... up on the clouds where it's already slippery... a special pair of star boots may help."
+
+**The buildings (`TradingPost`, `HomeForge`, `HomeDecor`):**
+- **Trading Post.** The KayKit red house sits across the yard, with crates, a lantern and a sign.
+  - Its door teleports you into a room built under the valley, like the cabin. The room is only drawn while you're inside.
+  - Inside are seven displays. Each is a `Usable` that opens the shop panel at its own tab.
+  - Tobble is a `ShopNPC`: an `NPC` with no quest marker or sky beam.
+- **Forge.** It's an open stone smithy built from boxes, with no teleport.
+  - The furnace has coals, flames, flickering light and chimney smoke. Home fires never burn you, even after an Insane run.
+  - Inside: an anvil, a quench barrel, a weapon rack, a grindstone and the journal stand.
+- **Layout.** The home valley skips trees at both building sites and drops one fence segment so you can walk to the forge. The skipped trees still consume their random numbers, so every other tree stays where it was. The opening movie's valley is unchanged.
+- **Indoors.** The cabin and the shop share `HomeWorld.indoors()` for the sun switch and the softer soundscape.
+
+**Shop magic is saved and timed.**
+- `Game.boons` is saved. It ticks down only while you play, and new adventures and level replays keep it (you paid for it).
+- Food buffs are different: they aren't saved and are cleared by replays.
+- Effects are small hooks, all inert unless bought:
+  - `attack_damage` ×1.3 (Giant Strength);
+  - `mitigate` ×0.75 (Stoneskin);
+  - the third jump (Triple Jump);
+  - speed ×1.25 (Swift Feet);
+  - gold pickups ×1.5 (Lucky Coin);
+  - fire and lava halved in `hazard_hit`/`burn` (Fireproof).
+- Enchantments and Thorns share the forge powers' code (`Powers.BOON_FOR`).
+- **Shop-only costumes** are new `Loot.COSTUMES` entries with four new finishes in `CharacterModel.DARK_LOOKS` (golden, starlight, frost, candy). They're in none of the drop pools, and they last one real day.
+- **Today's Special** is picked from the day number, so it's the same all day and different tomorrow.
+
+**The forge's hidden system (`ForgeRecipes`):**
+- **Essences.** Every piece carries hidden essences. They come from its magic bonuses (Embers/Fury = Fire, Tides = Frost, Precision = Storm, Turtle = Stone, Bear = Beast, Leech = Shadow, Owl = Light), from words in its name and kind (Bone, Ghost, Moon, Sky, Plate...), and from skins and dark finishes.
+- **Reading.** The anvil adds the essences up. The strongest leads; the second counts if it's at least 45% as strong, otherwise the piece is "pure".
+- **Recipes.** That pair plus the tier picks a recipe from a plain data table (17 recipes):
+  - 9 grand recipes at Masterforged or better (Starstride at Reforged);
+  - 8 "pure" recipes at Forged.
+- **Without a recipe:** a piece gets the leading essence's small power from Reforged up.
+- **Starforged** adds the second essence's power as a second power.
+- **Determinism.** Same essences in, same name and power out; only the numbers roll.
+- **Tiers.** The new tier is one more than the lowest tier you put in, which makes deep tiers naturally rare: 3, 9, 27 and 81 found pieces.
+- **Stats.** Built like legendary gear at (best ingredient's item level + tier), +12% per tier, with bonuses that lean towards the essences.
+- **Item levels.** New items now record their item level. Older ones get an estimate from their attack or defense.
+
+**Powers (`Powers`, one per player):**
+- **Hooks:** melee hits, blows taken, blocks, dodges, a new `Game.foe_down` signal from every monster death, and one physics tick.
+- **New monster code:** `Enemy.ignite()` gives monsters a cheap damage-over-time (one float compare per frame when not burning).
+- **Phoenix** intercepts `die()`, but not falls off the world, and works once per level (a new level creates a new player).
+- **Raise Dead and Moonfang** reuse the Necromancer's and Beastmaster's `Ally` skeletons and wolves.
+- **Blazewalker's fire trail** is a pool of at most 8 reused particle patches.
+- **Starstride** ignores low grip and allows the third jump.
+- **Insane note:** Insane "with my gear" matches your gear's numbers, so the forge's stat edge cancels out there and its powers are the real advantage. That fits Jason's "star boots" idea.
+
+**A real bug fixed along the way:** `Loot._next` (the counter for new item ids) started from 1 again in every new session.
+- After you loaded a save in a fresh browser session, the first thing you found took the id `g1`, replacing whatever `g1` was in your bag or gear chest.
+- `_register` now skips ids that are already taken, and the counter is saved too. The test loads a save and checks that a new find doesn't replace anything.
+
+**Tested:** the new `outbuildings` test (84 checks, Forward+ and the web renderer):
+- **Shop:** every display's prompt and tab, buying, prices, one enchantment and one blessing at a time, Today's Special, costumes, decorations, selling one piece and selling everything, the HUD line, saving and ticking.
+- **Shop magic in play:** the Triple Jump in the yard, Fireproof halving a fire hit, Lucky Coin on a gold pickup.
+- **Forge:**
+  - The anvil prompt and the smith's riddle.
+  - **Forging steps:**
+    1. three fiery weapons make an Emberblade, and the same three again make another;
+    2. a plain mix makes plain armor;
+    3. three Forged make Reforged;
+    4. fire and light at Masterforged make Phoenix Plate;
+    5. storm and light at Starforged make a Thunderking blade with two powers;
+    6. light and stone make the Starstride Boots.
+  - **Panels:** the journal count, and the forge panel stepping aside to watch the hammer fall.
+- **Powers:** every power fires in a fight with dummies at home, Phoenix saves you once and only once, and everything survives save and continue.

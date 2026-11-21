@@ -73,6 +73,50 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### Tobble's Trading Post and the Forge (Nov 20)
+Two new buildings at home, for spending your gold and making better gear.
+
+**Tobble's Trading Post** is the red house across the yard from the cabin. Tobble, the merchant whose strongbox you got back in the Goblin Forest, runs it. Inside, everything is on display: walk up to a display and press **E**.
+
+| Display | What's for sale | How long it lasts | Price |
+|---|---|---|---|
+| Elixir shelf | **Triple Jump** (a third jump in the air), **Swift Feet** (run 25% faster), **Giant Strength** (hit 30% harder), **Lucky Coin** (gold pickups are worth 50% more) | 10–15 minutes of play | 250–600 |
+| Enchanting table | Weapon enchantments: **Flame Edge** (foes keep burning), **Frost Edge** (foes slow down), **Lightning Edge** (lightning leaps to another foe). One at a time. | 15 minutes of play | 500–700 |
+| Blessing altar | Armor blessings: **Stoneskin** (take 25% less damage), **Thorns** (foes that hit you get hurt), **Fireproof** (fire and lava burn you half as much: handy in Insane). One at a time. | 15 minutes of play | 450–800 |
+| Costume mannequins | Costumes you can't find anywhere else: Golden Knight, Star Mage, Frost Ninja, Candy Clown, Golden Dino | a whole real day | 2,000–6,000 |
+| Yard catalog | Things for your yard: flower beds, twinkle lights, a garden gnome, a bench, a bird bath (more birds come to sing), and a **giant golden statue of your hero** | yours to keep | 600–12,000 |
+| Today's Special | one thing at **half price**, a different one each day | | |
+| Tobble at the counter | **Sell your gear** for twice its salvage value, or **sell everything you're not using** in one go (it keeps what you wear, and your forged and legendary gear) | | |
+
+Elixirs, enchantments and blessings only count down while you play, and they show on the HUD under your powers. There are no loot boxes, and nothing to pay for Port Home or for coming back to life.
+
+**The Forge** is the open stone smithy through the gap in the fence, its furnace glowing day and night. Ironbeard the smith works the anvil (that name is a placeholder: Jason's son gets to name the smith).
+- **Put three pieces of gear on the anvil and forge them into one** piece you can't find anywhere else. The gear can come from your bag or the gear chest; take off anything you're wearing first.
+- **Every forge makes something.** There's never a dud. The smith charges a small fee.
+- **Forged gear can be forged again.** The new piece's tier is one more than the *lowest* tier you put in:
+
+| Tier | Made from | Fee |
+|---|---|---|
+| **Forged** | 3 found pieces | 100 |
+| **Reforged** | 3 Forged (9 found pieces in all) | 300 |
+| **Masterforged** | 3 Reforged (27) | 800 |
+| **Starforged** | 3 Masterforged (81): the very best, with **two** powers | 2,000 |
+
+- **There's a hidden system.** Which kind of gear comes out depends on what you put in, and the same ingredients always make the same kind of gear (only the numbers vary). Nobody tells you the rules. The anvil gives one clue (what the glow smells of), and Ironbeard gives riddles if you talk to him.
+- **Forge-only powers** come with the special recipes and with every Reforged piece or better. Some examples:
+  - burning or freezing hits, and lightning that chains between foes;
+  - a shield block that sends out a shockwave;
+  - **Phoenix** gear that brings you back from a fall once per level;
+  - **Thunderking** gear that strikes foes with lightning from the sky;
+  - fire footprints;
+  - skeletons and spirit wolves that rise to fight for you;
+  - **Starstride Boots**: no slipping on wet clouds or Insane's Slippery Ice, plus a third jump.
+- **The Forge Journal** (the red book by the anvil) lists every recipe you've discovered and shows "???" for the rest. The smith's riddles get written in it too.
+
+**The secret recipes are made to be edited.** They live in `game/scripts/world/forge_recipes.gd` (spoilers inside!). Jason's son can add his own: copy a line, choose two essences, a tier, the names, a power and a riddle.
+
+Forged gear is stronger than found gear and gets stronger with every tier, so it's the way to gear up for Hard and Insane. In **Insane with your gear**, though, the monsters match your gear's numbers, so there the forge's real edge is its **powers**.
+
 ### Replay modes and the level picker
 Once you've finished the adventure (flown home on the Sky Ride), the family portal in the yard offers:
 
@@ -152,13 +196,6 @@ The first version was too busy (its breeze swelled like surf), so it was toned r
 - **Identical scenery props** in each 40 m patch are drawn together.
 
 Measured on the web renderer, an Insane forest fight went from about 12,800 draw calls (the first Insane build) to about 2,300. Normal's forest stays at its original ~7,300, which was smooth on the iPad. `tools/run_tests.sh perf` measures it; `tour` takes a fixed screenshot tour of every level for before/after comparisons.
-- **Monsters sleep** when you're far away: no thinking, physics or animation until you come within about 50 m.
-- Monsters only steer around their **awake** neighbours (that check used to compare every monster with every other one, every tick).
-- Insane has **fewer, fiercer** monsters (above).
-- **Small things far away aren't drawn:** pieces under 0.6 m beyond 40 m, under 2 m beyond 65 m, under 5 m beyond 110 m.
-- **Identical scenery props** in each 40 m patch are drawn together in one go.
-
-Measured on the web renderer, the Goblin Forest went from about 4,400 draw calls to about 1,300, and an Insane forest fight from 12,800 (the first Insane build) to about 2,300. Normal mode got the same savings. `tools/run_tests.sh perf` measures it; `tour` takes a fixed screenshot tour of every level for before/after comparisons.
 
 ### New in the Nov 19 afternoon notes
 - **The Sky Ride: the flight home is its own arcade game.** Your dragonfly now flies itself along the course, about a minute and a half home.
@@ -501,6 +538,7 @@ tools/       build.sh (exports), run_tests.sh (automated playthrough), make_audi
 GODOT=/path/to/godot tools/build.sh all        # export Windows / Linux / macOS into builds/
 GODOT=/path/to/godot tools/run_tests.sh flow   # scripted playthrough to victory, with screenshots
 GODOT=/path/to/godot tools/run_tests.sh shots  # screenshot tour of every area
+GODOT=/path/to/godot tools/run_tests.sh outbuildings  # the Trading Post, the Forge and every forge power
 ```
 
 The test drives the real game through input actions (movement, mouse-wheel zoom, attacks, interaction) and writes `results.json` plus screenshots.

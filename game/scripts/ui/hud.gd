@@ -299,6 +299,8 @@ func _process(delta: float) -> void:
 		special_label.text += ("\n%s: %s" if Game.touch_active else "\n%s [B]: %s") % [ab2.name, st2]
 	if not Game.buffs.is_empty() or Game.shroom >= 1.0:
 		special_label.text += "\n" + Game.buffs_text()
+	if not Game.boons.is_empty():
+		special_label.text += "\n" + Game.boons_text()          # (bought at Tobble's Trading Post)
 	var cid := Game.costume_id()
 	costume_label.visible = cid != ""
 	if cid != "":

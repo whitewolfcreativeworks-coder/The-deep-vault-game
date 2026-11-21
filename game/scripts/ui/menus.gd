@@ -31,6 +31,8 @@ var _lore_text: Label
 var _victory_stats: Label
 var _death_label: Label
 var _mute_btn: Button
+## Tobble's Trading Post, the anvil and the Forge Journal (see ShopUI).
+var shop_ui: ShopUI
 
 const PREVIEW_COMPAT_EXPOSURE := 0.68
 const PREVIEW_COMPAT_KEY := 0.45
@@ -61,6 +63,9 @@ func _ready() -> void:
 	_build_dialogue()
 	_build_forest_victory()
 	_build_designer()
+	shop_ui = ShopUI.new(); shop_ui.name = "ShopUI"
+	add_child(shop_ui)
+	shop_ui.setup(self)
 	fade = ColorRect.new()
 	fade.color = Color(0, 0, 0, 1)
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -987,7 +992,7 @@ func _item_row(id: String, equipped_now: bool) -> Control:
 	var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 12); row.add_child(hb)
 	var vb := VBoxContainer.new(); vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hb.add_child(vb)
 	var slot: String = it.get("slot", "")
-	vb.add_child(UIKit.label("%s   [%s %s]" % [it.name, Loot.RARITY_NAMES[r], Game.SLOT_NAMES.get(slot, slot)], 18, it.get("color", UIKit.PARCH), true))
+	vb.add_child(UIKit.label("%s   [%s %s]" % [it.name, Loot.rarity_label(it), Game.SLOT_NAMES.get(slot, slot)], 18, it.get("color", UIKit.PARCH), true))
 	var lines := Game.item_lines(id)
 	var stat := UIKit.label(", ".join(lines) if lines.size() > 0 else String(it.get("desc", "")), 15, UIKit.PARCH)
 	stat.autowrap_mode = TextServer.AUTOWRAP_WORD; stat.custom_minimum_size.x = 480
@@ -1231,7 +1236,7 @@ func _stash_row(id: String, in_chest: bool) -> Control:
 	var slot: String = it.get("slot", "")
 	vb.add_child(UIKit.label(String(it.get("name", id)), 18, it.get("color", UIKit.PARCH), true))
 	var lines := Game.item_lines(id)
-	var st := UIKit.label("%s %s   %s" % [Loot.RARITY_NAMES[r], Game.SLOT_NAMES.get(slot, slot), ", ".join(lines)], 14, UIKit.DIM)
+	var st := UIKit.label("%s %s   %s" % [Loot.rarity_label(it), Game.SLOT_NAMES.get(slot, slot), ", ".join(lines)], 14, UIKit.DIM)
 	st.autowrap_mode = TextServer.AUTOWRAP_WORD; st.custom_minimum_size.x = 420
 	vb.add_child(st)
 	var b := Button.new(); b.custom_minimum_size = Vector2(150, 54)

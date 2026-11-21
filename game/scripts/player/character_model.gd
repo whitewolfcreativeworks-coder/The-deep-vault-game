@@ -174,6 +174,11 @@ const DARK_LOOKS := {
 	"rot": {"albedo": Color(0.6, 0.85, 0.5), "rough": 0.8, "emit": Color(0.03, 0.12, 0.0), "aura": Color(0.45, 1.0, 0.3)},
 	"deathly": {"albedo": Color(0.55, 0.7, 0.85), "rough": 0.4, "metal": 0.2, "emit": Color(0.05, 0.22, 0.45), "aura": Color(0.3, 0.75, 1.0)},
 	"infernal": {"albedo": Color(0.85, 0.38, 0.32), "rough": 0.5, "emit": Color(0.55, 0.08, 0.02), "aura": Color(1.0, 0.3, 0.1)},
+	# the shop-only finishes (Tobble's Trading Post)
+	"golden": {"albedo": Color(1.0, 0.8, 0.38), "rough": 0.28, "metal": 0.85, "emit": Color(0.22, 0.13, 0.0), "aura": Color(1.0, 0.82, 0.3)},
+	"starlight": {"albedo": Color(0.72, 0.78, 1.0), "rough": 0.3, "metal": 0.35, "emit": Color(0.16, 0.2, 0.5), "aura": Color(0.75, 0.82, 1.0)},
+	"frost": {"albedo": Color(0.78, 0.95, 1.0), "rough": 0.18, "metal": 0.15, "emit": Color(0.08, 0.28, 0.38), "aura": Color(0.55, 0.92, 1.0)},
+	"candy": {"albedo": Color(1.0, 0.66, 0.88), "rough": 0.35, "emit": Color(0.3, 0.05, 0.2), "aura": Color(1.0, 0.55, 0.9)},
 }
 
 ## cfg: {kind:"hero", hero:"Knight", cape_color:Color, outfit_color:Color, show_hat:bool, weapon:id, shield:id|""}

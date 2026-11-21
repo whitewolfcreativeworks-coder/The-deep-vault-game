@@ -405,6 +405,45 @@ func _thaw() -> void:
 		_ice.queue_free()
 	_ice = null
 
+## On fire (a Flame Edge weapon or a forge power): it keeps burning for a few
+## seconds, a little damage every half second.
+var _dot_t := 0.0
+var _dot_dps := 0.0
+var _dot_tick := 0.0
+var _dot_fx: CPUParticles3D
+
+func ignite(dps: float, secs: float) -> void:
+	if dead:
+		return
+	_dot_dps = maxf(_dot_dps if _dot_t > 0.0 else 0.0, dps)
+	_dot_t = maxf(_dot_t, secs)
+	if _dot_fx == null or not is_instance_valid(_dot_fx):
+		_dot_fx = CPUParticles3D.new(); _dot_fx.amount = 14; _dot_fx.lifetime = 0.5
+		_dot_fx.mesh = FX.quad(0.22); _dot_fx.material_override = FX.glow_material(Color(1.0, 0.5, 0.15), 2.5)
+		_dot_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		_dot_fx.emission_box_extents = Vector3(0.25, 0.5, 0.25) * t.scale / 0.84
+		_dot_fx.direction = Vector3.UP; _dot_fx.spread = 15; _dot_fx.initial_velocity_min = 1.2; _dot_fx.initial_velocity_max = 2.2
+		_dot_fx.gravity = Vector3(0, 2, 0); _dot_fx.color_ramp = FX._fade_ramp(Color(1.0, 0.5, 0.15))
+		_dot_fx.position.y = 1.0 * t.scale / 0.84
+		add_child(_dot_fx)
+	_dot_fx.emitting = true
+
+func _dot_step(delta: float) -> void:
+	_dot_t -= delta
+	_dot_tick -= delta
+	if _dot_tick <= 0.0:
+		_dot_tick = 0.5
+		var d := _dot_dps * 0.5
+		hp -= d
+		FX.damage_number(global_position + Vector3(0, 2.0 * t.scale / 0.84, 0), d, Color(1.0, 0.6, 0.2), false)
+		if state == S.DORMANT:
+			_awaken()
+		if hp <= 0.0:
+			_die(Vector3.ZERO)
+			return
+	if _dot_t <= 0.0 and _dot_fx and is_instance_valid(_dot_fx):
+		_dot_fx.emitting = false
+
 ## Smoke Bomb: lose sight of the player for a few seconds.
 func lose_target(sec := 3.0) -> void:
 	_blind_t = sec
@@ -471,6 +510,10 @@ func _physics_process(delta: float) -> void:
 	if player == null or not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("player")
 		if player == null:
+			return
+	if _dot_t > 0.0:
+		_dot_step(delta)
+		if dead:
 			return
 	if not lean:
 		pass
@@ -1303,6 +1346,10 @@ func take_damage(amount: float, from_pos: Vector3, knock := 2.5, crit := false) 
 func _die(away: Vector3) -> void:
 	_frozen_t = 0.0
 	_thaw()
+	_dot_t = 0.0
+	if _dot_fx and is_instance_valid(_dot_fx):
+		_dot_fx.emitting = false
+	Game.foe_down.emit(global_position)
 	if oddity == "bomber":
 		_bomb(global_position)
 	if _dive_mark and is_instance_valid(_dive_mark):

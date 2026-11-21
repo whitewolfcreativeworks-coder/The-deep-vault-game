@@ -68,7 +68,7 @@ func _build() -> void:
 func _process(_delta: float) -> void:
 	# no sunshine through the roof
 	if home.player and home.sun:
-		home.sun.visible = not is_inside(home.player.global_position)
+		home.sun.visible = not home.indoors(home.player.global_position)
 
 # --- furniture -------------------------------------------------------------------
 func _desk() -> void:

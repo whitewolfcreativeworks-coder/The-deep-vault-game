@@ -440,7 +440,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			menus.designer.close(false)      # Esc steps back out of the Skin Designer
 		elif menus.current in ["ask", "modes", "levels"] and _ask_cancel.is_valid():
 			_ask_cancel.call()
-		elif menus.current in ["pause", "inventory", "lore", "stash", "ask"]:
+		elif menus.current in ["pause", "inventory", "lore", "stash", "ask", "shop", "forge", "journal"]:
 			_resume()
 		elif menus.current == "" and state == "play":
 			_open("pause")
@@ -670,6 +670,46 @@ func open_stash() -> void:
 	if state != "play" or menus.current != "":
 		return
 	_open("stash")
+
+## Tobble's Trading Post: a display (or Tobble himself) opens the shop at that tab.
+func open_shop(tab: String) -> void:
+	if state != "play" or menus.current != "":
+		return
+	_open("shop")
+	menus.shop_ui.open_shop(tab)
+
+## The anvil (or, journal = true, the Forge Journal).
+func open_forge(journal := false) -> void:
+	if state != "play" or menus.current != "":
+		return
+	if journal:
+		_open("journal")
+		menus.shop_ui.refresh_journal()
+	else:
+		_open("forge")
+		menus.shop_ui.open_forge()
+
+## FORGE! The panel steps aside so you can watch the smith hammer it out, then
+## comes back to show what you made.
+func forge_strike(uid: String) -> void:
+	_resume()
+	var grand := ForgeRecipes.is_grand(uid)
+	var f = world.get("forge") if world else null
+	if f is HomeForge:
+		(f as HomeForge).strike(grand)
+	player.input_enabled = false
+	get_tree().create_timer(2.1).timeout.connect(func() -> void:
+		if not is_instance_valid(player):
+			return
+		player.input_enabled = true
+		var it := Game.item(uid)
+		Game.say("You forged: %s!" % String(it.get("name", "?")), it.get("color", Color.WHITE))
+		autosave()
+		if state == "play" and menus.current == "":
+			_open("forge")
+			var who: String = String(Game.NPC_NAMES.smith).split(" ")[0]
+			menus.shop_ui.open_forge(("%s: \"Now THAT is something special. I haven't made one of those in years!\"" % who) if grand
+				else ("%s: \"There. Never a dud from my anvil! Bring me three more and we'll see what else we can make.\"" % who)))
 
 func show_lore(t: String, body: String) -> void:
 	menus.show_lore(t, body)

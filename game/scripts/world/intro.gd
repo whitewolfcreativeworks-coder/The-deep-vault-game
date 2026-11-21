@@ -19,6 +19,9 @@ const ROOM := Vector3(400, 0, 0)       # the cabin interior set (filmed separate
 
 var cam: Camera3D
 var soundscape: Soundscape
+## At home only (HomeWorld): spots kept clear of trees for the outbuildings, which
+## also opens a gap in the fence beside the well. (The opening movie keeps its valley.)
+var clear_spots: Array = []
 var actor: CharacterModel
 var env: Environment
 var sun: DirectionalLight3D
@@ -151,12 +154,16 @@ func _valley() -> void:
 	for p in [Vector2(-3, 8), Vector2(-4.5, 9.5), Vector2(-2, 10)]:
 		_model("pumpkin_orange" if p.x > -4 else "pumpkin_yellow_small", g(p.x, p.y), p.x * 40.0, 1.0)
 	_model("fence_wood_straight", g(-9, 2), 0.0, 6.0)
-	_model("fence_wood_straight", g(-9, 9), 0.0, 6.0)
+	if clear_spots.is_empty():
+		_model("fence_wood_straight", g(-9, 9), 0.0, 6.0)
 	_model("lantern_standing", g(3.5, 6.0), 0.0, 1.0)
 	var rng := RandomNumberGenerator.new(); rng.seed = 21
 	for k in 110:
 		var p := Vector2(rng.randf_range(-60, 60), rng.randf_range(-60, 60))
 		if p.length() < 13.0 or p.distance_to(Vector2(PORTAL.x, PORTAL.z)) < 9.0 or p.distance_to(Vector2(5, 10)) < 9.0 or p.distance_to(PORTAL_CAM) < 6.0:
+			continue
+		if clear_spots.any(func(c: Vector2) -> bool: return p.distance_to(c) < 8.5):
+			rng.randi(); rng.randf()        # (keep the other trees exactly where they were)
 			continue
 		var nm: String = ["tree_single_A", "tree_single_B", "tree_pine_yellow_large", "tree_pine_orange_medium"][rng.randi() % 4]
 		_model(nm, g(p.x, p.y) - Vector3(0, 0.2, 0), rng.randf() * 360.0, 6.5 if nm.begins_with("tree_single") else 1.1)
