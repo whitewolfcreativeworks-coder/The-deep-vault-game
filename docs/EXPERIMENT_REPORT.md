@@ -1262,3 +1262,29 @@ Jason, after a session of Insane in the Goblin Forest: Speed Freak "doesn't real
 | Still going forward after 0.4 s of pushing right | 3.0 m/s | 0 |
 | Still gliding 0.5 s after letting go | 3.3 m/s | 0 |
 
+## Follow-up 38: a real disco and a real chicken rain (Nov 21)
+
+Jason: "the disco party should have like a disco ball that appears and disco music while the effect is going on. and then underneath the feet is the different colored checkers... Saturday Night Fever". On Chicken Party: "a lot more chickens should fall out of the sky".
+
+**Disco Time (`DiscoParty`)** follows you for its 14 seconds:
+- **Mirror ball:** a faceted ball about 5 m above you. Each little mirror has its own silver, pink or ice tone, so it glitters as it turns. It's ringed with sparkles and throws four coloured beams that sweep round.
+- **Dance floor:** a 7×7 floor of 1.25 m squares centred on the square you're standing on, each square laid on the ground below it. On every beat (120 BPM) the squares change to new disco colours (a dark one now and then), and the square under your feet glows white.
+- **Lights:** the two coloured lights that circled you before.
+- **Music:** `loop_disco`, a new 16-second synthesized loop:
+  - four-on-the-floor kick, claps on 2 and 4, open hats on the off-beats;
+  - an octave-jumping bass over Dm–Bb–C–A, strings and funky stabs;
+  - a plucked-lute tune in D minor on top, so it still sounds like this game.
+
+  The level's music ducks 22 dB while it plays and comes back afterwards.
+- **Cost:** the floor is one MultiMesh (one draw call), plus the ball, four beams, one particle effect and two lights.
+- **Not checked by ear:** the music was checked by spectrogram only; nobody here can listen to it.
+
+**Chicken Party (`ChickenRain`):**
+- **The rain:** about 40 chickens drop from 12–18 m up within 12 m of you, about ten a second. They flap madly and spin a little as they fall, land with a bawk (rate-limited), scurry off in a random direction for a second or two, and vanish in a puff of feathers.
+- **Cost:** they're only for show. One baked mesh is drawn for all of them in one MultiMesh, and all their wings in another: two draw calls however many there are, at most 26 at once. There's no physics. A single ray finds each landing spot, so they don't land over cliffs or cloud gaps.
+- **Real chickens:** four real chickens or turkeys still drop in with them, and those can be caught for food.
+
+**Tested** by the new `party` test, in Insane in the Goblin Forest:
+- **Disco:** the ball is up, the 49-square floor is down, it beats, the music plays and the level music ducks, and when it ends the party goes and the music comes back.
+- **Chickens:** 8–26 are in the air at once, 15 or more have landed after a few seconds, the real ones arrive, and the rain cleans itself up.
+

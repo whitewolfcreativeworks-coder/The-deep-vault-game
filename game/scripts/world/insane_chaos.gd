@@ -10,9 +10,9 @@ class_name InsaneChaos
 ##   BOING BOING     you bounce every time you land
 ##   SPEED FREAK     you run super fast
 ##   METEOR SHOWER   fireballs crash down: watch for the red circles
-##   CHICKEN PARTY   a few chickens burst out of nowhere
+##   CHICKEN PARTY   it rains chickens! (and a few land for real: catch one for a drumstick)
 ##   MONSTER RAGE    every monster near you goes into a rage and comes for you
-##   DISCO TIME      the lights go disco
+##   DISCO TIME      a mirror ball, a lit-up dance floor under your feet and disco music
 ##   GOLD RAIN       coins pour out of the sky (a nice one)
 ##   GIANT FOES      every monster nearby grows huge
 ##   EARTHQUAKE      the ground shakes and shoves you about
@@ -43,8 +43,9 @@ var events_fired := 0
 var _ui: CanvasLayer
 var _label: Label
 var _timers: Label
-var _disco: Array = []
 var _disco_t := 0.0
+var party_disco: DiscoParty        # (the latest ones, for the tests)
+var party_rain: ChickenRain
 var _moon_t := 0.0
 var _quake_t := 0.0
 var _quake_kick := 0.0
@@ -142,18 +143,9 @@ func _foes_near(r: float) -> Array:
 
 func _tick_effects(delta: float) -> void:
 	if _disco_t > 0.0:
-		_disco_t -= delta
-		for i in _disco.size():
-			var l: OmniLight3D = _disco[i]
-			if is_instance_valid(l):
-				var a := Time.get_ticks_msec() * 0.003 + i * TAU / _disco.size()
-				l.global_position = player.global_position + Vector3(cos(a) * 4.0, 2.5, sin(a) * 4.0)
-				l.light_color = Color.from_hsv(fmod(a * 0.3, 1.0), 0.9, 1.0)
-		if _disco_t <= 0.0:
-			for l in _disco:
-				if is_instance_valid(l):
-					l.queue_free()
-			_disco.clear()
+		_disco_t -= delta          # (the party itself is a DiscoParty)
+		if party_disco == null or not is_instance_valid(party_disco):
+			_disco_t = 0.0
 	if _moon_t > 0.0:
 		_moon_t -= delta
 		if _moon_t <= 0.0:
@@ -240,13 +232,17 @@ func fire(ev: String, also := false) -> void:
 				var old: Node3D = _birds.pop_front()
 				FX.burst(old.global_position + Vector3(0, 0.5, 0), Color(1, 1, 1), 10, 2.0, 0.1, 0.5, 0.0)
 				old.queue_free()
+			# it rains chickens (Jason: "a lot more chickens should fall out of the sky"),
+			# and four real ones drop in with them: catch one for a drumstick
+			party_rain = ChickenRain.start(world, p, 40)
 			for k in 4:
 				var a := k * TAU / 4.0
-				get_tree().create_timer(k * 0.15).timeout.connect(func() -> void:
+				get_tree().create_timer(0.4 + k * 0.5).timeout.connect(func() -> void:
 					if is_instance_valid(p) and is_instance_valid(world):
-						var at := p.global_position + Vector3(cos(a), 0.5, sin(a)) * 4.5
+						var at := p.global_position + Vector3(cos(a) * 4.5, 7.0, sin(a) * 4.5)
 						_birds.append(Fowl.make(world, at, "turkey" if k % 2 == 0 else "chicken", 9.0)))
 			Sfx.play("cluck", -2.0, 0.2)
+			Sfx.play("bawk", -4.0, 0.2)
 		"rage":
 			for e in _foes_near(45.0):
 				var en := e as Enemy
@@ -259,10 +255,7 @@ func fire(ev: String, also := false) -> void:
 					en._go(Enemy.S.CHASE)
 		"disco":
 			_disco_t = 14.0
-			for k in 2:
-				var l := OmniLight3D.new(); l.light_energy = 3.5; l.omni_range = 9.0
-				world.add_child(l)
-				_disco.append(l)
+			party_disco = DiscoParty.start(world, p, 14.0)
 		"gold":
 			for k in 10:
 				get_tree().create_timer(k * 0.2).timeout.connect(func() -> void:

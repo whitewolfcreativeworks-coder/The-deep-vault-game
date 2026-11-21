@@ -602,6 +602,80 @@ def death_fire_2(): return _mix(_say_uh_oh(1.08), _crackle_tail(1.4, 812), 0.4)
 def death_lava_1(): return _mix(_say_oh_no(0.95), _bubbles(1.6, 821), 0.6)
 def death_lava_2(): return _mix(_say_uh_oh(1.0), _bubbles(1.6, 822), 0.45)
 
+# --- DISCO TIME (Insane): a disco groove with a fairy-tale lute on top ------------------
+def loop_disco():
+    """16 s, 120 BPM, 8 bars: four-on-the-floor kick, claps on 2 and 4, open hats on
+    the off-beats, an octave-jumping disco bass, swelling strings and a plucked lute
+    tune in D minor (so it still sounds like it belongs in the game). Loops seamlessly."""
+    r = np.random.default_rng(907)
+    bpm = 120.0; beat = 60.0 / bpm; bars = 8; L = int(bars * 4 * beat * SR); tail = int(1.5 * SR)
+    x = np.zeros(L + tail)
+    def put(sig, at):
+        s0 = int(at * SR); e = min(len(x), s0 + len(sig)); x[s0:e] += sig[: e - s0]
+    # drums
+    for k in range(bars * 4):
+        tt = t(0.4)
+        kick = np.sin(2 * np.pi * np.cumsum(50 + 70 * np.exp(-tt * 30)) / SR) * np.exp(-tt * 9)
+        put(kick * 0.9, k * beat)
+        if k % 2 == 1:
+            n = r.uniform(-1, 1, int(0.25 * SR)); tn = t(0.25)
+            clap = highpass(lowpass(n, 3500), 700) * (np.exp(-tn * 22) + 0.6 * np.exp(-np.maximum(tn - 0.012, 0) * 30) * (tn > 0.012))
+            put(clap * 0.55, k * beat)
+        n = r.uniform(-1, 1, int(0.2 * SR)); tn = t(0.2)
+        put(highpass(n, 6000) * np.exp(-tn * 14) * 0.2, k * beat + beat * 0.5)             # open hat on the "and"
+        for q in (0.25, 0.75):
+            n = r.uniform(-1, 1, int(0.05 * SR)); tn = t(0.05)
+            put(highpass(n, 8000) * np.exp(-tn * 80) * 0.08, k * beat + beat * q)          # quiet 16ths
+    # chords: Dm Dm Bb C | Dm Dm Bb A (bass roots and triads)
+    prog = [("D", 73.42, [293.66, 349.23, 440.00]), ("D", 73.42, [293.66, 349.23, 440.00]),
+            ("Bb", 58.27, [233.08, 293.66, 349.23]), ("C", 65.41, [261.63, 329.63, 392.00]),
+            ("D", 73.42, [293.66, 349.23, 440.00]), ("D", 73.42, [293.66, 349.23, 440.00]),
+            ("Bb", 58.27, [233.08, 293.66, 349.23]), ("A", 55.00, [220.00, 277.18, 329.63])]
+    for b, (_, root, triad) in enumerate(prog):
+        # octave bass: low, high, low, high on the eighths
+        for e8 in range(8):
+            f = root * (2 if e8 % 2 == 1 else 1)
+            tn = t(beat * 0.45)
+            ph = np.cumsum(np.full(len(tn), f)) / SR
+            saw = 2 * (ph % 1) - 1
+            sq = np.sign(np.sin(2 * np.pi * ph))
+            note = lowpass(0.6 * saw + 0.4 * sq, 700 + 1500 * np.exp(-tn * 18)) * np.exp(-tn * 5)
+            put(note * 0.5, b * 4 * beat + e8 * beat * 0.5)
+        # strings: a soft swelling pad
+        tn = t(4 * beat + 0.3)
+        pad = np.zeros(len(tn))
+        for f in triad:
+            for det in (0.996, 1.0, 1.004):
+                ph = f * det * tn
+                pad += 2 * (ph % 1) - 1
+        sw = np.clip(tn / 0.6, 0, 1) * np.clip((4 * beat + 0.3 - tn) / 0.4, 0, 1)
+        put(lowpass(pad, 1800) * sw * 0.05, b * 4 * beat)
+        # funky stabs on the off-beat of 2 and 4
+        for sb in (1.5, 3.5):
+            tn = t(0.18); st = np.zeros(len(tn))
+            for f in triad:
+                st += np.sign(np.sin(2 * np.pi * f * tn))
+            put(lowpass(st, 2600) * np.exp(-tn * 18) * 0.06, b * 4 * beat + sb * beat)
+    # the lute: plucked strings (Karplus-Strong), a little tune that answers itself
+    def pluck(f, dur, bright=0.996):
+        n = int(dur * SR); p = int(SR / f)
+        buf = r.uniform(-1, 1, p); out = np.zeros(n)
+        for i in range(n):
+            out[i] = buf[i % p]
+            buf[i % p] = bright * 0.5 * (buf[i % p] + buf[(i + 1) % p])
+        return out * np.exp(-np.arange(n) / SR * 2.5)
+    D5, E5, F5, G5, A5, Bb5, C6, D6, C5, A4 = 587.33, 659.25, 698.46, 783.99, 880.0, 932.33, 1046.5, 1174.66, 523.25, 440.0
+    tune = [  # (beat within the 32, note) - a two-bar phrase, an answer, and a turnaround
+        (0, A5), (0.5, D6), (1, A5), (1.5, F5), (2, G5), (2.5, A5), (3, F5), (4, E5), (4.5, D5), (5, E5), (5.5, F5), (6, A5),
+        (8, Bb5), (8.5, A5), (9, G5), (9.5, F5), (10, G5), (11, A5), (12, C6), (12.5, Bb5), (13, A5), (14, G5),
+        (16, A5), (16.5, D6), (17, A5), (17.5, F5), (18, G5), (18.5, A5), (19, F5), (20, E5), (20.5, D5), (21, C5), (21.5, D5), (22, F5),
+        (24, Bb5), (24.5, A5), (25, G5), (26, F5), (26.5, E5), (27, F5), (28, E5), (28.5, D5), (29, C5), (29.5, A4), (30, D5)]
+    for bt, f in tune:
+        put(pluck(f, 0.7) * 0.22, bt * beat)
+    # wrap the tail round to the start so it loops without a seam
+    x[:tail] += x[L:L + tail]
+    return x[:L]
+
 SOUNDS = {
     "swing": swing, "hit": hit, "bone_break": bone_break, "clang": clang, "footstep": footstep,
     "pickup": pickup, "coins": coins, "levelup": levelup, "spell": spell, "spell_hit": spell_hit,
@@ -622,6 +696,7 @@ SOUNDS = {
     "leaves_rustle": leaves_rustle, "loop_breeze": loop_breeze, "loop_crickets": loop_crickets, "loop_bees": loop_bees,
     "loop_campfire": loop_campfire,
     "death_fire_1": death_fire_1, "death_fire_2": death_fire_2, "death_lava_1": death_lava_1, "death_lava_2": death_lava_2,
+    "loop_disco": loop_disco,
 }
 
 if __name__ == "__main__":

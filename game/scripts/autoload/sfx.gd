@@ -107,6 +107,30 @@ func music(name: String, vol_db := -10.0) -> void:
 		tw.tween_property(outgoing, "volume_db", -60.0, 2.5)
 		tw.chain().tween_callback(outgoing.stop)
 
+## Turn the level's music down (DISCO TIME has its own), and back up again.
+var _ducked: Array = []          # [player, its volume before]
+var _duck_on := false
+func duck_music(on: bool, secs := 0.8) -> void:
+	if on == _duck_on:
+		return
+	_duck_on = on
+	var moves: Array = []           # [player, to volume]
+	if on:
+		for p: AudioStreamPlayer in [_music_a, _music_b]:
+			if p.playing and p.volume_db > -45.0:
+				_ducked.append([p, p.volume_db])
+				moves.append([p, p.volume_db - 22.0])
+	else:
+		for d in _ducked:
+			if (d[0] as AudioStreamPlayer).playing:
+				moves.append([d[0], float(d[1])])
+		_ducked.clear()
+	if moves.is_empty():
+		return
+	var tw := create_tween().set_parallel(true)
+	for mv in moves:
+		tw.tween_property(mv[0], "volume_db", float(mv[1]), secs)
+
 ## Start the current track again (used once the browser lets audio play).
 func restart_music() -> void:
 	for p: AudioStreamPlayer in [_music_a, _music_b]:

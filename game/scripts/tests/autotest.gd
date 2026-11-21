@@ -319,6 +319,9 @@ func _run() -> void:
 	elif mode == "homeview":
 		if await _homeview_test():
 			return
+	elif mode == "party":
+		if await _party_test():
+			return
 	elif mode == "chaosfeel":
 		await _chaosfeel_test()
 	elif mode == "bestgear":
@@ -6781,3 +6784,60 @@ func _chaosfeel_test() -> void:
 	check("fl_ice_keeps_sliding", float(walk.ice_still_forward) > 1.5 and float(walk.grip_still_forward) < 0.6, "ice %.1f, normal %.1f m/s still going forward" % [walk.ice_still_forward, walk.grip_still_forward])
 	check("fl_ice_glides", float(walk.ice_coast) > 1.0 and float(walk.grip_coast) < 0.5, "ice %.1f, normal %.1f" % [walk.ice_coast, walk.grip_coast])
 	_finish()
+
+# --- Insane's DISCO TIME and CHICKEN PARTY ----------------------------------------------
+func _party_test() -> bool:
+	if not Game.get_meta("pt_phase", false):
+		await _start()
+		Game.set_meta("pt_phase", true)
+		Game.mode = "insane"
+		Game.level = 8
+		main._travel("forest")
+		return true
+	await wait(2.0)
+	player = main.player
+	god = true
+	var ch: InsaneChaos = main.chaos
+	check("pt_chaos", ch != null)
+	if ch == null:
+		_finish()
+		return false
+	ch.next_t = 999.0          # (only the events we ask for)
+	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.35; player.snap_view()
+	ch.fire("disco")
+	await wait(2.2)
+	var dp: DiscoParty = ch.party_disco
+	check("pt_disco_party", dp != null and is_instance_valid(dp))
+	if dp:
+		check("pt_disco_ball", dp._ball_root.global_position.distance_to(player.global_position + Vector3(0, 4.8, 0)) < 1.5 and dp._ball_root.scale.x > 0.9, str(dp._ball_root.global_position - player.global_position))
+		check("pt_dance_floor", dp._floor.instance_count == DiscoParty.TILES * DiscoParty.TILES and dp._floor_node.visible)
+		check("pt_disco_beats", dp.beats >= 4, "%d beats" % dp.beats)
+		check("pt_disco_music", dp._music.playing and dp._music.stream != null and Sfx._duck_on)
+	await shot("pt_01_disco")
+	player.pitch = -0.1; player.snap_view()
+	await wait(0.6)
+	await shot("pt_02_disco_ball")
+	if dp:
+		dp.life = 0.05
+	await wait(1.6)
+	check("pt_disco_ends", (dp == null or not is_instance_valid(dp)) and not Sfx._duck_on)
+	# chickens!
+	var dmg0 := get_tree().get_nodes_in_group("damageable").size()
+	player.pitch = 0.25; player.snap_view()
+	ch.fire("chickens")
+	await wait(1.2)
+	var cr: ChickenRain = ch.party_rain
+	check("pt_chicken_rain", cr != null and is_instance_valid(cr))
+	if cr:
+		check("pt_lots_falling", cr._birds.size() >= 8 and cr._birds.size() <= ChickenRain.MAX_AT_ONCE, "%d in the air" % cr._birds.size())
+	await shot("pt_03_chicken_rain")
+	player.pitch = -0.3; player.snap_view()
+	await wait(2.5)
+	await shot("pt_04_chickens_landed")
+	if cr and is_instance_valid(cr):
+		check("pt_chickens_landing", cr.landed >= 15, "%d landed" % cr.landed)
+	check("pt_real_chickens_too", get_tree().get_nodes_in_group("damageable").size() >= dmg0 + 3, "%d -> %d" % [dmg0, get_tree().get_nodes_in_group("damageable").size()])
+	await wait(6.0)
+	check("pt_rain_over", cr == null or not is_instance_valid(cr))
+	_finish()
+	return false
