@@ -1811,6 +1811,9 @@ func use_special() -> void:
 	var ab := Game.ability()
 	if special_kind != "":
 		return
+	if mounted:
+		_mounted_say(String(ab.name))
+		return
 	if special_cd > 0.0:
 		Game.say("%s ready in %ds." % [ab.name, ceili(special_cd)], Color(0.75, 0.7, 1.0))
 		return
@@ -1843,10 +1846,22 @@ var _ward_fx: MeshInstance3D
 func special2_ready() -> bool:
 	return Game.has_special2() and special2_cd <= 0.0
 
+## In the saddle every hero is the same (Jason, Nov 20: "the characters have to be
+## fair"): your weapon and your arcane bolt work from a flying dragonfly, but class
+## powers (and pets) wait until you're back on your feet.
+var _mount_say_t := 0.0
+func _mounted_say(power: String) -> void:
+	if Time.get_ticks_msec() / 1000.0 - _mount_say_t > 2.0:
+		_mount_say_t = Time.get_ticks_msec() / 1000.0
+		Game.say("Land and hop off your mount to use %s." % power, Color(0.85, 0.85, 1.0))
+
 func use_special2() -> void:
 	if dead or mantling or not input_enabled or not Game.has_special2() or special_kind != "":
 		return
 	var ab := Game.ability2()
+	if mounted:
+		_mounted_say(String(ab.name))
+		return
 	if special2_cd > 0.0:
 		Game.say("%s ready in %ds." % [ab.name, ceili(special2_cd)], Color(0.75, 0.9, 1.0))
 		return

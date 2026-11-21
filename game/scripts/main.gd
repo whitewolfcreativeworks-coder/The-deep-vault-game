@@ -163,8 +163,9 @@ func _continue_game() -> void:
 	player.camera.current = true
 	player.input_enabled = true
 	player.set_mouse_captured(true)
-	hud.visible = true
 	Game.in_game = true
+	await _get_ready()
+	hud.visible = true
 	if Game.zone in ["forest", "castle", "cloud", "home"]:
 		Game.objective = Game.forest_objective()
 	Game.set_objective(Game.objective if Game.objective != "" else "Enter the Deep Vault beneath the cliffs.")
@@ -188,6 +189,89 @@ func _continue_game() -> void:
 		Game.say("Welcome back, %s. Level %d." % [Game.profile.name, Game.level], UIKit.GOLD)
 	menus.fade.color.a = 1.0
 	menus.fade_to(0.0, 1.2)
+
+# --- getting ready -------------------------------------------------------------
+## Jason, Nov 20: on a slower iPad a new level stutters for its first few seconds,
+## then plays better "once everything's loaded in". So arriving somewhere (through
+## a portal, Port Home, a level from the family portal, Continue) now waits behind
+## the dark screen for a moment, with the place's name up:
+##   - a camera turns once all the way round where you'll appear, so everything
+##     around you is drawn once (the graphics are ready before you see them);
+##   - the effects of a fight (sparks, bursts, damage numbers, slashes) and the
+##     common sounds are made once, out of sight, so the first fight doesn't hitch;
+##   - then it waits until the frame rate has settled.
+## The world is paused meanwhile (nothing can attack you). At least 2 s; a slow
+## device waits longer (up to 5 s), a fast one no longer than it needs.
+const READY_MIN := 2.0
+const READY_MAX := 5.0
+var ready_hold_secs := 0.0         # (for the tests: how long the last one took,
+var ready_held_paused := false     #  whether the world was paused, and what it said)
+var ready_title := ""
+const WARM_SOUNDS := ["hit", "swing", "clang", "hurt", "bone_break", "pickup", "coins", "levelup", "spell", "spell_hit",
+	"fire_burst", "skel_attack", "roar", "slam", "footstep", "death", "chest", "door", "portal", "thunder", "rumble", "whistle"]
+
+func _hold_wanted() -> bool:
+	if Game.has_meta("test_hold"):
+		return true
+	# (the automated tests time things from the moment a level starts)
+	return not (OS.get_cmdline_user_args().size() > 0 or OS.has_environment("DEEPVAULT_AUTOTEST") or _web_autotest() != "")
+
+func _get_ready() -> void:
+	if not _hold_wanted() or player == null:
+		return
+	var prev_state := state
+	state = "arriving"
+	get_tree().paused = true
+	menus.fade_to(1.0, 0.01)
+	menus.fade.color.a = 1.0
+	var title: String = Game.ZONE_NAMES.get(Game.zone, "Home" if Game.zone == "home" else "")
+	if Game.zone == "home":
+		title = "Home"
+	if Game.mode != "normal":
+		title += "  ·  " + Game.mode_name().to_upper()
+	menus.show_getting_ready(title, "Getting ready")
+	ready_title = title
+	ready_held_paused = get_tree().paused
+	var cam := Camera3D.new()
+	cam.fov = player.camera.fov; cam.near = player.camera.near; cam.far = player.camera.far
+	add_child(cam)
+	cam.current = true
+	var eye := player.global_position + Vector3(0, 1.9, 0)
+	cam.global_position = eye
+	for nm in WARM_SOUNDS:
+		Sfx.get_stream(nm)
+	# a little fight's worth of effects, just in front of the turning camera
+	var fx_at := eye + Vector3(-sin(player.yaw), -0.6, -cos(player.yaw)) * 3.0
+	FX.hit(fx_at); FX.sparks(fx_at); FX.burst(fx_at, Color(1.0, 0.6, 0.3), 20)
+	FX.damage_number(fx_at, 12.0, Color(1, 1, 1), false)
+	FX.damage_number(fx_at, 30.0, Color(1, 1, 1), true)
+	FX.swipe(fx_at, player.yaw, 0.9, 2.5, Color(0.9, 0.92, 1.0))
+	FX.shockwave(fx_at, Color(0.8, 0.9, 1.0), 2.0, 0.3)
+	FX.flash_light(fx_at, Color(1.0, 0.8, 0.5), 3.0, 4.0, 0.2)
+	var t0 := Time.get_ticks_msec()
+	var last := Time.get_ticks_usec()
+	var steady := 0
+	while true:
+		await get_tree().process_frame
+		var now := Time.get_ticks_usec()
+		var dt := float(now - last) / 1000000.0
+		last = now
+		var el := float(Time.get_ticks_msec() - t0) / 1000.0
+		var spin := clampf(el / 1.5, 0.0, 1.0)
+		if is_instance_valid(cam):
+			cam.global_position = eye
+			cam.rotation = Vector3(-0.2, player.yaw + spin * TAU, 0.0)
+		steady = steady + 1 if dt < 0.05 else 0
+		menus.show_getting_ready(title, "Getting ready" + ".".repeat(1 + int(el * 3.0) % 3))
+		if (el >= READY_MIN and spin >= 1.0 and steady >= 12) or el >= READY_MAX:
+			ready_hold_secs = el
+			break
+	cam.queue_free()
+	player.camera.current = true
+	player.snap_view()
+	menus.show_getting_ready("")
+	state = prev_state if prev_state != "arriving" else "play"
+	get_tree().paused = false
 
 # --- the opening movie --------------------------------------------------------
 var intro: IntroMovie

@@ -117,6 +117,22 @@ Elixirs, enchantments and blessings only count down while you play, and they sho
 
 Forged gear is stronger than found gear and gets stronger with every tier, so it's the way to gear up for Hard and Insane. In **Insane with your gear**, though, the monsters match your gear's numbers, so there the forge's real edge is its **powers**.
 
+### Getting ready, Hard mode, and riding rules (Nov 20, evening)
+- **Getting ready.** When you arrive somewhere (through a portal, Port Home, a level from the family portal, or Continue), the screen stays dark for a moment with the place's name and "Getting ready...". Behind it:
+  - a camera turns once all the way round where you'll appear, so the graphics for everything around you are ready before you see it;
+  - the effects and sounds of a fight are made once, out of sight;
+  - it waits until the frame rate settles.
+
+  It takes at least 2 seconds, up to 5 on a slow iPad. The world is paused meanwhile, so nothing can attack you.
+- **Hard is now Normal with about three times the monster health** (Jason: "exactly like normal mode with more hit points"). The monsters still grow to match your level, fire and lava still burn harder, and the rewards are still better. Hard no longer adds twin monsters. They were what made Hard lag in the Goblin Forest on the iPad, so Hard now has exactly as many monsters as Normal.
+- **Riding is fair for every hero.** While you're on any mount:
+  - **pets and summoned friends don't fight.** The Beastmaster's wolves, the Necromancer's skeletons and the forge's risen friends trot along on the ground below and join in again once you get off;
+  - **class powers (X and B) wait until you're on your feet**;
+  - **from a flying dragonfly, every hero has the same moves**: their weapon and the arcane bolt;
+  - **forge powers that fight by themselves** (Thunderking's lightning, Blazewalker's fire trail) pause too.
+
+  Jason: "the characters have to be fair... otherwise everybody's just gonna play the beastmaster all the time."
+
 ### Replay modes and the level picker
 Once you've finished the adventure (flown home on the Sky Ride), the family portal in the yard offers:
 
@@ -130,7 +146,7 @@ A level or a new adventure then asks for a mode, and **With my gear** (keep ever
 | Mode | Monsters grow to match you? | Then their health | They hit | They move | Rewards | More monsters? |
 |---|---|---|---|---|---|---|
 | **Normal** | no (a little if you out-level the zone) | as usual | as usual | as usual | as usual | no |
-| **Hard** | your level | x2 (bosses x1.7) | x1.6 | 12% faster | x1.6, loot at your level | about half get a twin |
+| **Hard** | your level | x3 (bosses x2.5) | as usual | as usual | x1.6, loot at your level | no |
 | **INSANE** | your level, and with your gear: your gear too, plus 15% | x3.4 (bosses x2.6) | x2.1 | 30% faster | x2.5, loot above your level | about a third get a twin, but they're **fierce** (below) |
 
 **Fire and lava by mode (Nov 20).**

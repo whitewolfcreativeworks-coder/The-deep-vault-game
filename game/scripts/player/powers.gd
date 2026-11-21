@@ -183,6 +183,8 @@ func _on_kill(pos: Vector3) -> void:
 		FX.burst(p.global_position + Vector3(0, 1.2, 0), Color(1.0, 0.92, 0.55), 12, 2.0, 0.12, 0.6, 1.0)
 		_went("radiance")
 	_risen = _risen.filter(func(a) -> bool: return is_instance_valid(a))
+	if p.mounted:
+		return                  # (no new friends while you ride: see Ally)
 	if has("raise_dead") and _risen.size() < 2 and randf() < 0.35:
 		_risen.append(Ally.spawn(p, "skeleton", pos + Vector3(0, 0.1, 0), 25.0))
 		Game.say("The fallen rise to fight for you!", Color(0.7, 1.0, 0.85))
@@ -201,7 +203,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if has("wild_heart") and Game.hp < Game.max_hp():
 		Game.hp = minf(Game.max_hp(), Game.hp + Game.max_hp() * 0.008 * delta)
-	if has("thunderking"):
+	if has("thunderking") and not p.mounted:      # (no striking from the saddle: everyone fights on foot)
 		_thunder_t -= delta
 		if _thunder_t <= 0.0:
 			_thunder_t = 1.0
@@ -224,7 +226,7 @@ func _fire_trail(delta: float) -> void:
 			t[1] = float(t[1]) - delta
 			if float(t[1]) <= 0.0:
 				(t[0] as CPUParticles3D).emitting = false
-	if not has("fire_trail"):
+	if not has("fire_trail") or p.mounted:
 		return
 	_trail_drop -= delta
 	var hs := Vector2(p.velocity.x, p.velocity.z).length()

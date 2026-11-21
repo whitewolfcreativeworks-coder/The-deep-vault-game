@@ -182,12 +182,29 @@ func _physics_process(delta: float) -> void:
 	var st: Dictionary = STATS[kind]
 	_cd -= delta
 	pounce_t -= delta
+	# Riding (Jason, Nov 20): pets and summoned friends don't fight while their hero
+	# is on a mount, so nobody can fly high above a fight and let the wolves do the
+	# work. They trot along on the ground below and join in again once you get off.
+	var riding: bool = owner_p.mounted
+	var flying: bool = riding and owner_p.flying
+	if riding:
+		target = null
+		pounce_t = 0.0
 	# stay with your hero: catch up across floors / big gaps
-	if global_position.distance_to(owner_p.global_position) > 26.0 or absf(global_position.y - owner_p.global_position.y) > 6.0:
+	var flat := Vector2(global_position.x - owner_p.global_position.x, global_position.z - owner_p.global_position.z).length()
+	if flying:
+		if flat > 30.0:
+			var from := owner_p.global_position + _offset.rotated(Vector3.UP, owner_p.facing)
+			var q := PhysicsRayQueryParameters3D.create(from, from - Vector3(0, 150.0, 0), 1)
+			var hit := get_world_3d().direct_space_state.intersect_ray(q)
+			if not hit.is_empty():
+				global_position = (hit.position as Vector3) + Vector3(0, 0.2, 0)     # (the ground under you)
+				velocity = Vector3.ZERO
+	elif global_position.distance_to(owner_p.global_position) > 26.0 or absf(global_position.y - owner_p.global_position.y) > 6.0:
 		global_position = owner_p.global_position + _offset.rotated(Vector3.UP, owner_p.facing)
 		velocity = Vector3.ZERO
 		target = null
-	if pounce_t <= 0.0:
+	if pounce_t <= 0.0 and not riding:
 		_pick_target()
 	var goal: Vector3
 	var spd: float = st.speed
@@ -198,6 +215,8 @@ func _physics_process(delta: float) -> void:
 			spd *= 1.8
 	else:
 		goal = owner_p.global_position + _offset.rotated(Vector3.UP, owner_p.facing)
+		if flying:
+			goal.y = global_position.y      # (follow along underneath, on the ground)
 	var to := goal - global_position; to.y = 0
 	var reach: float = st.range + (float(target.get("hit_radius")) if engaged and target.get("hit_radius") != null else 0.3)
 	var dir := Vector3.ZERO

@@ -74,10 +74,38 @@ func _ready() -> void:
 	Game.inventory_changed.connect(_refresh_inventory)
 	Game.stats_changed.connect(_refresh_stats)
 
+var _fade_tw: Tween
 func fade_to(a: float, t := 0.8) -> Tween:
+	if _fade_tw and _fade_tw.is_valid():
+		_fade_tw.kill()          # (a new fade replaces one still running)
 	var tw := create_tween()
 	tw.tween_property(fade, "color:a", a, t)
+	_fade_tw = tw
 	return tw
+
+## "Getting ready": the place's name over the dark screen while a new level settles
+## in (see Main._get_ready). "" hides it.
+var _ready_box: VBoxContainer
+var _ready_title: Label
+var _ready_line: Label
+func show_getting_ready(title: String, sub := "") -> void:
+	if _ready_box == null:
+		_ready_box = VBoxContainer.new()
+		_ready_box.set_anchors_preset(Control.PRESET_CENTER)
+		_ready_box.position = Vector2(-500, -80); _ready_box.size = Vector2(1000, 160)
+		_ready_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		_ready_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(_ready_box)
+		_ready_title = UIKit.label("", 54, UIKit.GOLD, true)
+		_ready_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_ready_box.add_child(_ready_title)
+		_ready_line = UIKit.label("", 24, UIKit.PARCH)
+		_ready_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_ready_box.add_child(_ready_line)
+	_ready_box.visible = title != ""
+	_ready_title.text = title
+	_ready_line.text = sub
+	root.move_child(_ready_box, -1)
 
 func show_panel(n: String) -> void:
 	if n == "designer" and current != "designer":
@@ -1102,7 +1130,7 @@ func _build_modes() -> void:
 	v.add_child(_mode_intro)
 	var rows := [
 		["normal", "NORMAL", "The adventure as you know it.", Color(0.55, 0.9, 0.55)],
-		["hard", "HARD", "The monsters grow to match your level, then get twice the health, hit harder, move faster, and many come in pairs. Better rewards and loot at your level.", Color(1.0, 0.7, 0.3)],
+		["hard", "HARD", "Just like Normal, but the monsters grow to match your level and have about THREE TIMES the health. Fire and lava burn harder. Better rewards and loot at your level.", Color(1.0, 0.7, 0.3)],
 		["insane", "INSANE", "The monsters match your level AND your gear (start fresh and they only match your level), they're very tough, and they're FIERCE: they spot you from far away, call their friends, chase you down and rage when hurt. Champions (giant, speedy, vampire, blinking, exploding...) and something crazy every 15 seconds or so: earthquakes, bullet time, ghost monsters, slippery ice... Extremely hard!", Color(1.0, 0.4, 0.8)],
 	]
 	for r in rows:

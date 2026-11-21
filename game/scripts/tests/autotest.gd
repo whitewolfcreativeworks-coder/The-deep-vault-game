@@ -319,6 +319,9 @@ func _run() -> void:
 	elif mode == "homeview":
 		if await _homeview_test():
 			return
+	elif mode == "arrival":
+		if await _arrival_test():
+			return
 	elif mode == "outbuildings":
 		if await _outbuildings_test():
 			return
@@ -5588,6 +5591,11 @@ func _levels_test() -> bool:
 		var mn: Dictionary = Enemy.TYPES["minion"]
 		check("lv_hard_monsters_grown", cen.minion_hp > float(mn.hp) * 2.0 * 2.0 and cen.minion_dmg > float(mn.dmg) * 2.0, "%s base hp %.0f dmg %.0f" % [str(cen), float(mn.hp), float(mn.dmg)])
 		check("lv_hard_no_chaos", main.chaos == null)
+		var hard_twins := 0
+		for e in get_tree().get_nodes_in_group("enemy"):
+			if e is Enemy and String((e as Enemy).uid).ends_with("+"):
+				hard_twins += 1
+		check("lv_hard_no_extra_monsters", hard_twins == 0 and cen.minion_hp > float(mn.hp) * 3.0 * 0.99, "%d twins, minion hp %.0f" % [hard_twins, cen.minion_hp])
 		# Normal and Hard run exactly as they always did: none of Insane's speed savings
 		var culled := 0
 		for g in main.world.find_children("*", "GeometryInstance3D", true, false):
@@ -6581,3 +6589,71 @@ func _outbuildings_test_2() -> void:
 	await _cam_shot("ob_15_yard", Vector3(2, 7, 24), Vector3(-6, 1, 6), 65.0)
 	await _cam_shot("ob_16_statue", Vector3(4.5, 2.6, 10), Vector3(7.6, 2.6, 3.4), 60.0)
 	_finish()
+
+# --- getting ready on arrival, and the riding rules -----------------------------------
+func _arrival_test() -> bool:
+	if not Game.get_meta("ar_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		Game.profile.hero = "Beastmaster"
+		await _start()
+		Game.set_meta("ar_phase", true)
+		Game.set_meta("test_hold", true)
+		Game.level = 12
+		Game.flags["mount_dragonfly"] = true
+		Game.mode = "hard"
+		main._travel("forest")
+		return true
+	# the level's just been built: it holds behind the dark screen for a moment
+	# (on this slow software renderer it may already be over by the time we look)
+	player = main.player
+	var m = main.menus
+	if main.state == "arriving":
+		check("ar_holding_dark", get_tree().paused and m.fade.color.a > 0.95 and m._ready_box.visible, "paused %s fade %.2f" % [get_tree().paused, m.fade.color.a])
+		await shot("ar_01_getting_ready")
+	check("ar_held_paused", main.ready_held_paused)
+	check("ar_title", main.ready_title.contains("Goblin Forest") and main.ready_title.contains("HARD"), main.ready_title)
+	var t0 := Time.get_ticks_msec()
+	while main.state == "arriving" and Time.get_ticks_msec() - t0 < 9000:
+		await frames(1)
+	var held: float = main.ready_hold_secs
+	check("ar_hold_length", held >= 2.0 and held <= main.READY_MAX + 2.0, "%.2f s" % held)
+	check("ar_playing", main.state == "play" and not get_tree().paused and player.camera.current and not m._ready_box.visible, main.state)
+	await wait(1.5)
+	check("ar_faded_in", m.fade.color.a < 0.05, "%.2f" % m.fade.color.a)
+	Game.remove_meta("test_hold")
+	await shot("ar_02_arrived")
+	# what the card looks like (it's usually over before this slow renderer can photograph it)
+	m.fade.color.a = 1.0
+	m.show_getting_ready(main.ready_title, "Getting ready..")
+	await shot("ar_03_card")
+	m.show_getting_ready("")
+	m.fade.color.a = 0.0
+	# --- riding: pets and class powers wait until you're on your feet
+	god = true
+	var at := player.global_position
+	var e := Enemy.new(); e.configure("goblin", "dummy"); e.position = at + Vector3(0, 0.5, -3.0)
+	e.dmg_mult = 0.0
+	e.hp_mult = 50.0
+	main.world.add_child(e)
+	await wait(1.0)
+	player._ensure_pet()
+	await wait(0.3)
+	var pet: Ally = player.pet
+	check("ar_has_pet", pet != null)
+	player.mount_up("dragonfly")
+	await wait(0.3)
+	var hp0 := e.hp
+	var cd0: float = player.special_cd
+	var allies0 := get_tree().get_nodes_in_group("ally").size()
+	player.use_special()
+	player.use_special2()
+	await wait(3.0)
+	check("ar_mounted", player.mounted)
+	check("ar_no_specials_mounted", player.special_cd == cd0 and get_tree().get_nodes_in_group("ally").size() == allies0, "cd %.1f allies %d -> %d" % [player.special_cd, allies0, get_tree().get_nodes_in_group("ally").size()])
+	check("ar_pet_waits_while_riding", is_instance_valid(e) and e.hp >= hp0 - 0.01 and (pet == null or pet.target == null), "hp %.0f -> %.0f" % [hp0, e.hp if is_instance_valid(e) else -1.0])
+	player.dismount()
+	await wait(4.0)
+	check("ar_pet_fights_on_foot", not is_instance_valid(e) or e.hp < hp0, "hp %.0f -> %.0f" % [hp0, e.hp if is_instance_valid(e) else -1.0])
+	_finish()
+	return true

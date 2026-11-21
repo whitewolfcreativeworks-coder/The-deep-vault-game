@@ -1183,3 +1183,32 @@ Jason, talking it through with his son: gold should buy "weapon or armor tempora
   - **Panels:** the journal count, and the forge panel stepping aside to watch the hammer fall.
 - **Powers:** every power fires in a fight with dummies at home, Phoenix saves you once and only once, and everything survives save and continue.
 - **Regressions (Forward+):** cabin 28, porthome 13, ambience 10, homeflight 10, intro 10, modes 25, levels 36, hazards 6, classes 12, flow 31, sinkhole 25. All pass, and Normal is unchanged.
+
+## Follow-up 35: Hard without the lag, a getting-ready pause, and fair riding (Nov 20, evening)
+
+Jason, testing on his son's iPad: Normal is fine, but "hard mode on his iPad in the goblin forest is laggy". He added: "it plays a little better once everything's loaded in... maybe instead of starting right away, you do like two or three seconds of a buffering period". And: "some of the characters can just fly around and they don't have to battle anything and they just have their pets battle for them... the characters have to be fair."
+
+**Why Hard lagged:** Hard gave about half the monsters a twin, so the forest had about 1.5× as many monsters as Normal. Normal and Hard keep the original crowding check that compares every monster with every other one (Insane's savings are Insane-only), so the cost grew by about 2.25×. Hard is now what Jason described: Normal's monsters (no twins, normal speed and hits), about 3× the health (bosses 2.5×), still grown to your level, with the harder fire and lava and better rewards. It has exactly Normal's monster count, so it should run like Normal.
+
+**Getting ready (`Main._get_ready`):**
+- **What happens:** after a level loads, the world stays paused behind the dark screen while:
+  - a camera turns 360° at the arrival spot, so every material, mesh and shadow variant around you gets drawn (and compiled) once;
+  - a burst, sparks, a hit, damage numbers, a sword swipe, a shockwave and a flash light are spawned in front of it, so the first fight doesn't compile them;
+  - about 20 common sounds are loaded.
+- **When it ends:** after at least 2 s, once the turn is done and 12 frames in a row took under 50 ms, or after 5 s at most.
+- **On screen:** the place's name and mode, with "Getting ready...".
+- **In tests:** the automated tests skip the pause (they time things from the moment a level starts), except the new `arrival` test.
+- **Not measurable here:** the stutter it targets is the first-time shader and pipeline compilation on the iPad's WebGL. Software rendering here is too slow to reproduce it; the test checks the mechanism, not the iPad's frame rate.
+
+**Riding rules:**
+- `Ally` drops its target and doesn't pick new ones while its hero `mounted`.
+- While the hero is flying, allies follow along on the ground underneath (a long ray finds the ground below; they no longer teleport up into the air).
+- `use_special`/`use_special2` refuse while mounted, with a gentle "Land and hop off your mount to use ...".
+- On ground mounts nothing changes for the player: a fighting move already hops you off first.
+- The forge's self-acting powers (Thunderking, Blazewalker, Bonecaller and Moonfang summons) are paused while you ride.
+- Weapon swings and the arcane bolt from a flying dragonfly stay, the same for every hero, to fend off flyers. Jason's other idea, flying monsters that hunt riders, is noted for later.
+
+**Tested:**
+- **`arrival`:** the hold happens with the world paused, it's titled "The Goblin Forest · HARD", it lasts 2 s or more and ends, and the game fades in. Then, as a Beastmaster on a dragonfly, the pet leaves a goblin alone and no special or summon goes off. Once back on foot, the pet attacks.
+- **`levels`:** Hard has no twin monsters, and its minions have more than 3× their base health.
+
