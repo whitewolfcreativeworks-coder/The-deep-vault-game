@@ -1167,9 +1167,10 @@ Jason, talking it through with his son: gold should buy "weapon or armor tempora
 - After you loaded a save in a fresh browser session, the first thing you found took the id `g1`, replacing whatever `g1` was in your bag or gear chest.
 - `_register` now skips ids that are already taken, and the counter is saved too. The test loads a save and checks that a new find doesn't replace anything.
 
-**Tested:** the new `outbuildings` test (84 checks, Forward+ and the web renderer):
+**Tested:** the new `outbuildings` test (85 checks; 84 also on the web renderer before the costume check was added):
 - **Shop:** every display's prompt and tab, buying, prices, one enchantment and one blessing at a time, Today's Special, costumes, decorations, selling one piece and selling everything, the HUD line, saving and ticking.
 - **Shop magic in play:** the Triple Jump in the yard, Fireproof halving a fire hit, Lucky Coin on a gold pickup.
+- **Bought costumes stay on:** a costume pickup doesn't replace one you bought (it waits on the ground until you take yours off). The first test run showed why: a monster's costume drop swapped out a 3,000-gold Golden Knight.
 - **Forge:**
   - The anvil prompt and the smith's riddle.
   - **Forging steps:**
@@ -1181,3 +1182,4 @@ Jason, talking it through with his son: gold should buy "weapon or armor tempora
     6. light and stone make the Starstride Boots.
   - **Panels:** the journal count, and the forge panel stepping aside to watch the hammer fall.
 - **Powers:** every power fires in a fight with dummies at home, Phoenix saves you once and only once, and everything survives save and continue.
+- **Regressions (Forward+):** cabin 28, porthome 13, ambience 10, homeflight 10, intro 10, modes 25, levels 36, hazards 6, classes 12, flow 31, sinkhole 25. All pass, and Normal is unchanged.
