@@ -144,6 +144,7 @@ func _build_floor() -> void:
 	_floor_node.extra_cull_margin = 10.0
 	add_child(_floor_node)
 	_heights.resize(TILES * TILES)
+	_heights.fill(-10000.0)              # (no squares until the floor's been laid)
 
 ## Lay the floor out round the square you're standing on (each square sits on the ground).
 func _place_floor(c: Vector2i) -> void:
@@ -213,7 +214,7 @@ func _process(delta: float) -> void:
 		l.global_position = at + Vector3(cos(a) * 4.0, 2.5, sin(a) * 4.0)
 		l.light_color = Color.from_hsv(fmod(_t * 0.25 + i * 0.5, 1.0), 0.85, 1.0)
 	var c := Vector2i(roundi(at.x / TILE), roundi(at.z / TILE))
-	if c != _centre and (player as CharacterBody3D).is_on_floor():
+	if c != _centre and ((player as CharacterBody3D).is_on_floor() or _centre == Vector2i(99999, 99999)):
 		_place_floor(c)
 	_beat_t -= delta
 	if _beat_t <= 0.0:

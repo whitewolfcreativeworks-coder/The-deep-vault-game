@@ -6837,7 +6837,10 @@ func _party_test() -> bool:
 	if cr and is_instance_valid(cr):
 		check("pt_chickens_landing", cr.landed >= 15, "%d landed" % cr.landed)
 	check("pt_real_chickens_too", get_tree().get_nodes_in_group("damageable").size() >= dmg0 + 3, "%d -> %d" % [dmg0, get_tree().get_nodes_in_group("damageable").size()])
-	await wait(6.0)
+	for k in 30:
+		if cr == null or not is_instance_valid(cr):
+			break
+		await wait(0.5)
 	check("pt_rain_over", cr == null or not is_instance_valid(cr))
 	_finish()
 	return false
