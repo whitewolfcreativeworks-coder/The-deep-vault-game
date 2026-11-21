@@ -1356,3 +1356,16 @@ Jason, after the device-tiers discussion: "I like the wheel idea for mobile, the
   - Medium's scenery savings and sleeping monsters in the forest.
 - **Not measured on real devices.** The thresholds and the size of each saving are educated guesses until we try it on the iPad Pro, the iPhone 15 and the iPhone 12 mini. Resolution should matter most on those high-density screens.
 
+## Follow-up 42: a ghosted dance floor (Nov 21)
+
+Jason: "You got the disco floor right with a different colors, but it almost feels like the dance floor needs to be ghosted a little bit, just so it kind of blends into the game a little bit more... I still want the effect. I just want it ghosted a little bit so that you have both things going on, and that's just with the dance floor part."
+
+**The change:** only the dance floor changed; the ball, beams, lights and music are the same.
+- **See-through squares:** each square is now a soft-edged square of coloured light, so the grass or stone shows through. The squares used to be solid tiles at 93% opacity. They now cover 42%; your own square 60%, and the "dark" squares only 10%.
+- **Soft edges:** each square fades out towards its edges (a small square-gradient texture), so it looks like light on the ground rather than plastic tiles.
+- **The browser/iPad renderer** shows the same colours paler, so its squares are drawn 1.5× stronger to look about the same as on desktop. Both were compared in screenshots.
+
+**Tested:** the `party` test now also checks that no square is more than 60% opaque (90% on the iPad renderer) and that the floor still shows. It passes on both renderers.
+
+**Still waiting on:** Jason's opinion of the disco music ("I want that real disco sound"); he'll listen again.
+

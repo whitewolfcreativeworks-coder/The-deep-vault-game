@@ -7123,6 +7123,14 @@ func _party_test() -> bool:
 	if dp:
 		check("pt_disco_ball", dp._ball_root.global_position.distance_to(player.global_position + Vector3(0, 4.8, 0)) < 1.5 and dp._ball_root.scale.x > 0.9, str(dp._ball_root.global_position - player.global_position))
 		check("pt_dance_floor", dp._floor.instance_count == DiscoParty.TILES * DiscoParty.TILES and dp._floor_node.visible)
+		var most := 0.0
+		var shown := 0
+		for k in dp._floor.instance_count:
+			var a := dp._floor.get_instance_color(k).a
+			most = maxf(most, a)
+			if a > 0.2:
+				shown += 1
+		check("pt_floor_ghosted", most <= DiscoParty.GHOST_ME * DiscoParty.ghost_k() + 0.01 and most < 0.91 and shown >= 15, "most opaque %.2f, %d squares showing" % [most, shown])
 		check("pt_disco_beats", dp.beats >= 4, "%d beats" % dp.beats)
 		check("pt_disco_music", dp._music.playing and dp._music.stream != null and Sfx._duck_on)
 	await shot("pt_01_disco")

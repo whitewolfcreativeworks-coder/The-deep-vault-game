@@ -5,7 +5,11 @@ class_name DiscoParty
 ## checkers... Saturday Night Fever".
 ##   - a mirror ball spins above you, throwing coloured beams of light about;
 ##   - a lit-up dance floor of coloured squares follows your feet, changing colour
-##     on every beat (the square you're standing on glows brightest);
+##     on every beat (the square you're standing on glows brightest). It's ghosted:
+##     see-through soft squares of coloured light, so the grass or stone shows
+##     through and it blends in (Jason, Nov 21: "the dance floor... it's a little
+##     out of place with the environment, and I still want the effect. I just want
+##     it ghosted a little bit so that you have both things going on");
 ##   - two coloured lights circle you, and the music turns into a disco groove
 ##     (loop_disco: a four-on-the-floor beat with a fairy-tale lute on top) while
 ##     the level's own music goes quiet.
@@ -15,6 +19,14 @@ class_name DiscoParty
 const TILES := 7                  # the floor is TILES x TILES squares
 const TILE := 1.25                # metres
 const BPM := 120.0
+const GHOST := 0.42               # how strongly a coloured square shows (the ground shows through the rest)
+const GHOST_ME := 0.6             # the square you're dancing on
+const GHOST_DARK := 0.1           # a "dark" square: just a hint
+
+## The browser/iPad renderer shows the same see-through colours paler (no extra
+## brightness there), so the squares show a bit more strongly to look the same.
+static func ghost_k() -> float:
+	return 1.5 if Game.is_compat() else 1.0
 const PALETTE := [Color(1.0, 0.2, 0.6), Color(0.2, 0.85, 1.0), Color(1.0, 0.9, 0.2), Color(0.65, 0.3, 1.0),
 	Color(0.3, 1.0, 0.45), Color(1.0, 0.5, 0.15), Color(1.0, 1.0, 1.0)]
 
@@ -139,6 +151,15 @@ func _build_floor() -> void:
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.vertex_color_use_as_albedo = true
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# soft-edged squares, like coloured light on the ground rather than plastic tiles
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.62, 1.0])
+	g.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.85), Color(1, 1, 1, 0)])
+	var gt := GradientTexture2D.new()
+	gt.gradient = g; gt.fill = GradientTexture2D.FILL_SQUARE
+	gt.fill_from = Vector2(0.5, 0.5); gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 64; gt.height = 64
+	m.albedo_texture = gt
 	_floor_node.material_override = m
 	_floor_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_floor_node.extra_cull_margin = 10.0
@@ -175,13 +196,13 @@ func _paint() -> void:
 			if y < -9999.0:
 				col = Color(0, 0, 0, 0)                        # (no ground there: no square)
 			elif cell == me:
-				col = Color(1.0, 1.0, 1.0, 0.95)                # where you're dancing
+				col = Color(1.0, 1.0, 1.0, GHOST_ME)            # where you're dancing
 			var edge := maxi(absi(i - h), absi(j - h))
 			col.a *= 1.0 - 0.18 * maxf(edge - 1, 0)          # fading out towards the edges
 			var lit := HomeDecor._vc(Color(col.r, col.g, col.b))      # (bright, saturated colours on either renderer)
 			if not Game.is_compat():
 				lit = lit * 1.6
-			_floor.set_instance_color(k, Color(lit.r, lit.g, lit.b, col.a))
+			_floor.set_instance_color(k, Color(lit.r, lit.g, lit.b, minf(col.a * ghost_k(), 0.9)))
 
 ## A new beat: the squares light up in new colours.
 func _new_colours() -> void:
@@ -190,10 +211,10 @@ func _new_colours() -> void:
 		for i in TILES:
 			var cell := Vector2i(_centre.x + i - h, _centre.y + j - h)
 			if _rng.randf() < 0.25:
-				_cells[cell] = Color(0.12, 0.1, 0.18, 0.75)      # a dark square now and then
+				_cells[cell] = Color(0.12, 0.1, 0.18, GHOST_DARK)      # a dark square now and then
 			else:
 				var c: Color = PALETTE[_rng.randi() % PALETTE.size()]
-				_cells[cell] = Color(c.r, c.g, c.b, 0.93)
+				_cells[cell] = Color(c.r, c.g, c.b, GHOST)
 	if _cells.size() > 400:
 		_cells.clear()
 

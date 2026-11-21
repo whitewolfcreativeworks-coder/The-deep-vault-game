@@ -200,7 +200,7 @@ If fire or lava finishes you off in Insane, a cute little voice says **"oh no!"*
   - **Meteor Shower** (get out of the red circles)
   - **Chicken Party** (it rains chickens: about 40 flap down out of the sky all around you, land with a BAWK and scurry off in a panic; a few real ones land too, which you can catch for a drumstick)
   - **Monster Rage** (every monster near you rages and comes for you)
-  - **Disco Time** (a spinning mirror ball with coloured beams, a lit-up Saturday Night Fever dance floor under your feet that changes colour on every beat, and disco music with a fairy-tale lute on top)
+  - **Disco Time** (a spinning mirror ball with coloured beams, a ghosted Saturday Night Fever dance floor under your feet: see-through squares of coloured light that change on every beat, with the ground showing through, and disco music with a fairy-tale lute on top)
   - **Gold Rain**
   - **Giant Foes**
   - **Earthquake** (the ground shakes and shoves you about)
