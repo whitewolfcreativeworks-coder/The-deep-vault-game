@@ -186,6 +186,19 @@ func _story(z: float) -> void:
 		_start_boss()
 
 # ---------------------------------------------------------------------------
+## The edge of the level (Player._keep_in_level). Up at the outpost you stay in the
+## clearing: not up onto the hills around it, and not over the cliff behind (where
+## you used to be able to climb out and fall off the edge of the world). Down in
+## the Vault itself there's no edge: its walls are the edge.
+func keep_in(p: Vector3) -> Vector3:
+	var q := p
+	if p.y > 5.2 or (p.y > -0.5 and p.z > -2.5):
+		q.x = clampf(q.x, -33.6, 33.6)
+		q.z = minf(q.z, 43.6)
+	if p.y > 5.2:
+		q.z = maxf(q.z, -1.6)
+	return q
+
 func _outpost() -> void:
 	# the ancient portal you arrive through (from the opening movie), in the west side area
 	var arch: Node3D = (load("res://assets/kaykit/forest/arch_gate.gltf") as PackedScene).instantiate()

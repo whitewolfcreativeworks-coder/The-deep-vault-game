@@ -633,7 +633,29 @@ func _horizon() -> void:
 		var a := k * TAU / 22.0
 		var r := 168.0 + _rng.randf_range(-8, 12)
 		var p := Vector3(cos(a) * r, -6.0, sin(a) * r)
-		_model(names[k % 3], p, _rng.randf() * 360.0, _rng.randf_range(28.0, 38.0))
+		solid_mountain(_model(names[k % 3], p, _rng.randf() * 360.0, _rng.randf_range(28.0, 38.0)))
+
+## The big mountains ringing the valley reach into the corners of the play area;
+## they were only scenery, so you (and the hot air balloon) sank straight into
+## them. Now they're solid: you can land on them.
+func solid_mountain(n: Node3D) -> void:
+	for m in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var sb := StaticBody3D.new(); sb.collision_layer = 1
+		var cs := CollisionShape3D.new(); cs.shape = mi.mesh.create_convex_shape(true, true)
+		sb.add_child(cs)
+		mi.add_child(sb)
+
+## The edge of the level (Player._keep_in_level): above ground you can't go past the
+## invisible walls however you travel, even flying higher than they reach. (The
+## Warren and the Sinkhole, deep underground, reach further out: no edge there.)
+func keep_in(p: Vector3) -> Vector3:
+	if p.y < -20.0:
+		return p
+	var m := PLAY - 0.6
+	return Vector3(clampf(p.x, -m, m), p.y, clampf(p.z, -m, m))
 
 func _bounds() -> void:
 	var sb := StaticBody3D.new(); sb.collision_layer = 1; add_child(sb)

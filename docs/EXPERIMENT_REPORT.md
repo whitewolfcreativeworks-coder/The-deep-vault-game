@@ -1369,3 +1369,42 @@ Jason: "You got the disco floor right with a different colors, but it almost fee
 
 **Still waiting on:** Jason's opinion of the disco music ("I want that real disco sound"); he'll listen again.
 
+## Follow-up 43: the hot air balloon, and the edges of each level (Nov 22)
+
+Jason: "There's places where you can go up over walls and kind of the outside of the zone... if you fall off the ledge, you die. But it's kind of weird that you can leave the area at all." On the balloon:
+- "the jump button should turn to a lift button only while you're in the balloon, and it should stay yellow";
+- "a lot of the glowing weapons seep through the skin of the bucket";
+- "you go really way up high to the highest point to the top of the mountain and you try and land... it just sinks right into the mountain";
+- "you should be able to exit the hot air balloon by hitting attack or something, and... fall gently down to the ground and your balloon could come to rest naturally".
+
+**What was wrong:**
+- **Sinking into mountains:** the big mountains ringing the forest (scaled scenery models) reach into the corners of the play area, but they had no collision. The balloon found "the ground" with one ray pointing down from just above the basket, and it moved sideways through anything.
+- **Glowing weapons:** a hero's weapon (45% longer since the Nov 17 changes) and shield stick out through the wicker walls of the basket.
+- **Leaving a level:** the invisible walls only reach so high (60 m in the forest), and the Vault outpost's hills and cliff are low enough to climb, with nothing beyond them.
+
+**The changes:**
+- **`BalloonRide`:**
+  - The basket is now a solid box. Each move is a shape cast: it climbs rises up to 45°, slides along walls and cliffs, comes to rest on whatever is below, and pops up if it ever starts inside something.
+  - USE or ATTACK: on the ground you step out; in the air you **hop out** with a striped parachute (the balloon's own stripes, falling at 2.6 m/s), which folds away when you land.
+  - The empty balloon drifts to a stop, sinks at 2 m/s and settles.
+  - Weapon and shield are hidden while you ride.
+- **Touch:** while ballooning, JUMP is a held, steady-yellow **LIFT** button, and ATTACK says **HOP OUT**.
+- **Mountains:** the forest's and castle's ring of mountains now have convex collision, so you can land on them. The highest spot the balloon can reach is the forest's north-east corner, at 72 m.
+- **Level edges (`keep_in`):** each level says where its edge is, and the player is held inside it at any height (not while riding a vehicle, which keeps its own bounds):
+  - Forest and castle: the invisible-wall square, above ground only; the Warren, Sinkhole and Crypt are deep underground and reach further out.
+  - Cloud Island: its walls, at any height.
+  - Home: a circle 92 m out, except during the flight home.
+  - Vault outpost: the clearing, and not over the cliff; the tunnel and the Vault below are untouched.
+  - A friendly "That's the edge of …!" at most every 6 s.
+
+**Tested** by a new `balloon2` test, on both renderers:
+- boarding hides the weapon, and the buttons say LIFT and HOP OUT;
+- a side view of the basket;
+- the highest reachable point;
+- a low approach into the mountain, sampled 40 times, never ends up inside it or under its surface;
+- landing on the summit;
+- hopping out about 13 m up: the parachute holds the fall to 2.6 m/s and folds on landing, and the empty balloon settles;
+- the edges of the forest, the Vault outpost (and the tunnel still open), Cloud Island and home.
+
+The old `polish2` balloon check "can't step out mid-air" is gone, because now you can.
+

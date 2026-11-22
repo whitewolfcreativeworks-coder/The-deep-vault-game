@@ -73,6 +73,16 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### The hot air balloon and the edges of each level (Nov 22)
+- **The hot air balloon** (on its launch deck in the Goblin Forest):
+  - **LIFT:** on the iPad, the JUMP button turns into a big yellow **LIFT** button while you're in the basket; hold it to fire the burner. ATTACK says **HOP OUT**.
+  - **Getting out:** press USE or ATTACK. On the ground you step out. Up in the air you **hop out**, and a little striped parachute floats you gently down. The empty balloon sinks slowly and comes to rest wherever it lands, ready to ride again.
+  - **A solid basket:** it bumps into walls, rocks and trees, climbs gentle rises, and lands on anything, even the tops of the big mountains in the corners of the forest. It never sinks into the ground any more.
+  - **Weapons away:** your weapon and shield are put away while you're in the basket, so nothing glows through the wicker.
+- **The edge of every level:** however you travel (walking, jumping, riding, the dragonfly, the balloon), you can't go past the edge of a level any more, even flying higher than its walls. You get a friendly "That's the edge of the Goblin Forest!".
+  - At the Vault outpost you can't climb up onto the hills round the clearing or over the cliff behind it (where you used to be able to fall off the edge of the world). The Vault, the Warren and the Sinkhole underground are unchanged.
+  - The mountains ringing the Goblin Forest and Ghost Knight Castle are solid now, so you can stand on them instead of sinking in.
+
 ### Graphics: Auto, High, Medium or Low (Nov 21)
 The same game on every device. Only how much it draws changes, never the levels, heroes, quests or monsters. Change it with the **Graphics** button in the pause menu; it's remembered on that device, not in the save.
 
@@ -359,7 +369,7 @@ Measured on the web renderer, an Insane forest fight went from about 12,800 draw
   - Switches and levers are gold.
   - The glowing orb is replaced by the Heart of the Vault, which rises out of the altar after the Warden falls.
 - **The Goblin Forest:**
-  - A hot air balloon you can fly and land anywhere.
+  - A hot air balloon you can fly and land anywhere (see "The hot air balloon and the edges of each level" above).
   - Cute random discoveries.
   - Chickens, and now and then a turkey, that you can hunt for food.
   - The Moonlit Portal glows when it's awake.

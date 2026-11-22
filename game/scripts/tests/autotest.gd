@@ -346,6 +346,9 @@ func _run() -> void:
 	elif mode == "graphics":
 		if await _graphics_test():
 			return
+	elif mode == "balloon2":
+		if await _balloon2_test():
+			return
 	elif mode == "perf":
 		if await _perf_test():
 			return
@@ -3962,9 +3965,6 @@ func _polish2_test() -> bool:
 	Input.action_release("move_forward"); Input.action_release("jump")
 	var moved := h0.distance_to(Vector2(bl.global_position.x, bl.global_position.z))
 	check("p2_balloon_steers", moved > 8.0, "%.1f m" % moved)
-	await tap("interact")
-	await wait(0.3)
-	check("p2_cant_step_out_midair", player.vehicle == bl)
 	Input.action_press("dodge")
 	for k in 60:
 		await wait(0.5)
@@ -5432,6 +5432,188 @@ func _enemy_census() -> Dictionary:
 				out.minion_hp = maxf(out.minion_hp, en.max_hp)
 				out.minion_dmg = maxf(out.minion_dmg, float(en.t.dmg))
 	return out
+
+## Nov 22: the hot air balloon and the edges of the levels.
+##  - in the basket, JUMP says LIFT (yellow) and ATTACK says HOP OUT; weapons are put away;
+##  - the basket is solid: it lands on the highest mountain in the forest and never
+##    ends up inside anything;
+##  - hop out up high: a parachute floats you down, the empty balloon settles itself;
+##  - every level has an edge you can't get past, however high you go.
+func _surface_at(x: float, z: float) -> float:
+	var q := PhysicsRayQueryParameters3D.create(Vector3(x, 400.0, z), Vector3(x, -30.0, z), 1)
+	var hit: Dictionary = (main.world as Node3D).get_world_3d().direct_space_state.intersect_ray(q)
+	return (hit.position as Vector3).y if not hit.is_empty() else -999.0
+
+func _balloon2_test() -> bool:
+	var phase := int(Game.get_meta("bl_phase", 0))
+	if phase == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("bl_phase", 1)
+		Game.level = 15
+		Game.add_item(Loot.make_random(15, 1.0, 4, "weapon"), true)     # a glowing legendary blade
+		Game.flags["adventure_done"] = true
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		main._travel("forest")
+		return true
+	if phase == 1:
+		Game.set_meta("bl_phase", 2)
+		await wait(2.5)
+		player = main.player
+		god = true
+		var fw: ForestWorld = main.world
+		var bl: BalloonRide = fw.balloon
+		await tp(bl.global_position + Vector3(0, 0.3, 2.0), 0.0)
+		await wait(0.5)
+		await tap("interact")
+		await wait(0.4)
+		check("bl_board", player.vehicle == bl)
+		check("bl_gear_put_away", player.body.weapon_root != null and not player.body.weapon_root.visible)
+		main.touch._set_active(true)
+		await wait(0.2)
+		check("bl_lift_button", main.touch.balloon_label("jump") == "LIFT" and main.touch.balloon_label("attack") == "HOP OUT",
+			"%s / %s" % [main.touch.balloon_label("jump"), main.touch.balloon_label("attack")])
+		player.yaw = PI * 0.5; player.zoom_target = 3.2; player.zoom = 3.2; player.pitch = -0.05; player.snap_view()
+		await wait(0.5)
+		await shot("bl_01_lift_button_and_basket")
+		main.touch._set_active(false)
+		# from the side, at basket height: nothing pokes through the wicker
+		var cam := Camera3D.new(); main.add_child(cam)
+		cam.global_position = bl.global_position + Vector3(3.2, 1.1, 0.4)
+		cam.look_at(bl.global_position + Vector3(0, 0.9, 0))
+		cam.current = true
+		await wait(0.3)
+		await shot("bl_01b_basket_side")
+		cam.queue_free()
+		player.camera.current = true
+		# up, then off to the highest place in the forest
+		Input.action_press("jump")
+		await wait(3.0)
+		Input.action_release("jump")
+		var best := Vector3(0, -999, 0)
+		var x := -bl.bound
+		while x <= bl.bound:
+			var z := -bl.bound
+			while z <= bl.bound:
+				var y := _surface_at(x, z)
+				if y > best.y:
+					best = Vector3(x, y, z)
+				z += 6.0
+			x += 6.0
+		print("BALLOON highest place in reach: ", best)
+		check("bl_corner_mountains_solid", best.y > 30.0, str(best))
+		# come in low from the side, below the top: it must never end up inside the mountain
+		var toward := Vector3(-best.x, 0, -best.z).normalized()
+		bl.global_position = Vector3(best.x, 0, best.z) + toward * 28.0
+		bl.global_position.y = maxf(_surface_at(bl.global_position.x, bl.global_position.z) + 2.0, best.y - 12.0)
+		bl._vel = Vector3.ZERO; bl._landed = false
+		await wait(0.2)
+		player.view_yaw = atan2(-(-toward.x), -(-toward.z)); player.yaw = player.view_yaw
+		var inside := 0
+		var under := 0
+		Input.action_press("move_forward")
+		for k in 40:
+			await wait(0.25)
+			if bl._inside(bl.global_position):
+				inside += 1
+			if bl.global_position.y < _surface_at(bl.global_position.x, bl.global_position.z) - 0.4:
+				under += 1
+		Input.action_release("move_forward")
+		check("bl_never_inside_the_mountain", inside == 0 and under == 0, "inside %d, under %d" % [inside, under])
+		# right over the top, then let the air out: it lands on the summit
+		bl.global_position = best + Vector3(0, 14.0, 0)
+		bl._vel = Vector3.ZERO; bl._landed = false
+		Input.action_press("dodge")
+		for k in 40:
+			await wait(0.25)
+			if bl._landed:
+				break
+		Input.action_release("dodge")
+		var floor_y := _surface_at(bl.global_position.x, bl.global_position.z)
+		check("bl_lands_on_the_summit", bl._landed and bl.global_position.y >= floor_y - 0.15 and bl.global_position.y < best.y + 3.0
+			and not bl._inside(bl.global_position), "basket %.1f, ground %.1f, top %.1f" % [bl.global_position.y, floor_y, best.y])
+		check("bl_rider_on_top", player.global_position.y >= floor_y - 0.1)
+		player.yaw = 0.6; player.zoom_target = 9.0; player.zoom = 9.0; player.pitch = -0.25; player.snap_view()
+		await wait(0.8)
+		await shot("bl_02_landed_on_the_mountain")
+		# up high, hop out
+		Input.action_press("jump")
+		await wait(6.0)
+		Input.action_release("jump")
+		var hi := bl.global_position.y - _surface_at(bl.global_position.x, bl.global_position.z)
+		await tap("attack")
+		await wait(0.6)
+		check("bl_hop_out_midair", player.vehicle == null and player.parachute != null and hi > 12.0, "%.1f m up" % hi)
+		check("bl_gear_back", player.body.weapon_root.visible)
+		var fastest := 0.0
+		for k in 8:
+			await wait(0.25)
+			fastest = maxf(fastest, -player.velocity.y)
+		player.yaw = 0.0; player.zoom_target = 6.0; player.zoom = 6.0; player.pitch = 0.15; player.snap_view()
+		await wait(0.3)
+		await shot("bl_03_parachute")
+		check("bl_floats_down_gently", fastest <= Player.CHUTE_FALL + 0.2, "%.1f m/s" % fastest)
+		for k in 120:
+			await wait(0.25)
+			if player.is_on_floor():
+				break
+		await wait(0.5)
+		check("bl_parachute_folds_on_landing", player.is_on_floor() and player.parachute == null and not player.dead)
+		for k in 160:
+			await wait(0.25)
+			if bl._landed:
+				break
+		check("bl_empty_balloon_settles", bl._landed and not bl._inside(bl.global_position)
+			and bl.global_position.y >= _surface_at(bl.global_position.x, bl.global_position.z) - 0.15, str(bl.global_position))
+		# the edge of the forest: high above the invisible walls, pushing out
+		player.global_position = Vector3(ForestWorld.PLAY + 15.0, 80.0, 10.0)
+		await wait(0.1)
+		check("bl_forest_edge", player.global_position.x <= ForestWorld.PLAY - 0.59, "x %.2f" % player.global_position.x)
+		main._travel("vault")
+		return true
+	if phase == 2:
+		Game.set_meta("bl_phase", 3)
+		await wait(2.5)
+		player = main.player
+		god = true
+		# up on the hill beside the outpost, and over the cliff behind it
+		player.global_position = Vector3(37.5, 7.6, 20.0)
+		await wait(0.3)
+		var on_hill := player.global_position
+		player.global_position = Vector3(0.0, 24.0, -8.0)
+		await wait(0.1)
+		var over_cliff := player.global_position
+		check("bl_vault_edges", on_hill.x <= 33.61 and over_cliff.z >= -1.61, "%s %s" % [on_hill, over_cliff])
+		# ...but down the tunnel into the Vault is fine
+		player.global_position = Vector3(0.0, -2.5, -7.0)
+		await wait(0.05)
+		check("bl_vault_tunnel_open", player.global_position.z < -5.0, str(player.global_position))
+		main._travel("cloud")
+		return true
+	if phase == 3:
+		Game.set_meta("bl_phase", 4)
+		await wait(2.5)
+		player = main.player
+		god = true
+		player.global_position = Vector3(CloudWorld.PLAY + 20.0, 60.0, 0.0)
+		await wait(0.1)
+		check("bl_cloud_edge", player.global_position.x <= CloudWorld.PLAY - 0.59, str(player.global_position))
+		Game.resume_pos = HomeCabin.arrival()
+		main._travel("home", HomeCabin.arrival(), 0.0)
+		return true
+	if phase == 4:
+		await wait(3.0)
+		player = main.player
+		god = true
+		var hw: HomeWorld = main.world
+		check("bl_home_landed", hw.landed)
+		player.global_position = Vector3(0.0, 90.0, 120.0)
+		await wait(0.1)
+		var r := Vector2(player.global_position.x, player.global_position.z).length()
+		check("bl_home_edge", r <= HomeWorld.EDGE_R + 0.01, "r %.1f" % r)
+		return false
+	return false
 
 ## The graphics setting (Nov 21): Auto / High / Medium / Low. High is the game exactly
 ## as it always was; Medium and Low draw less (resolution, sun shadows, lamps, sparks,

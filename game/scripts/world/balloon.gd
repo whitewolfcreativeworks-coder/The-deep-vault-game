@@ -2,13 +2,20 @@ extends Node3D
 class_name BalloonRide
 ## A striped hot air balloon on a wooden launch deck in the Goblin Forest.
 ## Climb in (USE), then:
-##   JUMP (hold)   fire the burner and rise
+##   JUMP (hold)   fire the burner and rise (on the iPad the button says LIFT and
+##                 glows yellow while you're in the basket)
 ##   DODGE (hold)  let air out and sink faster (otherwise it sinks slowly)
 ##   move          drift where the camera points
-##   USE           step out once the basket is on the ground
-## It lands anywhere and waits there until you ride it again.
+##   USE / ATTACK  on the ground: step out. Up in the air: hop out! A little striped
+##                 parachute floats you gently down, and the empty balloon sinks
+##                 slowly and comes to rest wherever it lands (Jason, Nov 22).
+## The basket is solid: it bumps against walls, rocks and trees, climbs gentle rises
+## and lands on anything, even the mountain tops in the corners of the forest. In
+## the basket your weapon and shield are put away, so nothing pokes through it.
 
 const MAX_Y := 85.0
+const BOX := Vector3(1.4, 0.9, 1.4)      # the basket, for bumping into things
+const BOX_UP := 0.55                     # its centre above the basket floor
 var bound := 112.0
 var _rider: Player
 var _vel := Vector3.ZERO
@@ -21,6 +28,8 @@ var _roar: AudioStreamPlayer3D
 var _hint_t := 0.0
 var _cool := 0.0
 var _sway := 0.0
+var _q: PhysicsShapeQueryParameters3D
+var _stripes: ShaderMaterial
 
 static func make(parent: Node3D, pos: Vector3, yaw := 0.0) -> BalloonRide:
 	var b := BalloonRide.new()
@@ -73,6 +82,7 @@ void fragment() {
 }
 """
 	var em := ShaderMaterial.new(); em.shader = sh
+	_stripes = em
 	env.material_override = em
 	env.position = Vector3(0, 7.7, 0)
 	_vis.add_child(env)
@@ -88,6 +98,10 @@ void fragment() {
 	_roar = Sfx.loop_on(self, "loop_fire", -60.0, 4.0, 30.0)
 	if _roar:
 		_roar.position = Vector3(0, 3.0, 0)
+	var box := BoxShape3D.new(); box.size = BOX
+	_q = PhysicsShapeQueryParameters3D.new()
+	_q.shape = box
+	_q.collision_mask = 1
 
 func can_interact() -> bool:
 	return _rider == null and _cool <= 0.0
@@ -100,19 +114,64 @@ func interact(by: Node) -> void:
 		return
 	_rider = by as Player
 	_rider.ride_vehicle(self, "")
+	_rider.show_gear(false)
 	_vel = Vector3.ZERO
 	_hint_t = 0.0
-	Game.say("Up, up and away! Hold JUMP to fire the burner, DODGE to sink, move to steer. Land and press USE to step out.", Color(1.0, 0.85, 0.5))
+	Game.say("Up, up and away! Hold %s to fire the burner, DODGE to sink, move to steer. USE or ATTACK to get out (up high you hop out with a parachute)." % ("LIFT" if Game.touch_active else "JUMP"), Color(1.0, 0.85, 0.5))
 
 func riding() -> bool:
 	return _rider != null
 
-func _floor_y() -> float:
-	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 3.0, 0), global_position - Vector3(0, 60.0, 0), 1)
-	if _rider:
-		q.exclude = [_rider.get_rid()]
-	var hit := get_world_3d().direct_space_state.intersect_ray(q)
-	return (hit.position as Vector3).y if not hit.is_empty() else global_position.y - 60.0
+func _cast(at: Vector3, motion: Vector3) -> float:
+	_q.transform = Transform3D(Basis(Vector3.UP, rotation.y), at + Vector3(0, BOX_UP, 0))
+	_q.motion = motion
+	return get_world_3d().direct_space_state.cast_motion(_q)[0]
+
+func _inside(at: Vector3) -> bool:
+	_q.transform = Transform3D(Basis(Vector3.UP, rotation.y), at + Vector3(0, BOX_UP, 0))
+	_q.motion = Vector3.ZERO
+	return not get_world_3d().direct_space_state.intersect_shape(_q, 1).is_empty()
+
+## Move the basket by `motion`, bumping into whatever is in the way: it climbs a
+## gentle rise, slides along a wall or a cliff, and comes to rest on whatever is
+## below it. Returns true when it's resting on something.
+func _move(motion: Vector3) -> bool:
+	var at := global_position
+	var k := 0
+	while k < 16 and _inside(at):         # (never stuck inside anything: pop up out of it)
+		at.y += 0.25
+		k += 1
+	var h := Vector3(motion.x, 0, motion.z)
+	var t := at + h
+	t.x = clampf(t.x, -bound, bound)
+	t.z = clampf(t.z, -bound, bound)
+	h = Vector3(t.x - at.x, 0, t.z - at.z)
+	if h.length_squared() > 1e-8:
+		if _cast(at, h) >= 1.0:
+			at += h
+		else:
+			# a rise no steeper than 45 degrees: up and over it
+			var up := Vector3(0, h.length() + 0.05, 0)
+			var fu := _cast(at, up)
+			if fu >= 1.0 and _cast(at + up, h) >= 1.0:
+				at += up + h
+			else:
+				# a wall: slide along it
+				for part in [Vector3(h.x, 0, 0), Vector3(0, 0, h.z)]:
+					var f := _cast(at, part)
+					at += part * f
+	var v := Vector3(0, motion.y, 0)
+	if at.y + v.y > MAX_Y:
+		v.y = minf(MAX_Y - at.y, 0.0)
+	var rest := false
+	if v.y != 0.0:
+		var fv := _cast(at, v)
+		at += v * fv
+		rest = v.y < 0.0 and fv < 1.0
+	if not rest:
+		rest = _cast(at, Vector3(0, -0.08, 0)) < 1.0
+	global_position = at
+	return rest
 
 func _physics_process(delta: float) -> void:
 	_cool -= delta
@@ -125,7 +184,10 @@ func _physics_process(delta: float) -> void:
 			_descend_only(delta)
 		return
 	if not is_instance_valid(_rider) or _rider.dead or _rider.vehicle != self:
+		if is_instance_valid(_rider):
+			_rider.show_gear(true)
 		_rider = null
+		_landed = false
 		return
 	var iv := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var dir := Vector3(iv.x, 0, iv.y).rotated(Vector3.UP, _rider.view_yaw)
@@ -139,17 +201,14 @@ func _physics_process(delta: float) -> void:
 	_vel.x = lerpf(_vel.x, want_h.x, 1.0 - exp(-1.2 * delta))
 	_vel.z = lerpf(_vel.z, want_h.z, 1.0 - exp(-1.2 * delta))
 	_vel.y = lerpf(_vel.y, want_vy, 1.0 - exp(-1.5 * delta))
-	var p := global_position + _vel * delta
-	p.x = clampf(p.x, -bound, bound)
-	p.z = clampf(p.z, -bound, bound)
-	p.y = minf(p.y, MAX_Y)
-	global_position = p
-	var fy := _floor_y()
-	_landed = false
-	if global_position.y <= fy + 0.02:
-		global_position.y = fy
+	var before := global_position
+	_landed = _move(_vel * delta)
+	if _landed:
 		_vel.y = maxf(_vel.y, 0.0)
-		_landed = true
+	if delta > 0.0:
+		var moved := (global_position - before) / delta
+		_vel.x = moved.x if absf(moved.x) < absf(_vel.x) else _vel.x     # (bumped: lose that speed)
+		_vel.z = moved.z if absf(moved.z) < absf(_vel.z) else _vel.z
 	# a gentle sway while flying
 	var fly := 0.0 if _landed else 1.0
 	_vis.rotation.x = lerpf(_vis.rotation.x, (sin(_sway * 0.9) * 0.03 - _vel.z * 0.01) * fly, 1.0 - exp(-2.0 * delta))
@@ -159,18 +218,16 @@ func _physics_process(delta: float) -> void:
 	_rider.facing = _rider.view_yaw
 	_rider.body.rotation.y = _rider.facing
 	_hint_t += delta
-	if Input.is_action_just_pressed("interact") and _hint_t > 0.4:
-		if _landed:
-			_step_out()
-		else:
-			Game.say("Land first! Hold DODGE (C) to come down.", Color(1.0, 0.8, 0.5))
+	if (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("attack")) and _hint_t > 0.4:
+		hop_out()
 
+## Empty: it sinks slowly, drifting to a stop, and rests wherever it comes down.
 func _descend_only(delta: float) -> void:
-	global_position.y -= 2.0 * delta
-	var fy := _floor_y()
-	if global_position.y <= fy:
-		global_position.y = fy
-		_landed = true
+	_vel.x = lerpf(_vel.x, 0.0, 1.0 - exp(-0.6 * delta))
+	_vel.z = lerpf(_vel.z, 0.0, 1.0 - exp(-0.6 * delta))
+	_landed = _move(Vector3(_vel.x, -2.0, _vel.z) * delta)
+	if _landed:
+		_vel = Vector3.ZERO
 
 func _set_burner(on: bool) -> void:
 	if on == _burn:
@@ -181,11 +238,57 @@ func _set_burner(on: bool) -> void:
 	if _roar:
 		_roar.volume_db = -6.0 if on else -60.0
 
+## Out of the basket: on the ground you step out; up in the air you hop over the
+## side and a little parachute floats you down.
+func hop_out() -> void:
+	if _rider == null:
+		return
+	if _landed:
+		_step_out()
+		return
+	var r := _rider
+	_rider = null
+	_cool = 1.5
+	_set_burner(false)
+	r.show_gear(true)
+	var side := Vector3(cos(r.view_yaw), 0, -sin(r.view_yaw))
+	r.leave_vehicle(side * 2.5 + Vector3(0, 3.0, 0))
+	r.global_position = global_position + side * 1.3 + Vector3(0, 1.2, 0)
+	r.parachute = _parachute(r)
+	Sfx.play("whistle", -10.0, 0.15)
+	Game.say("Wheee! Your little parachute floats you down. The balloon will come down by itself.", Color(1.0, 0.85, 0.5))
+
+## A small striped parachute (the balloon's own colours) over the hero's head.
+func _parachute(r: Player) -> Node3D:
+	var c := Node3D.new(); c.name = "Parachute"
+	r.add_child(c)
+	c.position = Vector3(0, 2.7, 0)
+	var dome := MeshInstance3D.new(); var sm := SphereMesh.new()
+	sm.radius = 1.15; sm.height = 1.15; sm.is_hemisphere = true; sm.radial_segments = 24; sm.rings = 8
+	dome.mesh = sm; dome.material_override = _stripes
+	dome.scale = Vector3(1.0, 0.7, 1.0)
+	dome.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	c.add_child(dome)
+	var rope := StandardMaterial3D.new(); rope.albedo_color = Color(0.9, 0.85, 0.7)
+	for a in [0.785, 2.356, 3.927, 5.498]:
+		var top := Vector3(cos(a) * 1.0, 0.0, sin(a) * 1.0)
+		var bot := Vector3(cos(a) * 0.25, -1.45, sin(a) * 0.25)
+		var line := MeshInstance3D.new(); var cm := CylinderMesh.new()
+		cm.top_radius = 0.012; cm.bottom_radius = 0.012; cm.height = top.distance_to(bot); cm.radial_segments = 4
+		line.mesh = cm; line.material_override = rope
+		line.position = (top + bot) * 0.5
+		line.basis = Basis(Quaternion(Vector3.UP, (top - bot).normalized()))
+		c.add_child(line)
+	c.scale = Vector3.ONE * 0.2
+	c.create_tween().tween_property(c, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK)
+	return c
+
 func _step_out() -> void:
 	var r := _rider
 	_rider = null
 	_cool = 1.0
 	_set_burner(false)
+	r.show_gear(true)
 	var side := Vector3(cos(r.view_yaw), 0, -sin(r.view_yaw))
 	var out := global_position + side * 1.8 + Vector3(0, 1.0, 0)
 	r.leave_vehicle()

@@ -636,6 +636,12 @@ func _enemy(type_name: String, pos: Vector3, uid: String) -> Enemy:
 	add_child(e)
 	return e
 
+## The edge of the level (Player._keep_in_level): the same lines as the invisible
+## walls, at any height, so the dragonfly can't fly out over them either.
+func keep_in(p: Vector3) -> Vector3:
+	var m := PLAY - 0.6
+	return Vector3(clampf(p.x, -m, m), p.y, clampf(p.z, -NORTH + 0.6, m))
+
 func _bounds() -> void:
 	var sb := StaticBody3D.new(); sb.collision_layer = 1; add_child(sb)
 	# (the north wall sits well past Mr. Bubbles' thunderhead, so nothing stops you reaching it)

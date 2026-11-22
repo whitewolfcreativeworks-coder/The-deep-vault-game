@@ -60,6 +60,8 @@ func _ready() -> void:
 	player.global_position = world.spawn_point
 	player.input_enabled = false
 	world.player = player
+	if world.has_method("keep_in"):
+		player.keep_in = world.keep_in          # (the edge of the level)
 	if not continue_pending or Game.checkpoint_pos == Vector3.ZERO:
 		Game.checkpoint_pos = world.spawn_point
 		Game.checkpoint_yaw = float(world.get("spawn_yaw")) if world.get("spawn_yaw") != null else 0.0

@@ -322,6 +322,19 @@ func _physics_process(delta: float) -> void:
 	if not landed and player.is_on_floor() and Vector2(pp.x - LAND.x, pp.z - LAND.z).length() < 26.0 and pp.y < 12.0:
 		_land()
 
+## The edge of the level (Player._keep_in_level): the valley and the hills around
+## it, not out past the mountains where the ground ends. (Not during the flight
+## home, which starts far out over the clouds.)
+const EDGE_R := 92.0
+func keep_in(p: Vector3) -> Vector3:
+	if not landed:
+		return p
+	var f := Vector2(p.x, p.z)
+	if f.length() <= EDGE_R:
+		return p
+	f = f.normalized() * EDGE_R
+	return Vector3(f.x, p.y, f.y)
+
 func _land() -> void:
 	landed = true
 	if ride and ride.riding:

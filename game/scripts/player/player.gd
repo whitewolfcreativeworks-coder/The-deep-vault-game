@@ -708,10 +708,13 @@ func _physics_process(delta: float) -> void:
 		velocity.y = lerpf(velocity.y, lift, 1.0 - exp(-4.0 * delta))    # riding a bubble
 	elif not is_on_floor():
 		velocity.y -= GRAVITY * gravity_mult * chaos_gravity * delta
-		velocity.y = maxf(velocity.y, -fall_cap)
+		velocity.y = maxf(velocity.y, -(CHUTE_FALL if parachute else fall_cap))
 	move_and_slide()
 	if global_position.y < kill_y:
 		take_damage(9999.0, global_position, 0.0)
+	if parachute and (is_on_floor() or mounted or dead or vehicle != null or lift > -100.0):
+		_fold_parachute()
+	_keep_in_level()
 
 	# facing
 	var want := facing
@@ -1211,6 +1214,51 @@ func take_damage(amount: float, from_pos: Vector3, knock := 3.0, _crit := false)
 		powers.on_hurt(dmg, from_pos)
 	if Game.hp <= 0.0:
 		die()
+
+## THE EDGE OF THE LEVEL (Jason, Nov 22: "it's kind of weird that you can leave
+## the area at all"): however you travel (on foot, jumping, riding, flying the
+## dragonfly), you can't go past the edge of the level. Each level says where its
+## edge is (`keep_in`, set by main from the level's own keep_in()).
+var keep_in: Callable
+var _edge_said := 0.0
+func _keep_in_level() -> void:
+	if not keep_in.is_valid() or vehicle != null:
+		return
+	var p := global_position
+	var k: Vector3 = keep_in.call(p)
+	if is_equal_approx(k.x, p.x) and is_equal_approx(k.z, p.z):
+		return
+	if not is_equal_approx(k.x, p.x):
+		velocity.x = 0.0
+	if not is_equal_approx(k.z, p.z):
+		velocity.z = 0.0
+	global_position = Vector3(k.x, p.y, k.z)
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _edge_said > 6.0:
+		_edge_said = now
+		Game.say("That's the edge of %s!" % String(Game.PLACE_NAMES.get(Game.zone, "the land")), Color(0.8, 0.85, 0.95))
+
+## Jumped out of the hot air balloon: a little striped parachute floats you down
+## (BalloonRide.hop_out). It folds away when you land.
+const CHUTE_FALL := 2.6
+var parachute: Node3D = null
+func _fold_parachute() -> void:
+	var c := parachute
+	parachute = null
+	if c and is_instance_valid(c):
+		FX.burst(c.global_position, Color(1.0, 0.9, 0.6), 14, 2.0, 0.12, 0.6, -1.0)
+		var tw := c.create_tween()
+		tw.tween_property(c, "scale", Vector3.ONE * 0.05, 0.25)
+		tw.tween_callback(c.queue_free)
+
+## In the hot air balloon's basket your weapon and shield are put away (glowing
+## blades poked out through the wicker: "Nothing should be seen through the bucket").
+func show_gear(on: bool) -> void:
+	if body == null:
+		return
+	for n in [body.weapon_root, body.offhand_root]:
+		if n and is_instance_valid(n):
+			(n as Node3D).visible = on
 
 ## Riding something (a swing, the hot air balloon): the vehicle moves you each
 ## physics frame and reads the controls it cares about; you can still look

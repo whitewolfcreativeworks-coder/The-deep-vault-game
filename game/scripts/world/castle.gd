@@ -768,7 +768,7 @@ func _horizon() -> void:
 	for k in 22:
 		var a := k * TAU / 22.0
 		var r := 168.0 + _rng.randf_range(-8, 12)
-		_model(names[k % 3], Vector3(cos(a) * r, -6.0, sin(a) * r), _rng.randf() * 360.0, _rng.randf_range(28.0, 38.0))
+		solid_mountain(_model(names[k % 3], Vector3(cos(a) * r, -6.0, sin(a) * r), _rng.randf() * 360.0, _rng.randf_range(28.0, 38.0)))
 
 # ---------------------------------------------------------------------------
 # Quest-driven changes

@@ -408,12 +408,23 @@ func _press_button(b: Dictionary) -> void:
 				player.toggle_view()
 		_:
 			Input.action_press(b.action)
-			if not b.hold and not (b.name == "jump" and _flying()):
+			if not b.hold and not (b.name == "jump" and (_flying() or ballooning())):
 				get_tree().create_timer(0.08, true, true).timeout.connect(func() -> void: Input.action_release(b.action))
 
 ## On the dragonfly, JUMP is held down to climb (and is labelled FLY).
 func _flying() -> bool:
 	return player != null and player.get("mounted") == true and player.get("mount_kind") == "dragonfly"
+
+## In the hot air balloon's basket, JUMP is held down to fire the burner: it says
+## LIFT and glows yellow the whole ride, so you know that's the button (Jason,
+## Nov 22). ATTACK says HOP OUT.
+func ballooning() -> bool:
+	return player != null and player.vehicle is BalloonRide
+
+func balloon_label(n: String) -> String:
+	if not ballooning():
+		return ""
+	return {"jump": "LIFT", "attack": "HOP OUT"}.get(n, "")
 
 func _release_button(n: String) -> void:
 	_held.erase(n)
@@ -448,7 +459,7 @@ func _process(d: float) -> void:
 			if player and player._foe_near(12.0):
 				info.t = 0.0           # (fighting: that's a block, not a move)
 				continue
-		if info.t >= need and info.name != "attack" and not (info.name == "jump" and _flying()):
+		if info.t >= need and info.name != "attack" and not (info.name == "jump" and (_flying() or ballooning())):
 			_press_info.erase(idx)
 			_btn_touch.erase(idx)
 			_held.erase(info.name)
@@ -500,6 +511,7 @@ func _draw_pad() -> void:
 		var held: bool = _held.has(b.name)
 		var picked: bool = b.name in moving_names
 		var interact_ready: bool = b.name == "interact" and player != null and player.interact_target != null
+		var lift_lit: bool = b.name == "jump" and not arrange and ballooning()
 		var fill := Color(0.08, 0.07, 0.07, 0.45 if not held else 0.75)
 		if b.name == "potion":
 			fill = Color(0.35, 0.05, 0.07, 0.5 if Game.potions > 0 else 0.2)
@@ -518,6 +530,10 @@ func _draw_pad() -> void:
 		var rad: float = b.radius
 		if b.name == "auto" and player and player.get("auto_run"):
 			fill = Color(0.2, 0.55, 0.9, 0.75)
+		if lift_lit:
+			fill = Color(0.85, 0.62, 0.12, 0.95 if held else 0.8)
+			rad = b.radius * 1.2
+			pad.draw_circle(b.center, rad + 8.0, Color(1.0, 0.8, 0.25, 0.16))
 		if interact_ready and not arrange:
 			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.008)
 			fill = Color(0.85, 0.62, 0.12, 0.75 + 0.15 * pulse)
@@ -540,7 +556,7 @@ func _draw_pad() -> void:
 				var k: float = clampf((info.t - t0) / (need - t0), 0.0, 1.0)
 				pad.draw_arc(b.center, b.radius + 8.0, -PI / 2, -PI / 2 + TAU * k, 40, yellow, 6.0)
 		pad.draw_circle(b.center, rad, fill)
-		pad.draw_arc(b.center, rad, 0, TAU, 40, ring if not interact_ready else Color(1.0, 0.95, 0.6), ring_w if not interact_ready else 5.0)
+		pad.draw_arc(b.center, rad, 0, TAU, 40, ring if not (interact_ready or lift_lit) else Color(1.0, 0.95, 0.6), ring_w if not (interact_ready or lift_lit) else 5.0)
 		var fs := 20 if rad > 60 else (17 if rad > 45 else 15)
 		var label: String = b.label
 		if b.name == "potion":
@@ -575,4 +591,7 @@ func _draw_pad() -> void:
 		if interact_ready and not arrange:
 			label = "USE!"
 			fs = 24
+		if balloon_label(b.name) != "":
+			label = balloon_label(b.name)
+			fs = 24 if b.name == "jump" else 17
 		pad.draw_string(_font, b.center + Vector2(-rad, fs * 0.35), label, HORIZONTAL_ALIGNMENT_CENTER, rad * 2.0, fs, Color(0.1, 0.08, 0.02) if picked else Color(1, 0.95, 0.85, 0.9))
