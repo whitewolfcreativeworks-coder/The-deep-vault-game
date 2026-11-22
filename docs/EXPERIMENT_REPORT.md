@@ -1408,3 +1408,8 @@ Jason: "There's places where you can go up over walls and kind of the outside of
 
 The old `polish2` balloon check "can't step out mid-air" is gone, because now you can.
 
+**Regressions:** homeflight, sinkhole, cloud2, dragonfly, touch, flow and polish2 all pass.
+- `castle5` fails one check, `c5_fish_too_fast_loses_it`: a fish was caught when the test tapped too fast to keep it. The commit before these changes fails it the same way here.
+- The cause is the test machine: a new `fpsdiag` check measured the castle at about **1 frame a second** under the software renderer, with or without the solid mountains. At that speed the test's taps are too far apart in game time to snap the line.
+- So this is a test-environment flake, not a game change. Worth making the fishing check independent of frame rate some time.
+

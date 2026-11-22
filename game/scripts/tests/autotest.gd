@@ -349,6 +349,9 @@ func _run() -> void:
 	elif mode == "balloon2":
 		if await _balloon2_test():
 			return
+	elif mode == "fpsdiag":
+		if await _fpsdiag_test():
+			return
 	elif mode == "perf":
 		if await _perf_test():
 			return
@@ -5432,6 +5435,33 @@ func _enemy_census() -> Dictionary:
 				out.minion_hp = maxf(out.minion_hp, en.max_hp)
 				out.minion_dmg = maxf(out.minion_dmg, float(en.t.dmg))
 	return out
+
+## (diagnostic) frames per second in the castle, with and without the solid mountains
+func _fpsdiag_test() -> bool:
+	if not Game.get_meta("fd_phase", false):
+		await _start()
+		Game.set_meta("fd_phase", true)
+		main._travel("castle")
+		return true
+	await wait(4.0)
+	player = main.player
+	god = true
+	var w: Node = main.world
+	var measure := func() -> float:
+		var f0 := Engine.get_process_frames()
+		var t0 := Time.get_ticks_msec()
+		await wait(5.0)
+		return float(Engine.get_process_frames() - f0) / (float(Time.get_ticks_msec() - t0) / 1000.0)
+	var a: float = await measure.call()
+	var n := 0
+	for m in w.find_children("*", "StaticBody3D", true, false):
+		if m.get_parent() is MeshInstance3D and m.get_child_count() == 1 and (m.get_child(0) as CollisionShape3D).shape is ConvexPolygonShape3D:
+			n += (m.get_child(0) as CollisionShape3D).shape.points.size()
+			m.queue_free()
+	await wait(0.5)
+	var b: float = await measure.call()
+	print("FPSDIAG with mountains %.1f fps, without %.1f fps (%d hull points removed)" % [a, b, n])
+	return false
 
 ## Nov 22: the hot air balloon and the edges of the levels.
 ##  - in the basket, JUMP says LIFT (yellow) and ATTACK says HOP OUT; weapons are put away;
