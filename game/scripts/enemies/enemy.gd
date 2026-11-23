@@ -137,6 +137,14 @@ var facing := 0.0
 var player: Node3D
 var display_name := ""
 var bounds := AABB()        # optional room bounds the enemy will not leave
+## Optional: where this monster has to stay (a boss's arena). Given a position,
+## returns the nearest one inside. Walking, charging, leaping and diving all keep
+## to it. (Mr. Bubbles uses it to stay out of his arena's wall of storm clouds.)
+var arena: Callable
+## Doesn't heal back up when it goes home (Insane Mr. Bubbles).
+var no_heal := false
+const BUBBLES_INSANE_HP := 1.4
+const BUBBLES_INSANE_SIZE := 0.82
 var _strafe := 1.0
 var _hurt_t := -1.0
 var _stagger_acc := 0.0
@@ -179,6 +187,11 @@ func _ready() -> void:
 	_base_hp_mult = hp_mult
 	var boss := bool(t.get("heavy", false)) or int(t.xp) >= 900
 	hp_mult *= Game.mode_value("boss_hp" if boss else "hp")
+	# INSANE Mr. Bubbles (Jason, Nov 23): no more healing himself, just a LOT of
+	# health, so you can see yourself wearing him down; and a bit smaller.
+	if type_id == "mr_bubbles" and Game.mode == "insane":
+		no_heal = true
+		hp_mult *= BUBBLES_INSANE_HP
 	fierce = Game.mode == "insane"
 	lean = Game.mode == "insane" or Graphics.lean()      # (Medium and Low graphics too)
 	if fierce and not boss and not mini and oddity == "" and randf() < 0.3:
@@ -219,6 +232,10 @@ func _ready() -> void:
 			t.scale = float(t.scale) * 1.4
 		elif mini:
 			t.scale = float(t.scale) * 0.6
+		if type_id == "mr_bubbles" and Game.mode == "insane":
+			# a bit more to scale beside a hero ("not the same size as me... he's a boss")
+			for k in ["scale", "look_size", "radius"]:
+				t[k] = float(t[k]) * BUBBLES_INSANE_SIZE
 	display_name = {"giant": "Giant ", "speedy": "Speedy ", "splitter": "Splitting ", "vampire": "Vampire ", "blinker": "Blinking ",
 		"bomber": "Exploding "}.get(oddity, "Little " if mini else "") + String(t.name)
 	# INSANE: fewer monsters than you might fear, but every one of them means it.
@@ -319,6 +336,8 @@ func _fly(delta: float, pdead: bool) -> void:
 				if _dive_t > 1.8:
 					_dive_phase = 2; _dive_t = 0.0
 					_dive_at = player.global_position
+					if arena.is_valid():
+						_dive_at = arena.call(_dive_at)
 					_dive_mark = MeshInstance3D.new()
 					var cm := CylinderMesh.new(); cm.top_radius = 5.0; cm.bottom_radius = 5.0; cm.height = 0.03
 					(_dive_mark as MeshInstance3D).mesh = cm
@@ -626,7 +645,8 @@ func _physics_process(delta: float) -> void:
 					_nova_cd = randf_range(6.5, 9.0) if hp > max_hp * 0.5 else randf_range(4.5, 6.5)
 					_fire_nova()
 			if pdead or dist > t.aggro * 2.2 or global_position.distance_to(home) > leash or not _in_bounds(player.global_position, 3.0) \
-					or absf(player.global_position.y - global_position.y) > 6.0 + float(t.get("fly", 0.0)) + (16.0 if _dive_phase > 0 else 0.0):
+					or (absf(player.global_position.y - global_position.y) > 6.0 + float(t.get("fly", 0.0)) + (16.0 if _dive_phase > 0 else 0.0)
+						and not (no_heal and _hero_in_bubble())):
 				_go(S.RETURN)
 			elif t.get("ranged", false):
 				# keep a comfortable distance and circle
@@ -679,7 +699,8 @@ func _physics_process(delta: float) -> void:
 			var th := home - global_position; th.y = 0
 			if th.length() < 0.6:
 				_go(S.IDLE)
-				hp = minf(max_hp, hp + max_hp * 0.5)
+				if not no_heal:
+					hp = minf(max_hp, hp + max_hp * 0.5)
 			else:
 				move = th.normalized()
 			if not pdead and dist < t.aggro * 0.7 and global_position.distance_to(home) < leash * 0.6 and _can_engage(delta):
@@ -721,6 +742,10 @@ func _physics_process(delta: float) -> void:
 		velocity.x = 0.0; velocity.z = 0.0     # standing still on the ground: nothing to slide
 	else:
 		move_and_slide()
+	if arena.is_valid():
+		var ap: Vector3 = arena.call(global_position)
+		if not ap.is_equal_approx(global_position):
+			global_position = ap
 
 	# face the player while engaged; face movement otherwise
 	var want_face := facing
@@ -858,6 +883,17 @@ func _grimgor_regalia(root: Node3D, r: float, ab: AABB) -> void:
 	lava.shader = sh
 	if body.flash_mat:
 		body.flash_mat.next_pass = lava
+
+## The hero is floating in a bubble (Mr. Bubbles' own trap): wait below, don't go home.
+func _hero_in_bubble() -> bool:
+	for b in get_tree().get_nodes_in_group("bubble_trap"):
+		if b.has_method("caught") and b.caught():
+			return true
+	return false
+
+## Bosses: the big ones (heavy, or worth a lot of experience).
+func is_boss() -> bool:
+	return bool(t.get("heavy", false)) or int(t.xp) >= 900
 
 func _in_bounds(p: Vector3, margin := 0.0) -> bool:
 	if bounds.size == Vector3.ZERO:
@@ -1037,6 +1073,8 @@ func _mv_bubble_float() -> void:
 ## Leap high and crash down where you were standing.
 func _mv_leap_slam() -> void:
 	var to: Vector3 = player.global_position
+	if arena.is_valid():
+		to = arena.call(to)
 	var from := global_position
 	_warn_ring(to, 4.2, 1.15)
 	Game.say("%s leaps!" % display_name, Color(1.0, 0.6, 0.35))
@@ -1068,6 +1106,12 @@ func _mv_charge() -> void:
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	if not hit.is_empty():
 		length = maxf(2.0, global_position.distance_to(hit.position) - 1.5)
+	if arena.is_valid():
+		# (stop at the edge of the arena)
+		var stop := 0.0
+		while stop < length and (arena.call(global_position + dir * (stop + 0.5)) as Vector3).is_equal_approx(global_position + dir * (stop + 0.5)):
+			stop += 0.5
+		length = maxf(2.0, stop)
 	var line := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(2.2, 0.03, length)
 	line.mesh = bm; line.material_override = FX.beam_material(Color(1.0, 0.35, 0.15), 1.4, 0.55)
 	get_tree().current_scene.add_child(line)

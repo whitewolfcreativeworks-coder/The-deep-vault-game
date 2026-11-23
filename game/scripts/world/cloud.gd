@@ -925,6 +925,22 @@ func _physics_process(delta: float) -> void:
 			_arena_told = true
 			Game.say("The storm winds blow you back into the fight!", Color(0.8, 0.9, 1.0))
 
+## Mr. Bubbles stays out in the open on his thunderhead: never walking, charging,
+## leaping or diving into the ring of storm clouds round its edge, where he
+## vanished from sight (Jason, Nov 23: "he disappears into the walls... you
+## actually see him the entire time"). The clouds' inner edge is about 21 m out;
+## his middle stays inside LORD_R, so even his paws stay clear of them.
+const LORD_R := 17.5
+func lord_arena(p: Vector3) -> Vector3:
+	var c: Vector3 = ISLANDS.E.c
+	if p.y < c.y - 6.0:
+		return p
+	var d := Vector2(p.x - c.x, p.z - c.z)
+	if d.length() <= LORD_R:
+		return p
+	d = d.normalized() * LORD_R
+	return Vector3(c.x + d.x, p.y, c.z + d.y)
+
 var _arena_told := false
 ## The push back towards the middle of Mr. Bubbles' arena while he's fighting you
 ## (so a charge or a bubble can't knock you right off the thunderhead).
@@ -1041,6 +1057,8 @@ func _on_quests() -> void:
 	# Mr. Bubbles takes the thunderhead once Anu sends you
 	if Game.quest_state("mr_bubbles") == "active" and (lord == null or not is_instance_valid(lord)) and not Game.flags.get("mr_bubbles", false):
 		lord = _enemy("mr_bubbles", ISLANDS.E.c + Vector3(0, 2, -6), "mr_bubbles")
+		if lord:
+			lord.arena = lord_arena
 		if lord:
 			lord.died.connect(func(_e: Enemy) -> void:
 				_boss_started = false

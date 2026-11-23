@@ -125,19 +125,25 @@ func _makes_sense(ev: String) -> bool:
 			return Game.zone != "cloud" and _slip_t <= 0.0      # (Cloud Island has its own ice)
 		"rage":
 			return _foes_near(45.0).size() >= 2
-		"ghosts", "slowmo", "giants":
+		"slowmo":
 			return _foes_near(40.0).size() >= 1
+		"ghosts", "giants":
+			return _foes_near(40.0, false).size() >= 1
 		"moon":
 			return _moon_t <= 0.0
 		"quake":
 			return _quake_t <= 0.0
 	return true
 
-func _foes_near(r: float) -> Array:
+## The monsters near you. (Bosses can be left out: GIANT FOES and GHOST MONSTERS
+## leave them alone, so a boss is always its own size and always in sight. Nov 23:
+## Mr. Bubbles grew half as big again and blinked in and out, and you lost him in
+## the storm clouds round his arena.)
+func _foes_near(r: float, bosses := true) -> Array:
 	var out: Array = []
 	for e in get_tree().get_nodes_in_group("enemy"):
 		if e is Enemy and not (e as Enemy).dead and not (e as Enemy).asleep and (e as Enemy).state != Enemy.S.DORMANT \
-				and (e as Enemy).global_position.distance_to(player.global_position) < r:
+				and (e as Enemy).global_position.distance_to(player.global_position) < r and (bosses or not (e as Enemy).is_boss()):
 			out.append(e)
 	return out
 
@@ -264,7 +270,7 @@ func fire(ev: String, also := false) -> void:
 						Pickup.spawn(at2, "gold", _rng.randi_range(3, 9), "", true)
 						FX.burst(at2 + Vector3(0, 3, 0), Color(1.0, 0.85, 0.3), 8, 3.0, 0.1, 0.5, -6.0))
 		"giants":
-			for e in _foes_near(30.0):
+			for e in _foes_near(30.0, false):
 				var en := e as Enemy
 				if en.has_meta("giant_ev"):
 					continue
@@ -288,7 +294,7 @@ func fire(ev: String, also := false) -> void:
 			p.ice = true
 		"ghosts":
 			_ghost_t = 10.0
-			_ghosted = _foes_near(45.0)
+			_ghosted = _foes_near(45.0, false)
 
 ## A fireball crashes down: a red circle shows where, a moment before.
 func _meteor() -> void:

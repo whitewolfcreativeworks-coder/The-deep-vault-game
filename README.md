@@ -212,11 +212,17 @@ If fire or lava finishes you off in Insane, a cute little voice says **"oh no!"*
   - **Monster Rage** (every monster near you rages and comes for you)
   - **Disco Time** (a spinning mirror ball with coloured beams, a ghosted Saturday Night Fever dance floor under your feet: see-through squares of coloured light that change on every beat, with the ground showing through, and disco music with a fairy-tale lute on top)
   - **Gold Rain**
-  - **Giant Foes**
+  - **Giant Foes** (bosses keep their own size)
   - **Earthquake** (the ground shakes and shoves you about)
   - **Bullet Time** (the monsters go into slow motion; you don't)
   - **Slippery Ice** (getting going is easy, but turn or stop and you keep sliding the way you were going until your feet catch: real ice, not mud)
-  - **Ghost Monsters** (they flicker in and out of sight)
+  - **Ghost Monsters** (they flicker in and out of sight; bosses stay in sight)
+
+**Mr. Bubbles on Insane (Nov 23).**
+- He **doesn't heal himself** any more. He used to get half his health back every time he went home (often while you floated in his bubble). Instead he has **40% more health**, so you can watch the bar go down.
+- He's **a bit smaller** (82%), about twice your height, and he waits under his bubble instead of going home.
+- In every mode, he stays out in the open on his thunderhead: walking, charging, leaping or diving, he never goes into the ring of storm clouds round it.
+- (Tested in a real fight at the edge of his arena: he never went further out than 17.1 m and was never hidden.)
 
 Your mode shows next to your level, and it's saved with your game. Port Home works in every mode.
 

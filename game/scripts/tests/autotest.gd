@@ -352,6 +352,9 @@ func _run() -> void:
 	elif mode == "fpsdiag":
 		if await _fpsdiag_test():
 			return
+	elif mode == "bubbles":
+		if await _bubbles_test():
+			return
 	elif mode == "perf":
 		if await _perf_test():
 			return
@@ -5435,6 +5438,116 @@ func _enemy_census() -> Dictionary:
 				out.minion_hp = maxf(out.minion_hp, en.max_hp)
 				out.minion_dmg = maxf(out.minion_dmg, float(en.t.dmg))
 	return out
+
+## Nov 23: Mr. Bubbles in INSANE. "you actually see him the entire time":
+##  - GIANT FOES and GHOST MONSTERS leave bosses alone (he grew half as big again and blinked out);
+##  - he stays out of the ring of storm clouds round his arena (walking, charging, leaping, diving);
+##  - Insane: he doesn't heal when he goes home, has a lot more health instead, and is a bit smaller;
+##  - Normal: the same Mr. Bubbles as before (apart from staying out of the clouds).
+func _mesh_box(root: Node) -> AABB:
+	var box := AABB()
+	var first := true
+	for m in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null or not mi.is_visible_in_tree():
+			continue
+		var b := mi.global_transform * mi.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
+
+func _bubbles_test() -> bool:
+	var phase := int(Game.get_meta("mb_phase", 0))
+	if phase == 0 or phase == 2:
+		if phase == 0:
+			for i in Game.SAVE_SLOTS:
+				Game.delete_slot(i)
+			await _start()
+		Game.set_meta("mb_phase", phase + 1)
+		Game.mode = "insane" if phase == 0 else "normal"
+		Game.mode_geared = true
+		Game.level = 25
+		for q in ["lost_feathers", "thunder_birds", "sky_whale", "storm_bubbles", "bubble_lifts", "storm_gate", "why_clouds"]:
+			Game.quests[q] = {"state": "done", "n": 1}
+		Game.quests["mr_bubbles"] = {"state": "active", "n": 0}
+		Game.flags["hail_golem"] = true
+		Game.flags.erase("mr_bubbles")
+		main._travel("cloud")
+		return true
+	if phase == 3:
+		await wait(3.0)
+		var w3: CloudWorld = main.world
+		var lord3: Enemy = w3.lord
+		check("mb_normal_unchanged", lord3 != null and not lord3.no_heal and is_equal_approx(float(lord3.t.look_size), 1.6) and lord3.arena.is_valid(),
+			"%s %s" % [lord3.no_heal if lord3 else "?", lord3.t.look_size if lord3 else "?"])
+		return false
+	Game.set_meta("mb_phase", 2)
+	await wait(3.0)
+	player = main.player
+	god = true
+	var w: CloudWorld = main.world
+	var lord: Enemy = w.lord
+	check("mb_lord_there", lord != null and is_instance_valid(lord))
+	if lord == null:
+		return false
+	var c: Vector3 = CloudWorld.ISLANDS.E.c
+	check("mb_insane_no_heal_more_hp", lord.no_heal and lord.arena.is_valid(), "hp %.0f" % lord.max_hp)
+	main.chaos.next_t = 999.0
+	await tp(c + Vector3(0, 0.6, 2.0), 0.0)
+	await wait(1.0)
+	var lb := _mesh_box(lord.body)
+	var hb := _mesh_box(player.body)
+	print("BUBBLES size: Mr. Bubbles %.2f m tall, %.2f m wide; hero %.2f m tall; ratio %.2f" % [lb.size.y, maxf(lb.size.x, lb.size.z), hb.size.y, lb.size.y / maxf(hb.size.y, 0.01)])
+	check("mb_more_to_scale", lb.size.y / maxf(hb.size.y, 0.01) < 3.6 and lb.size.y / maxf(hb.size.y, 0.01) > 1.8, "%.2f" % (lb.size.y / maxf(hb.size.y, 0.01)))
+	face(lord.global_position)
+	player.zoom_target = 7.0; player.zoom = 7.0; player.pitch = -0.12; player.snap_view()
+	await wait(0.4)
+	await shot("mb_01_face_to_face")
+	# the chaos leaves him alone
+	var s0: Vector3 = lord.body.scale
+	main.chaos.fire("giants")
+	main.chaos.fire("ghosts")
+	var hidden := 0
+	for k in 15:
+		await wait(0.2)
+		if not lord.body.visible:
+			hidden += 1
+	check("mb_giant_foes_leave_him", lord.body.scale.is_equal_approx(s0), "%s -> %s" % [s0, lord.body.scale])
+	check("mb_ghosts_leave_him", hidden == 0, "%d" % hidden)
+	# out of the storm clouds
+	lord.global_position = c + Vector3(26.0, 2.0, 0.0)
+	await wait(0.3)
+	var r0 := Vector2(lord.global_position.x - c.x, lord.global_position.z - c.z).length()
+	check("mb_kept_out_of_the_clouds", r0 <= CloudWorld.LORD_R + 0.4, "%.1f" % r0)
+	# going home doesn't heal him
+	lord.hp = lord.max_hp * 0.5
+	lord._go(Enemy.S.RETURN)
+	await tp(w.spawn_point + Vector3(0, 0.5, 0), 0.0)        # (back at the Sky Temple, out of his reach)
+	for k in 60:
+		await wait(0.25)
+		if lord.state == Enemy.S.IDLE:
+			break
+	check("mb_going_home_no_heal", lord.hp <= lord.max_hp * 0.5 + 1.0, "%.0f of %.0f" % [lord.hp, lord.max_hp])
+	# a real fight at the edge of the arena: he stays in the open the whole time
+	await tp(c + Vector3(0, 0.6, 16.0), PI)
+	check("mb_hero_ok_for_the_fight", not player.dead and main.state == "play", main.state)
+	player.invuln = 60.0          # (his Insane charge can knock out a test hero in one go)
+	var worst := 0.0
+	var gone := 0
+	for k in 120:
+		await wait(0.2)
+		if lord.dead:
+			break
+		worst = maxf(worst, Vector2(lord.global_position.x - c.x, lord.global_position.z - c.z).length())
+		if not lord.body.visible:
+			gone += 1
+		if k == 40:
+			face(lord.global_position)
+			await shot("mb_02_fight_at_the_edge")
+	print("BUBBLES fight: furthest out %.1f m, hidden %d, moves %s" % [worst, gone, lord.moves_done])
+	check("mb_always_in_the_open", worst <= CloudWorld.LORD_R + 0.6 and gone == 0, "%.1f m, hidden %d" % [worst, gone])
+	Game.set_meta("mb_phase", 2)
+	return await _bubbles_test()
 
 ## (diagnostic) frames per second in the castle, with and without the solid mountains
 func _fpsdiag_test() -> bool:

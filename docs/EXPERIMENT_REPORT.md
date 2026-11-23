@@ -1413,3 +1413,27 @@ The old `polish2` balloon check "can't step out mid-air" is gone, because now yo
 - The cause is the test machine: a new `fpsdiag` check measured the castle at about **1 frame a second** under the software renderer, with or without the solid mountains. At that speed the test's taps are too far apart in game time to snap the line.
 - So this is a test-environment flake, not a game change. Worth making the fishing check independent of frame rate some time.
 
+## Follow-up 44: Mr. Bubbles you can always see (Nov 23)
+
+Jason's son got all the way to Mr. Bubbles on Insane. Jason: "Mr Bubbles keeps on like he's really hard to see in insane mode. He like disappears into the walls and he regenerates a lot... we have to get the size ratio down and make sure that Mr Bubbles is always available to see and attack." Then: "he doesn't need to be the same size as me, just the size difference needs to be a bit more to scale", and on the healing: "I'd prefer... he's just got a lot of hit points".
+
+**What was going on:**
+- **Size:** Insane's **Giant Foes** event made every monster near you 1.45× bigger for good, bosses included. Mr. Bubbles went from 2.0 to 2.9, more than five metres tall and wider still.
+- **Hard to see:** **Ghost Monsters** made him blink in and out of sight for 10 seconds.
+- **Into the walls:** his arena is ringed by towering storm clouds, which are scenery with nothing solid inside, and they reach about 21 m in from the 24 m edge. Chasing a hero at the edge, or charging 16 m, he walked straight into them and vanished.
+- **Healing:** a monster that gives up the chase walks home and heals half its health. His own "BUBBLE TIME!" floats you 9 m up, which counted as you getting away, so every bubble (every 5–9 s) could send him home for half his health back.
+
+**The changes:**
+- **The chaos leaves bosses alone:** Giant Foes and Ghost Monsters skip them (`Enemy.is_boss()`; `InsaneChaos._foes_near(r, bosses := false)`). Those events only happen in Insane anyway.
+- **He keeps to his arena:** `Enemy.arena` is a new optional limit. Walking, charging (the charge stops at the edge), leaping and the storm dive all keep inside it. Mr. Bubbles' centre stays within 17.5 m of the middle, clear of the clouds. This applies in every mode: it's a glitch fix.
+- **Insane only** (Normal stays as signed off):
+  - he doesn't heal when he goes home;
+  - he has 1.4× health instead;
+  - he's 82% of his size, which makes him about 2× the hero's height instead of 2.9×;
+  - he doesn't give up the fight while you're floating in his bubble.
+
+**Tested:** a new `bubbles` test:
+- on Insane: size ratio 2.0, Giant Foes and Ghost Monsters don't touch him, he's kept out of the clouds even if placed in them, and going home doesn't heal him;
+- a real fight at the arena's edge: he's never further out than 17.4 m and never hidden;
+- on Normal, he's the same as before.
+
