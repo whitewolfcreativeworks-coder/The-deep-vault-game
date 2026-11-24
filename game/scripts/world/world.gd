@@ -191,7 +191,7 @@ func _story(z: float) -> void:
 ## [from, looking at]. Halfway down the stairs, then every room.
 func warm_spots() -> Array:
 	return [
-		[Vector3(0, -1.2, -4.0), Vector3(0, -5.0, -18.0)],
+		[Vector3(0, 0.5, -4.0), Vector3(0, -4.5, -18.0)],          # (the steps are at -1.2 here: eye height above them)
 		[Vector3(0, Y + 2.2, -14.0), Vector3(0, Y + 1.0, -30.0)],
 		[Vector3(0, Y + 2.2, -30.0), Vector3(0, Y + 1.0, -14.0)],
 		[Vector3(0, Y + 2.0, -37.0), Vector3(0, Y + 1.0, -58.0)],

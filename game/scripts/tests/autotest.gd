@@ -5886,12 +5886,16 @@ func _levers_test() -> bool:
 		var gem_after: Vector3 = lev._lid.global_position + lev._lid.global_transform.basis.y * 0.67
 		check("lv_pulled_green", ok and lev.spent and lev._light.light_color.g > 0.9 and lev._light.light_color.r < 0.6 and w.corridor_gate.is_open, "ok %s spent %s" % [ok, lev.spent])
 		check("lv_pulled_down_toward_you", gem_after.y < gem_at.y - 0.5 and gem_after.x < lp.x - 0.2, "%s -> %s" % [gem_at, gem_after])
+		await tp(Vector3(-1.2, -6.0, -52.0), 0.0, -0.1)
+		await wait(1.5)
 		await _cam_shot("lv_04_lever_pulled", eye, lp + Vector3(0, 1.0, 0), 55.0)
+		await _cam_shot("lv_05_lever_pulled_corridor", Vector3(-1.2, -6 + 1.7, -55.0), lp + Vector3(0, 0.9, 0), 60.0)
 		Game.set_meta("lv_phase", 2)
 		main._travel("forest")
 		return true
 	# the Goblin Forest: the mine-gate lever (stands on its own) and the Sinkhole's sluices
 	await wait(2.0)
+	player = main.player
 	var fw = main.world
 	var n := 0
 	for l in fw.find_children("*", "Interactable", true, false):

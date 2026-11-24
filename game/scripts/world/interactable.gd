@@ -239,7 +239,7 @@ func _build_lever() -> void:
 	_gem_mat = StandardMaterial3D.new(); _gem_mat.albedo_color = LEVER_AMBER; _gem_mat.metallic = 0.2; _gem_mat.roughness = 0.1
 	_gem_mat.emission_enabled = true; _gem_mat.emission = LEVER_AMBER; _gem_mat.emission_energy_multiplier = 2.5
 	gem.material_override = _gem_mat; gem.position = Vector3(0, 0.67, 0); _lid.add_child(gem)
-	var halo := MeshInstance3D.new(); var hq := QuadMesh.new(); hq.size = Vector2(0.55, 0.55); halo.mesh = hq
+	var halo := MeshInstance3D.new(); var hq := QuadMesh.new(); hq.size = Vector2(0.4, 0.4); halo.mesh = hq
 	_halo_mat = StandardMaterial3D.new(); _halo_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; _halo_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	_halo_mat.albedo_texture = FX.soft_texture(); _halo_mat.albedo_color = Color(LEVER_AMBER.r, LEVER_AMBER.g, LEVER_AMBER.b, 0.55)
@@ -247,8 +247,8 @@ func _build_lever() -> void:
 	halo.material_override = _halo_mat; halo.position = Vector3(0, 0.67, 0); halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_lid.add_child(halo)
 	_lid.rotation.x = LEVER_UP          # sticking out of the plate, up and towards you
-	_light = OmniLight3D.new(); _light.light_color = LEVER_AMBER; _light.light_energy = 1.0; _light.omni_range = 3.2
-	_light.position = c + Vector3(0, 0.25, -0.5); base.add_child(_light)
+	_light = OmniLight3D.new(); _light.light_color = LEVER_AMBER; _light.light_energy = 0.85; _light.omni_range = 3.4
+	_light.position = c + Vector3(0, 0.3, -0.85); base.add_child(_light)
 	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(0.78, 1.06, 0.3)
 	cs.shape = bs; cs.position = c + Vector3(0, 0.05, 0.0); sb.add_child(cs); base.add_child(sb)
 
@@ -274,7 +274,7 @@ func _process(delta: float) -> void:
 	if kind == "lever" and _gem_mat and not spent:
 		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004)
 		_gem_mat.emission_energy_multiplier = 1.8 + pulse * 1.6
-		_halo_mat.albedo_color.a = 0.35 + pulse * 0.35
+		_halo_mat.albedo_color.a = 0.25 + pulse * 0.3
 		return
 	if kind == "shrine" and _vis:
 		_vis.rotation.y += delta
