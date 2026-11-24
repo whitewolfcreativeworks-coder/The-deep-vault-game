@@ -763,6 +763,18 @@ func _mist() -> void:
 		add_child(w)
 		w.position = c + Vector3(0, height(c.x, c.z) + 2.5, 0)
 
+## Places the warm-up camera looks at while "Getting ready" (main._get_ready), with
+## the sun off: down in the Bone Crypt.
+func warm_spots() -> Array:
+	return [
+		[Vector3(-62.0, CY + 2.5, 22.0), Vector3(-62.0, CY + 1.0, 8.0)],        # the stairs' foot
+		[Vector3(-62.0, CY + 3.0, -10.0), Vector3(-62.0, CY + 1.0, -40.0)],     # the great hall
+		[Vector3(-40.0, CY + 3.0, -26.0), Vector3(-85.0, CY + 1.0, -26.0)],
+		[Vector3(-100.0, CY + 4.0, -24.0), Vector3(-108.0, CY, -60.0)],         # the pit
+		[Vector3(-105.0, CY + 3.0, -76.0), Vector3(-100.0, CY + 1.0, -95.0)],
+		[Vector3(-50.0, CY + 4.0, -74.0), Vector3(-75.0, CY + 1.0, -100.0)],    # the Ghost Lord's hall
+	]
+
 func _horizon() -> void:
 	var names := ["mountain_A_grass_trees", "mountain_B_grass_trees", "mountain_C_grass_trees"]
 	for k in 22:

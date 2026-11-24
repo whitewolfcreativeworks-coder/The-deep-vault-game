@@ -49,23 +49,7 @@ func _build() -> void:
 			_light.position = Vector3(0, 0.8, 0)
 			add_child(_light)
 		"lever":
-			var base := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(0.5, 0.6, 0.2); base.mesh = bm
-			# gold, with a soft glow, so it never blends into the wall
-			var gold := _metal(Color(1.0, 0.76, 0.28))
-			gold.emission_enabled = true; gold.emission = Color(1.0, 0.7, 0.25); gold.emission_energy_multiplier = 0.35
-			base.material_override = gold; base.position = Vector3(0, 1.1, 0); add_child(base)
-			var plate := MeshInstance3D.new(); var pbm := BoxMesh.new(); pbm.size = Vector3(0.7, 0.85, 0.06); plate.mesh = pbm
-			plate.material_override = gold; plate.position = Vector3(0, 1.1, 0.1); add_child(plate)
-			var glow := OmniLight3D.new(); glow.light_color = Color(1.0, 0.8, 0.4); glow.light_energy = 0.9; glow.omni_range = 3.0
-			glow.position = Vector3(0, 1.3, -0.5); add_child(glow)
-			_lid = Node3D.new(); _lid.position = Vector3(0, 1.1, -0.12); add_child(_lid)
-			var arm := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.03; cm.bottom_radius = 0.03; cm.height = 0.55
-			arm.mesh = cm; arm.material_override = gold; arm.position = Vector3(0, 0.25, 0); _lid.add_child(arm)
-			var knob := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.06; sm.height = 0.12; knob.mesh = sm
-			knob.material_override = _metal(Color(0.8, 0.2, 0.15)); knob.position = Vector3(0, 0.52, 0); _lid.add_child(knob)
-			_lid.rotation.x = -0.7
-			var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(0.5, 0.6, 0.3)
-			cs.shape = bs; cs.position = Vector3(0, 1.1, 0); sb.add_child(cs); add_child(sb)
+			_build_lever()
 		"inscription":
 			_vis = MeshInstance3D.new(); var b2 := BoxMesh.new(); b2.size = Vector3(1.0, 1.4, 0.25); (_vis as MeshInstance3D).mesh = b2
 			var sm2 := ShaderMaterial.new(); sm2.shader = load("res://shaders/stone.gdshader"); sm2.set_shader_parameter("mode", 2)
@@ -187,11 +171,111 @@ func reveal() -> void:
 	tw.tween_callback(beam.queue_free)
 	Sfx.play_at("portal", global_position, -2.0, 0.0)
 
+## An ornate golden lever on a carved golden wall plate (Jason, Nov 24: "it could
+## be all gold with a little glow to it... re-craft those levers so they look more
+## ornate... and they glow a bit"). A framed plate with rivets, a glowing rune in a
+## ring at the top, a slotted track, a golden arm with a collar and a glowing gem
+## knob that pulses gently. Pulled, the gem, the rune and the light turn green.
+var _gem_mat: StandardMaterial3D
+var _halo_mat: StandardMaterial3D
+var _rune_mat: ShaderMaterial
+const LEVER_AMBER := Color(1.0, 0.68, 0.22)
+const LEVER_GREEN := Color(0.4, 1.0, 0.45)
+const LEVER_UP := -0.9                  # the arm's tilt: up and out of the plate...
+const LEVER_DOWN := -2.25               # ...pulled: down and out
+func _build_lever() -> void:
+	var gold := _metal(Color(1.0, 0.78, 0.3))
+	gold.metallic = 0.95; gold.roughness = 0.28
+	gold.emission_enabled = true; gold.emission = Color(1.0, 0.72, 0.3); gold.emission_energy_multiplier = 0.25
+	var dark := _metal(Color(0.62, 0.42, 0.14))
+	dark.metallic = 0.9; dark.roughness = 0.4
+	var groove := StandardMaterial3D.new(); groove.albedo_color = Color(0.08, 0.06, 0.04); groove.roughness = 0.9
+	var c := Vector3(0, 1.15, 0)
+	# (built facing -z, then turned round: every lever in the game faces the way
+	# it's placed, +z, where you stand to pull it. The old one faced the wall and
+	# you saw its back: "that weird handle with a gold backpiece".)
+	var base := Node3D.new(); base.rotation.y = PI; add_child(base)
+	# it stands on its own: a gold-capped post on a stone foot
+	var foot := MeshInstance3D.new(); var ftm := BoxMesh.new(); ftm.size = Vector3(0.56, 0.14, 0.42); foot.mesh = ftm
+	foot.material_override = dark; foot.position = Vector3(0, 0.07, -0.06); add_child(foot)
+	var post := MeshInstance3D.new(); var ptm := BoxMesh.new(); ptm.size = Vector3(0.24, 0.6, 0.18); post.mesh = ptm
+	post.material_override = dark; post.position = Vector3(0, 0.44, -0.1); add_child(post)
+	# the plate: a dark gold frame round a bright gold face, with a rivet in each corner
+	var frame := MeshInstance3D.new(); var fb := BoxMesh.new(); fb.size = Vector3(0.78, 1.06, 0.07); frame.mesh = fb
+	frame.material_override = dark; frame.position = c + Vector3(0, 0.05, 0.1); base.add_child(frame)
+	var face := MeshInstance3D.new(); var fcb := BoxMesh.new(); fcb.size = Vector3(0.64, 0.92, 0.06); face.mesh = fcb
+	face.material_override = gold; face.position = c + Vector3(0, 0.05, 0.065); base.add_child(face)
+	for corner in [Vector2(-0.32, 0.48), Vector2(0.32, 0.48), Vector2(-0.32, -0.38), Vector2(0.32, -0.38)]:
+		var rv := MeshInstance3D.new(); var rs := SphereMesh.new(); rs.radius = 0.035; rs.height = 0.07; rs.radial_segments = 8; rs.rings = 4
+		rv.mesh = rs; rv.material_override = gold; rv.position = c + Vector3(corner.x, corner.y, 0.03); base.add_child(rv)
+	# a crest on top
+	var crest := MeshInstance3D.new(); var cp := PrismMesh.new(); cp.size = Vector3(0.42, 0.16, 0.07); crest.mesh = cp
+	crest.material_override = dark; crest.position = c + Vector3(0, 0.66, 0.1); base.add_child(crest)
+	# the glowing rune in a golden ring, above the lever
+	var ring := MeshInstance3D.new(); var rt := TorusMesh.new(); rt.inner_radius = 0.13; rt.outer_radius = 0.16; rt.rings = 24; rt.ring_segments = 6
+	ring.mesh = rt; ring.material_override = gold; ring.rotation.x = PI * 0.5; ring.position = c + Vector3(0, 0.3, 0.02); base.add_child(ring)
+	var rune := MeshInstance3D.new(); var rq := QuadMesh.new(); rq.size = Vector2(0.26, 0.26); rune.mesh = rq
+	_rune_mat = ShaderMaterial.new(); _rune_mat.shader = load("res://shaders/rune.gdshader")
+	_rune_mat.set_shader_parameter("color", LEVER_AMBER); _rune_mat.set_shader_parameter("intensity", 1.4)
+	rune.material_override = _rune_mat; rune.rotation.y = PI; rune.position = c + Vector3(0, 0.3, 0.025); base.add_child(rune)
+	# the slot the lever swings along
+	var slot := MeshInstance3D.new(); var sbm := BoxMesh.new(); sbm.size = Vector3(0.08, 0.58, 0.02); slot.mesh = sbm
+	slot.material_override = groove; slot.position = c + Vector3(0, -0.06, 0.03); base.add_child(slot)
+	# the pivot: a gold hub with a ring
+	var hub := MeshInstance3D.new(); var hc := CylinderMesh.new(); hc.top_radius = 0.09; hc.bottom_radius = 0.09; hc.height = 0.1
+	hub.mesh = hc; hub.material_override = gold; hub.rotation.x = PI * 0.5; hub.position = c + Vector3(0, -0.1, -0.02); base.add_child(hub)
+	var hr := MeshInstance3D.new(); var hrt := TorusMesh.new(); hrt.inner_radius = 0.1; hrt.outer_radius = 0.13; hrt.rings = 20; hrt.ring_segments = 6
+	hr.mesh = hrt; hr.material_override = dark; hr.rotation.x = PI * 0.5; hr.position = c + Vector3(0, -0.1, 0.0); base.add_child(hr)
+	# the arm, with a collar half way and a glowing gem for a knob
+	_lid = Node3D.new(); _lid.position = c + Vector3(0, -0.1, -0.08); base.add_child(_lid)
+	var arm := MeshInstance3D.new(); var am := CylinderMesh.new(); am.top_radius = 0.035; am.bottom_radius = 0.05; am.height = 0.6
+	arm.mesh = am; arm.material_override = gold; arm.position = Vector3(0, 0.3, 0); _lid.add_child(arm)
+	var collar := MeshInstance3D.new(); var ct := TorusMesh.new(); ct.inner_radius = 0.04; ct.outer_radius = 0.07; ct.rings = 16; ct.ring_segments = 6
+	collar.mesh = ct; collar.material_override = dark; collar.position = Vector3(0, 0.32, 0); _lid.add_child(collar)
+	var cup := MeshInstance3D.new(); var cc := CylinderMesh.new(); cc.top_radius = 0.075; cc.bottom_radius = 0.04; cc.height = 0.07
+	cup.mesh = cc; cup.material_override = gold; cup.position = Vector3(0, 0.6, 0); _lid.add_child(cup)
+	var gem := MeshInstance3D.new(); var gs := SphereMesh.new(); gs.radius = 0.075; gs.height = 0.15; gs.radial_segments = 12; gs.rings = 6
+	gem.mesh = gs
+	_gem_mat = StandardMaterial3D.new(); _gem_mat.albedo_color = LEVER_AMBER; _gem_mat.metallic = 0.2; _gem_mat.roughness = 0.1
+	_gem_mat.emission_enabled = true; _gem_mat.emission = LEVER_AMBER; _gem_mat.emission_energy_multiplier = 2.5
+	gem.material_override = _gem_mat; gem.position = Vector3(0, 0.67, 0); _lid.add_child(gem)
+	var halo := MeshInstance3D.new(); var hq := QuadMesh.new(); hq.size = Vector2(0.55, 0.55); halo.mesh = hq
+	_halo_mat = StandardMaterial3D.new(); _halo_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; _halo_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_halo_mat.albedo_texture = FX.soft_texture(); _halo_mat.albedo_color = Color(LEVER_AMBER.r, LEVER_AMBER.g, LEVER_AMBER.b, 0.55)
+	_halo_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	halo.material_override = _halo_mat; halo.position = Vector3(0, 0.67, 0); halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_lid.add_child(halo)
+	_lid.rotation.x = LEVER_UP          # sticking out of the plate, up and towards you
+	_light = OmniLight3D.new(); _light.light_color = LEVER_AMBER; _light.light_energy = 1.0; _light.omni_range = 3.2
+	_light.position = c + Vector3(0, 0.25, -0.5); base.add_child(_light)
+	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(0.78, 1.06, 0.3)
+	cs.shape = bs; cs.position = c + Vector3(0, 0.05, 0.0); sb.add_child(cs); base.add_child(sb)
+
+## A pulled lever glows green.
+func _lever_done(silent: bool) -> void:
+	if _gem_mat == null:
+		return
+	_gem_mat.albedo_color = LEVER_GREEN; _gem_mat.emission = LEVER_GREEN
+	_halo_mat.albedo_color = Color(LEVER_GREEN.r, LEVER_GREEN.g, LEVER_GREEN.b, 0.5)
+	_rune_mat.set_shader_parameter("color", LEVER_GREEN)
+	if _light:
+		_light.light_color = LEVER_GREEN
+	if not silent and _lid:
+		var at := _lid.global_position + _lid.global_transform.basis.y * 0.67
+		FX.burst(at, LEVER_GREEN, 26, 2.6, 0.1, 0.7, -1.0)
+		FX.flash_light(at, LEVER_GREEN, 3.0, 4.0, 0.4)
+
 func _metal(c: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new(); m.albedo_color = c; m.metallic = 0.8; m.roughness = 0.4
 	return m
 
 func _process(delta: float) -> void:
+	if kind == "lever" and _gem_mat and not spent:
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004)
+		_gem_mat.emission_energy_multiplier = 1.8 + pulse * 1.6
+		_halo_mat.albedo_color.a = 0.35 + pulse * 0.35
+		return
 	if kind == "shrine" and _vis:
 		_vis.rotation.y += delta
 		_vis.position.y = 1.25 + sin(Time.get_ticks_msec() * 0.002) * 0.06
@@ -297,7 +381,8 @@ func _apply_spent(silent: bool) -> void:
 		"lever":
 			if _lid:
 				var tw2 := create_tween()
-				tw2.tween_property(_lid, "rotation:x", 0.7, 0.0 if silent else 0.35)
+				tw2.tween_property(_lid, "rotation:x", LEVER_DOWN, 0.0 if silent else 0.35)
+			_lever_done(silent)
 		"altar":
 			if silent and _vis:
 				_vis.visible = false

@@ -213,6 +213,7 @@ const READY_MAX := 5.0
 var ready_hold_secs := 0.0         # (for the tests: how long the last one took,
 var ready_held_paused := false     #  whether the world was paused, and what it said)
 var ready_title := ""
+var warmed_spots := 0              # (for the tests: places looked at while getting ready)
 const WARM_SOUNDS := ["hit", "swing", "clang", "hurt", "bone_break", "pickup", "coins", "levelup", "spell", "spell_hit",
 	"fire_burst", "skel_attack", "roar", "slam", "footstep", "death", "chest", "door", "portal", "thunder", "rumble", "whistle"]
 
@@ -272,6 +273,28 @@ func _get_ready() -> void:
 		if (el >= READY_MIN and spin >= 1.0 and steady >= 12) or el >= READY_MAX:
 			ready_hold_secs = el
 			break
+	# The places the sun doesn't reach (down the Vault's stairs, the Warren, the
+	# Crypt, indoors): look at each once now, with the sun off as it will be there.
+	# The first time a tablet draws a room in a new light it stops to get ready, and
+	# that was the stutter on the Vault stairs (Jason, Nov 24: "every time you go
+	# down the stairs... it lags just for a second at a certain spot").
+	if is_instance_valid(cam) and world.has_method("warm_spots"):
+		var suns: Array = world.find_children("*", "DirectionalLight3D", true, false).filter(
+			func(l: Node) -> bool: return (l as Node3D).visible)
+		var spots: Array = world.warm_spots()
+		spots.push_front([eye, eye + Vector3(-sin(player.yaw), -0.3, -cos(player.yaw))])     # (up here, sun off: as seen from the stairs)
+		warmed_spots = 0
+		for sp: Array in spots:
+			cam.global_position = sp[0]
+			cam.look_at(sp[1])
+			for l: Node3D in suns:
+				l.visible = false
+			await get_tree().process_frame
+			await get_tree().process_frame
+			for l: Node3D in suns:
+				l.visible = true
+			await get_tree().process_frame
+			warmed_spots += 1
 	cam.queue_free()
 	player.camera.current = true
 	player.snap_view()

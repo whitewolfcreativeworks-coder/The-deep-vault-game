@@ -126,7 +126,7 @@ func show_panel(n: String) -> void:
 	if n == "pause" and _arrange_btn:
 		_arrange_btn.visible = Game.touch_active
 		_reset_btn.visible = Game.touch_active
-		_gfx_btn.text = Graphics.label()
+		_show_gfx()
 
 func is_open() -> bool:
 	return current != ""
@@ -905,7 +905,32 @@ func _refresh_slots() -> void:
 
 var _arrange_btn: Button
 var _reset_btn: Button
-var _gfx_btn: Button
+var _gfx_btns := {}
+var _gfx_title: Label
+## Light up the graphics setting in use. On Auto, the level Auto is using right now
+## is shown too (its button's writing lit, not the button).
+func _show_gfx() -> void:
+	var lv: int = Graphics.level()
+	for c: String in _gfx_btns:
+		var gb: Button = _gfx_btns[c]
+		var on: bool = Graphics.choice == c
+		var using: bool = Graphics.choice == "auto" and c == ["low", "medium", "high"][lv]
+		var col: Color = Color(0.08, 0.06, 0.03) if on else (UIKit.GOLD if using else UIKit.PARCH)
+		for k: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+			gb.add_theme_color_override(k, col)
+		if on:
+			var sb := StyleBoxFlat.new()
+			sb.bg_color = UIKit.GOLD
+			sb.set_corner_radius_all(6)
+			sb.border_color = Color(1.0, 0.9, 0.6); sb.set_border_width_all(2)
+			for st: String in ["normal", "hover", "pressed", "focus"]:
+				gb.add_theme_stylebox_override(st, sb)
+		else:
+			for st: String in ["normal", "hover", "pressed", "focus"]:
+				gb.remove_theme_stylebox_override(st)
+	if _gfx_title:
+		_gfx_title.tooltip_text = Graphics.label()
+
 func _build_pause() -> void:
 	var p := _center_panel("pause", 420, 820)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -930,12 +955,33 @@ func _build_pause() -> void:
 		Game.strafe_mode = not Game.strafe_mode
 		mv.text = "Movement: Strafe (face camera)" if Game.strafe_mode else "Movement: Free (face where you run)")
 	v.add_child(mv)
-	_gfx_btn = _button(Graphics.label(), func() -> void: pass, 360)
-	_gfx_btn.pressed.connect(func() -> void:
-		var m := get_parent()
-		Graphics.cycle(m.world if m and m.get("world") else null)
-		_gfx_btn.text = Graphics.label())
-	v.add_child(_gfx_btn)
+	# Graphics: Auto | High | Medium | Low, all four in a row. (It was one button that
+	# stepped through them, and on the iPad a tap could count twice and jump past
+	# Low: Jason, Nov 24, "there's only a medium and a high setting".) Each button
+	# just picks its setting, so tapping twice changes nothing.
+	var gr := HBoxContainer.new(); gr.add_theme_constant_override("separation", 5)
+	gr.custom_minimum_size = Vector2(360, 46)
+	_gfx_title = UIKit.label("Graphics", 15, UIKit.DIM)
+	_gfx_title.custom_minimum_size.x = 62
+	_gfx_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	gr.add_child(_gfx_title)
+	_gfx_btns.clear()
+	for c: String in ["auto", "high", "medium", "low"]:
+		var gb := Button.new()
+		gb.text = c.capitalize()
+		gb.name = "Gfx_" + c
+		gb.add_theme_font_size_override("font_size", 16)
+		gb.custom_minimum_size = Vector2(84 if c == "medium" else 64, 46)
+		gb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		gb.pressed.connect(func() -> void:
+			Sfx.play("footstep", -8.0, 0.0)
+			var m := get_parent()
+			Graphics.set_choice(c, m.world if m and m.get("world") else null)
+			_show_gfx())
+		_gfx_btns[c] = gb
+		gr.add_child(gb)
+	v.add_child(gr)
+	_show_gfx()
 	var sl_row := HBoxContainer.new(); sl_row.add_theme_constant_override("separation", 10)
 	sl_row.add_child(UIKit.label("Mouse", 17, UIKit.DIM))
 	var sl := HSlider.new(); sl.min_value = 0.0006; sl.max_value = 0.006; sl.step = 0.0002

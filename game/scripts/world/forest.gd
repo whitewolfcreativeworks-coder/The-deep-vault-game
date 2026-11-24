@@ -648,6 +648,24 @@ func solid_mountain(n: Node3D) -> void:
 		sb.add_child(cs)
 		mi.add_child(sb)
 
+## Places the warm-up camera looks at while "Getting ready" (main._get_ready), with
+## the sun off: the Warren and the Sinkhole, so going underground doesn't stutter.
+func warm_spots() -> Array:
+	var sy := SinkholeOfDeath.SY
+	var x0 := SinkholeOfDeath.X0
+	return [
+		[Vector3(0, WY + 2.5, -116.0), Vector3(0, WY + 1.0, -150.0)],
+		[Vector3(0, WY + 2.5, -168.0), Vector3(0, WY + 1.0, -192.0)],
+		[Vector3(-30.0, WY + 2.5, -150.0), Vector3(-46.0, WY + 1.0, -160.0)],
+		[Vector3(30.0, WY + 2.5, -140.0), Vector3(46.0, WY + 1.0, -146.0)],
+		[Vector3(x0, sy + 3.0, -55.0), Vector3(x0, sy + 1.0, -76.0)],             # the landing cavern
+		[Vector3(x0, sy + 8.0, -92.0), Vector3(x0, sy, -125.0)],                  # the Cauldron
+		[Vector3(x0, sy + 8.0, -156.0), Vector3(x0, sy, -125.0)],
+		[Vector3(x0, sy + 5.0, -125.0), Vector3(-78.0, sy, -124.0)],
+		[Vector3(-84.0, sy + 3.0, -124.0), Vector3(-110.0, sy + 1.0, -124.0)],    # the Ember Forge
+		[Vector3(20.0, sy + 3.0, -124.0), Vector3(50.0, sy + 1.0, -124.0)],       # the Magma Mines
+	]
+
 ## The edge of the level (Player._keep_in_level): above ground you can't go past the
 ## invisible walls however you travel, even flying higher than they reach. (The
 ## Warren and the Sinkhole, deep underground, reach further out: no edge there.)

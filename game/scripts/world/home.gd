@@ -322,6 +322,18 @@ func _physics_process(delta: float) -> void:
 	if not landed and player.is_on_floor() and Vector2(pp.x - LAND.x, pp.z - LAND.z).length() < 26.0 and pp.y < 12.0:
 		_land()
 
+## Places the warm-up camera looks at while "Getting ready" (main._get_ready), with
+## the sun off: inside the cabin and Tobble's Trading Post.
+func warm_spots() -> Array:
+	var room := HomeCabin.AT
+	var shop := TradingPost.IN
+	return [
+		[room + Vector3(0, 2.0, 4.0), room + Vector3(-1.0, 1.0, -4.0)],
+		[room + Vector3(0, 2.0, -3.0), room + Vector3(0.5, 1.0, 4.0)],
+		[shop + Vector3(0, 1.8, 3.0), shop + Vector3(0, 1.0, -3.0)],
+		[shop + Vector3(0, 1.8, -3.0), shop + Vector3(0, 1.0, 3.0)],
+	]
+
 ## The edge of the level (Player._keep_in_level): the valley and the hills around
 ## it, not out past the mountains where the ground ends. (Not during the flight
 ## home, which starts far out over the clouds.)

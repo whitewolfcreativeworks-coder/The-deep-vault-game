@@ -346,6 +346,9 @@ func _run() -> void:
 	elif mode == "graphics":
 		if await _graphics_test():
 			return
+	elif mode == "levers":
+		if await _levers_test():
+			return
 	elif mode == "balloon2":
 		if await _balloon2_test():
 			return
@@ -5846,6 +5849,65 @@ func _gfx_totals(w: Node) -> Dictionary:
 	out["scale"] = get_viewport().scaling_3d_scale
 	return out
 
+# --- the ornate levers, and the warm-up spots (Jason, Nov 24) ---------------------------
+func _levers_test() -> bool:
+	var phase: int = Game.get_meta("lv_phase", 1)
+	if phase == 1:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		await wait(1.5)
+		var w = main.world
+		# the Vault's warm-up spots are all in open air (not inside a wall)
+		var bad: Array = []
+		var space: PhysicsDirectSpaceState3D = w.get_world_3d().direct_space_state
+		for sp: Array in w.warm_spots():
+			var q := PhysicsPointQueryParameters3D.new(); q.position = sp[0]
+			if not space.intersect_point(q, 1).is_empty():
+				bad.append(sp[0])
+		check("lv_vault_spots_open", bad.is_empty() and w.warm_spots().size() >= 8, str(bad))
+		await _cam_shot("lv_01_stairs_spot", w.warm_spots()[0][0], w.warm_spots()[0][1], 70.0)
+		# the corridor lever faces you (its glowing knob on your side of the plate)
+		var lev: Interactable = null
+		for n in w.find_children("*", "Interactable", true, false):
+			if (n as Interactable).kind == "lever":
+				lev = n
+		var lp: Vector3 = lev.global_position
+		var toward: Vector3 = lev.global_transform.basis.z           # where you stand to pull it
+		var gem_at: Vector3 = lev._lid.global_position + lev._lid.global_transform.basis.y * 0.67
+		check("lv_faces_the_corridor", toward.x < -0.9 and gem_at.x < lp.x - 0.2, "toward %s gem %s lever %s" % [toward, gem_at, lp])
+		check("lv_glows_amber", lev._light != null and lev._light.light_color.r > 0.9 and lev._light.light_color.b < 0.4 and lev._gem_mat.emission_enabled)
+		var eye := lp + toward * 1.8 + Vector3(0, 1.5, 0)
+		await _cam_shot("lv_02_lever_close", eye, lp + Vector3(0, 1.1, 0), 55.0)
+		await _cam_shot("lv_03_lever_corridor", Vector3(-1.2, -6 + 1.7, -52.5), lp + Vector3(0, 1.0, 0), 65.0)
+		await tp(lp + toward * 1.2, atan2(toward.x, toward.z), -0.1)
+		var ok := await use_nearest_interactable()
+		await wait(0.8)
+		var gem_after: Vector3 = lev._lid.global_position + lev._lid.global_transform.basis.y * 0.67
+		check("lv_pulled_green", ok and lev.spent and lev._light.light_color.g > 0.9 and lev._light.light_color.r < 0.6 and w.corridor_gate.is_open, "ok %s spent %s" % [ok, lev.spent])
+		check("lv_pulled_down_toward_you", gem_after.y < gem_at.y - 0.5 and gem_after.x < lp.x - 0.2, "%s -> %s" % [gem_at, gem_after])
+		await _cam_shot("lv_04_lever_pulled", eye, lp + Vector3(0, 1.0, 0), 55.0)
+		Game.set_meta("lv_phase", 2)
+		main._travel("forest")
+		return true
+	# the Goblin Forest: the mine-gate lever (stands on its own) and the Sinkhole's sluices
+	await wait(2.0)
+	var fw = main.world
+	var n := 0
+	for l in fw.find_children("*", "Interactable", true, false):
+		var lv := l as Interactable
+		if lv.kind != "lever":
+			continue
+		var p: Vector3 = lv.global_position
+		var tw: Vector3 = lv.global_transform.basis.z
+		await tp(p + tw * 3.0, atan2(tw.x, tw.z), -0.1)
+		await wait(1.0)
+		await _cam_shot("lv_1%d_%s" % [n, lv.uid], p + tw * 2.2 + Vector3(0, 1.6, 0), p + Vector3(0, 1.0, 0), 55.0)
+		n += 1
+	check("lv_forest_levers", n == 3, str(n))
+	_finish()
+	return true
+
 func _graphics_test() -> bool:
 	var phase := int(Game.get_meta("gfx_phase", 0))
 	if phase == 0:
@@ -5887,19 +5949,27 @@ func _graphics_test() -> bool:
 		var back := _gfx_totals(w)
 		check("gfx_high_exactly_as_before", back.scale == 1.0 and back.sun_shadow == hi.sun_shadow and back.sun_dist == hi.sun_dist and back.sun_layers == hi.sun_layers
 			and back.particles == hi.particles and back.lamps_fading == hi.lamps_fading, "%s vs %s" % [back, hi])
-		# the pause menu button: High -> Medium -> Low -> Auto -> High
+		# the pause menu: Auto | High | Medium | Low, all four there; each one picks
+		# its setting, and pressing one twice (an iPad tap counting twice) changes nothing
 		main._open("pause")
 		await wait(0.4)
-		var b: Button = main.menus._gfx_btn
-		var seen: Array = [b.text]
-		for k in 4:
-			b.pressed.emit()
+		var btns: Dictionary = main.menus._gfx_btns
+		var row_ok: bool = btns.size() == 4
+		for c: String in ["auto", "high", "medium", "low"]:
+			row_ok = row_ok and btns.has(c) and (btns[c] as Button).is_visible_in_tree()
+		var seen: Array = []
+		for c: String in ["low", "medium", "high", "auto", "low"]:
+			var gb: Button = btns[c]
+			gb.pressed.emit()
+			gb.pressed.emit()
 			await wait(0.1)
-			seen.append(b.text)
+			seen.append(Graphics.choice)
 		print("GRAPHICS menu: ", seen)
-		check("gfx_menu_cycles", seen == ["Graphics: High", "Graphics: Medium", "Graphics: Low", "Graphics: Auto (High)", "Graphics: High"], str(seen))
-		Graphics.set_choice("low", w)
-		b.text = Graphics.label()
+		check("gfx_menu_four_choices", row_ok and seen == ["low", "medium", "high", "auto", "low"], "%s %s" % [btns.keys(), seen])
+		var lit: Button = btns["low"]
+		check("gfx_menu_shows_choice", lit.has_theme_stylebox_override("normal")
+			and not (btns["high"] as Button).has_theme_stylebox_override("normal")
+			and not (btns["auto"] as Button).has_theme_stylebox_override("normal"), "")
 		# with the touch buttons on, the pause menu (two more buttons) still fits on screen
 		main.touch._set_active(true)
 		main.menus.show_panel("pause")
@@ -7326,10 +7396,14 @@ func _arrival_test() -> bool:
 	check("ar_held_paused", main.ready_held_paused)
 	check("ar_title", main.ready_title.contains("Goblin Forest") and main.ready_title.contains("HARD"), main.ready_title)
 	var t0 := Time.get_ticks_msec()
-	while main.state == "arriving" and Time.get_ticks_msec() - t0 < 9000:
+	while main.state == "arriving" and Time.get_ticks_msec() - t0 < 60000:
 		await frames(1)
 	var held: float = main.ready_hold_secs
 	check("ar_hold_length", held >= 2.0 and held <= main.READY_MAX + 2.0, "%.2f s" % held)
+	# ...and it looked down into the Warren and the Sinkhole with the sun off (so going
+	# underground the first time doesn't stutter), then put the sun back
+	var suns_on: bool = main.world.find_children("*", "DirectionalLight3D", true, false).any(func(l: Node) -> bool: return (l as Node3D).visible)
+	check("ar_warmed_underground", main.warmed_spots == 1 + main.world.warm_spots().size() and main.warmed_spots >= 9 and suns_on, "%d spots, sun %s" % [main.warmed_spots, suns_on])
 	check("ar_playing", main.state == "play" and not get_tree().paused and player.camera.current and not m._ready_box.visible, main.state)
 	await wait(1.5)
 	check("ar_faded_in", m.fade.color.a < 0.05, "%.2f" % m.fade.color.a)

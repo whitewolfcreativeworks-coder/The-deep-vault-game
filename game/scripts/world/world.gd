@@ -186,6 +186,22 @@ func _story(z: float) -> void:
 		_start_boss()
 
 # ---------------------------------------------------------------------------
+## Places the warm-up camera looks at while "Getting ready" (main._get_ready), with
+## the sun off, so the first walk down the stairs into the Vault doesn't stutter:
+## [from, looking at]. Halfway down the stairs, then every room.
+func warm_spots() -> Array:
+	return [
+		[Vector3(0, -1.2, -4.0), Vector3(0, -5.0, -18.0)],
+		[Vector3(0, Y + 2.2, -14.0), Vector3(0, Y + 1.0, -30.0)],
+		[Vector3(0, Y + 2.2, -30.0), Vector3(0, Y + 1.0, -14.0)],
+		[Vector3(0, Y + 2.0, -37.0), Vector3(0, Y + 1.0, -58.0)],
+		[Vector3(0, Y + 2.5, -62.0), Vector3(0, Y + 1.0, -82.0)],
+		[Vector3(0, Y + 3.0, -93.0), Vector3(0, Y + 0.0, -125.0)],
+		[Vector3(0, Y + 3.0, -126.0), Vector3(0, Y + 0.0, -100.0)],
+		[Vector3(0, Y + 3.0, -138.0), Vector3(0, Y + 1.0, -165.0)],
+		[Vector3(0, Y + 3.0, -168.0), Vector3(0, Y + 1.0, -182.0)],
+	]
+
 ## The edge of the level (Player._keep_in_level). Up at the outpost you stay in the
 ## clearing: not up onto the hills around it, and not over the cliff behind (where
 ## you used to be able to climb out and fall off the edge of the world). Down in

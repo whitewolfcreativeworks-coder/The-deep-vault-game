@@ -1489,3 +1489,42 @@ Jason: "Mr Bubbles barely goes down in hit points and Mr Bubbles moves slowly...
   - he has about 88,000 health, roughly 300 blows, or two to three minutes of hitting inside a fight of a few minutes;
   - he lands far more blows than before, because he no longer circles or drifts.
 
+## Follow-up 46: the Vault stairs stutter, ornate levers, and a Low you can pick (Nov 24)
+
+Jason took the Rogue through a new Normal adventure on the iPad and sent three things.
+
+**"Every time you go down the stairs, it always lags just for a second at a certain spot."**
+- **Why:** halfway down the stairs (z < -6) the Vault switches the sun off for underground. On the iPad's renderer a scene drawn without the sun, and the Vault's rooms seen for the first time, are new combinations of light and material, and the first time each is drawn it has to be prepared. That's a pause of a frame or several. Jason's guess ("two different environments being mixed together") was close.
+- **Fix:** "Getting ready" (follow-up 34) already turned a camera round where you appear. Now, after that, it also looks once into each place the sun doesn't reach, with the sun off:
+  - the spot you're standing on;
+  - halfway down the Vault stairs and each Vault room;
+  - the Warren's rooms and the Sinkhole's caverns (Goblin Forest);
+  - the Bone Crypt (castle);
+  - inside the cabin and Tobble's (home).
+  
+  It's three frames per place, so it adds about half a second on an iPad and happens behind the dark screen. Each level lists its places in `warm_spots()`. Normal plays exactly as before.
+- **Tested:** the `arrival` test checks every spot was visited and the sun is back on. The `levers` test checks every Vault spot is in open air (not inside a wall).
+- **Not verified:** whether the stutter is gone on the real iPad. It can only show there.
+
+**Levers: "re-craft those levers. So they look more ornate... and they glow a bit."**
+- **Found a bug:** the old lever faced the wall. Every lever is placed to face where you stand, but the model was built back to front. So you saw the back of its plate with the handle poking into the wall: "that weird handle with a gold backpiece".
+- **The new lever:**
+  - a bright gold plate in a dark-gold frame, with four rivets and a crest;
+  - a glowing rune in a gold ring;
+  - a slot and a gold hub;
+  - a gold arm with a collar and a cup holding a glowing amber gem that softly pulses with a halo;
+  - a warm amber light;
+  - it stands on a post and foot, because the forest's mine lever stands in the open.
+- **Pulling it:** the arm swings down towards you, and the gem, halo, rune and light turn green with a burst of sparks.
+- **Tested:** the `levers` test checks:
+  - it faces the corridor;
+  - it glows amber, turns green and opens the gate;
+  - the arm swings down towards you.
+  
+  It also photographs all four levers (the Vault corridor, the mine gate, the two lava sluices).
+
+**"There's only a medium and a high setting. There's no low setting for graphics."**
+- **Why:** Low was there, but the setting was one button that stepped Auto → High → Medium → Low. On the iPad a tap could count twice, so it jumped two steps each time. Auto → Medium → Auto (High) → Medium..., so you only ever saw Medium and "High".
+- **Fix:** the pause menu now has a **Graphics** row of four buttons: Auto | High | Medium | Low. Each just picks its setting, so a tap that counts twice changes nothing. The one in use is lit gold; on Auto, the level it's using has gold writing. The menu is the same height.
+- **Tested:** the `graphics` test presses every button twice and checks you get exactly what you pressed, and that the right one is lit.
+

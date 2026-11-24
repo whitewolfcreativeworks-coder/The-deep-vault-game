@@ -84,7 +84,7 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
   - The mountains ringing the Goblin Forest and Ghost Knight Castle are solid now, so you can stand on them instead of sinking in.
 
 ### Graphics: Auto, High, Medium or Low (Nov 21)
-The same game on every device. Only how much it draws changes, never the levels, heroes, quests or monsters. Change it with the **Graphics** button in the pause menu; it's remembered on that device, not in the save.
+The same game on every device. Only how much it draws changes, never the levels, heroes, quests or monsters. Pick it in the pause menu's **Graphics** row (Auto, High, Medium, Low; the one in use is lit gold, and on Auto the level it's using has gold writing). It's remembered on that device, not in the save.
 
 | Setting | What it does |
 |---|---|
@@ -147,6 +147,7 @@ Forged gear is stronger than found gear and gets stronger with every tier, so it
 ### Getting ready, Hard mode, and riding rules (Nov 20, evening)
 - **Getting ready.** When you arrive somewhere (through a portal, Port Home, a level from the family portal, or Continue), the screen stays dark for a moment with the place's name and "Getting ready...". Behind it:
   - a camera turns once all the way round where you'll appear, so the graphics for everything around you are ready before you see it;
+  - then it looks once into each place the sun doesn't reach (down the Vault's stairs and every Vault room, the Warren and the Sinkhole's caverns, the Bone Crypt, inside the cabin and Tobble's), with the sun switched off as it will be there. The first time a tablet draws a room in a new light it stops to get it ready, and that was the stutter halfway down the Vault stairs (Nov 24);
   - the effects and sounds of a fight are made once, out of sight;
   - it waits until the frame rate settles.
 
@@ -376,7 +377,7 @@ Measured on the web renderer, an Insane forest fight went from about 12,800 draw
 - **The Vault:**
   - The arrival yard has a playground (merry-go-round, swings and a trampoline), street lights and a Rogue statue.
   - Fire vents burn harder.
-  - Switches and levers are gold.
+  - Switches and levers are gold. Since Nov 24 every lever is an ornate one: a gold plate in a dark-gold frame with rivets and a crest, a glowing rune in a gold ring, a gold arm with a glowing amber gem for a knob, on a post of its own. It casts a soft amber light. Pull it and it swings down towards you and everything on it turns green. (The old lever faced the wall, so you saw the back of its plate.)
   - The glowing orb is replaced by the Heart of the Vault, which rises out of the altar after the Warden falls.
 - **The Goblin Forest:**
   - A hot air balloon you can fly and land anywhere (see "The hot air balloon and the edges of each level" above).
