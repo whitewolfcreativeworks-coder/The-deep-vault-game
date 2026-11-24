@@ -18,8 +18,9 @@ const CALLS := [
 	# (peaceful above all: soft, unhurried, never right in your ear)
 	[["bird_warble_1", "bird_warble_2", "bird_warble_3"], 32, -13.0, 12.0, 36.0, true],
 	# (the "fee-bee" whistle sounds like a little flute: lovely, but it came round
-	#  too often, so a third as often as it was; Jason, Nov 21)
-	[["bird_whistle_1", "bird_whistle_2"], 5, -14.0, 14.0, 40.0, true],
+	#  too often: a third as often (Jason, Nov 21), then less again (Nov 23: "still
+	#  going off a bit too much"), and its answering call is rarer)
+	[["bird_whistle_1", "bird_whistle_2"], 2, -15.0, 16.0, 42.0, false],
 	[["bird_trill_1", "bird_trill_2"], 12, -15.0, 12.0, 34.0, false],
 	[["bird_chip_1", "bird_chip_2"], 16, -14.0, 10.0, 28.0, false],
 	[["dove"], 8, -17.0, 25.0, 45.0, false],

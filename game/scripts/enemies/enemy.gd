@@ -143,8 +143,21 @@ var bounds := AABB()        # optional room bounds the enemy will not leave
 var arena: Callable
 ## Doesn't heal back up when it goes home (Insane Mr. Bubbles).
 var no_heal := false
-const BUBBLES_INSANE_HP := 1.4
+## INSANE MR. BUBBLES (Nov 23, after the son's first go: "dad, it's boring and it
+## takes a long time"): a final boss that's exciting instead of a slow grind.
+##   - less health (you see him going down), but he hits much harder, moves faster
+##     and never stands about circling: potions alone won't get you through;
+##   - a special move every few seconds: CHARGE, LEAP, WHIRLWIND, BUBBLE BLASTER
+##     (a fan of bubbles) and the STOMP WAVE (a ring that rolls out across the
+##     thunderhead: JUMP over it);
+##   - BUBBLE TIME: a magic bubble you can't pop or dodge for good catches you and
+##     floats you up; CHOP it three times to pop it and drop back into the fight.
+var insane_bubbles := false
+const BUBBLES_INSANE_HP := 0.35          # (a geared Insane hero needs ~300 blows, not ~700)
 const BUBBLES_INSANE_SIZE := 0.82
+const BUBBLES_INSANE_DMG := 1.2         # (a swing about half your health; he lands a lot more of them now)
+const BUBBLES_INSANE_SPEED := 1.3
+const BUBBLES_INSANE_MOVES := ["charge", "leap_slam", "whirl", "bubble_blast", "stomp_wave", "stomp_wave"]
 var _strafe := 1.0
 var _hurt_t := -1.0
 var _stagger_acc := 0.0
@@ -191,6 +204,7 @@ func _ready() -> void:
 	# health, so you can see yourself wearing him down; and a bit smaller.
 	if type_id == "mr_bubbles" and Game.mode == "insane":
 		no_heal = true
+		insane_bubbles = true
 		hp_mult *= BUBBLES_INSANE_HP
 	fierce = Game.mode == "insane"
 	lean = Game.mode == "insane" or Graphics.lean()      # (Medium and Low graphics too)
@@ -236,6 +250,10 @@ func _ready() -> void:
 			# a bit more to scale beside a hero ("not the same size as me... he's a boss")
 			for k in ["scale", "look_size", "radius"]:
 				t[k] = float(t[k]) * BUBBLES_INSANE_SIZE
+			t.dmg = float(t.dmg) * BUBBLES_INSANE_DMG
+			t.speed = float(t.speed) * BUBBLES_INSANE_SPEED
+			t.cooldown = float(t.cooldown) * 0.6
+			t.moves = BUBBLES_INSANE_MOVES.duplicate()
 	display_name = {"giant": "Giant ", "speedy": "Speedy ", "splitter": "Splitting ", "vampire": "Vampire ", "blinker": "Blinking ",
 		"bomber": "Exploding "}.get(oddity, "Little " if mini else "") + String(t.name)
 	# INSANE: fewer monsters than you might fear, but every one of them means it.
@@ -526,6 +544,7 @@ func _physics_process(delta: float) -> void:
 			velocity.x *= 0.95; velocity.z *= 0.95
 			move_and_slide()
 		return
+	_keep_to_arena()
 	if player == null or not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("player")
 		if player == null:
@@ -630,12 +649,16 @@ func _physics_process(delta: float) -> void:
 				_float_cd -= delta
 				if _float_cd <= 0.0 and get_tree().get_nodes_in_group("bubble_trap").is_empty():
 					_float_cd = randf_range(5.0, 6.5) if _enraged else randf_range(7.0, 9.0)
+					if insane_bubbles:
+						_float_cd = randf_range(10.0, 12.0) if _enraged else randf_range(13.0, 16.0)
 					_boss_move("bubble_float")
 					return
 			if t.has("moves") and not pdead and dist < 22.0 and _can_engage(delta):
 				_move_cd -= delta
 				if _move_cd <= 0.0:
 					_move_cd = randf_range(3.5, 5.5) if _enraged else randf_range(5.5, 8.0)
+					if insane_bubbles:
+						_move_cd = randf_range(1.8, 2.8) if _enraged else randf_range(2.6, 3.8)
 					var mv: Array = t.moves
 					_boss_move(String(mv[randi() % mv.size()]))
 					return
@@ -668,6 +691,8 @@ func _physics_process(delta: float) -> void:
 					_go(S.WINDUP)
 				elif dist < t.range * 0.9:
 					move = to_p.normalized().cross(Vector3.UP) * _strafe * 0.4  # circle while waiting
+					if insane_bubbles:
+						move = Vector3.ZERO           # (no drifting about: right in your face)
 		S.WINDUP:
 			if state_time == delta or state_time < delta * 1.5:
 				var kind := 2 if t.get("heavy", false) else randi() % 2
@@ -742,10 +767,7 @@ func _physics_process(delta: float) -> void:
 		velocity.x = 0.0; velocity.z = 0.0     # standing still on the ground: nothing to slide
 	else:
 		move_and_slide()
-	if arena.is_valid():
-		var ap: Vector3 = arena.call(global_position)
-		if not ap.is_equal_approx(global_position):
-			global_position = ap
+	_keep_to_arena()
 
 	# face the player while engaged; face movement otherwise
 	var want_face := facing
@@ -891,6 +913,14 @@ func _hero_in_bubble() -> bool:
 			return true
 	return false
 
+## Back inside the arena, if it has one (whatever moved it: walking, a whirlwind,
+## being knocked about).
+func _keep_to_arena() -> void:
+	if arena.is_valid():
+		var ap: Vector3 = arena.call(global_position)
+		if not ap.is_equal_approx(global_position):
+			global_position = ap
+
 ## Bosses: the big ones (heavy, or worth a lot of experience).
 func is_boss() -> bool:
 	return bool(t.get("heavy", false)) or int(t.xp) >= 900
@@ -954,6 +984,8 @@ func _boss_move(mv: String) -> void:
 		"boulders": await _mv_boulders()
 		"blink": await _mv_blink()
 		"bubble_float": await _mv_bubble_float()
+		"bubble_blast": await _mv_bubble_blast()
+		"stomp_wave": await _mv_stomp_wave()
 		"spore_bomb": await _mv_spore_bomb()
 		"war_horn": await _mv_war_horn()
 	if is_inside_tree() and not dead and state != S.WINDUP:
@@ -1062,6 +1094,8 @@ func _mv_bubble_float() -> void:
 		return
 	var fwd := -Vector3(sin(facing), 0, cos(facing))
 	var trap := BubbleTrap.blow(get_parent(), global_position + fwd * 2.4 + Vector3(0, 2.2, 0), player, 5 if _enraged else 4)
+	if insane_bubbles:
+		trap.make_sure(3)          # it gets you; chop it three times
 	await get_tree().create_timer(1.6, false).timeout
 	if dead or not is_inside_tree() or not is_instance_valid(trap) or not trap.caught():
 		return
@@ -1069,6 +1103,69 @@ func _mv_bubble_float() -> void:
 	for k in (2 if _enraged else 1):
 		LightningBubble.blow(get_parent(), global_position + Vector3(randf_range(-1.5, 1.5), 3.0, randf_range(-1.5, 1.5)), float(t.dmg) * 0.4)
 	await get_tree().create_timer(0.8, false).timeout
+
+## BUBBLE BLASTER (Insane Mr. Bubbles): two quick fans of hard bubbles.
+func _mv_bubble_blast() -> void:
+	Game.say("Mr. Bubbles: \"BUBBLE BLASTER!\"", Color(1.0, 0.9, 0.5))
+	for volley in 2:
+		body.cast_t = 0.0
+		await get_tree().create_timer(0.45, false).timeout
+		if dead or not is_inside_tree() or player == null:
+			return
+		var base_dir: Vector3 = player.global_position - global_position; base_dir.y = 0
+		base_dir = base_dir.normalized()
+		for k in 9:
+			var d := base_dir.rotated(Vector3.UP, (k - 4) * 0.16 + (0.08 if volley == 1 else 0.0))
+			var bolt := Area3D.new()
+			bolt.set_script(load("res://scripts/player/projectile.gd"))
+			get_tree().current_scene.add_child(bolt)
+			bolt.global_position = global_position + Vector3(0, 1.2, 0) + d * 1.6
+			bolt.launch(d + Vector3(0, -0.03, 0), "enemy", float(t.dmg) * 0.45, Color(0.7, 0.9, 1.0), 11.0)
+		Sfx.play_at("pop", global_position, 0.0, 0.3)
+		body.cast_t = -1.0
+	await get_tree().create_timer(0.4, false).timeout
+
+## STOMP WAVE (Insane Mr. Bubbles): he bounces up and slams the thunderhead, and a
+## glowing ring rolls out across it. JUMP over it as it passes!
+var waves := 0          # (for the tests)
+func _mv_stomp_wave() -> void:
+	Game.say("Mr. Bubbles: \"STOMP!\"  (JUMP over the wave!)", Color(1.0, 0.9, 0.5))
+	body.play_role("jump", 1.0)
+	var y0 := global_position.y
+	var tw := create_tween()
+	tw.tween_property(self, "global_position:y", y0 + 2.4, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "global_position:y", y0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tw.finished
+	if dead or not is_inside_tree():
+		return
+	waves += 1
+	var at := global_position
+	Sfx.play_at("slam", at, 0.0, 0.05)
+	Sfx.play_at("thunder", at, -6.0, 0.1)
+	if player and player.has_method("add_trauma"):
+		player.add_trauma(0.35)
+	FX.burst(at + Vector3(0, 0.4, 0), Color(0.75, 0.9, 1.0), 40, 6.0, 0.3, 0.7, -3.0)
+	var ring := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 0.82; tm.outer_radius = 1.0
+	tm.rings = 48; tm.ring_segments = 6
+	ring.mesh = tm; ring.material_override = FX.glow_material(Color(0.65, 0.85, 1.0), 3.5)
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	get_tree().current_scene.add_child(ring)
+	ring.global_position = at + Vector3(0, 0.25, 0)
+	var r := 1.0
+	var hit := false
+	while r < 24.0 and is_inside_tree():
+		await get_tree().physics_frame
+		r += 15.0 * get_physics_process_delta_time()
+		ring.scale = Vector3(r, 2.2, r)
+		if hit or player == null or player.get("dead") == true:
+			continue
+		var pd := Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length()
+		var up: float = player.global_position.y - at.y
+		if absf(pd - r) < 0.9 and up < 0.8 and absf(up) < 3.0:
+			hit = true
+			player.take_damage(float(t.dmg) * 0.9, at, 7.0)
+	ring.queue_free()
+	await get_tree().create_timer(0.3, false).timeout
 
 ## Leap high and crash down where you were standing.
 func _mv_leap_slam() -> void:
@@ -1146,6 +1243,7 @@ func _mv_whirl() -> void:
 		var to: Vector3 = player.global_position - global_position; to.y = 0
 		if to.length() > 1.5:
 			global_position += to.normalized() * minf(1.2, to.length() - 1.0)
+			_keep_to_arena()
 		body.rotation.y += 2.4
 		FX.shockwave(global_position + Vector3(0, 1.0, 0), t.eye, 3.4, 0.25)
 		Sfx.play_at("swing", global_position, -2.0, 0.2)

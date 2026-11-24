@@ -1437,3 +1437,55 @@ Jason's son got all the way to Mr. Bubbles on Insane. Jason: "Mr Bubbles keeps o
 - a real fight at the arena's edge: he's never further out than 17.4 m and never hidden;
 - on Normal, he's the same as before.
 
+## Follow-up 45: an exciting Insane Mr. Bubbles, and the flute again (Nov 23, evening)
+
+The son's first comment on the fixed fight: "dad, it's boring and it takes a long time."
+
+Jason: "Mr Bubbles barely goes down in hit points and Mr Bubbles moves slowly... it's so easy just to wait until you take a potion... it seems like he's always like kind of floating away from you." His idea: a bubble that "puts you inside a bubble... and you have to chop the bubble three times to pop it."
+
+**Why it was dull:**
+- **Health:** 1.4× Insane boss health (from follow-up 44), so a long grind.
+- **Damage:** hits weak enough to soak with potions.
+- **Movement:** while waiting for his swing he circled sideways, which looks like drifting away.
+- **Specials:** one only every 5.5–8 s.
+- **The bubble:** his signature move already existed, but any hit popped it on the way in. Swinging at him popped it before it ever reached you, which is why it felt like a new idea.
+
+**Insane Mr. Bubbles now** (`Enemy.insane_bubbles`; Normal and Hard unchanged):
+
+| | Before | Now |
+|---|---|---|
+| Health | 1.4× Insane boss health | 0.35× |
+| Damage | | 1.2× |
+| Speed | | 1.3× |
+| Time between swings | | 0.6× |
+| Between swings | circles sideways | holds still in your face |
+| Specials | every 5.5–8 s | every 2.6–3.8 s (1.8–2.8 s enraged) |
+| Moves | | charge, leap, whirlwind, plus BUBBLE BLASTER and STOMP WAVE |
+
+- **BUBBLE BLASTER** (new): two fans of nine bubbles.
+- **STOMP WAVE** (new): a hop and a slam, then a glowing ring expands at 15 m/s to the edge of the arena. It hits you only if you're on the ground as it passes, so you jump over it.
+- **BUBBLE TIME** (`BubbleTrap.make_sure(3)`):
+  - can't be popped in flight;
+  - homes in all the way (8 s);
+  - once you're inside: "CHOP IT! 3";
+  - comes every 13–16 s (10–12 enraged) instead of every 7–9, since now it always lands.
+
+**The flute:** Jason says it's "still going off a bit too much... maybe reduce that a little bit throughout the game". The yard's "fee-bee" whistle is now weight 2 of the bird calls, about 1 call in 40 (it was 1 in 16, and 1 in 5 before Nov 21). It's a little quieter and further away, and no longer answered by a second bird. The `ambience` test checks the share.
+- **Not sure it's this sound:** it's the only flute-like sound that repeats on its own, but it only plays in the home valley. If he means a sound elsewhere, the likeliest is the rising five-note chime played for rare loot, elixirs and some powers; we'll ask.
+
+**Tested:** the `bubbles` test now also checks, on Insane:
+- the new move set;
+- the bubble catches you even while you hack at it, and three chops pop it and you land;
+- the stomp wave hits you if you stay on the ground;
+- the Bubble Blaster fires its fans.
+
+**Calibrating it:** with a geared level-25 hero (739 health, about 281 a hit), the test printed the real numbers.
+- **First try (1.6× damage, 0.8× health):**
+  - a swing took **486** (66% of your health) and the charge 681 (92%);
+  - Mr. Bubbles had **200,540** health, about 700 of your blows.
+  - That would be two hits and you're out, and still a grind.
+- **Now (1.2× damage, 0.35× health):**
+  - a swing takes about half your health;
+  - he has about 88,000 health, roughly 300 blows, or two to three minutes of hitting inside a fight of a few minutes;
+  - he lands far more blows than before, because he no longer circles or drifts.
+

@@ -22,6 +22,7 @@ var _shell: MeshInstance3D
 var _mat: ShaderMaterial
 var _label: Label3D
 var _speed := 9.0
+var _sure := false          # INSANE Mr. Bubbles: it keeps coming until it gets you
 const BUBBLE_SHADER := preload("res://shaders/bubble.gdshader")
 
 static func blow(parent: Node, at: Vector3, p: Player, taps := 4) -> BubbleTrap:
@@ -53,9 +54,18 @@ func _ready() -> void:
 	add_child(_label)
 	Sfx.play_at("pop", global_position, -6.0, 0.4)
 
-## Your attacks pop it before it gets you.
+## INSANE Mr. Bubbles' bubble: you can't pop it on the way in, it homes in on
+## you all the way (a dodge roll only buys a moment), and once you're inside you
+## CHOP it `taps` times to pop it (Jason, Nov 23: "you have to chop the bubble
+## three times to pop it to fall to the ground").
+func make_sure(taps := 3) -> void:
+	_sure = true
+	_need = taps
+	_speed = 8.0
+
+## Your attacks pop it before it gets you (but not Insane Mr. Bubbles' one).
 func take_damage(_amount: float, _from: Vector3, _knock := 0.0, _crit := false) -> void:
-	if not _caught:
+	if not _caught and not _sure:
 		_pop()
 
 func caught() -> bool:
@@ -88,13 +98,13 @@ func _physics_process(delta: float) -> void:
 	if not _caught:
 		# fly at you, homing a little (a dodge roll gets you out of the way)
 		var to := chest - global_position
-		if _t < 1.4:
+		if _t < 1.4 or _sure:
 			_drift = to.normalized() * _speed       # it stops steering after a moment: dodge it!
 		global_position += _drift * delta
 		_shell.scale = Vector3.ONE * (1.0 + sin(_t * 7.0) * 0.05)
 		if to.length() < 1.3 and not _player.dead and not _player.dodging:
 			_catch()
-		elif _t > 4.0:
+		elif _t > (8.0 if _sure else 4.0):
 			_pop()
 		return
 	# you're inside: up you go, drifting
@@ -112,7 +122,7 @@ func _physics_process(delta: float) -> void:
 		_taps += 1
 		Sfx.play("pop", -14.0, 0.4)
 		FX.burst(global_position, Color(0.9, 0.95, 1.0), 8, 2.0, 0.08, 0.3, 0.0)
-	_label.text = "TAP ATTACK!  %d" % maxi(0, _need - _taps)
+	_label.text = ("CHOP IT!  %d" if _sure else "TAP ATTACK!  %d") % maxi(0, _need - _taps)
 	if _taps >= _need or _t > 7.0 or _player.dead:
 		_pop()
 
@@ -128,4 +138,7 @@ func _catch() -> void:
 		_player.dismount()
 	_label.visible = true
 	Sfx.play("pop", -4.0, 0.0)
-	Game.say("Floating away in a bubble! TAP ATTACK (or JUMP) to pop it!", Color(0.85, 0.95, 1.0))
+	if _sure:
+		Game.say("Caught in a bubble! CHOP it %d times (ATTACK) to pop it!" % _need, Color(0.85, 0.95, 1.0))
+	else:
+		Game.say("Floating away in a bubble! TAP ATTACK (or JUMP) to pop it!", Color(0.85, 0.95, 1.0))

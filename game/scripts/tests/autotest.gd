@@ -5204,7 +5204,7 @@ func _ambience_test() -> bool:
 		if (sc._pick()[0] as Array).has("bird_whistle_1"):
 			whistles += 1
 	var share := whistles / 6000.0
-	check("am_whistle_a_third_as_often", share > 0.045 and share < 0.08, "%.3f of calls (was 0.196)" % share)
+	check("am_whistle_rare", share > 0.012 and share < 0.04, "%.3f of calls (was 0.196, then 0.062)" % share)
 	check("am_calmer_inside", float(indoors) / 20.0 <= float(outdoors) / 45.0 + 0.01, "inside %d/20 s, outside %d/45 s" % [indoors, outdoors])
 	check("am_soft_breeze", sc._breeze.volume_db < -26.0, "%.0f dB" % sc._breeze.volume_db)
 	await shot("am_yard")
@@ -5467,6 +5467,9 @@ func _bubbles_test() -> bool:
 		Game.mode = "insane" if phase == 0 else "normal"
 		Game.mode_geared = true
 		Game.level = 25
+		if phase == 0:
+			for slot in ["weapon", "armor"]:
+				Game.add_item(Loot.make_random(25, 0.6, 3, slot), true)      # (geared like a hero who got this far)
 		for q in ["lost_feathers", "thunder_birds", "sky_whale", "storm_bubbles", "bubble_lifts", "storm_gate", "why_clouds"]:
 			Game.quests[q] = {"state": "done", "n": 1}
 		Game.quests["mr_bubbles"] = {"state": "active", "n": 0}
@@ -5491,7 +5494,10 @@ func _bubbles_test() -> bool:
 	if lord == null:
 		return false
 	var c: Vector3 = CloudWorld.ISLANDS.E.c
+	player.invuln = 999.0          # (until we want him to land a blow)
 	check("mb_insane_no_heal_more_hp", lord.no_heal and lord.arena.is_valid(), "hp %.0f" % lord.max_hp)
+	var swing := Game.mitigate(float(lord.t.dmg) * Game.mode_value("dmg"))
+	print("BUBBLES blows: a swing %.0f, charge %.0f, stomp %.0f, bubbles %.0f each; hero %.0f hp (a swing is %.0f%%); his health %.0f vs hero damage ~%.0f a hit" % [swing, swing * 1.4, swing * 0.9, swing * 0.45, Game.max_hp(), swing / Game.max_hp() * 100.0, lord.max_hp, Game.attack_damage()])
 	main.chaos.next_t = 999.0
 	await tp(c + Vector3(0, 0.6, 2.0), 0.0)
 	await wait(1.0)
@@ -5514,6 +5520,66 @@ func _bubbles_test() -> bool:
 			hidden += 1
 	check("mb_giant_foes_leave_him", lord.body.scale.is_equal_approx(s0), "%s -> %s" % [s0, lord.body.scale])
 	check("mb_ghosts_leave_him", hidden == 0, "%d" % hidden)
+	# the new Insane Mr. Bubbles: faster, harder, more moves
+	check("mb_insane_moves", lord.insane_bubbles and (lord.t.moves as Array).has("stomp_wave") and (lord.t.moves as Array).has("bubble_blast"), str(lord.t.moves))
+	# BUBBLE TIME: you can't pop it on the way in (hacking away at it), it catches
+	# you, and three chops pop it
+	player.invuln = 60.0          # (his Insane hits can knock out a test hero in one go)
+	await tp(c + Vector3(0, 0.6, 6.0), PI)
+	lord.global_position = c + Vector3(0, 2.0, -2.0)
+	lord._float_cd = 999.0; lord._move_cd = 999.0
+	lord._boss_move("bubble_float")
+	var trap: BubbleTrap = null
+	for k in 40:
+		await wait(0.1)
+		if trap == null:
+			for b in get_tree().get_nodes_in_group("bubble_trap"):
+				trap = b
+		if trap and is_instance_valid(trap):
+			trap.take_damage(50.0, player.global_position)      # (your sword hitting it as it comes)
+			if trap.caught():
+				break
+	check("mb_bubble_catches_you", trap != null and is_instance_valid(trap) and trap.caught(), "")
+	await wait(1.0)
+	await shot("mb_03_in_the_bubble")
+	if trap and is_instance_valid(trap):
+		for k in 3:
+			await tap("attack")
+			await wait(0.15)
+	await wait(0.4)
+	check("mb_three_chops_pop_it", trap == null or not is_instance_valid(trap) or trap.dead, "")
+	for k in 40:
+		await wait(0.25)
+		if player.is_on_floor():
+			break
+	check("mb_back_down", player.is_on_floor())
+	# STOMP WAVE: stand on the thunderhead and it gets you (jump over it!)
+	await tp(c + Vector3(0, 0.6, 6.0), PI)
+	lord.global_position = c + Vector3(0, 2.0, -2.0)
+	await wait(0.5)
+	var real_dmg: float = lord.t.dmg
+	lord.t.dmg = 5.0                # (a gentle wave, just to see it land)
+	player.invuln = 0.0
+	Game.hp = Game.max_hp()
+	var hurt0: float = float(player.damage_taken)
+	var w0: int = lord.waves
+	lord._boss_move("stomp_wave")
+	for k in 30:
+		await wait(0.1)
+		if lord.waves > w0 and float(player.damage_taken) > hurt0:
+			break
+	await shot("mb_04_stomp_wave")
+	lord.t.dmg = real_dmg
+	player.invuln = 60.0
+	check("mb_stomp_wave", lord.waves > w0 and float(player.damage_taken) > hurt0, "waves %d, hurt %.0f" % [lord.waves - w0, float(player.damage_taken) - hurt0])
+	# BUBBLE BLASTER: a fan of bubbles
+	var n0 := get_tree().current_scene.find_children("*", "Area3D", true, false).size()
+	lord._boss_move("bubble_blast")
+	await wait(0.8)
+	var n1 := get_tree().current_scene.find_children("*", "Area3D", true, false).size()
+	check("mb_bubble_blaster", n1 >= n0 + 6, "%d -> %d" % [n0, n1])
+	await wait(1.5)
+	lord._float_cd = 2.0; lord._move_cd = 1.0
 	# out of the storm clouds
 	lord.global_position = c + Vector3(26.0, 2.0, 0.0)
 	await wait(0.3)
@@ -5531,7 +5597,7 @@ func _bubbles_test() -> bool:
 	# a real fight at the edge of the arena: he stays in the open the whole time
 	await tp(c + Vector3(0, 0.6, 16.0), PI)
 	check("mb_hero_ok_for_the_fight", not player.dead and main.state == "play", main.state)
-	player.invuln = 60.0          # (his Insane charge can knock out a test hero in one go)
+	player.invuln = 999.0
 	var worst := 0.0
 	var gone := 0
 	for k in 120:

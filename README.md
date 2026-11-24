@@ -218,11 +218,15 @@ If fire or lava finishes you off in Insane, a cute little voice says **"oh no!"*
   - **Slippery Ice** (getting going is easy, but turn or stop and you keep sliding the way you were going until your feet catch: real ice, not mud)
   - **Ghost Monsters** (they flicker in and out of sight; bosses stay in sight)
 
-**Mr. Bubbles on Insane (Nov 23).**
-- He **doesn't heal himself** any more. He used to get half his health back every time he went home (often while you floated in his bubble). Instead he has **40% more health**, so you can watch the bar go down.
-- He's **a bit smaller** (82%), about twice your height, and he waits under his bubble instead of going home.
-- In every mode, he stays out in the open on his thunderhead: walking, charging, leaping or diving, he never goes into the ring of storm clouds round it.
-- (Tested in a real fight at the edge of his arena: he never went further out than 17.1 m and was never hidden.)
+**Mr. Bubbles on Insane: an exciting final boss (Nov 23).** After the first try ("dad, it's boring and it takes a long time"), Insane Mr. Bubbles was rebuilt:
+- **Hits harder and much more often:** each blow is 20% harder (a swing takes about half your health), he moves **about 30% faster**, swings sooner, and stays right on you instead of drifting around between swings. Drinking potions while he plods about doesn't work any more.
+- **Much less of a grind:** about a third of the health he had (a hero geared for him needs roughly 300 blows instead of 700), so you can watch his bar go down. He never heals himself.
+- **A special move every few seconds:** CHARGE, LEAP, WHIRLWIND, plus two new ones:
+  - **BUBBLE BLASTER:** two quick fans of bubbles to dodge;
+  - **STOMP WAVE:** he bounces up and slams down, and a glowing ring rolls out across the thunderhead. **Jump over it!**
+- **BUBBLE TIME:** his magic bubble always gets you (your sword can't pop it on the way in, and a dodge roll only buys a moment). It floats you up; **chop it 3 times** to pop it and drop back into the fight.
+- He's **a bit smaller** (82%), about twice your height.
+- **Every mode:** he stays out in the open on his thunderhead. Walking, charging, leaping or diving, he never goes into the ring of storm clouds round it.
 
 Your mode shows next to your level, and it's saved with your game. Port Home works in every mode.
 
@@ -230,7 +234,7 @@ Your mode shows next to your level, and it's saved with your game. Port Home wor
 
 **The cabin sounds peaceful and alive (Nov 20).** The old cabin sound was one 9-second loop of the same chirp. Now it's a calm, unhurried soundscape:
 - a quiet whisper of leaves, soft crickets, and bees humming by the garden;
-- every several seconds, a different bird somewhere off in the trees: a warbling song, a "fee-bee" whistle, a trill, a few chips. Now and then another answers;
+- every several seconds, a different bird somewhere off in the trees: a warbling song, a trill, a few chips, and once in a while a "fee-bee" whistle (rarer since Nov 23). Now and then another answers;
 - once in a while, a dove coos far off, a cuckoo calls or a woodpecker drums.
 
 The first version was too busy (its breeze swelled like surf), so it was toned right down the same day. It's calmer inside the cabin and silent up in the sky.
