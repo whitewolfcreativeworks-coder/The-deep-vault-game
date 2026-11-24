@@ -187,8 +187,9 @@ func _build_lever() -> void:
 	var gold := _metal(Color(1.0, 0.78, 0.3))
 	gold.metallic = 0.95; gold.roughness = 0.28
 	gold.emission_enabled = true; gold.emission = Color(1.0, 0.72, 0.3); gold.emission_energy_multiplier = 0.25
-	var dark := _metal(Color(0.62, 0.42, 0.14))
-	dark.metallic = 0.9; dark.roughness = 0.4
+	var dark := _metal(Color(0.8, 0.56, 0.2))          # (still gold, a shade deeper, so the frame and post read)
+	dark.metallic = 0.85; dark.roughness = 0.35
+	dark.emission_enabled = true; dark.emission = Color(0.75, 0.48, 0.14); dark.emission_energy_multiplier = 0.15
 	var groove := StandardMaterial3D.new(); groove.albedo_color = Color(0.08, 0.06, 0.04); groove.roughness = 0.9
 	var c := Vector3(0, 1.15, 0)
 	# (built facing -z, then turned round: every lever in the game faces the way
