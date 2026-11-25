@@ -621,18 +621,23 @@ func _hand_free(blend := 0.25) -> void:
 		if is_instance_valid(ik):
 			ik.stop(); ik.queue_free())
 
-## Where his mouth is (from the visible head), for the cup and the toothbrush.
-func _mouth(fwd: Vector3) -> Vector3:
-	var head: MeshInstance3D = null
-	for m in actor.find_children("*", "MeshInstance3D", true, false):
-		if String(m.name).ends_with("_Head") and (m as MeshInstance3D).visible:
-			head = m
-	if head == null:
-		return _bone_world("head") + Vector3(0, 0.15, 0) + fwd * 0.15
-	var ab: AABB = head.global_transform * head.get_aabb()
-	var c := ab.get_center()
-	var half := absf(fwd.x) * ab.size.x * 0.5 + absf(fwd.z) * ab.size.z * 0.5
-	return Vector3(c.x, ab.position.y + ab.size.y * 0.22, c.z) + fwd * half * 0.9
+## Where his mouth is, for the cup and the toothbrush. Every hero's face sits at the
+## same place on the head bone (all the KayKit heads share it), so it's worked out
+## from the bone, not from the size of the head: a Druid's antlers, a long beard or
+## a Necromancer's hood made the head bigger and put the toothbrush up his nose
+## (Jason, Nov 25). Rig-space points, measured on the Rogue, where it was right.
+const MOUTH_BRUSH := Vector3(0.0, 1.374, 0.48)
+const MOUTH_CUP := Vector3(0.0, 1.394, 0.47)
+
+func _head_point(rest_p: Vector3) -> Vector3:
+	var sk := actor.skel
+	var i := sk.find_bone("head") if sk else -1
+	if i < 0:
+		return actor.position + Vector3(0, 1.1, 0)
+	return sk.global_transform * (sk.get_bone_global_pose(i) * (sk.get_bone_global_rest(i).affine_inverse() * rest_p))
+
+func _mouth(_fwd: Vector3) -> Vector3:
+	return _head_point(MOUTH_CUP)
 
 ## Seated at the table, he must be able to reach the cup: slide the cup and its
 ## saucer toward him (and his stool toward the table, if that's not enough).
@@ -661,14 +666,7 @@ func _cup_in_reach() -> void:
 
 ## A toothbrush held at the mouth (it follows the head as he brushes), with foam.
 func _toothbrush(foam: Array) -> Node3D:
-	var head: MeshInstance3D = null
-	for m in actor.find_children("*", "MeshInstance3D", true, false):
-		if String(m.name).ends_with("_Head") and (m as MeshInstance3D).visible:
-			head = m
-	var mouth := actor.position + Vector3(-0.32, 1.12, 0)
-	if head:
-		var ab: AABB = head.global_transform * head.get_aabb()
-		mouth = Vector3(ab.position.x + 0.03, ab.position.y + ab.size.y * 0.2, ab.get_center().z)
+	var mouth := _head_point(MOUTH_BRUSH)
 	var att := actor._attach("head")
 	var root := Node3D.new()
 	if att:

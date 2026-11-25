@@ -358,6 +358,8 @@ func _run() -> void:
 	elif mode == "garden":
 		if await _garden_test():
 			return
+	elif mode == "brushing":
+		await _brushing_test()
 	elif mode == "balloon2":
 		if await _balloon2_test():
 			return
@@ -5859,6 +5861,58 @@ func _gfx_totals(w: Node) -> Dictionary:
 				out.lamp_reach = minf(out.lamp_reach, (n as Light3D).distance_fade_begin)
 	out["scale"] = get_viewport().scaling_3d_scale
 	return out
+
+# --- brushing teeth in the opening movie: the brush at every hero's mouth (Nov 25) ------
+func _brushing_test() -> void:
+	await wait(1.0)
+	var im := IntroMovie.new()
+	get_tree().root.add_child(im)
+	im.build()
+	im.set_process(false)
+	var R := IntroMovie.ROOM
+	var ok := 0
+	var n := 0
+	for hc in [["Rogue", ""], ["Druid", ""], ["Necromancer", ""], ["Mage", ""], ["Priest", ""], ["Barbarian", ""], ["Knight", "female"], ["Beastmaster", ""]]:
+		Game.profile.hero = String(hc[0]); Game.profile.sex = String(hc[1])
+		Game.profile.hair_style = "natural"
+		im._dress(false)
+		im.actor.position = R + im._basin + Vector3(1.45, 0, 0)
+		im.actor.rotation.y = PI / 2
+		im.actor.hold_clip = "Idle"
+		await frames(3)
+		var foam: Array = []
+		var brush := im._toothbrush(foam)
+		var scrub: Node3D = brush.get_child(0)
+		scrub.position.x = 0.0
+		im._hand_to(scrub.get_node("Grip"), 0.01)
+		for f in foam:
+			(f as Node3D).scale = Vector3.ONE
+		await frames(4)
+		# the bristles sit just in front of the face, at the height of the mouth: between
+		# the eyes' height and the chin, whatever the head (antlers, hoods, beards...)
+		var hb: Vector3 = im._bone_world("head")
+		var bp := (scrub.get_child(2) as Node3D).global_position
+		var s := im.actor.skel.global_transform.basis.y.length()
+		var up := (bp.y - hb.y) / s
+		var fwd := (hb.x - bp.x) / s                   # (facing -x: the face is towards -x)
+		var good := up > 0.05 and up < 0.25 and fwd > 0.3 and fwd < 0.75
+		print("BRUSH %s%s: up %.2f, forward %.2f (rig units)" % [hc[0], (" " + String(hc[1])) if hc[1] != "" else "", up, fwd])
+		if good:
+			ok += 1
+		n += 1
+		var mouth := im._head_point(IntroMovie.MOUTH_BRUSH)
+		im.cam.current = true
+		im.cam.global_position = mouth + Vector3(-0.75, 0.12, 0.28)
+		im.cam.look_at(mouth + Vector3(0, -0.02, 0))
+		im.cam.fov = 40.0
+		await frames(3)
+		await shot("br_%s%s" % [String(hc[0]).to_lower(), ("_" + String(hc[1])) if hc[1] != "" else ""])
+		im._hand_free(0.0)
+		brush.queue_free()
+		await frames(2)
+	check("brush_at_every_mouth", ok == n, "%d of %d" % [ok, n])
+	im.queue_free()
+	Game.profile.hero = "Rogue"; Game.profile.sex = ""
 
 # --- the Garden at home (Jason and his son, Nov 25) ------------------------------------
 func _garden_test() -> bool:
