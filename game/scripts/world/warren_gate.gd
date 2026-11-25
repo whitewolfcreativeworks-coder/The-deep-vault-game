@@ -64,8 +64,10 @@ func _build(world: ForestWorld) -> WarrenDoor:
 	y0 = w.ground(0, MOUTH_Z + 6.0).y
 	rock = w.b.wall_mat(Color(0.5, 0.47, 0.41), 0.35, y0, 2.8, 1.4)
 	(rock as ShaderMaterial).set_shader_parameter("mode", 2)          # natural rock, not building stone
+	(rock as ShaderMaterial).set_shader_parameter("mortar_color", Color(0.32, 0.3, 0.26))   # (soft cracks)
 	dark_rock = w.b.wall_mat(Color(0.27, 0.22, 0.17), 0.05, y0, 1.6, 0.8)
 	(dark_rock as ShaderMaterial).set_shader_parameter("mode", 2)
+	(dark_rock as ShaderMaterial).set_shader_parameter("mortar_color", Color(0.16, 0.13, 0.1))
 	wood = StandardMaterial3D.new(); wood.albedo_color = Color(0.46, 0.3, 0.17); wood.roughness = 0.85
 	iron = StandardMaterial3D.new(); iron.albedo_color = Color(0.24, 0.23, 0.24); iron.metallic = 0.7; iron.roughness = 0.45
 	_rock_face()
