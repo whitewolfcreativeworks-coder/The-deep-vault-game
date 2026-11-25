@@ -258,23 +258,15 @@ func _on_touch(e: InputEventScreenTouch) -> void:
 		elif _zoom_rect().grow(16.0).has_point(e.position) and _zoom_id == -1:
 			_zoom_id = e.index
 			_zoom_from_y(e.position.y)
-		elif _look.size() == 1 and (_look.values()[0] as Vector2).distance_to(e.position) < 520.0:
-			# a second finger near the first one is a pinch, wherever it lands
-			_look[e.index] = e.position
-			_pinch_dist = -1.0
-		elif e.position.x < _screen().x * 0.42 and _stick_id == -1:
-			_stick_id = e.index
-			# the base appears under the thumb, but only inside the bottom-left home zone
-			var r := _screen()
-			_stick_home = Vector2(clampf(e.position.x, 120.0, 430.0), clampf(e.position.y, r.y - 430.0, r.y - 120.0))
-			_stick_origin = _stick_home
-			_stick_pos = e.position
-			_update_stick()
+		elif _look.is_empty() and _mover() and _mover().touch_down(e.index, e.position):
+			pass            # holding still on a yard decoration: it lifts, then you drag it (DecorMover)
 		else:
-			_look[e.index] = e.position
-			_pinch_dist = -1.0
+			_free_touch(e.index, e.position)
 	else:
 		_press_info.erase(e.index)
+		var mv := _mover()
+		if mv and mv.touch_index() == e.index:
+			mv.touch_up(e.index)
 		if _moving.has(e.index):
 			_drop(e.index)
 		elif _btn_touch.has(e.index):
@@ -291,9 +283,41 @@ func _on_touch(e: InputEventScreenTouch) -> void:
 			_pinch_dist = -1.0
 	pad.queue_redraw()
 
+## The yard's decoration mover, when you're home (or null).
+func _mover() -> DecorMover:
+	var w = main.get("world") if main else null
+	if w is HomeWorld and (w as HomeWorld).decor and (w as HomeWorld).landed:
+		return (w as HomeWorld).decor.mover
+	return null
+
+## A touch that isn't on a button: a pinch, the stick (left side) or looking around.
+func _free_touch(index: int, pos: Vector2) -> void:
+	if _look.size() == 1 and (_look.values()[0] as Vector2).distance_to(pos) < 520.0:
+		# a second finger near the first one is a pinch, wherever it lands
+		_look[index] = pos
+		_pinch_dist = -1.0
+	elif pos.x < _screen().x * 0.42 and _stick_id == -1:
+		_stick_id = index
+		# the base appears under the thumb, but only inside the bottom-left home zone
+		var r := _screen()
+		_stick_home = Vector2(clampf(pos.x, 120.0, 430.0), clampf(pos.y, r.y - 430.0, r.y - 120.0))
+		_stick_origin = _stick_home
+		_stick_pos = pos
+		_update_stick()
+	else:
+		_look[index] = pos
+		_pinch_dist = -1.0
+
 func _on_drag(e: InputEventScreenDrag) -> void:
 	if _moving.has(e.index):
 		_move_to(_moving[e.index], e.position)
+		return
+	var mv := _mover()
+	if mv and mv.touch_index() == e.index:
+		if mv.touch_drag(e.index, e.position):
+			return
+		_free_touch(e.index, e.position)      # it was a swipe after all: look round (or the stick)
+		pad.queue_redraw()
 		return
 	if _press_info.has(e.index) and (_press_info[e.index].pos as Vector2).distance_to(e.position) > 22.0:
 		_press_info.erase(e.index)   # the thumb moved: it's a press, not a pick-up
@@ -438,6 +462,9 @@ func _release_all() -> void:
 			Input.action_release(b.action)
 	_held.clear(); _btn_touch.clear(); _look.clear(); _press_info.clear(); _moving.clear()
 	_stick_id = -1; _stick_vec = Vector2.ZERO; _zoom_id = -1
+	var mv := _mover()
+	if mv and mv.touch_index() != -1:
+		mv.cancel()
 	for a in ["move_left", "move_right", "move_forward", "move_back", "sprint"]:
 		Input.action_release(a)
 	if pad:

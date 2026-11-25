@@ -10,16 +10,17 @@ class_name HomeGarden
 ##   the cabin's breakfast table: eat what you've grown (HomeCabin)
 ## Plants grow while you play anywhere, even far away on an adventure.
 
-const C := Vector3(10.5, 0, -3.8)                 # the garden's middle
-const X0 := 6.6
-const X1 := 14.4
-const Z0 := -8.6
-const Z1 := 1.0
-const GATE := [9.5, 11.5]                          # the gap in the front fence (x)
-const BEDS := [Vector2(8.4, -5.9), Vector2(10.5, -5.9), Vector2(12.6, -5.9),
-	Vector2(8.4, -2.4), Vector2(10.5, -2.4), Vector2(12.6, -2.4)]
+## (Moved 3.5 m further from the cabin on Nov 25, for more room in the yard.)
+const C := Vector3(14.0, 0, -4.8)                 # the garden's middle
+const X0 := 10.1
+const X1 := 17.9
+const Z0 := -9.6
+const Z1 := 0.0
+const GATE := [13.0, 15.0]                         # the gap in the front fence (x)
+const BEDS := [Vector2(11.9, -6.9), Vector2(14.0, -6.9), Vector2(16.1, -6.9),
+	Vector2(11.9, -3.4), Vector2(14.0, -3.4), Vector2(16.1, -3.4)]
 const BED_HALF := 0.8
-const SEED_BOX := Vector2(7.4, 0.1)
+const SEED_BOX := Vector2(10.9, -0.9)
 
 var home: HomeWorld
 var beds: Array[GardenBed] = []
@@ -163,8 +164,8 @@ func _fence() -> void:
 func _paths() -> void:
 	var path := _mat(Color(0.58, 0.46, 0.32), 1.0)
 	var y := gp(C.x, C.z).y
-	box(Vector3(GATE[0] + 0.1, y - 0.06, -4.15 - 0.6), Vector3(GATE[1] - 0.1, y + 0.025, Z1), path, false)
-	box(Vector3(X0 + 0.4, y - 0.06, -4.15 - 0.6), Vector3(X1 - 0.4, y + 0.025, -4.15 + 0.6), path, false)
+	box(Vector3(GATE[0] + 0.1, y - 0.06, (C.z - 0.35) - 0.6), Vector3(GATE[1] - 0.1, y + 0.025, Z1), path, false)
+	box(Vector3(X0 + 0.4, y - 0.06, (C.z - 0.35) - 0.6), Vector3(X1 - 0.4, y + 0.025, (C.z - 0.35) + 0.6), path, false)
 
 # --- the seed box by the gate -----------------------------------------------------
 func _seed_box() -> void:
@@ -206,7 +207,7 @@ func _use_seed_box() -> void:
 
 # --- a scarecrow, and a rain barrel ------------------------------------------------
 func _scarecrow() -> void:
-	var p := gp(13.6, -7.8)
+	var p := gp(X1 - 0.8, Z0 + 0.8)
 	var straw := _mat(Color(0.92, 0.8, 0.42), 0.95)
 	box(p + Vector3(-0.05, 0, -0.05), p + Vector3(0.05, 1.7, 0.05), _dark, true)
 	box(p + Vector3(-0.7, 1.25, -0.04), p + Vector3(0.7, 1.33, 0.04), _dark, false)
@@ -220,7 +221,7 @@ func _scarecrow() -> void:
 	ball(p + Vector3(0.6, 1.45, 0), 0.1, _mat(Color(0.06, 0.06, 0.07)), Vector3(1.4, 1.0, 0.9))
 
 func _water_barrel() -> void:
-	var p := gp(13.6, 0.2)
+	var p := gp(X1 - 0.8, Z1 - 0.8)
 	cyl(p + Vector3(0, 0.4, 0), 0.36, 0.33, 0.8, _wood)
 	for hy in [0.15, 0.65]:
 		cyl(p + Vector3(0, hy, 0), 0.365, 0.365, 0.05, _mat(Color(0.3, 0.3, 0.32), 0.4))

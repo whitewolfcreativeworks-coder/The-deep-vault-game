@@ -10,7 +10,7 @@ class_name HomeForge
 ##                     "???" for the ones still waiting to be found
 ## You walk straight in (no door): it's open at the front.
 
-const AT := Vector3(-17, 0, 9.5)      # the smithy, open side facing the yard (+x)
+const AT := Vector3(-23, 0, 10.5)     # the smithy, open side facing the yard (+x) (further out from Nov 25)
 const YAW := 90.0
 const HW := 3.6                       # half width (local x) and half depth (local z)
 const HD := 3.0

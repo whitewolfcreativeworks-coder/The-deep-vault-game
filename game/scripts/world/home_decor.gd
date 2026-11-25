@@ -9,14 +9,33 @@ class_name HomeDecor
 ##   bird_bath       a stone bird bath (and the birds come and sing more often)
 ##   statue          a giant golden statue of your hero
 ## Everything's simple shapes (no extra lights), so it costs next to nothing to draw.
+##
+## You can MOVE them (Jason's son, Nov 25): touch one and hold, or hold USE (E) by it
+## (DecorMover). Everything but the twinkle lights. Spots are saved (Game.decor_spots).
 
 var built := {}
+## Things you can move: spot id -> {"node", "r" (footprint), "h", "ext" (half size), "name", "front"}
+var movable := {}
+var mover: DecorMover
+
+## Where each one stands to begin with: [x, z, yaw in degrees], and its size [half x, height, half z].
+const SPOTS := {
+	"statue": [3.0, 21.0, 8.0], "gnome": [-1.2, 9.6, 20.0], "bench": [12.4, 9.4, -130.0],
+	"bird_bath": [9.6, 7.4, 0.0], "flower_bed_1": [-2.0, 3.9, 0.0], "flower_bed_2": [3.4, 3.9, 0.0],
+}
+const SIZES := {
+	"statue": [1.2, 5.0, 1.2], "gnome": [0.3, 0.8, 0.3], "bench": [0.95, 1.0, 0.5],
+	"bird_bath": [0.5, 1.0, 0.5], "flower_bed_1": [1.26, 0.5, 0.42], "flower_bed_2": [0.86, 0.5, 0.42],
+}
+const NAMES := {"statue": "statue", "gnome": "gnome", "bench": "bench", "bird_bath": "bird bath",
+	"flower_bed_1": "flower bed", "flower_bed_2": "flower bed"}
 
 static func build_in(h: HomeWorld) -> HomeDecor:
 	var d := HomeDecor.new()
 	d.name = "Decor"
 	d.home = h
 	h.add_child(d)
+	d.mover = DecorMover.make(d)
 	d.refresh()
 	Game.inventory_changed.connect(d.refresh)
 	return d
@@ -38,6 +57,35 @@ func refresh() -> void:
 	if home._scen and home._scen.soundscape:
 		home._scen.soundscape.more_birds = Game.decor.has("bird_bath")
 
+## A movable thing's own group, standing at its spot (saved, or where it starts).
+func _spot(n: Node3D, id: String) -> Node3D:
+	var grp := Node3D.new(); grp.name = id
+	n.add_child(grp)
+	var d: Array = SPOTS[id]
+	var at := _g(float(d[0]), float(d[1]))
+	var yaw := deg_to_rad(float(d[2]))
+	var saved: Array = Game.decor_spots.get(id, [])
+	if saved.size() >= 3:
+		at = _g(float(saved[0]), float(saved[1]))
+		yaw = float(saved[2])
+	grp.global_position = at
+	grp.rotation.y = yaw
+	return grp
+
+## Make it movable: its size, and a handle so USE (E) can pick it up too.
+func _movable(grp: Node3D, id: String, front := 0.0) -> void:
+	var sz: Array = SIZES[id]
+	movable[id] = {"node": grp, "r": maxf(float(sz[0]), float(sz[2])), "h": float(sz[1]),
+		"ext": Vector3(float(sz[0]), float(sz[1]), float(sz[2])), "name": NAMES[id], "front": front}
+	var u := DecorHandle.new()
+	u.prompt = "[E] Hold to move the %s" % NAMES[id]
+	u.action = func() -> void: mover.begin_use(id)
+	u.mover = mover
+	u.interact_reach = 2.6 + maxf(float(sz[0]), float(sz[2])) * 0.8
+	grp.add_child(u)
+	u.position = Vector3(0, minf(float(sz[1]) * 0.5, 1.0), 0)
+	u.add_to_group("interactable")
+
 ## Vertex colours: the Forward+ renderer wants them linear (like the valley's own).
 static func _vc(c: Color) -> Color:
 	return c if Game.is_compat() else c.srgb_to_linear()
@@ -49,13 +97,13 @@ func _g(x: float, z: float) -> Vector3:
 func _flowers(n: Node3D) -> void:
 	var soil := mat(Color(0.3, 0.2, 0.12), 1.0)
 	var r := RandomNumberGenerator.new(); r.seed = 41
-	for bed in [[Vector2(-2.0, 3.9), 2.4], [Vector2(3.4, 3.9), 1.6]]:
-		var c: Vector2 = bed[0]
+	for bed in [["flower_bed_1", 2.4], ["flower_bed_2", 1.6]]:
+		var grp := _spot(n, String(bed[0]))
 		var wdt: float = bed[1]
-		var at := _g(c.x, c.y)
-		box(n, at + Vector3(-wdt * 0.5, -0.1, -0.35), at + Vector3(wdt * 0.5, 0.12, 0.35), soil, false)
+		var at := Vector3.ZERO
+		box(grp, at + Vector3(-wdt * 0.5, -0.1, -0.35), at + Vector3(wdt * 0.5, 0.12, 0.35), soil, false)
 		for k in [-1, 1]:
-			box(n, at + Vector3(-wdt * 0.5 - 0.06, -0.1, k * 0.38 - 0.04), at + Vector3(wdt * 0.5 + 0.06, 0.18, k * 0.38 + 0.04), mat(Color(0.6, 0.6, 0.58)), false)
+			box(grp, at + Vector3(-wdt * 0.5 - 0.06, -0.1, k * 0.38 - 0.04), at + Vector3(wdt * 0.5 + 0.06, 0.18, k * 0.38 + 0.04), mat(Color(0.6, 0.6, 0.58)), false)
 		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.use_colors = true
 		var sm := SphereMesh.new(); sm.radius = 0.07; sm.height = 0.1; sm.radial_segments = 8; sm.rings = 4
 		mm.mesh = sm
@@ -72,7 +120,8 @@ func _flowers(n: Node3D) -> void:
 		var mi := MultiMeshInstance3D.new(); mi.multimesh = mm
 		var fm := StandardMaterial3D.new(); fm.vertex_color_use_as_albedo = true; fm.roughness = 0.7
 		mi.material_override = fm
-		n.add_child(mi)
+		grp.add_child(mi)
+		_movable(grp, String(bed[0]))
 
 # --- twinkle lights ---------------------------------------------------------------------
 func _lights(n: Node3D) -> void:
@@ -122,10 +171,9 @@ func _lights(n: Node3D) -> void:
 
 # --- the gnome -------------------------------------------------------------------------
 func _gnome(n: Node3D) -> void:
-	var g := Node3D.new(); n.add_child(g)
-	g.position = _g(-1.2, 9.6)
-	g.rotation.y = deg_to_rad(20.0)
+	var g := _spot(n, "gnome")
 	gnome_model(self, g, 1.0)
+	_movable(g, "gnome")
 
 ## A garden gnome (also on show at the Trading Post).
 static func gnome_model(b: HomeBuilding, g: Node3D, s: float) -> void:
@@ -142,17 +190,19 @@ func _bench(n: Node3D) -> void:
 	var path := "res://assets/kaykit/halloween/bench.gltf"
 	if not ResourceLoader.exists(path):
 		return
+	var grp := _spot(n, "bench")
 	var bn: Node3D = (load(path) as PackedScene).instantiate()
-	n.add_child(bn)
-	bn.position = _g(12.4, 8.7)
-	bn.rotation.y = deg_to_rad(-130.0)
+	grp.add_child(bn)
 	var a := Props.mesh_aabb(bn)
 	if a.size.x > 0.0:
 		bn.scale = Vector3.ONE * clampf(1.8 / maxf(a.size.x, a.size.z), 0.3, 6.0)
+	_movable(grp, "bench", PI)           # (the seat faces the model's +z)
 
 # --- the bird bath ---------------------------------------------------------------------
 func _bird_bath(n: Node3D) -> void:
-	var at := _g(10.6, 7.0)
+	var grp := _spot(n, "bird_bath")
+	n = grp
+	var at := Vector3.ZERO
 	var stone := mat(Color(0.7, 0.7, 0.68), 0.9)
 	cylinder(n, at, 0.22, 0.3, 0.1, stone)
 	cylinder(n, at + Vector3(0, 0.1, 0), 0.1, 0.14, 0.62, stone)
@@ -178,13 +228,12 @@ func _bird_bath(n: Node3D) -> void:
 	hop.tween_property(bird, "position:y", -0.06, 0.08).as_relative()
 	hop.tween_interval(3.0)
 	hop.tween_property(bird, "rotation:y", -PI * 0.6, 0.15).as_relative()
+	_movable(grp, "bird_bath")
 
 # --- the golden statue -----------------------------------------------------------------
 func _statue(n: Node3D) -> void:
-	var at := _g(7.6, 3.4)
-	var grp := Node3D.new(); n.add_child(grp)
-	grp.position = at
-	grp.rotation.y = deg_to_rad(157.0)       # looking out over the yard (the statue faces local -z)
+	var grp := _spot(n, "statue")            # (the statue faces local -z: towards the cabin to begin with)
+	_body = StaticBody3D.new(); _body.collision_layer = 1; grp.add_child(_body)   # (its own, so it moves with it)
 	var stone := mat(Color(0.75, 0.72, 0.68), 0.85)
 	var goldm := mat(Color(1.0, 0.78, 0.3), 0.22, 0.95)
 	goldm.emission_enabled = true; goldm.emission = Color(0.25, 0.15, 0.02); goldm.emission_energy_multiplier = 0.6
@@ -215,3 +264,14 @@ func _statue(n: Node3D) -> void:
 	sp.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX; sp.emission_box_extents = Vector3(0.8, 1.6, 0.8)
 	sp.direction = Vector3.UP; sp.spread = 30; sp.initial_velocity_min = 0.1; sp.initial_velocity_max = 0.3; sp.gravity = Vector3.ZERO
 	grp.add_child(sp); sp.position = Vector3(0, 2.8, 0)
+	_body = null
+	_movable(grp, "statue")
+
+## The "hold to move" handle on each movable thing (a Usable that knows how far away
+## you can reach it from, and that steps aside while something's being carried).
+class DecorHandle extends Usable:
+	var interact_reach := 2.6
+	var mover: DecorMover
+	func can_interact() -> bool:
+		return action.is_valid() and (mover == null or not mover.busy())
+

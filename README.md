@@ -195,6 +195,20 @@ The same game on every device. Only how much it draws changes, never the levels,
 
 Resolution, shadows, lamps and sparks change straight away; the scenery savings and sleeping monsters start from the next place you arrive.
 
+### Moving your yard decorations, and a roomier yard (Nov 25, Jason's son's idea)
+- **Move what you've bought:** the golden statue, the gnome, the bench, the bird bath and the two flower beds. The twinkle lights and the buildings stay put.
+  - **On the iPad:** touch the decoration and hold still. A ring of lights fills up around it, then flashes, and the decoration lifts off the ground. Drag it where you want it and let go. It turns to face you while you carry it.
+  - **With USE or a keyboard:** walk up to it and hold USE (E) until the ring fills. It floats where you look; walk it where you want it and press USE (E) to set it down.
+  - **Green ring:** it fits there. **Red ring:** it doesn't, because the spot is in a building, the garden, the portal or the well, on a slope, on top of something else, or out past the yard. Let go there and it floats back.
+  - Where you put things is saved with your hero.
+- **A roomier yard** (Jason: "just a tiny bit crowded"):
+  - the flat yard reaches further out (27 m from the cabin instead of 14), and trees stand back further;
+  - Tobble's Trading Post and the Forge are further out;
+  - the garden is 3.5 m further from the cabin;
+  - the statue starts on its own patch of grass by the portal, facing the cabin, instead of in front of the garden gate.
+
+  The opening movie's valley is unchanged.
+
 ### Tobble's Trading Post and the Forge (Nov 20)
 Two new buildings at home, for spending your gold and making better gear.
 

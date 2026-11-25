@@ -361,6 +361,9 @@ func _run() -> void:
 	elif mode == "kitchen":
 		if await _kitchen_test():
 			return
+	elif mode == "decor":
+		if await _decor_test():
+			return
 	elif mode == "brushing":
 		await _brushing_test()
 	elif mode == "balloon2":
@@ -5947,7 +5950,7 @@ func _garden_test() -> bool:
 	# dressed for it: the gardener's dungarees and rain boots
 	Game.wear_outfit("work_gardener"); Game.wear_footwear("wellies")
 	await wait(0.5)
-	await _cam_shot("gd_01_the_garden", g.gp(10.5, 9.0) + Vector3(0, 5.5, 0), g.gp(10.5, -3.5) + Vector3(0, 0.5, 0), 60.0)
+	await _cam_shot("gd_01_the_garden", g.gp(14.0, 8.0) + Vector3(0, 5.5, 0), g.gp(14.0, -4.5) + Vector3(0, 0.5, 0), 60.0)
 	# the seed box by the gate: a present of seeds
 	await tp(g.gp(HomeGarden.SEED_BOX.x, HomeGarden.SEED_BOX.y + 1.3) + Vector3(0, 0.3, 0), 0.0, -0.1)
 	await wait(0.6)
@@ -6002,7 +6005,7 @@ func _garden_test() -> bool:
 	for b in g.beds:
 		b.tick(true)
 	await wait(0.5)
-	await _cam_shot("gd_03_growing", g.gp(10.5, 3.6) + Vector3(0, 3.2, 0), g.gp(10.5, -4.0) + Vector3(0, 0.3, 0), 62.0)
+	await _cam_shot("gd_03_growing", g.gp(14.0, 2.6) + Vector3(0, 3.2, 0), g.gp(14.0, -5.0) + Vector3(0, 0.3, 0), 62.0)
 	# later: everything's ripe (it grew while we were out adventuring)
 	Game.play_time += 900.0
 	for b in g.beds:
@@ -6010,14 +6013,14 @@ func _garden_test() -> bool:
 	await wait(0.5)
 	await frames(2)
 	check("gd_all_ripe", g.beds.all(func(b) -> bool: return b.stage == 4) and g.sparkle.emitting)
-	await _cam_shot("gd_04_ripe", g.gp(10.5, 3.6) + Vector3(0, 3.2, 0), g.gp(10.5, -4.0) + Vector3(0, 0.3, 0), 62.0)
-	await _cam_shot("gd_05_ripe_close", g.gp(9.4, -0.2) + Vector3(0, 1.6, 0), g.gp(10.5, -3.0) + Vector3(0, 0.4, 0), 60.0)
+	await _cam_shot("gd_04_ripe", g.gp(14.0, 2.6) + Vector3(0, 3.2, 0), g.gp(14.0, -5.0) + Vector3(0, 0.3, 0), 62.0)
+	await _cam_shot("gd_05_ripe_close", g.gp(12.9, -1.2) + Vector3(0, 1.6, 0), g.gp(14.0, -4.0) + Vector3(0, 0.4, 0), 60.0)
 	await tp(g.beds[4].global_position + Vector3(0.0, 0.05, 1.3), PI * 0.15, -0.2)
 	await wait(0.6)
-	await _cam_shot("gd_05b_ripe_from_the_corner", g.gp(14.0, 0.4) + Vector3(0, 2.2, 0), g.gp(9.6, -4.4) + Vector3(0, 0.3, 0), 64.0)
+	await _cam_shot("gd_05b_ripe_from_the_corner", g.gp(17.5, -0.6) + Vector3(0, 2.2, 0), g.gp(13.1, -5.4) + Vector3(0, 0.3, 0), 64.0)
 	# what the whole garden costs to draw, ripe and sparkling (Jason: "this game must have no lag")
 	var dc_cam := Camera3D.new(); dc_cam.fov = 62.0; w.add_child(dc_cam)
-	dc_cam.global_position = g.gp(10.5, 3.6) + Vector3(0, 3.2, 0); dc_cam.look_at(g.gp(10.5, -4.0) + Vector3(0, 0.3, 0))
+	dc_cam.global_position = g.gp(14.0, 2.6) + Vector3(0, 3.2, 0); dc_cam.look_at(g.gp(14.0, -5.0) + Vector3(0, 0.3, 0))
 	dc_cam.current = true
 	await frames(6)
 	var dc_with := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
@@ -6051,7 +6054,7 @@ func _garden_test() -> bool:
 	Game.wear_outfit("work_gardener")
 	Game.harvest_plot(0); Game.harvest_plot(4); Game.harvest_plot(5)
 	await wait(0.3)
-	await _cam_shot("gd_06_picked", g.gp(10.5, 3.6) + Vector3(0, 3.2, 0), g.gp(10.5, -4.0) + Vector3(0, 0.3, 0), 62.0)
+	await _cam_shot("gd_06_picked", g.gp(14.0, 2.6) + Vector3(0, 3.2, 0), g.gp(14.0, -5.0) + Vector3(0, 0.3, 0), 62.0)
 	# a home-grown meal at the cabin table
 	var cab: HomeCabin = w.cabin
 	await tp(cab.w(cab.room._table + Vector3(0.0, 0.05, 1.5)), 0.0, -0.2)
@@ -6083,6 +6086,143 @@ func _garden_test() -> bool:
 	var sv: Dictionary = Game.read_slot(Game.active_slot)
 	check("gd_saved", String((sv.get("garden_plots", []) as Array)[3].plant) == "heartberry" and bool(sv.get("garden_starter", false)))
 	_finish()
+	return true
+
+# --- moving yard decorations (Jason's son, Nov 25) and a roomier yard ---------------------
+func _dm_screen(p: Vector3) -> Vector2:
+	return player.camera.unproject_position(p)
+
+func _decor_test() -> bool:
+	if Game.get_meta("dm_phase", 0) == 2:
+		# back home after the game reloaded: the statue is where you put it
+		await wait(2.5)
+		player = main.player
+		var w3: HomeWorld = main.world
+		var st_spot: Array = Game.get_meta("dm_spot", [])
+		var st3: Node3D = w3.decor.movable["statue"].node
+		check("dm_stays_moved", st_spot.size() == 3 and Vector2(st3.global_position.x, st3.global_position.z).distance_to(Vector2(float(st_spot[0]), float(st_spot[1]))) < 0.1,
+			"%s vs %s" % [st3.global_position, st_spot])
+		await _cam_shot("dm_10_yard_after_moving", Vector3(-2, 52, 34), Vector3(-2, 0, 8), 60.0)
+		_finish()
+		return true
+	if Game.get_meta("dm_phase", 0) == 0:
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("dm_phase", 1)
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		Game.flags["adventure_done"] = true
+		Game.decor = ["flower_garden", "twinkle_lights", "gnome", "bench", "bird_bath", "statue"]
+		main._travel("home", Vector3(4, 1, 10))
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	var d: HomeDecor = w.decor
+	var mv: DecorMover = d.mover
+	check("dm_all_movable", d.movable.size() == 6, str(d.movable.keys()))
+	# everything starts somewhere it's allowed to be
+	var bad: Array = []
+	for id in d.movable:
+		if not mv.can_place(id, (d.movable[id].node as Node3D).global_position):
+			bad.append(id)
+	check("dm_starting_spots_fit", bad.is_empty(), str(bad))
+	# the yard is roomier: everything further apart than before, and flat
+	var tp := Vector2(TradingPost.AT.x, TradingPost.AT.z)
+	var fg := Vector2(HomeForge.AT.x, HomeForge.AT.z)
+	check("dm_more_room", tp.length() > 24.0 and fg.length() > 24.0 and HomeGarden.X0 > 10.0, "%.1f %.1f %.1f" % [tp.length(), fg.length(), HomeGarden.X0])
+	var hmax := 0.0
+	for p2 in [tp, fg, Vector2(HomeGarden.C.x, HomeGarden.C.z), Vector2(3, 21), Vector2(-9, 15)]:
+		hmax = maxf(hmax, absf(w.ground(p2.x, p2.y).y))
+	check("dm_yard_flat", hmax < 0.15, "%.2f" % hmax)
+	await _cam_shot("dm_01_yard_from_above", Vector3(-2, 52, 34), Vector3(-2, 0, 8), 60.0)
+	await _cam_shot("dm_02_yard_from_the_door", Vector3(1, 3.2, 7.5), Vector3(-2, 1.5, 22), 70.0)
+	await _cam_shot("dm_03_yard_east", Vector3(-1, 3.2, 8), Vector3(14, 1.0, -2), 70.0)
+	# touch the statue and hold still: the ring fills, it lifts
+	var st: Node3D = d.movable["statue"].node
+	var st0 := st.global_position
+	await tp(w.ground(st0.x - 1.0, st0.z - 9.0) + Vector3(0, 0.2, 0), PI, -0.12)
+	player.zoom_target = 4.2; player.zoom = 4.2; player.snap_view()
+	await wait(0.8)
+	var sp := _dm_screen(st0 + Vector3(0, 2.5, 0))
+	await touch_ev(5, sp, true)
+	check("dm_touch_picks_statue", mv.state == "hold" and mv.item == "statue", "%s %s" % [mv.state, mv.item])
+	await wait(0.6)
+	await shot("dm_04_holding_ring_fills")
+	await wait(0.7)
+	check("dm_lifted", mv.state == "carry" and player.carrying)
+	await shot("dm_05_lifted")
+	# drag it to a new spot, and let go
+	var to := w.ground(st0.x - 6.0, st0.z - 1.0)
+	var tsp := _dm_screen(to)
+	await drag_ev(5, sp, tsp, 12)
+	await wait(0.8)
+	check("dm_follows_finger", Vector2(st.global_position.x, st.global_position.z).distance_to(Vector2(to.x, to.z)) < 1.2 and mv.ok,
+		"%s vs %s ok=%s" % [st.global_position, to, mv.ok])
+	await shot("dm_06_dragging_green_ring")
+	await touch_ev(5, tsp, false)
+	await wait(0.8)
+	var spot: Array = Game.decor_spots.get("statue", [])
+	check("dm_set_down_and_saved", mv.state == "" and mv.moved == 1 and spot.size() == 3
+		and Vector2(float(spot[0]), float(spot[1])).distance_to(Vector2(to.x, to.z)) < 1.2 and absf(st.global_position.y - to.y) < 0.05, str(spot))
+	await shot("dm_07_statue_moved")
+	# the gnome won't go on the cabin: it floats back
+	var gn: Node3D = d.movable["gnome"].node
+	var g0 := gn.global_position
+	await tp(w.ground(g0.x + 0.5, g0.z + 6.0) + Vector3(0, 0.2, 0), 0.0, -0.25)
+	await wait(0.6)
+	var gsp := _dm_screen(g0 + Vector3(0, 0.4, 0))
+	await touch_ev(6, gsp, true)
+	await wait(1.3)
+	check("dm_gnome_lifted", mv.state == "carry" and mv.item == "gnome", "%s %s" % [mv.state, mv.item])
+	var bad_sp := _dm_screen(w.ground(0.5, 1.5) + Vector3(0, 0.3, 0))
+	await drag_ev(6, gsp, bad_sp, 10)
+	await wait(0.6)
+	check("dm_red_on_the_cabin", not mv.ok)
+	await shot("dm_08_red_ring_on_the_cabin")
+	await touch_ev(6, bad_sp, false)
+	await wait(0.8)
+	check("dm_floats_back", mv.refused == 1 and gn.global_position.distance_to(g0) < 0.1 and not Game.decor_spots.has("gnome"), str(gn.global_position))
+	# a quick swipe across the bird bath is still just looking round
+	var bb: Node3D = d.movable["bird_bath"].node
+	var b0 := bb.global_position
+	await tp(w.ground(b0.x - 0.5, b0.z + 5.0) + Vector3(0, 0.2, 0), 0.0, -0.2)
+	await wait(0.6)
+	var yaw0 := player.yaw
+	var bsp := _dm_screen(b0 + Vector3(0, 0.6, 0))
+	await touch_ev(7, bsp, true)
+	await drag_ev(7, bsp, bsp + Vector2(220, 0), 6)
+	await touch_ev(7, bsp + Vector2(220, 0), false)
+	await wait(0.3)
+	check("dm_swipe_still_looks", mv.state == "" and absf(player.yaw - yaw0) > 0.05 and bb.global_position.distance_to(b0) < 0.05, "%.2f" % (player.yaw - yaw0))
+	# with USE (E): hold it by the bird bath, it floats where you look, USE again sets it down
+	await tp(w.ground(b0.x - 0.4, b0.z + 2.0) + Vector3(0, 0.2, 0), 0.0, -0.3)
+	await wait(0.6)
+	var it = player.interact_target
+	check("dm_use_prompt", it != null and String(it.get_prompt()).contains("Hold to move the bird bath"), str(it.get_prompt()) if it else "none")
+	Input.action_press("interact")
+	await wait(1.4)
+	check("dm_use_lifts", mv.state == "carry" and mv.how == "use", mv.state)
+	Input.action_release("interact")
+	await wait(0.2)
+	player.yaw += 0.9; player.facing = player.yaw; player.snap_view()
+	await wait(0.8)
+	await shot("dm_09_use_carrying_bird_bath")
+	Input.action_press("interact")
+	await frames(2)
+	Input.action_release("interact")
+	await wait(0.8)
+	check("dm_use_sets_down", mv.state == "" and mv.moved == 2 and Game.decor_spots.has("bird_bath") and bb.global_position.distance_to(b0) > 1.0,
+		str(bb.global_position))
+	# saved: back home after a trip, the statue is where you put it
+	Game.save_slot()
+	check("dm_saved", (Game.read_slot(Game.active_slot).get("decor_spots", {}) as Dictionary).has("statue"))
+	Game.set_meta("dm_spot", (Game.decor_spots["statue"] as Array).duplicate())
+	Game.set_meta("dm_phase", 2)
+	main._travel("home", Vector3(4, 1, 10))
 	return true
 
 # --- the Kitchen: cook what you grow at your cabin stove (Jason and his son, Nov 25) ------
@@ -7534,14 +7674,16 @@ func _homeview_test() -> bool:
 	check("hv_landed", w.landed)
 	var sc: IntroMovie = w._scen
 	await wait(0.5)
-	await _cam_shot("hv_01_top", Vector3(-4, 46, 30), Vector3(-5, 0, 8), 60.0)
+	await _cam_shot("hv_01_top", Vector3(-4, 56, 36), Vector3(-3, 0, 8), 60.0)
 	await _cam_shot("hv_02_from_portal", Vector3(14, 6, 24), Vector3(-6, 1, 2))
-	await _cam_shot("hv_03_west", Vector3(4, 4, 9), Vector3(-17, 1.5, 9.5))
-	await _cam_shot("hv_04_shop_front", Vector3(3, 3.5, 6), Vector3(-6, 3, 19))
-	await _cam_shot("hv_05_forge_front", Vector3(-8.5, 2.6, 10.5), Vector3(-17, 1.3, 9.5))
-	await _cam_shot("hv_06_statue", Vector3(4, 3, 12), Vector3(7.6, 2.5, 3.4))
+	await _cam_shot("hv_03_west", Vector3(4, 4, 9), HomeForge.AT + Vector3(0, 1.5, 0))
+	await _cam_shot("hv_04_shop_front", TradingPost.AT + w.shop._fwd() * 14.0 + Vector3(0, 3.5, 0), TradingPost.AT + Vector3(0, 3, 0))
+	await _cam_shot("hv_05_forge_front", HomeForge.AT + Vector3(8.5, 2.6, 1.0), HomeForge.AT + Vector3(0, 1.3, 0))
+	var stp: Vector3 = w.decor.movable["statue"].node.global_position
+	await _cam_shot("hv_06_statue", stp + Vector3(1.0, 3.0, -9.0), stp + Vector3(0, 2.5, 0))
 	await _cam_shot("hv_07_yard_lights", Vector3(-2, 3.0, 16), Vector3(4, 1.0, 6))
-	await _cam_shot("hv_07b_birdbath", Vector3(6, 2.5, 12), Vector3(11, 0.8, 7.5))
+	var bbp: Vector3 = w.decor.movable["bird_bath"].node.global_position
+	await _cam_shot("hv_07b_birdbath", bbp + Vector3(-4.0, 2.5, 4.5), bbp + Vector3(0, 0.8, 0))
 	await _cam_shot("hv_07c_shop_door", w.shop.door_out() + Vector3(0, 2.2, 0) + w.shop._fwd() * 3.0, w.shop.door_out() + Vector3(0, 1.2, 0) - w.shop._fwd() * 2.0)
 	var sp: TradingPost = w.shop
 	sp.room.visible = true

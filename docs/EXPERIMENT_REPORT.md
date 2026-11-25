@@ -1725,3 +1725,38 @@ A perk only works while the outfit shows, not under a magic costume. None of the
 - The `garden` test picks in dungarees (4 carrots instead of 3, 3 potions instead of 2). It checks the smith's discount and the fishing perk, and that a perk stops when you change.
 - The `kitchen` test cooks in Chef's Whites (an extra helping each time) and checks the extra goes away in adventuring clothes.
 
+## Follow-up 54: move your yard decorations; a roomier yard (Nov 25)
+
+Jason's son wanted to move the statue: touch it, hold on, "a ring goes around until it lights up and then you can drag the statue wherever you want and set it down... There are certain things you can't move, but there should be a few things you can move around." Jason added: "can you spread things out just a little bit? It's just a tiny bit crowded. I think that's what initiated my son wanting to move the statue."
+
+**Moving things (`DecorMover`, `scripts/world/decor_mover.gd`):**
+- **What moves:** the statue, gnome, bench, bird bath and both flower beds (`HomeDecor.movable`). Each was rebuilt as its own group standing at a spot (`HomeDecor.SPOTS`), so it can move as one piece. The statue's collision moves with it.
+- **Touch:** the touch controls offer a finger to the mover first.
+  - If the finger lands on a movable thing and holds still, a ring of 28 lights fills over a second. It flashes and the thing lifts.
+  - Dragging moves it over the ground under the finger, turning it to face you. Letting go sets it down with a thump and a puff of dust.
+  - If the finger moves before the ring fills, it was a swipe: the touch goes back to steering the camera, or to the stick on the left.
+- **USE / E:** every movable thing has a "Hold to move" prompt. Hold USE and the ring fills; the thing floats where you look, and USE again sets it down. While you carry it, USE doesn't do anything else.
+- **Where things can go:** in the yard (within 44 m of the cabin) and on fairly level ground. Not in a building or its doorway, the garden, the portal or the well, not overlapping another decoration or your hero, and not inside anything solid. The ring is green or red to show which; let go on red and it floats back.
+- **Saved:** `Game.decor_spots` (spot id → x, z, turn).
+- **Cost:** nothing new is drawn, except the ring (one draw call) while you're moving something.
+
+**A roomier yard:**
+- **Flat ground:** the home's valley is flat out to 27 m (it was 14), and trees keep 21 m back. The other trees stay exactly where they were. Only home uses these numbers; the opening movie's valley is unchanged.
+- **Further out:**
+  - Tobble's Trading Post: (-6, 19) to (-9, 24), turned to keep facing the cabin;
+  - the Forge: (-17, 9.5) to (-23, 10.5);
+  - the garden: 3.5 m further east and 1 m further back.
+- **Decorations:**
+  - The statue now starts on open grass near the portal, facing the cabin. It used to stand in front of the garden gate.
+  - The bench and bird bath shifted a little.
+
+**Tested:** the new `decor` test:
+- it checks every decoration starts somewhere it's allowed to be;
+- it checks the yard is roomier and flat;
+- it photographs the yard;
+- by touch, it holds on the statue until it lifts, drags it, lets go and checks it was saved;
+- it tries to put the gnome on the cabin (red ring; it floats back);
+- it swipes across the bird bath and checks that only looks round;
+- it moves the bird bath with USE;
+- it reloads home and checks the statue stayed where it was put.
+

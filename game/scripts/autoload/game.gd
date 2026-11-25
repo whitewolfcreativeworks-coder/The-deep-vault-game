@@ -696,6 +696,7 @@ func spell_damage() -> float:
 var boons := {}
 ## Yard decorations you've bought for home (ShopCatalog ids). Saved, kept forever.
 var decor: Array = []
+var decor_spots := {}               # where you've moved them: spot id -> [x, z, yaw] (DecorMover)
 ## The Forge Journal: recipes you've discovered and riddles the smith has told you.
 var forge_book := {"found": [], "hints": []}
 ## Forge powers on the gear you wear ("power" on forged items: see ForgeRecipes),
@@ -820,7 +821,7 @@ func reset_run() -> void:
 	unlocked_looks = []; custom_look = {}; custom_look_on = false
 	outfit = "adventure"; footwear = "boots"; outfits_owned = []; footwear_owned = []; wardrobe_new = []
 	seeds = {}; basket = {}; garden_plots = []; garden_starter = false; lunchbox = {}
-	boons = {}; decor = []; forge_book = {"found": [], "hints": []}
+	boons = {}; decor = []; decor_spots = {}; forge_book = {"found": [], "hints": []}
 	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
 	game_over = false
@@ -1124,7 +1125,7 @@ func save_slot(i := -1) -> bool:
 		"wardrobe_new": wardrobe_new.duplicate(),
 		"seeds": seeds.duplicate(), "basket": basket.duplicate(), "garden_plots": garden_plots.duplicate(true), "garden_starter": garden_starter,
 		"lunchbox": lunchbox.duplicate(),
-		"boons": boons.duplicate(), "decor": decor.duplicate(), "forge_book": forge_book.duplicate(true),
+		"boons": boons.duplicate(), "decor": decor.duplicate(), "decor_spots": decor_spots.duplicate(true), "forge_book": forge_book.duplicate(true),
 		"loot_next": Loot._next,
 	}
 	var f := FileAccess.open(_slot_path(i), FileAccess.WRITE)
@@ -1206,6 +1207,7 @@ func load_slot(i: int) -> bool:
 	_mend_garden()
 	boons = (d.get("boons", {}) as Dictionary).duplicate()
 	decor = (d.get("decor", []) as Array).duplicate()
+	decor_spots = (d.get("decor_spots", {}) as Dictionary).duplicate(true)
 	var fb: Dictionary = d.get("forge_book", {})
 	forge_book = {"found": (fb.get("found", []) as Array).duplicate(), "hints": (fb.get("hints", []) as Array).duplicate()}
 	Loot._next = maxi(Loot._next, int(d.get("loot_next", 1)))

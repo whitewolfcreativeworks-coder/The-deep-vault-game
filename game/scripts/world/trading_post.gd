@@ -13,8 +13,8 @@ class_name TradingPost
 ## Like the cabin, the room is built out of sight under the valley (and only drawn
 ## while you're in it).
 
-const AT := Vector3(-6, 0, 19)              # the building in the yard
-const YAW := 150.0                          # its door faces the cabin
+const AT := Vector3(-9, 0, 24)              # the building in the yard (further out from Nov 25: more room)
+const YAW := 158.0                          # its door faces the cabin
 const SCALE := 6.0
 const IN := Vector3(30, -30, 30)            # the room
 const W := 12.0                             # room width (x) and depth (z)

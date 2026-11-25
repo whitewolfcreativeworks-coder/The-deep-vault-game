@@ -84,6 +84,7 @@ var step_accum := 0.0
 var in_river := false
 var river_tick := 0.0
 var interact_target: Node = null
+var carrying := false          # moving a yard decoration (DecorMover): USE sets it down
 var damage_taken := 0.0
 var bolts_fired := 0
 var melee_mana_gained := 0.0
@@ -922,7 +923,7 @@ func _handle_actions() -> void:
 		drink_stamina_potion()
 	if Input.is_action_just_pressed("potion"):
 		drink_potion()
-	if Input.is_action_just_pressed("interact") and interact_target and is_instance_valid(interact_target):
+	if Input.is_action_just_pressed("interact") and interact_target and is_instance_valid(interact_target) and not carrying:
 		interact_target.interact(self)
 	if Input.is_action_just_pressed("toggle_view"):
 		toggle_view()

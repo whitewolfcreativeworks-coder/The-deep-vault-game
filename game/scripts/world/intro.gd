@@ -22,6 +22,8 @@ var soundscape: Soundscape
 ## At home only (HomeWorld): spots kept clear of trees for the outbuildings, which
 ## also opens a gap in the fence beside the well. (The opening movie keeps its valley.)
 var clear_spots: Array = []
+var yard_flat := 14.0          # the flat ground round the cabin (home: a bigger yard, Nov 25)
+var yard_trees := 13.0         # no trees this close to the cabin
 var actor: CharacterModel
 var env: Environment
 var sun: DirectionalLight3D
@@ -49,7 +51,7 @@ func height(x: float, z: float) -> float:
 	var h := _noise.get_noise_2d(x, z) * 3.0
 	var r := Vector2(x, z).length()
 	h += pow(maxf(r - 45.0, 0.0), 1.5) * 0.18
-	return h * smoothstep(14.0, 30.0, r)
+	return h * smoothstep(yard_flat, yard_flat + 16.0, r)
 
 func g(x: float, z: float) -> Vector3:
 	return Vector3(x, height(x, z), z)
@@ -161,6 +163,9 @@ func _valley() -> void:
 	for k in 110:
 		var p := Vector2(rng.randf_range(-60, 60), rng.randf_range(-60, 60))
 		if p.length() < 13.0 or p.distance_to(Vector2(PORTAL.x, PORTAL.z)) < 9.0 or p.distance_to(Vector2(5, 10)) < 9.0 or p.distance_to(PORTAL_CAM) < 6.0:
+			continue
+		if p.length() < yard_trees:
+			rng.randi(); rng.randf()        # (home's bigger yard: the other trees stay exactly where they were)
 			continue
 		if clear_spots.any(func(c: Vector2) -> bool: return p.distance_to(c) < 8.5):
 			rng.randi(); rng.randf()        # (keep the other trees exactly where they were)

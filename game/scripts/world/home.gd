@@ -31,7 +31,8 @@ var _splashed := false
 var cabin: HomeCabin
 var shop: TradingPost        # Tobble's Trading Post, across the yard
 var forge: HomeForge         # the Forge, through the gap in the fence
-var decor: HomeDecor         # things for the yard you bought at the Trading Post
+var decor: HomeDecor         # things for the yard you bought at the Trading Post (move them: DecorMover)
+var ground_body: StaticBody3D   # the valley floor
 var garden: HomeGarden       # the vegetable and flower garden beside the cabin
 var ride: SkyRide
 
@@ -133,6 +134,8 @@ func _valley() -> void:
 	_scen.set_process(false)
 	_scen._noise.seed = 3; _scen._noise.frequency = 0.02
 	# room for the Trading Post and the Forge (no trees there, and a gap in the fence)
+	_scen.yard_flat = 27.0                  # room to spread out (Jason, Nov 25: "just a tiny bit crowded")
+	_scen.yard_trees = 21.0
 	_scen.clear_spots = [Vector2(TradingPost.AT.x, TradingPost.AT.z), Vector2(HomeForge.AT.x, HomeForge.AT.z),
 		Vector2(HomeGarden.C.x, HomeGarden.C.z)]
 	_scen._valley()
@@ -141,6 +144,7 @@ func _valley() -> void:
 	for c in _scen.get_children():
 		if c is MeshInstance3D and (c as MeshInstance3D).material_override is ShaderMaterial:
 			var sb := StaticBody3D.new(); sb.collision_layer = 1; add_child(sb)
+			ground_body = sb
 			var cs := CollisionShape3D.new(); var sh := ConcavePolygonShape3D.new()
 			sh.set_faces((c as MeshInstance3D).mesh.get_faces())
 			cs.shape = sh; sb.add_child(cs)
@@ -341,6 +345,19 @@ func warm_spots() -> Array:
 ## it, not out past the mountains where the ground ends. (Not during the flight
 ## home, which starts far out over the clouds.)
 const EDGE_R := 92.0
+
+## Where yard decorations can't go (DecorMover): [centre, radius] or [Rect2].
+func keep_clear_of() -> Array:
+	var tp := shop.door_out() if shop else TradingPost.AT
+	return [
+		[Rect2(-3.3, -3.3, 6.6, 6.6)], [Vector2(1.0, 5.6), 1.0],                      # the cabin and its door
+		[Vector2(TradingPost.AT.x, TradingPost.AT.z), 5.2], [Vector2(tp.x, tp.z), 1.4],  # Tobble's and its door
+		[Vector2(HomeForge.AT.x, HomeForge.AT.z), 5.0],
+		[Rect2(HomeGarden.X0 - 0.3, HomeGarden.Z0 - 0.3, HomeGarden.X1 - HomeGarden.X0 + 0.6, HomeGarden.Z1 - HomeGarden.Z0 + 0.6)],
+		[Vector2((HomeGarden.GATE[0] + HomeGarden.GATE[1]) * 0.5, HomeGarden.Z1 + 1.0), 1.0],
+		[Vector2(IntroMovie.PORTAL.x, IntroMovie.PORTAL.z), 4.6],
+		[Vector2(-7, 6), 1.9],                                                         # the well
+	]
 func keep_in(p: Vector3) -> Vector3:
 	if not landed:
 		return p
