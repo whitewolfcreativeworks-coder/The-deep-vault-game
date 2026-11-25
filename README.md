@@ -133,6 +133,28 @@ A fenced garden beside the cabin (to the right as you come out of the door), wit
   - **Magic seeds** can't be bought. Every boss chest has one, and now and then a lucky chest does too.
 - **Outfit:** the wardrobe has Gardener's Dungarees and Rain Boots for it.
 
+### The Kitchen (Nov 25)
+Cook what you grow. Walk up to the **stove** in your cabin (it has a KITCHEN sign over it) and press USE.
+- **The cooking screen:** a cosy little kitchen on the left, the recipes on the right. Pick a recipe and press **COOK IT!**
+  - Your vegetables drop into the copper pot one by one with a splash, and the soup changes colour.
+  - The spoon stirs, there's a puff of steam and sparkles, and the dish pops out onto the counter.
+  - If you're short of something, the button says so ("You need 1 more carrot").
+- **Your lunchbox:** every dish goes in your lunchbox. Open your **Bag** (I) and press **Eat**, at home or out on an adventure.
+- **The recipes (the basics for now; more come with the open world):**
+
+| Dish | Ingredients | Makes | Eating one |
+|---|---|---|---|
+| Carrot Soup | 2 carrots | 1 | some health, **QUICK** for 10 minutes |
+| Tomato Pie | 2 tomatoes | 1 | some health, **STRONG** for 10 minutes |
+| Pumpkin Stew | 1 pumpkin | 2 | half your health, **TOUGH** for 10 minutes |
+| Garden Salad | 1 carrot, 1 tomato | 1 | all your health and energy, **WELL FED** |
+| Hero's Feast | 1 carrot, 1 tomato, 1 pumpkin | 1 | all your health and energy, **QUICK, STRONG, TOUGH and WELL FED** |
+| Sunflower Cookies | 1 sunflower | 3 | fills your energy |
+| Rose Tea | 2 roses | 2 | fills your magic |
+
+- **Outfit:** the wardrobe has Chef's Whites for it.
+- **Adding a recipe:** one line in `scripts/world/cooking.gd`, and a look for the dish in `KitchenPanel._dish_look`.
+
 ### The hot air balloon and the edges of each level (Nov 22)
 - **The hot air balloon** (on its launch deck in the Goblin Forest):
   - **LIFT:** on the iPad, the JUMP button turns into a big yellow **LIFT** button while you're in the basket; hold it to fire the burner. ATTACK says **HOP OUT**.

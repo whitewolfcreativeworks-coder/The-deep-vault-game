@@ -91,6 +91,7 @@ func _ready() -> void:
 	menus.resume_requested.connect(_resume)
 	menus.desk_closed.connect(_on_desk_closed)
 	menus.wardrobe_closed.connect(_on_wardrobe_closed)
+	menus.kitchen_closed.connect(_on_kitchen_closed)
 	menus.respawn_requested.connect(_respawn)
 	menus.restart_requested.connect(_restart)
 	menus.quit_requested.connect(func() -> void: get_tree().quit())
@@ -560,6 +561,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		if menus.current == "designer":
 			menus.designer.close(false)      # Esc steps back out of the Skin Designer
+		elif menus.current == "wardrobe":
+			menus.wardrobe.close()
+		elif menus.current == "kitchen":
+			if not menus.kitchen.busy:       # (let the pot finish first)
+				menus.kitchen.closed.emit()
 		elif menus.current in ["ask", "modes", "levels"] and _ask_cancel.is_valid():
 			_ask_cancel.call()
 		elif menus.current in ["pause", "inventory", "lore", "stash", "ask", "shop", "forge", "journal"]:
@@ -808,6 +814,20 @@ func _on_wardrobe_closed(changed: bool) -> void:
 		player.rebuild_body()
 		var o: Dictionary = Outfits.OUTFITS.get(Game.outfit, {})
 		Game.say("All dressed: %s!" % String(o.get("name", "")), Color(1.0, 0.85, 1.0))
+
+## The stove in your cabin: cook what you grow (Cooking, KitchenPanel).
+func open_kitchen() -> void:
+	if state != "play" or menus.current != "":
+		return
+	Sfx.play("stir", -8.0, 0.1)
+	_open("kitchen")
+
+func _on_kitchen_closed() -> void:
+	_resume()
+	if menus.kitchen.cooked > 0:
+		menus.kitchen.cooked = 0
+		autosave()
+		Game.say("Your lunchbox is packed! Open your Bag to eat, any time.", Color(0.8, 1.0, 0.7))
 
 func open_stash() -> void:
 	if state != "play" or menus.current != "":

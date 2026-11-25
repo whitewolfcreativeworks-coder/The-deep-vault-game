@@ -358,6 +358,9 @@ func _run() -> void:
 	elif mode == "garden":
 		if await _garden_test():
 			return
+	elif mode == "kitchen":
+		if await _kitchen_test():
+			return
 	elif mode == "brushing":
 		await _brushing_test()
 	elif mode == "balloon2":
@@ -6071,6 +6074,142 @@ func _garden_test() -> bool:
 	Game.save_slot()
 	var sv: Dictionary = Game.read_slot(Game.active_slot)
 	check("gd_saved", String((sv.get("garden_plots", []) as Array)[3].plant) == "heartberry" and bool(sv.get("garden_starter", false)))
+	_finish()
+	return true
+
+# --- the Kitchen: cook what you grow at your cabin stove (Jason and his son, Nov 25) ------
+func _kt_cook(k: KitchenPanel, id: String) -> void:
+	k.select(id)
+	k.cook()
+	var t := 0.0
+	while k.busy and t < 12.0:
+		await wait(0.1)
+		t += 0.1
+	await wait(0.5)
+
+func _kitchen_test() -> bool:
+	if not Game.get_meta("kt_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		Game.profile.hero = "Ranger"
+		await _start()
+		Game.set_meta("kt_phase", true)
+		Game.level = 12
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		main._travel("home")
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	var m = main.menus
+	var cab: HomeCabin = w.cabin
+	await tp(w.ground(HomeWorld.LAND.x, HomeWorld.LAND.z) + Vector3(0, 1.0, 0), 0.0, -0.1)
+	await wait(1.5)
+	Game.wear_outfit("work_chef")
+	player.rebuild_body()
+	Game.basket = {"carrot": 4, "tomato": 3, "pumpkin": 2, "sunflower": 1, "rose": 2}
+	# the stove, with a KITCHEN sign over it
+	await tp(cab.w(cab.room._stove + Vector3(-1.6, 0.05, 0.0)), -PI * 0.5, -0.1)
+	await wait(0.8)
+	var it = player.interact_target
+	check("kt_prompt", it != null and String(it.get_prompt()).contains("Cook"), str(it.get_prompt()) if it else "none")
+	player.zoom_target = 3.6; player.zoom = 3.6; player.pitch = -0.15; player.snap_view()
+	await wait(0.5)
+	await shot("kt_01_the_stove")
+	if it:
+		it.interact(player)
+	await wait(1.0)
+	check("kt_opens", m.current == "kitchen" and get_tree().paused, m.current)
+	var k: KitchenPanel = m.kitchen
+	check("kt_all_recipes", k._cards.size() == Cooking.ORDER.size())
+	check("kt_picks_one_you_can_cook", Cooking.can_cook(k._sel), k._sel)
+	await shot("kt_02_kitchen")
+	# not enough vegetables: the button says so
+	var full: Dictionary = Game.basket.duplicate()
+	Game.basket = {"carrot": 1}
+	k.select("carrot_soup")
+	check("kt_needs_more", k._cook_btn.disabled and k._status.text.contains("1 more carrot"), k._status.text)
+	k.cook()
+	check("kt_cant_cook_without", Game.lunchbox.is_empty() and int(Game.basket.get("carrot", 0)) == 1)
+	await shot("kt_03_need_more")
+	Game.basket = full
+	# carrot soup: the carrots plop in, the spoon stirs, the soup pops out
+	k.select("carrot_soup")
+	k.cook()
+	await wait(0.3)
+	await shot("kt_04_carrot_plops_in")
+	var t := 0.0
+	while k.busy and t < 1.0:
+		await wait(0.1)
+		t += 0.1
+	await shot("kt_05_stirring")
+	t = 0.0
+	while k.busy and t < 12.0:
+		await wait(0.1)
+		t += 0.1
+	await wait(0.5)
+	check("kt_cooked_soup", int(Game.lunchbox.get("carrot_soup", 0)) == 1 and int(Game.basket.get("carrot", 0)) == 2 and k._dish.get_child_count() > 0,
+		"%s %s" % [Game.lunchbox, Game.basket])
+	await shot("kt_06_carrot_soup")
+	for id in ["pumpkin_stew", "heros_feast", "sunflower_cookies", "rose_tea", "tomato_pie"]:
+		await _kt_cook(k, id)
+		await shot("kt_07_%s" % id)
+	check("kt_lunchbox_full", Game.lunchbox == {"carrot_soup": 1, "pumpkin_stew": 2, "heros_feast": 1, "sunflower_cookies": 3, "rose_tea": 2, "tomato_pie": 1}
+		and Game.basket == {"carrot": 1}, "%s %s" % [Game.lunchbox, Game.basket])
+	# what the little kitchen costs to draw (only while it's open; the game is paused)
+	await frames(6)
+	var dc_with := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+	k._vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	await frames(6)
+	var dc_without := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+	k._vp.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
+	print("KITCHEN draw calls: %d with, %d without" % [dc_with, dc_without])
+	check("kt_cheap_to_draw", dc_with - dc_without <= 140, "%d extra draw calls (%d with, %d without)" % [dc_with - dc_without, dc_with, dc_without])
+	# Done: back to the cabin, saved
+	k.closed.emit()
+	await wait(1.0)
+	check("kt_closed", m.current == "" and not get_tree().paused, m.current)
+	var sv: Dictionary = Game.read_slot(Game.active_slot)
+	check("kt_saved", (sv.get("lunchbox", {}) as Dictionary).get("pumpkin_stew", 0) == 2, str(sv.get("lunchbox", {})))
+	# the Bag: your lunchbox, with Eat buttons
+	main._open("inventory")
+	await wait(0.6)
+	var eat_feast: Button = m._inv_list.find_child("Eat_heros_feast", true, false)
+	check("kt_bag_lunchbox", eat_feast != null and m._inv_list.find_child("Eat_sunflower_cookies", true, false) != null)
+	await shot("kt_08_bag_lunchbox")
+	if eat_feast:
+		eat_feast.pressed.emit()
+	await wait(0.4)
+	check("kt_feast_buffs", Game.has_buff("quick") and Game.has_buff("strong") and Game.has_buff("tough") and Game.has_buff("fed")
+		and not Game.lunchbox.has("heros_feast"), str(Game.buffs))
+	god = false
+	Game.hp = Game.max_hp() * 0.2
+	var stew: Button = m._inv_list.find_child("Eat_pumpkin_stew", true, false)
+	if stew:
+		stew.pressed.emit()
+	await wait(0.4)
+	check("kt_stew_heals", Game.hp >= Game.max_hp() * 0.69 and int(Game.lunchbox.get("pumpkin_stew", 0)) == 1, "%.0f / %.0f" % [Game.hp, Game.max_hp()])
+	Game.mana = 0.0
+	var tea: Button = m._inv_list.find_child("Eat_rose_tea", true, false)
+	if tea:
+		tea.pressed.emit()
+	await wait(0.4)
+	check("kt_tea_fills_magic", Game.mana >= Game.max_mana() - 0.5, "%.0f" % Game.mana)
+	god = true
+	await shot("kt_09_bag_after_eating")
+	main._resume()
+	await wait(0.5)
+	# loads back
+	Game.save_slot()
+	var slot := Game.active_slot
+	var lb: Dictionary = Game.lunchbox.duplicate()
+	Game.reset_run()
+	check("kt_reset_empties", Game.lunchbox.is_empty())
+	Game.load_slot(slot)
+	check("kt_loads_back", Game.lunchbox == lb, "%s vs %s" % [Game.lunchbox, lb])
 	_finish()
 	return true
 

@@ -512,6 +512,7 @@ var seeds := {}                    # seed id -> how many
 var basket := {}                   # what you've harvested (vegetables, flowers) -> how many
 var garden_plots: Array = []       # per bed: {"plant", "grow" (seconds grown), "last" (play_time), "wet_until"}
 var garden_starter := false        # the seed box by the gate has been opened
+var lunchbox := {}                 # dishes you've cooked (Cooking), ready to eat anywhere
 const GARDEN_BEDS := 6
 
 func _mend_garden() -> void:
@@ -771,7 +772,7 @@ func reset_run() -> void:
 	costume = {}
 	unlocked_looks = []; custom_look = {}; custom_look_on = false
 	outfit = "adventure"; footwear = "boots"; outfits_owned = []; footwear_owned = []; wardrobe_new = []
-	seeds = {}; basket = {}; garden_plots = []; garden_starter = false
+	seeds = {}; basket = {}; garden_plots = []; garden_starter = false; lunchbox = {}
 	boons = {}; decor = []; forge_book = {"found": [], "hints": []}
 	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
@@ -1075,6 +1076,7 @@ func save_slot(i := -1) -> bool:
 		"outfit": outfit, "footwear": footwear, "outfits_owned": outfits_owned.duplicate(), "footwear_owned": footwear_owned.duplicate(),
 		"wardrobe_new": wardrobe_new.duplicate(),
 		"seeds": seeds.duplicate(), "basket": basket.duplicate(), "garden_plots": garden_plots.duplicate(true), "garden_starter": garden_starter,
+		"lunchbox": lunchbox.duplicate(),
 		"boons": boons.duplicate(), "decor": decor.duplicate(), "forge_book": forge_book.duplicate(true),
 		"loot_next": Loot._next,
 	}
@@ -1152,6 +1154,7 @@ func load_slot(i: int) -> bool:
 	basket = (d.get("basket", {}) as Dictionary).duplicate()
 	garden_plots = (d.get("garden_plots", []) as Array).duplicate(true)
 	garden_starter = bool(d.get("garden_starter", false))
+	lunchbox = (d.get("lunchbox", {}) as Dictionary).duplicate()
 	_mend_garden()
 	boons = (d.get("boons", {}) as Dictionary).duplicate()
 	decor = (d.get("decor", []) as Array).duplicate()

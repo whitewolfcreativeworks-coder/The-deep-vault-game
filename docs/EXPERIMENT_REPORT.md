@@ -1658,3 +1658,27 @@ Jason: in the opening movie "the rogue brushes his teeth perfectly right in the 
   - for each, it checks the bristles sit at mouth height just in front of the face;
   - it photographs each one.
 
+## Follow-up 51: the Kitchen (Nov 25)
+
+Jason: "now it's time to work on the kitchen. We can do the basics now. It'll expand later, but there should be some basic cooking set up and it should be really cute." Earlier that day he'd said cooking belongs at the cabin's stove and should open its own screen, like the wardrobe.
+
+- **The stove** in the cabin now has a KITCHEN sign and a USE prompt. It opens the **Kitchen** screen (`KitchenPanel`, `scripts/ui/kitchen.gd`).
+- **The cute part:** the left of the screen is a tiny 3D kitchen in its own viewport:
+  - a black iron stove with a glowing fire behind bars;
+  - a copper pot with bubbling soup and a wooden spoon;
+  - a shelf of jars, bunches of herbs, and a counter with a checked cloth.
+  - **Cooking is a little show:** each vegetable drops into the pot with a splash and a "pop", the soup turns the dish's colour, the spoon stirs twice, and with a puff of sparkles the dish bounces onto the counter.
+  - Every dish has its own look: soup and stew in bowls, a lattice tomato pie, a salad bowl, a feast platter, a plate of cookies, a teacup.
+- **Seven recipes** from the garden (`scripts/world/cooking.gd`). Dishes go in a **lunchbox** (`Game.lunchbox`, saved with the hero) and you eat them from the Bag, anywhere. Buffs last 10 minutes, twice as long as eating raw vegetables at the table.
+- **Kept basic on purpose:** Jason wants the really cool things in the open world. A recipe is one line, so more can be added then.
+- **Cost:** the little kitchen is only drawn while its screen is open, and the game is paused then. With it open, the frame draws 52 more calls on the iPad renderer. Nothing new is drawn in the world except one sign. The pot's steam and bubbles stop when the screen closes.
+- **Also:** Esc now closes the Wardrobe and the Kitchen (it did nothing in the wardrobe before).
+- **Tested:** the new `kitchen` test (17 checks):
+  - it opens the stove;
+  - it checks the button says what's missing;
+  - it cooks all six dishes the basket allows, photographing each;
+  - it checks the basket and lunchbox afterwards;
+  - it eats from the Bag: the feast's four buffs, the stew's healing, the tea's magic;
+  - it saves, resets and loads the lunchbox;
+  - it checks the draw-call budget.
+

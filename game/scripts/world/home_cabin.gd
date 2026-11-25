@@ -68,7 +68,9 @@ func _build() -> void:
 	Usable.make(self, w(room._bed + Vector3(1.0, 0.6, 0.2)), "[E] Have a nap in your bed", nap)
 	Usable.make(self, w(room._wardrobe + Vector3(-0.1, 0.9, 0.85)), "[E] Open your wardrobe (outfits, shoes and slippers)", _use_wardrobe)
 	Usable.make(self, w(room._table + Vector3(0.0, 0.7, 0.75)), "[E] Sit down for a home-grown meal", _eat_meal)
+	Usable.make(self, w(room._stove + Vector3(-0.85, 0.9, 0.0)), "[E] Cook at the stove (your kitchen)", _use_stove)
 	_wardrobe_sign()
+	_sign("KITCHEN", room._stove + Vector3(-0.2, 2.35, 0.0), Color(1.0, 0.7, 0.4))
 
 func _process(_delta: float) -> void:
 	# no sunshine through the roof
@@ -208,11 +210,19 @@ func _use_wardrobe() -> void:
 		sc.open_wardrobe()
 
 func _wardrobe_sign() -> void:
-	var lbl := Label3D.new(); lbl.text = "WARDROBE"; lbl.modulate = Color(1.0, 0.85, 0.4)
+	_sign("WARDROBE", room._wardrobe + Vector3(0, 2.85, 0.4), Color(1.0, 0.85, 0.4))
+
+func _sign(text: String, at: Vector3, col: Color) -> void:
+	var lbl := Label3D.new(); lbl.text = text; lbl.modulate = col
 	lbl.outline_size = 10; lbl.outline_modulate = Color(0.2, 0.1, 0.05); lbl.font_size = 64
 	lbl.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-	room.add_child(lbl); lbl.position = IntroMovie.ROOM + room._wardrobe + Vector3(0, 2.85, 0.4)
-	SignText.fit(lbl, 1.0, 0.2)
+	room.add_child(lbl); lbl.position = IntroMovie.ROOM + at
+	SignText.fit(lbl, 1.0 if text != "KITCHEN" else 1.5, 0.2 if text != "KITCHEN" else 0.34)
+
+func _use_stove() -> void:
+	var sc := get_tree().current_scene
+	if sc.has_method("open_kitchen"):
+		sc.open_kitchen()
 
 func _use_chest() -> void:
 	var sc := get_tree().current_scene

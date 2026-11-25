@@ -65,6 +65,7 @@ func _ready() -> void:
 	_build_forest_victory()
 	_build_designer()
 	_build_wardrobe()
+	_build_kitchen()
 	shop_ui = ShopUI.new(); shop_ui.name = "ShopUI"
 	add_child(shop_ui)
 	shop_ui.setup(self)
@@ -127,6 +128,8 @@ func show_panel(n: String) -> void:
 		designer.open()
 	if n == "wardrobe" and wardrobe:
 		wardrobe.open()
+	if n == "kitchen" and kitchen:
+		kitchen.open()
 	if n == "garden":
 		_refresh_garden()
 	if n == "pause" and _arrange_btn:
@@ -1075,6 +1078,44 @@ func _build_wardrobe() -> void:
 	_panels["wardrobe"] = wardrobe
 	wardrobe.closed.connect(func(changed: bool) -> void: wardrobe_closed.emit(changed))
 
+# --- the Kitchen: the stove in your cabin (scripts/ui/kitchen.gd, Cooking) -----------
+var kitchen: KitchenPanel
+signal kitchen_closed
+
+func _build_kitchen() -> void:
+	kitchen = KitchenPanel.new(); kitchen.name = "Kitchen"
+	root.add_child(kitchen)
+	_panels["kitchen"] = kitchen
+	kitchen.closed.connect(func() -> void: kitchen_closed.emit())
+
+## The Bag's lunchbox: what you cooked at home, each with an Eat button.
+func _lunchbox_rows() -> void:
+	if Game.lunchbox.is_empty():
+		return
+	_inv_list.add_child(UIKit.label("Lunchbox", 20, Color(0.8, 1.0, 0.7), true))
+	for d in Cooking.ORDER:
+		if int(Game.lunchbox.get(d, 0)) <= 0:
+			continue
+		var id := String(d)
+		var r: Dictionary = Cooking.RECIPES[id]
+		var row := PanelContainer.new()
+		row.add_theme_stylebox_override("panel", UIKit.panel_style(0.6, r.color, 4))
+		var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 12); row.add_child(hb)
+		var vb := VBoxContainer.new(); vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hb.add_child(vb)
+		vb.add_child(UIKit.label("%s  ×%d" % [String(r.name), int(Game.lunchbox[id])], 18, (r.color as Color).lightened(0.25), true))
+		var ln := UIKit.label(String(r.line), 14, UIKit.PARCH); ln.autowrap_mode = TextServer.AUTOWRAP_WORD; ln.custom_minimum_size.x = 480
+		vb.add_child(ln)
+		var eb := Button.new(); eb.text = "Eat"; eb.custom_minimum_size = Vector2(118, 46)
+		eb.name = "Eat_" + id
+		eb.pressed.connect(func() -> void:
+			var said := Cooking.eat(id)
+			if said != "":
+				Sfx.play("sip", -4.0)
+				Game.say(said, Color(0.8, 1.0, 0.7))
+			_refresh_inventory(); _refresh_stats())
+		hb.add_child(eb)
+		_inv_list.add_child(row)
+
 # --- the Skin Designer (scripts/ui/designer.gd) ------------------------------------
 var designer: SkinDesigner
 var _designer_back := ""
@@ -1210,6 +1251,7 @@ func _refresh_inventory() -> void:
 	bag.sort_custom(func(a, b) -> bool:
 		var ra: int = Game.item(a).get("rarity", 0); var rb: int = Game.item(b).get("rarity", 0)
 		return ra > rb if ra != rb else Game.score(a) > Game.score(b))
+	_lunchbox_rows()
 	if bag.is_empty():
 		_inv_list.add_child(UIKit.label("Nothing else yet. Open chests and defeat monsters to find gear!", 16, UIKit.DIM))
 	for id in bag:
