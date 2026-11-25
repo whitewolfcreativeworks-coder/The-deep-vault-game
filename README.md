@@ -99,7 +99,21 @@ The cabinet you change in at the start of the opening movie is now your **wardro
     - **Fishing Gear** (yellow raincoat and rain hat);
     - **Chef's Whites** (chef's hat and apron).
   - **Shoes and slippers, picked separately:** Your Boots, Fluffy Slippers, your class's slippers, Work Boots and Rain Boots.
-- **Outfits are only a look.** They never change health, damage or defence, so every class stays fair. You can wear them anywhere: fight Chief Gruk in your pajamas and bunny slippers if you like.
+- **Outfits, armour and skins are three different things** (Jason, Nov 25):
+  - **Armour and weapons** are your fighting gear, with the fighting stats.
+  - **Skins and magic costumes** go over the top of your gear and change your look for a while, then fade.
+  - **Outfits** are what you wear at home. They never change health, damage or defence, so every class stays fair. You can still wear them anywhere: fight Chief Gruk in your pajamas and bunny slippers if you like, and your gear still protects you underneath.
+- **Work clothes help with jobs at home** (a ★ in the wardrobe). A perk only works while you can see the outfit, not under a magic costume:
+
+| Outfit | Perk |
+|---|---|
+| Gardener's Dungarees | **Green Thumbs:** one extra from every garden bed you pick |
+| Chef's Whites | **Chef's Touch:** one extra helping of everything you cook |
+| Smith's Apron | **Smith's Friend:** the forge costs a quarter less |
+| Fishing Gear | **Steady Hands:** a wider green zone when you're fishing |
+| Builder's Overalls | ready for building projects (coming later) |
+
+- **Later:** pajamas and onesies could get funny little abilities of their own, and the open world will have outfits to find, maybe made at a tailor's shop from materials you bring home.
 - **Magic costumes and the wardrobe:** a magic costume (from a chest or Tobble's) goes on top of your clothes while it lasts.
   - **Picking clothes in the wardrobe takes the costume off**, so what you pick is what you wear.
   - The costume waits in the wardrobe (the "Magic" row) with the time it had left. Its time stops while it's put away, though a shop costume's real day keeps counting. Tap it to put it back on.

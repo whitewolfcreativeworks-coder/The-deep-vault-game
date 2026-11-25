@@ -175,7 +175,8 @@ func _fill() -> void:
 			var o: Dictionary = Outfits.OUTFITS[id]
 			var c1: Color = o.get("color", Color(0.55, 0.42, 0.3))
 			var c2: Color = o.get("pattern_color", o.get("hat_color", c1.lightened(0.3)))
-			var b := _choice(String(o.name), c1, c2, func() -> void: _pick_outfit(id), 284, Game.wardrobe_new.has(id))
+			var b := _choice(String(o.name) + ("  ★" if Outfits.PERKS.has(id) and String(Outfits.PERKS[id].id) != "" else ""), c1, c2,
+				func() -> void: _pick_outfit(id), 284, Game.wardrobe_new.has(id))
 			grid.add_child(b)
 			_outfit_btns[id] = b
 	for id in Game.footwear_owned:
@@ -216,6 +217,9 @@ func _refresh(cheer := false) -> void:
 	var o: Dictionary = Outfits.OUTFITS.get(Game.outfit, {})
 	var f: Dictionary = Outfits.FOOTWEAR.get(Game.footwear, {})
 	_line.text = "%s: %s   %s: %s" % [String(o.get("name", "")), String(o.get("line", "")), String(f.get("name", "")), String(f.get("line", ""))]
+	var pk: Dictionary = Outfits.PERKS.get(Game.outfit, {})
+	if not pk.is_empty():
+		_line.text += "\n★ %s: %s" % [String(pk.name), String(pk.line)]      # (work clothes help at home)
 	if _magic_btn:
 		var id := Game.costume_id() if magic_on else Game.costume_away_id()
 		var nm := String(Loot.COSTUMES.get(id, {}).get("name", "Magic"))

@@ -52,6 +52,10 @@ static func missing(id: String) -> Dictionary:
 			out[ing] = short
 	return out
 
+## How many come out of the pot (one more in Chef's Whites).
+static func makes(id: String) -> int:
+	return int(RECIPES.get(id, {}).get("makes", 1)) + (1 if Outfits.perk("chefs_touch") else 0)
+
 static func can_cook(id: String) -> bool:
 	return RECIPES.has(id) and missing(id).is_empty()
 
@@ -64,7 +68,7 @@ static func cook(id: String) -> bool:
 		Game.basket[ing] = int(Game.basket[ing]) - int(r.needs[ing])
 		if int(Game.basket[ing]) <= 0:
 			Game.basket.erase(ing)
-	Game.lunchbox[id] = int(Game.lunchbox.get(id, 0)) + int(r.makes)
+	Game.lunchbox[id] = int(Game.lunchbox.get(id, 0)) + makes(id)
 	Game.inventory_changed.emit()
 	return true
 

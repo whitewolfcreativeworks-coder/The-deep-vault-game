@@ -6036,11 +6036,19 @@ func _garden_test() -> bool:
 	if it:
 		it.interact(player)
 	await wait(0.4)
-	check("gd_picked_carrots", int(Game.basket.get("carrot", 0)) == 3 and String(Game.garden_plots[3].plant) == "")
+	check("gd_picked_carrots", int(Game.basket.get("carrot", 0)) == 4 and String(Game.garden_plots[3].plant) == "", "%s (3, +1 Green Thumbs)" % str(Game.basket))
 	var mp0 := Game.mana_potions
 	var sp0 := Game.stamina_potions
 	Game.harvest_plot(1); Game.harvest_plot(2)
-	check("gd_magic_potions", Game.mana_potions == mp0 + 2 and Game.stamina_potions == sp0 + 2, "%d %d" % [Game.mana_potions - mp0, Game.stamina_potions - sp0])
+	check("gd_magic_potions", Game.mana_potions == mp0 + 3 and Game.stamina_potions == sp0 + 3, "%d %d" % [Game.mana_potions - mp0, Game.stamina_potions - sp0])
+	# work clothes help at home (Jason, Nov 25), and only while you wear them
+	Game.wear_outfit("work_smith")
+	var fee_smith := ForgeRecipes.fee(1)
+	Game.wear_outfit("work_fisher")
+	var fish_perk := Outfits.perk("steady_hands")
+	Game.wear_outfit("adventure")
+	check("gd_work_clothes_perks", fee_smith == 75 and ForgeRecipes.fee(1) == 100 and fish_perk and not Outfits.perk("green_thumbs"), "%d %s" % [fee_smith, fish_perk])
+	Game.wear_outfit("work_gardener")
 	Game.harvest_plot(0); Game.harvest_plot(4); Game.harvest_plot(5)
 	await wait(0.3)
 	await _cam_shot("gd_06_picked", g.gp(10.5, 3.6) + Vector3(0, 3.2, 0), g.gp(10.5, -4.0) + Vector3(0, 0.3, 0), 62.0)
@@ -6054,7 +6062,7 @@ func _garden_test() -> bool:
 		it.interact(player)
 	await wait(0.4)
 	check("gd_meal_buffs", Game.has_buff("quick") and Game.has_buff("strong") and Game.has_buff("tough") and Game.has_buff("fed")
-		and int(Game.basket.get("carrot", 0)) == 2, "%s %s" % [Game.buffs, Game.basket])
+		and int(Game.basket.get("carrot", 0)) == 3, "%s %s" % [Game.buffs, Game.basket])
 	# Tobble buys the rest, and sells seeds
 	var gold0 := Game.gold
 	var hv := ShopCatalog.harvest_value()
@@ -6151,13 +6159,14 @@ func _kitchen_test() -> bool:
 		await wait(0.1)
 		t += 0.1
 	await wait(0.5)
-	check("kt_cooked_soup", int(Game.lunchbox.get("carrot_soup", 0)) == 1 and int(Game.basket.get("carrot", 0)) == 2 and k._dish.get_child_count() > 0,
+	check("kt_cooked_soup", int(Game.lunchbox.get("carrot_soup", 0)) == 2 and int(Game.basket.get("carrot", 0)) == 2 and k._dish.get_child_count() > 0,
 		"%s %s" % [Game.lunchbox, Game.basket])
 	await shot("kt_06_carrot_soup")
 	for id in ["pumpkin_stew", "heros_feast", "sunflower_cookies", "rose_tea", "tomato_pie"]:
 		await _kt_cook(k, id)
 		await shot("kt_07_%s" % id)
-	check("kt_lunchbox_full", Game.lunchbox == {"carrot_soup": 1, "pumpkin_stew": 2, "heros_feast": 1, "sunflower_cookies": 3, "rose_tea": 2, "tomato_pie": 1}
+	# (in Chef's Whites: one extra helping of everything)
+	check("kt_lunchbox_full", Game.lunchbox == {"carrot_soup": 2, "pumpkin_stew": 3, "heros_feast": 2, "sunflower_cookies": 4, "rose_tea": 3, "tomato_pie": 2}
 		and Game.basket == {"carrot": 1}, "%s %s" % [Game.lunchbox, Game.basket])
 	# what the little kitchen costs to draw (only while it's open; the game is paused)
 	await frames(6)
@@ -6173,7 +6182,10 @@ func _kitchen_test() -> bool:
 	await wait(1.0)
 	check("kt_closed", m.current == "" and not get_tree().paused, m.current)
 	var sv: Dictionary = Game.read_slot(Game.active_slot)
-	check("kt_saved", (sv.get("lunchbox", {}) as Dictionary).get("pumpkin_stew", 0) == 2, str(sv.get("lunchbox", {})))
+	check("kt_saved", (sv.get("lunchbox", {}) as Dictionary).get("pumpkin_stew", 0) == 3, str(sv.get("lunchbox", {})))
+	var chef_makes := Cooking.makes("pumpkin_stew")
+	Game.wear_outfit("adventure")
+	check("kt_chefs_touch_only_in_whites", chef_makes == 3 and Cooking.makes("pumpkin_stew") == 2, "%d" % chef_makes)
 	# the Bag: your lunchbox, with Eat buttons
 	main._open("inventory")
 	await wait(0.6)
@@ -6184,14 +6196,14 @@ func _kitchen_test() -> bool:
 		eat_feast.pressed.emit()
 	await wait(0.4)
 	check("kt_feast_buffs", Game.has_buff("quick") and Game.has_buff("strong") and Game.has_buff("tough") and Game.has_buff("fed")
-		and not Game.lunchbox.has("heros_feast"), str(Game.buffs))
+		and int(Game.lunchbox.get("heros_feast", 0)) == 1, str(Game.buffs))
 	god = false
 	Game.hp = Game.max_hp() * 0.2
 	var stew: Button = m._inv_list.find_child("Eat_pumpkin_stew", true, false)
 	if stew:
 		stew.pressed.emit()
 	await wait(0.4)
-	check("kt_stew_heals", Game.hp >= Game.max_hp() * 0.69 and int(Game.lunchbox.get("pumpkin_stew", 0)) == 1, "%.0f / %.0f" % [Game.hp, Game.max_hp()])
+	check("kt_stew_heals", Game.hp >= Game.max_hp() * 0.69 and int(Game.lunchbox.get("pumpkin_stew", 0)) == 2, "%.0f / %.0f" % [Game.hp, Game.max_hp()])
 	Game.mana = 0.0
 	var tea: Button = m._inv_list.find_child("Eat_rose_tea", true, false)
 	if tea:

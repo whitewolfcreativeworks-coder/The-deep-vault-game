@@ -115,6 +115,11 @@ const MAX_TIER := 4
 ## Gold to forge into each tier.
 const FEE := [0, 100, 300, 800, 2000]
 
+## The smith's fee (a quarter less in the Smith's Apron).
+static func fee(tier: int) -> int:
+	var f: int = FEE[clampi(tier, 0, FEE.size() - 1)]
+	return int(round(f * 0.75)) if Outfits.perk("smiths_friend") else f
+
 const ESSENCES := ["fire", "frost", "storm", "stone", "beast", "bone", "light", "shadow"]
 const ESSENCE_NAMES := {"fire": "Fire", "frost": "Frost", "storm": "Storm", "stone": "Stone", "beast": "Beast", "bone": "Bone", "light": "Light", "shadow": "Shadow"}
 const ESSENCE_COLORS := {"fire": Color(1.0, 0.45, 0.15), "frost": Color(0.55, 0.9, 1.0), "storm": Color(0.7, 0.72, 1.0),
@@ -277,8 +282,8 @@ static func why_not(uids: Array) -> String:
 	for u in uids:
 		if not usable(String(u)):
 			return "One of those can't go on the anvil."
-	if Game.gold < FEE[tier_of(uids)]:
-		return "You need %d gold for the smith." % FEE[tier_of(uids)]
+	if Game.gold < fee(tier_of(uids)):
+		return "You need %d gold for the smith." % fee(tier_of(uids))
 	return ""
 
 ## Gear that can go on the anvil: in your bag or the gear chest, not worn, not
@@ -358,7 +363,7 @@ static func forge(uids: Array) -> String:
 	it["ess"] = ess
 	it["desc"] = "%s on the anvil at home, from %s." % [TIER_NAMES[tier], ESSENCE_NAMES[a] if a == b else "%s and %s" % [ESSENCE_NAMES[a], ESSENCE_NAMES[b]]]
 	# pay the smith, and the three pieces become one
-	Game.gold -= FEE[tier]
+	Game.gold -= fee(tier)
 	for u in uids:
 		Game.inventory.erase(String(u))
 		Game.stash.erase(String(u))

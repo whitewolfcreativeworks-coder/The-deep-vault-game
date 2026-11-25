@@ -620,6 +620,8 @@ func harvest_plot(i: int) -> Dictionary:
 	var id := String(garden_plots[i].plant)
 	var pl: Dictionary = GardenPlants.PLANTS[id]
 	var n := int(pl.get("yield", 1))
+	if Outfits.perk("green_thumbs"):
+		n += 1                       # Gardener's Dungarees
 	match String(pl.get("gives", "")):
 		"mana": mana_potions += n
 		"potion": potions += n

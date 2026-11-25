@@ -114,6 +114,21 @@ const CLASS_SLIPPERS := {"Knight": "dino", "Barbarian": "bear", "Rogue": "bunny"
 	"Priest": "duck", "Druid": "dino", "Necromancer": "skull", "Beastmaster": "bear"}
 const WORK := ["work_builder", "work_smith", "work_gardener", "work_fisher", "work_chef"]
 
+## Outfits never change fighting (health, damage, defence): that's armour and weapons.
+## Work clothes help with jobs at home instead (Jason, Nov 25). An outfit's perk only
+## works while you can see it (not under a magic costume).
+const PERKS := {
+	"work_gardener": {"id": "green_thumbs", "name": "Green Thumbs", "line": "One extra from every garden bed you pick."},
+	"work_chef": {"id": "chefs_touch", "name": "Chef's Touch", "line": "One extra helping of everything you cook."},
+	"work_smith": {"id": "smiths_friend", "name": "Smith's Friend", "line": "The forge costs a quarter less."},
+	"work_fisher": {"id": "steady_hands", "name": "Steady Hands", "line": "A wider green zone when you're fishing."},
+	"work_builder": {"id": "", "name": "Ready to Build", "line": "For building projects at home (coming later)."},
+}
+
+## Is your outfit's perk working? ("green_thumbs", "chefs_touch", "smiths_friend", "steady_hands")
+static func perk(id: String) -> bool:
+	return id != "" and Game.costume_id() == "" and String(PERKS.get(Game.outfit, {}).get("id", "")) == id
+
 static func starter_outfits(hero: String) -> Array:
 	var a: Array = ["adventure", "pajamas"]
 	a.append_array(CLASS_OUTFITS.get(hero, CLASS_OUTFITS.Knight))

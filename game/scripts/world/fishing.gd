@@ -218,6 +218,8 @@ func _physics_process(delta: float) -> void:
 				_tension = 0.45; _run = 0.0; _phase_t = 1.0; _slack_t = 0.0; _tight_t = 0.0
 				var pull: float = _fish.pull
 				_zone_w = clampf(0.38 - (pull - 0.55) * 0.12, 0.2, 0.4)    # bigger fish: a narrower sweet spot
+				if Outfits.perk("steady_hands"):
+					_zone_w += 0.1             # Fishing Gear: steady hands
 				_zone = 0.5
 				_excl.visible = false
 				_show_fight(true)

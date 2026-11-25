@@ -338,7 +338,7 @@ func refresh_forge() -> void:
 	_whisper.add_theme_color_override("font_color", wh.color)
 	if anvil.size() == 3:
 		var t := ForgeRecipes.tier_of(anvil)
-		_tier_lbl.text = "This will be %s (the smith asks %d gold)." % [ForgeRecipes.TIER_NAMES[t].to_upper(), ForgeRecipes.FEE[t]]
+		_tier_lbl.text = "This will be %s (the smith asks %d gold)." % [ForgeRecipes.TIER_NAMES[t].to_upper(), ForgeRecipes.fee(t)]
 	else:
 		_tier_lbl.text = "Three found pieces make a FORGED piece. Three Forged make REFORGED, then MASTERFORGED, then STARFORGED."
 	var why := ForgeRecipes.why_not(anvil)

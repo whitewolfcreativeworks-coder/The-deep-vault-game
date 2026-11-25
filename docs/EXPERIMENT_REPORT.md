@@ -1702,3 +1702,26 @@ Jason, playing his Druid on the iPad: "I tried to put on the polka-dot pajamas, 
   - use the Adventure clothes button;
   - save.
 
+## Follow-up 53: outfits, armour and skins; work clothes that help at home (Nov 25)
+
+Jason set out the rules:
+- **Armour and weapons** are the fighting gear.
+- **Skins** (and magic costumes) go over the top of them and change your look for a while, then fade.
+- **Outfits** are different. They never give fighting stats, but "the outfits can give you stats that just help you with gardening or maybe with crafting and cooking... your overalls have stats for building". They could also have "funny special abilities... little kind of unique cute things".
+- **Later:** more outfits come from the open world, perhaps from a tailoring outbuilding using materials found there ("future thinking possibilities").
+
+**Built now, the basics:** the work clothes each have a home perk (`Outfits.PERKS`, checked with `Outfits.perk(id)`):
+- **Gardener's Dungarees, Green Thumbs:** one extra from every bed you pick.
+- **Chef's Whites, Chef's Touch:** one extra helping of every dish.
+- **Smith's Apron, Smith's Friend:** the forge's fee is a quarter less.
+- **Fishing Gear, Steady Hands:** the green zone is wider.
+- **Builder's Overalls:** nothing yet, since there's nothing to build. It's waiting for building projects.
+
+A perk only works while the outfit shows, not under a magic costume. None of them touch fighting, so every class stays fair and the modes play as before. The wardrobe marks work clothes with a ★ and names the perk.
+
+**Left for Jason and his son to design:** the cute abilities for pajamas and onesies, and the tailor's shop (in the roadmap for the open world).
+
+**Tested:**
+- The `garden` test picks in dungarees (4 carrots instead of 3, 3 potions instead of 2). It checks the smith's discount and the fishing perk, and that a perk stops when you change.
+- The `kitchen` test cooks in Chef's Whites (an extra helping each time) and checks the extra goes away in adventuring clothes.
+

@@ -23,6 +23,7 @@ var _cook_btn: Button
 var _status: Label
 var _basket: Label
 var _lunch: Label
+var _note: Label
 var busy := false
 var cooked := 0                    # (for the tests)
 const POT := Vector3(-0.35, 1.0, 0.0)      # the soup's surface, in the little kitchen
@@ -176,7 +177,8 @@ func _build() -> void:
 			Sfx.play("footstep", -8.0, 0.0)
 			closed.emit())
 	head.add_child(done)
-	var note := UIKit.label("Cook what you grow in your garden. Dishes go in your lunchbox: eat them any time from your Bag, even out on an adventure!", 16, UIKit.DIM)
+	_note = UIKit.label("", 16, UIKit.DIM)
+	var note := _note
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD; note.custom_minimum_size.x = 860
 	col.add_child(note)
 	var grid := GridContainer.new(); grid.columns = 2
@@ -221,6 +223,8 @@ func open() -> void:
 	if pick == "":
 		_status.text = "Pick vegetables and flowers in your garden, then come and cook them here!"
 
+const NOTE := "Cook what you grow in your garden. Dishes go in your lunchbox: eat them any time from your Bag, even out on an adventure!"
+
 func select(id: String) -> void:
 	_sel = id
 	_refresh()
@@ -236,9 +240,10 @@ func _refresh() -> void:
 		for ing in r.needs:
 			parts.append("%s%s" % [Cooking.ing_text(String(ing), int(r.needs[ing])), " ✓" if not miss.has(ing) else ""])
 		var b: Button = _cards[id]
-		b.text = "  %s%s\n  %s" % [String(r.name), ("  ×%d" % int(r.makes)) if int(r.makes) > 1 else "", ", ".join(parts)]
+		b.text = "  %s%s\n  %s" % [String(r.name), ("  ×%d" % Cooking.makes(id)) if Cooking.makes(id) > 1 else "", ", ".join(parts)]
 		b.set_pressed_no_signal(id == _sel)
 		b.add_theme_color_override("font_color", (r.color as Color).lightened(0.3) if miss.is_empty() else UIKit.DIM)
+	_note.text = NOTE + ("  Chef's Whites: one extra helping of everything!" if Outfits.perk("chefs_touch") else "")
 	var r2: Dictionary = Cooking.RECIPES[_sel]
 	var m2 := Cooking.missing(_sel)
 	_cook_btn.disabled = not m2.is_empty() or busy
@@ -307,10 +312,10 @@ func cook() -> void:
 	cooked += 1
 	_show_dish(id, true)
 	Sfx.play("levelup", -8.0, 0.0)
-	_status.text = "%s%s! Into your lunchbox it goes." % [String(r.name), (" ×%d" % int(r.makes)) if int(r.makes) > 1 else ""]
+	_status.text = "%s%s! Into your lunchbox it goes." % [String(r.name), (" ×%d" % Cooking.makes(id)) if Cooking.makes(id) > 1 else ""]
 	busy = false
 	_refresh()
-	_status.text = "%s%s! Into your lunchbox it goes." % [String(r.name), (" ×%d" % int(r.makes)) if int(r.makes) > 1 else ""]
+	_status.text = "%s%s! Into your lunchbox it goes." % [String(r.name), (" ×%d" % Cooking.makes(id)) if Cooking.makes(id) > 1 else ""]
 
 func _ingredient(ing: String) -> Node3D:
 	var n := Node3D.new(); _world.add_child(n)
