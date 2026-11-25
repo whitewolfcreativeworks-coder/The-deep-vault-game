@@ -35,6 +35,7 @@ var day_night: DayNight
 var sinkhole: SinkholeOfDeath
 var wild_chests: WildChests
 var gate_floor := NAN         # the level yard in front of the Warren Gate (WarrenGate)
+var gate_beacon := Vector3.ZERO   # ...and its beacon fire
 
 func _wild_spot_ok(p: Vector2) -> bool:
 	if road_dist(p) < 8.0 or stream_dist(p) < 7.0 or p.distance_to(SinkholeOfDeath.HOLE) < 12.0:

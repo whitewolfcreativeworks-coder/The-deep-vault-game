@@ -1544,7 +1544,7 @@ Jason, playing Hard on the iPad: "It's not intuitive that you're supposed to rid
   - two more timber sets, a dark floor, and darkness gathering towards its end, with a faint warm glow deep inside;
   - a sign over it, "THE GOBLIN WARREN", between two skulls;
   - rails run from the yard into the dark, and a goblin ore cart full of gold is parked on a siding;
-  - braziers stand either side, and the beacon now burns on top of the cliff.
+  - braziers stand either side, and the beacon burns on the hill above the tunnel, as high as before, so it still shows straight up the road from the portal.
 - **Getting in:**
   - **Barred:** until Captain Aldric gives you his quest, planks block the mouth and USE says to talk to him.
   - **Open:** walking into the tunnel takes you down (`WarrenDoor.add_walk_in`). USE also works from anywhere in the front of the yard.

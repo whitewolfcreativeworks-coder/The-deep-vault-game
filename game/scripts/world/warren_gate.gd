@@ -240,9 +240,12 @@ func _fires() -> void:
 		var bp := Vector3(sx, y0, MOUTH_Z + 1.6)
 		Props.place(w, "pillar", bp, 0.0, 1.0, true)
 		_fire(bp + Vector3(0, 4.1, 0), 0.7, 50, 4.0, 14.0, 0.4)
-	var beacon := Vector3(0, y0 + TOP, MOUTH_Z - 2.0)
-	Props.place(w, "pillar", beacon, 0.0, 1.4, false)
-	_fire(beacon + Vector3(0, 5.9, 0), 1.3, 90, 8.0, 30.0, 0.9)
+	# (up on the hill over the tunnel, as high as the old one: it's the landmark you
+	# see straight up the road from the portal)
+	var beacon := Vector3(0, y0 + ridge_top(BACK) + 0.2, BACK - 1.2)
+	Props.place(w, "pillar", beacon, 0.0, 1.6, false)
+	w.gate_beacon = beacon + Vector3(0, 6.7, 0)
+	_fire(w.gate_beacon, 1.3, 90, 8.0, 30.0, 0.9)
 
 func _fire(at: Vector3, size: float, amount: int, energy: float, rng_m: float, rad: float) -> void:
 	var fire := Node3D.new(); w.add_child(fire); fire.position = at
@@ -277,7 +280,7 @@ func _rocks() -> void:
 		w._instance(names[k % 5], Vector3(x + rng.randf_range(-0.6, 0.6), y0 + TOP - 0.9, MOUTH_Z - 1.2 - rng.randf_range(0.0, 1.6)),
 			rng.randf() * TAU, rng.randf_range(16.0, 22.0))
 		k += 1
-	for x in [-4.5, 0.5, 4.8]:
+	for x in [-5.0, 5.2]:
 		w._instance(names[k % 5], Vector3(x, y0 + ridge_top(BACK - 1.0) + 0.1, BACK - 1.5 - rng.randf_range(0.0, 2.0)),
 			rng.randf() * TAU, rng.randf_range(18.0, 24.0))
 		k += 1

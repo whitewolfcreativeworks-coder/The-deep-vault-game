@@ -1580,7 +1580,7 @@ func _forest_test() -> bool:
 		await shot("fo_01_arrival")
 		var w: ForestWorld = main.world
 		# the Warren Gate's beacon fire, on the rock above the tunnel (since Nov 25)
-		var entrance := Vector3(0, w.gate_floor + WarrenGate.TOP + 5.9, WarrenGate.MOUTH_Z - 2.0)
+		var entrance: Vector3 = w.gate_beacon
 		var cam_to_warren: Vector3 = entrance - player.camera.global_position
 		var q := PhysicsRayQueryParameters3D.create(player.camera.global_position, entrance, 1)
 		q.exclude = [player.get_rid()]
