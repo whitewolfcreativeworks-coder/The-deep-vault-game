@@ -5927,7 +5927,7 @@ func _warrengate_test() -> bool:
 	# coming back up puts you in the yard, facing away from the tunnel (not straight back in)
 	var out: Node = null
 	for n in get_tree().get_nodes_in_group("interactable"):
-		if n is ClimbOut and (n as Node3D).global_position.y < ForestWorld.WY + 5.0:
+		if n is ClimbOut and (n as Node3D).global_position.distance_to(Vector3(5, ForestWorld.WY, -113)) < 3.0:
 			out = n
 	if out:
 		await tp((out as Node3D).global_position + Vector3(0, 0.3, 1.2), PI)

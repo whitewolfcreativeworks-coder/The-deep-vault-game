@@ -63,7 +63,9 @@ func _build(world: ForestWorld) -> WarrenDoor:
 	rng.seed = 1125                # (its own dice: the rest of the forest stays exactly as it was)
 	y0 = w.ground(0, MOUTH_Z + 6.0).y
 	rock = w.b.wall_mat(Color(0.5, 0.47, 0.41), 0.35, y0, 2.8, 1.4)
+	(rock as ShaderMaterial).set_shader_parameter("mode", 2)          # natural rock, not building stone
 	dark_rock = w.b.wall_mat(Color(0.27, 0.22, 0.17), 0.05, y0, 1.6, 0.8)
+	(dark_rock as ShaderMaterial).set_shader_parameter("mode", 2)
 	wood = StandardMaterial3D.new(); wood.albedo_color = Color(0.46, 0.3, 0.17); wood.roughness = 0.85
 	iron = StandardMaterial3D.new(); iron.albedo_color = Color(0.24, 0.23, 0.24); iron.metallic = 0.7; iron.roughness = 0.45
 	_rock_face()
@@ -89,19 +91,30 @@ func ridge_top(z: float) -> float:
 # --- the rock: a cliff face across the back of the yard, walls down its sides -------
 func _rock_face() -> void:
 	var f := MOUTH_Z
-	_box(Vector3(-12.5, y0 - 0.8, BACK), Vector3(-ROCK_W, y0 + TOP, f), rock)
-	_box(Vector3(ROCK_W, y0 - 0.8, BACK), Vector3(12.5, y0 + TOP, f), rock)
+	_box(Vector3(-11.0, y0 - 0.8, BACK), Vector3(-ROCK_W, y0 + TOP, f), rock)
+	_box(Vector3(ROCK_W, y0 - 0.8, BACK), Vector3(11.0, y0 + TOP, f), rock)
 	_box(Vector3(-ROCK_W, y0 + ROOF, BACK), Vector3(ROCK_W, y0 + TOP, f), rock)
-	# the sides of the yard, stepping down with the ridge
-	for sx in [-1.0, 1.0]:
-		var segs := [[f, f + 3.0], [f + 3.0, f + 6.0], [f + 6.0, f + 9.0]]
-		for s in segs:
-			var top: float = ridge_top(s[0]) + 0.7
-			if top < 1.2:
-				continue
-			var x0: float = sx * YARD_HALF
-			var x1: float = sx * (YARD_HALF + 5.0)
-			_box(Vector3(minf(x0, x1), y0 - 0.8, s[0]), Vector3(maxf(x0, x1), y0 + top, s[1]), rock)
+	# the sides of the yard: a slab of rock either side, sloping down with the ridge
+	# (the hillside under it is too steep to climb, so it needs no collision of its own)
+	var za := f + 0.5
+	var zb := f + 11.5
+	var ha := ridge_top(f) + 1.0
+	var hb := 0.25
+	var along := Vector3(0, hb - ha, zb - za)
+	var ln := along.length()
+	var zax := along / ln
+	var yax := zax.cross(Vector3.RIGHT) * -1.0
+	if yax.y < 0.0:
+		yax = -yax
+	var bas := Basis(Vector3.RIGHT, yax, zax)
+	var thick := 9.0
+	var wide := 4.0
+	for sx: float in [-1.0, 1.0]:
+		var slab := MeshInstance3D.new(); var sm := BoxMesh.new(); sm.size = Vector3(wide, thick, ln + 1.0); slab.mesh = sm
+		slab.material_override = rock
+		var mid_top := Vector3(sx * (YARD_HALF + wide * 0.5 - 0.15), y0 + (ha + hb) * 0.5, (za + zb) * 0.5)
+		slab.transform = Transform3D(bas, mid_top - yax * thick * 0.5)
+		w.add_child(slab)
 
 # --- the tunnel into the dark ----------------------------------------------------------
 func _tunnel() -> void:
@@ -167,16 +180,16 @@ func _sign() -> void:
 	var z := MOUTH_Z + 0.6
 	var board_y := y0 + IN_H + 1.25
 	var dark_wood := StandardMaterial3D.new(); dark_wood.albedo_color = Color(0.3, 0.19, 0.1); dark_wood.roughness = 0.9
-	_box(Vector3(-2.7, board_y - 0.5, z - 0.1), Vector3(2.7, board_y + 0.5, z + 0.06), dark_wood, false)
+	_box(Vector3(-2.9, board_y - 0.5, z - 0.1), Vector3(2.9, board_y + 0.5, z + 0.06), dark_wood, false)
 	for sx in [-1.0, 1.0]:
 		_box(Vector3(sx * 2.0 - 0.09, y0 + IN_H + 0.7, z - 0.12), Vector3(sx * 2.0 + 0.09, board_y - 0.45, z), iron, false)
 	var lb := Label3D.new(); lb.text = "THE GOBLIN WARREN"; lb.font = UIKit.title_font()
-	lb.font_size = 72; lb.pixel_size = 0.0068; lb.outline_size = 14
+	lb.font_size = 72; lb.pixel_size = 0.0052; lb.outline_size = 14
 	lb.modulate = Color(1.0, 0.78, 0.4); lb.outline_modulate = Color(0.12, 0.05, 0.02)
 	lb.position = Vector3(0, board_y, z + 0.08)
 	w.add_child(lb)
 	for sx in [-1.0, 1.0]:
-		w._model("skull", Vector3(sx * 3.05, board_y - 0.25, z + 0.05), 0.0, 1.6)
+		w._model("skull", Vector3(sx * 3.45, board_y - 0.35, z + 0.05), 0.0, 1.3)
 
 # --- rails from the yard into the dark ---------------------------------------------------
 func _rails() -> void:

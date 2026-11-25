@@ -1528,3 +1528,37 @@ Jason took the Rogue through a new Normal adventure on the iPad and sent three t
 - **Fix:** the pause menu now has a **Graphics** row of four buttons: Auto | High | Medium | Low. Each just picks its setting, so a tap that counts twice changes nothing. The one in use is lit gold; on Auto, the level it's using has gold writing. The menu is the same height.
 - **Tested:** the `graphics` test presses every button twice and checks you get exactly what you pressed, and that the right one is lit.
 
+## Follow-up 47: the Warren Gate (Nov 25)
+
+Jason, playing Hard on the iPad: "It's not intuitive that you're supposed to ride up in the elevator thing to begin this part of the quest... the graphic looks funny, just sitting up there on the hill, and you've really gotta like run up into the railroad tracks of the mine before there's even the use button lights up... you could just kind of walk up the mountain a little bit and then you go inside the graphic, so there's a little bit of a graphic bleed."
+
+**Why:** the entrance was a small mine-house model (`building_mine_green`) scaled up and set on the slope of the ridge.
+- **It floated:** its front hung over the hillside, so you walked up the grass into the inside of the model.
+- **The door was out of reach:** its door point sat about 3 m above the ground in front of it. USE only looks for things within 3.5 m up or down and 2.6 m across, so the prompt appeared only once you'd climbed into the model, up among its rails.
+
+**The new gate** (`scripts/world/warren_gate.gd`, every mode):
+- **The ground:** the ridge is cut away into a level **yard** where the road ends (`ForestWorld.height()` with `WarrenGate.cut()`), plus a slot under the tunnel. Nothing else in the forest moves: trees and rocks that stood in the yard are left out after their dice are rolled, so every other tree stays where it was.
+- **The rock:** a natural-rock cliff across the back of the yard, and rock slabs sloping down either side with the ridge, topped with boulders.
+- **The tunnel:**
+  - it goes into the cliff under a heavy timber frame with iron bands and corner braces;
+  - two more timber sets, a dark floor, and darkness gathering towards its end, with a faint warm glow deep inside;
+  - a sign over it, "THE GOBLIN WARREN", between two skulls;
+  - rails run from the yard into the dark, and a goblin ore cart full of gold is parked on a siding;
+  - braziers stand either side, and the beacon now burns on top of the cliff.
+- **Getting in:**
+  - **Barred:** until Captain Aldric gives you his quest, planks block the mouth and USE says to talk to him.
+  - **Open:** walking into the tunnel takes you down (`WarrenDoor.add_walk_in`). USE also works from anywhere in the front of the yard.
+  - **USE reach:** a new `interact_reach` lets big things be used from further away. The gate's is 4.5 m; everything else keeps 2.6 m.
+  - **Coming back up:** you arrive in the yard facing away from the tunnel, so you don't walk straight back in.
+- **Moved:** Captain Aldric and the gate shrine moved a couple of metres in, to the yard's entrance.
+
+**Tested:** the new `warrengate` test checks:
+- the yard is level and the road runs into it;
+- the door is on the ground;
+- planks bar the mouth before the quest, and once it's open you can see straight in to the dark end;
+- the tunnel has a floor at yard level (no hillside poking in), a roof, and solid walls;
+- USE lights up 4 m out in the yard, with the right prompt barred and open;
+- walking in takes you down to the Warren, and climbing out puts you back in the yard.
+
+It also photographs the gate from the road, the yard's corner, the mouth, the portal glade and the side.
+
