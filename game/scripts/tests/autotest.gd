@@ -5869,6 +5869,8 @@ func _brushing_test() -> void:
 	get_tree().root.add_child(im)
 	im.build()
 	im.set_process(false)
+	if im._ui:
+		im._ui.visible = false           # (the movie's letterbox and fade)
 	var R := IntroMovie.ROOM
 	var ok := 0
 	var n := 0
