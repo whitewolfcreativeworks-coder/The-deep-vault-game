@@ -352,6 +352,9 @@ func _run() -> void:
 	elif mode == "warrengate":
 		if await _warrengate_test():
 			return
+	elif mode == "wardrobe":
+		if await _wardrobe_test():
+			return
 	elif mode == "balloon2":
 		if await _balloon2_test():
 			return
@@ -5853,6 +5856,126 @@ func _gfx_totals(w: Node) -> Dictionary:
 				out.lamp_reach = minf(out.lamp_reach, (n as Light3D).distance_fade_begin)
 	out["scale"] = get_viewport().scaling_3d_scale
 	return out
+
+# --- the Wardrobe: outfits, shoes and slippers (designed by Jason's son, Nov 25) -----------
+func _wardrobe_test() -> bool:
+	if not Game.get_meta("wr_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		Game.profile.hero = "Necromancer"
+		await _start()
+		Game.set_meta("wr_phase", true)
+		# a Necromancer's wardrobe: pajamas, the class's own two, the work clothes, slippers
+		var o: Array = Game.outfits_owned
+		check("wr_starts_full", o.has("adventure") and o.has("pajamas") and o.has("necro_skeleton") and o.has("necro_bat")
+			and Outfits.WORK.all(func(id) -> bool: return o.has(id)) and not o.has("beast_tiger")
+			and Game.footwear_owned.has("skull") and Game.footwear_owned.has("fluffy") and Game.footwear_owned.has("workboots"), "%s %s" % [o, Game.footwear_owned])
+		check("wr_starts_adventuring", Game.outfit == "adventure" and Game.footwear == "boots")
+		Game.level = 16
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		main._travel("home")
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	var m = main.menus
+	var cab: HomeCabin = w.cabin
+	await tp(w.ground(HomeWorld.LAND.x, HomeWorld.LAND.z) + Vector3(0, 1.0, 0), 0.0, -0.1)
+	await wait(1.5)
+	# in the cabin, in front of the wardrobe
+	await tp(cab.w(cab.room._wardrobe + Vector3(-0.1, 0.05, 1.5)), 0.0, -0.1)
+	await wait(0.8)
+	var it = player.interact_target
+	check("wr_prompt", it != null and String(it.get_prompt()).contains("wardrobe"), str(it.get_prompt()) if it else "none")
+	player.zoom_target = 3.6; player.zoom = 3.6; player.pitch = -0.1; player.snap_view()
+	await wait(0.5)
+	await shot("wr_01_the_wardrobe")
+	var def0 := Game.defense()
+	var hp0 := Game.max_hp()
+	if it:
+		it.interact(player)
+	await wait(1.0)
+	check("wr_opens", m.current == "wardrobe" and get_tree().paused, m.current)
+	var wd: WardrobePanel = m.wardrobe
+	check("wr_lists_everything", wd._outfit_btns.size() == Game.outfits_owned.size() and wd._foot_btns.size() == Game.footwear_owned.size(),
+		"%d/%d %d/%d" % [wd._outfit_btns.size(), Game.outfits_owned.size(), wd._foot_btns.size(), Game.footwear_owned.size()])
+	await shot("wr_02_panel_adventuring")
+	(wd._outfit_btns["pajamas"] as Button).pressed.emit()
+	(wd._foot_btns["skull"] as Button).pressed.emit()
+	await wait(1.2)
+	check("wr_pick_puts_it_on", Game.outfit == "pajamas" and Game.footwear == "skull" and (wd._outfit_btns["pajamas"] as Button).button_pressed)
+	check("wr_preview_dressed", wd._preview.outfit_parts > 0 and wd._preview._pattern == 1, "%d parts, pattern %d" % [wd._preview.outfit_parts, wd._preview._pattern])
+	await shot("wr_03_panel_pajamas_skull_slippers")
+	for pick in [["necro_bat", "fluffy"], ["necro_skeleton", "fluffy"], ["work_builder", "workboots"], ["work_smith", "workboots"],
+			["work_gardener", "wellies"], ["work_fisher", "wellies"], ["work_chef", "boots"]]:
+		(wd._outfit_btns[pick[0]] as Button).pressed.emit()
+		(wd._foot_btns[pick[1]] as Button).pressed.emit()
+		await wait(1.0)
+		await shot("wr_04_panel_%s" % pick[0])
+	(wd._outfit_btns["pajamas"] as Button).pressed.emit()
+	(wd._foot_btns["skull"] as Button).pressed.emit()
+	await wait(0.4)
+	wd.close()
+	await wait(1.2)
+	check("wr_closed", m.current == "" and not get_tree().paused, m.current)
+	# your hero in the cabin, in pajamas and skull slippers; the crown is off
+	var bd: CharacterModel = player.body
+	var crown_on := false
+	for mi in bd.find_children("*", "MeshInstance3D", true, false):
+		if String(mi.name).begins_with("Necromancer_Crown") and (mi as MeshInstance3D).is_visible_in_tree():
+			crown_on = true
+	check("wr_hero_dressed", bd.outfit_parts >= 6 and bd._pattern == 1 and not crown_on, "%d parts pattern %d crown %s" % [bd.outfit_parts, bd._pattern, crown_on])
+	check("wr_only_a_look", is_equal_approx(Game.defense(), def0) and is_equal_approx(Game.max_hp(), hp0))
+	await tp(cab.w(cab.room._wardrobe + Vector3(-0.6, 0.05, 2.2)), PI * 0.85, -0.1)
+	player.zoom_target = 3.2; player.zoom = 3.2; player.snap_view()
+	await wait(1.0)
+	await shot("wr_05_pajamas_in_the_cabin")
+	# saved with the hero; each class has its own wardrobe
+	Game.save_slot()
+	var saved: Dictionary = Game.read_slot(Game.active_slot)
+	check("wr_saved", saved.get("outfit", "") == "pajamas" and saved.get("footwear", "") == "skull" and (saved.get("outfits_owned", []) as Array).has("necro_bat"))
+	var slot := Game.active_slot
+	Game.reset_run()
+	Game.profile.hero = "Beastmaster"
+	Game.mend_wardrobe()
+	check("wr_beastmaster_has_their_own", Game.outfits_owned.has("beast_tiger") and Game.outfits_owned.has("beast_wolf") and not Game.outfits_owned.has("necro_bat")
+		and Game.footwear_owned.has("bear") and Game.outfit == "adventure", str(Game.outfits_owned))
+	Game.load_slot(slot)
+	check("wr_loads_back", Game.profile.hero == "Necromancer" and Game.outfit == "pajamas" and Game.footwear == "skull" and Game.outfits_owned.has("necro_bat"))
+	# a magic costume still goes on top, and the pajamas come back after
+	player.rebuild_body()
+	Game.wear_costume("dino", [0, 60.0, false, "a minute"])
+	await wait(1.0)
+	check("wr_costume_on_top", player.body.outfit_parts == 0 and Game.costume_id() == "dino")
+	Game.clear_costume()
+	await wait(1.0)
+	check("wr_back_in_pajamas", player.body.outfit_parts >= 6 and player.body._pattern == 1)
+	# everybody's outfits: a line-up of all nine classes, in each set
+	var at := w.ground(HomeWorld.LAND.x + 30.0, HomeWorld.LAND.z) + Vector3(0, 0.02, 0)
+	var line := Node3D.new(); w.add_child(line)
+	var heroes: Array = Game.HERO_ORDER
+	for set_i in 3:
+		for c in line.get_children():
+			c.queue_free()
+		await frames(2)
+		for k in heroes.size():
+			var hero := String(heroes[k])
+			var ids: Array = Outfits.CLASS_OUTFITS[hero]
+			var oid := String(ids[0]) if set_i == 0 else (String(ids[1]) if set_i == 1 else String(Outfits.WORK[k % Outfits.WORK.size()]))
+			var fid := String(Outfits.CLASS_SLIPPERS[hero]) if set_i < 2 else ("workboots" if k % 2 == 0 else "wellies")
+			var cfg := {"kind": "hero", "hero": hero, "show_hat": true, "weapon": "", "shield": "", "scale": 0.84}
+			Outfits.dress(cfg, oid, fid)
+			var cm := CharacterModel.new(); line.add_child(cm)
+			cm.position = at + Vector3((k - 4) * 1.25, 0, 0)
+			cm.setup(cfg)
+		await wait(1.0)
+		await _cam_shot("wr_1%d_lineup_%s" % [set_i, ["bedtime", "onesies", "work"][set_i]], at + Vector3(0, 1.4, 7.6), at + Vector3(0, 0.8, 0), 62.0)
+	line.queue_free()
+	_finish()
+	return true
 
 # --- the Warren Gate: a yard and a tunnel into the ridge (Jason, Nov 25) ----------------
 func _warrengate_test() -> bool:

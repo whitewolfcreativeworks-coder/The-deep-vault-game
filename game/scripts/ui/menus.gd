@@ -63,6 +63,7 @@ func _ready() -> void:
 	_build_dialogue()
 	_build_forest_victory()
 	_build_designer()
+	_build_wardrobe()
 	shop_ui = ShopUI.new(); shop_ui.name = "ShopUI"
 	add_child(shop_ui)
 	shop_ui.setup(self)
@@ -123,6 +124,8 @@ func show_panel(n: String) -> void:
 		_refresh_stash()
 	if n == "designer" and designer:
 		designer.open()
+	if n == "wardrobe" and wardrobe:
+		wardrobe.open()
 	if n == "pause" and _arrange_btn:
 		_arrange_btn.visible = Game.touch_active
 		_reset_btn.visible = Game.touch_active
@@ -1004,6 +1007,16 @@ func _build_pause() -> void:
 	v.add_child(_button("Save & exit to title", func() -> void: exit_to_title_requested.emit(), 360))
 	v.add_child(_button("Restart adventure", func() -> void: restart_requested.emit(), 360))
 	v.add_child(_button("Quit game", func() -> void: quit_requested.emit(), 360))
+
+# --- the Wardrobe in your cabin (scripts/ui/wardrobe.gd) ---------------------------
+var wardrobe: WardrobePanel
+signal wardrobe_closed(changed: bool)
+
+func _build_wardrobe() -> void:
+	wardrobe = WardrobePanel.new(); wardrobe.name = "Wardrobe"
+	root.add_child(wardrobe)
+	_panels["wardrobe"] = wardrobe
+	wardrobe.closed.connect(func(changed: bool) -> void: wardrobe_closed.emit(changed))
 
 # --- the Skin Designer (scripts/ui/designer.gd) ------------------------------------
 var designer: SkinDesigner

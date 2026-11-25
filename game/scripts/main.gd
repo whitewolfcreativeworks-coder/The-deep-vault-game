@@ -90,6 +90,7 @@ func _ready() -> void:
 	Game.leveled_up.connect(func(_l: int) -> void: autosave())
 	menus.resume_requested.connect(_resume)
 	menus.desk_closed.connect(_on_desk_closed)
+	menus.wardrobe_closed.connect(_on_wardrobe_closed)
 	menus.respawn_requested.connect(_respawn)
 	menus.restart_requested.connect(_restart)
 	menus.quit_requested.connect(func() -> void: get_tree().quit())
@@ -133,6 +134,7 @@ func _start_game() -> void:
 	Game.resume_pos = Vector3.ZERO
 	menus.close_all()
 	state = "play"
+	Game.mend_wardrobe()          # (this class's outfits, ready in the cabin's wardrobe)
 	player.rebuild_body()
 	player.respawn_at(world.spawn_point, float(world.get("spawn_yaw")) if world.get("spawn_yaw") != null else 0.0)
 	player.invuln = 0.0
@@ -786,6 +788,20 @@ func _on_desk_closed(changed: bool) -> void:
 	_resume()
 
 ## The gear chest in the cabin at home.
+## The wardrobe in your cabin: outfits, shoes and slippers (Outfits.gd).
+func open_wardrobe() -> void:
+	if state != "play" or menus.current != "":
+		return
+	Sfx.play("door", -10.0, 0.2)
+	_open("wardrobe")
+
+func _on_wardrobe_closed(changed: bool) -> void:
+	_resume()
+	if changed:
+		player.rebuild_body()
+		var o: Dictionary = Outfits.OUTFITS.get(Game.outfit, {})
+		Game.say("All dressed: %s!" % String(o.get("name", "")), Color(1.0, 0.85, 1.0))
+
 func open_stash() -> void:
 	if state != "play" or menus.current != "":
 		return

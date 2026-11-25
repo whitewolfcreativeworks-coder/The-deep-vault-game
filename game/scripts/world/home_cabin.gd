@@ -6,6 +6,8 @@ class_name HomeCabin
 ##                     you'll want one when the open world portal opens)
 ##   the gear chest    keep gear you don't want to carry, and take it back any time
 ##   the bed           have a nap: full health, magic and stamina
+##   the wardrobe      your outfits, shoes and slippers: pajamas, onesies, work
+##                     clothes... (Outfits.gd; designed by Jason's son)
 ## The front door leads in and out (the room itself is built out of sight, deep
 ## under the valley, like a film set).
 
@@ -64,6 +66,8 @@ func _build() -> void:
 	Usable.make(self, w(DESK + Vector3(0, 0.8, 0.55)), "[E] Sit at your desk (change your name and looks)", _use_desk)
 	Usable.make(self, w(CHEST + Vector3(0.55, 0.5, 0)), "[E] Open your gear chest", _use_chest)
 	Usable.make(self, w(room._bed + Vector3(1.0, 0.6, 0.2)), "[E] Have a nap in your bed", nap)
+	Usable.make(self, w(room._wardrobe + Vector3(-0.1, 0.9, 0.85)), "[E] Open your wardrobe (outfits, shoes and slippers)", _use_wardrobe)
+	_wardrobe_sign()
 
 func _process(_delta: float) -> void:
 	# no sunshine through the roof
@@ -177,6 +181,18 @@ func _use_desk() -> void:
 	var sc := get_tree().current_scene
 	if sc.has_method("open_desk"):
 		sc.open_desk()
+
+func _use_wardrobe() -> void:
+	var sc := get_tree().current_scene
+	if sc.has_method("open_wardrobe"):
+		sc.open_wardrobe()
+
+func _wardrobe_sign() -> void:
+	var lbl := Label3D.new(); lbl.text = "WARDROBE"; lbl.modulate = Color(1.0, 0.85, 0.4)
+	lbl.outline_size = 10; lbl.outline_modulate = Color(0.2, 0.1, 0.05); lbl.font_size = 64
+	lbl.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	room.add_child(lbl); lbl.position = IntroMovie.ROOM + room._wardrobe + Vector3(0, 2.85, 0.4)
+	SignText.fit(lbl, 1.0, 0.2)
 
 func _use_chest() -> void:
 	var sc := get_tree().current_scene

@@ -40,7 +40,10 @@ var _shield_depth := 0.0     # a sheathed weapon rides on top of the shield
 var weapon_tip: Node3D
 var head_meshes: Array[MeshInstance3D] = []
 var hold_clip := ""
-var _stripes := Color.BLACK   # cfg "outfit_stripes": striped pajamas in the opening movie      # cutscenes: keep playing this clip instead of walking/idling
+var _stripes := Color.BLACK   # cfg "outfit_stripes": striped pajamas in the opening movie
+var _pattern := 0             # cfg "outfit_pattern" (Outfits): 1 stripes, 2 dots, 3 checks, 4 stars
+var _pattern_c := Color.WHITE
+const PATTERNS := ["", "stripes", "dots", "checks", "stars"]      # cutscenes: keep playing this clip instead of walking/idling
 var all_meshes: Array[MeshInstance3D] = []
 var kind := "hero"            # "hero" | "skeleton"
 var anims := {}               # role -> clip name
@@ -206,6 +209,11 @@ func setup(cfg: Dictionary) -> void:
 			costume_fx = String(c.get("fx", ""))
 	kind = cfg.get("kind", "hero")
 	_stripes = cfg.get("outfit_stripes", Color.BLACK)
+	_pattern = 1 if _stripes != Color.BLACK else 0
+	_pattern_c = _stripes
+	if String(cfg.get("outfit_pattern", "")) != "":
+		_pattern = maxi(0, PATTERNS.find(String(cfg.outfit_pattern)))
+		_pattern_c = cfg.get("pattern_color", Color.WHITE)
 	var skin: String = cfg.get("skin", "")
 	if skin == "bone":
 		kind = "skeleton"
@@ -265,6 +273,12 @@ func setup(cfg: Dictionary) -> void:
 	_setup_anims()
 	if kind == "hero" and hero.has("body") and costume_file == "":
 		_wear_class_body(hero, cfg)
+	if kind == "hero" and cfg.get("no_cape", false) and costume_file == "":
+		# (pajamas and work clothes: no cape, no cloak)
+		for m in all_meshes:
+			if String(m.name).contains("Cape") or String(m.name).contains("Cloak"):
+				m.visible = false
+				_never_show.append(m)
 	if costume_file != "":
 		_wear_costume(costume_file, cfg)
 		if DARK_LOOKS.has(costume_fx):
@@ -379,6 +393,10 @@ func setup(cfg: Dictionary) -> void:
 			_fur_top()
 		if _cloud_kind != "":
 			_cloud_extras(_cloud_kind, hero)
+		if cfg.has("outfit_extras"):
+			_outfit_extras(Outfits.OUTFITS.get(String(cfg.outfit_extras), {}), hero)
+		if cfg.has("footwear"):
+			_footwear(Outfits.FOOTWEAR.get(String(cfg.footwear), {}))
 	_play(anims.idle, 0.0)
 
 # --- Cloud Island skins (designed by Jason's son): the hero, recoloured, plus pieces
@@ -542,6 +560,207 @@ func _cloud_extras(kind: String, hero: Dictionary) -> void:
 			var orange := _look_mat(Color(1.0, 0.55, 0.1), 0.3)
 			_cp(head, _sphere(), orange, front + Vector3(0, -0.1, hr * 0.12), Vector3(hr * 0.42, hr * 0.12, hr * 0.32), Vector3.ZERO, true)
 			_cp(chest, _cone_m(0.12, 0.25), _look_mat(Color(1.0, 0.86, 0.2), 0.2), Vector3(0, 0.6, -0.25), Vector3.ONE, Vector3(-1.0, 0, 0))
+
+# --- the Wardrobe (Outfits.gd): hats and ears, belts and aprons, slippers ------------
+var outfit_parts := 0          # (for the tests: pieces added by the wardrobe)
+
+func _outfit_extras(o: Dictionary, hero: Dictionary) -> void:
+	if o.is_empty():
+		return
+	var head := _on_bone("head")
+	if head == null:
+		return
+	var hb := _head_bounds(hero)
+	var hc := hb.get_center()
+	var hr := hb.size.x * 0.5
+	var top := hc + Vector3(0, hb.size.y * 0.5, 0)
+	var front := hc + Vector3(0, -0.05, hb.size.z * 0.5)
+	var hcol: Color = o.get("hat_color", Color.WHITE)
+	var trim: Color = o.get("trim", hcol.lightened(0.5))
+	var hm := _look_mat(hcol, 0.85)
+	var tm := _look_mat(trim, 0.8)
+	var n0 := head.get_child_count()
+	match String(o.get("hat", "")):
+		"nightcap":
+			# a floppy cone leaning to one side, a fluffy band and a bobble on the end
+			var h := hr * 1.7
+			var bas := Basis(Vector3(0, 0, 1), -0.75)
+			var base := top + Vector3(0, -hr * 0.28, -hr * 0.04)
+			var c := _cp(head, _cone_m(hr * 0.92, h), hm, base + bas.y * h * 0.5, Vector3.ONE, Vector3.ZERO, true)
+			c.basis = bas
+			var band := _cp(head, _cyl_m(hr * 0.95, hr * 0.22), tm, base + Vector3(0, hr * 0.02, 0), Vector3.ONE, Vector3.ZERO, true)
+			band.basis = bas
+			_cp(head, _sphere(), tm, base + bas.y * h, Vector3.ONE * hr * 0.2, Vector3.ZERO, true)
+		"toadstool":
+			_cp(head, _sphere(true), hm, top + Vector3(0, -hr * 0.42, 0), Vector3(hr * 1.3, hr * 0.85, hr * 1.3), Vector3.ZERO, true)
+			for k in 7:
+				var a := k * TAU / 7.0
+				var el := 0.35 + 0.25 * float(k % 2)
+				var dirv := Vector3(cos(a) * cos(el), sin(el), sin(a) * cos(el))
+				var dot := _cp(head, _sphere(), tm, top + Vector3(0, -hr * 0.42, 0) + Vector3(dirv.x * hr * 1.25, dirv.y * hr * 0.82, dirv.z * hr * 1.25),
+					Vector3.ONE * hr * 0.14, Vector3.ZERO, true)
+				dot.basis = Basis(Quaternion(Vector3.UP, dirv.normalized())) * Basis.from_scale(Vector3(hr * 0.16, hr * 0.08, hr * 0.16))
+		"bear":
+			for sx in [-1.0, 1.0]:
+				_cp(head, _sphere(), hm, top + Vector3(sx * hr * 0.62, -hr * 0.12, -hr * 0.05), Vector3.ONE * hr * 0.3, Vector3.ZERO, true)
+				_cp(head, _sphere(), tm, top + Vector3(sx * hr * 0.62, -hr * 0.14, hr * 0.12), Vector3(hr * 0.18, hr * 0.18, hr * 0.1), Vector3.ZERO, true)
+		"cat":
+			var big := 1.45 if o.get("big_ears", false) else 1.0
+			for sx in [-1.0, 1.0]:
+				_cp(head, _cone_m(hr * 0.27 * big, hr * 0.6 * big), hm, top + Vector3(sx * hr * 0.55, hr * 0.12 * big, -hr * 0.02), Vector3.ONE, Vector3(0, 0, -sx * 0.35), true)
+				_cp(head, _cone_m(hr * 0.15 * big, hr * 0.4 * big), tm, top + Vector3(sx * hr * 0.55, hr * 0.1 * big, hr * 0.1), Vector3(1, 1, 0.35), Vector3(0, 0, -sx * 0.35), true)
+		"bunny":
+			for sx in [-1.0, 1.0]:
+				_cp(head, _sphere(), hm, top + Vector3(sx * hr * 0.32, hr * 0.62, -hr * 0.05), Vector3(hr * 0.17, hr * 0.7, hr * 0.11), Vector3(0, 0, -sx * 0.18), true)
+				_cp(head, _sphere(), tm, top + Vector3(sx * hr * 0.32, hr * 0.62, hr * 0.03), Vector3(hr * 0.09, hr * 0.55, hr * 0.06), Vector3(0, 0, -sx * 0.18), true)
+		"lamb":
+			for sx in [-1.0, 1.0]:
+				_cp(head, _sphere(), hm, hc + Vector3(sx * hr * 1.0, hr * 0.15, 0), Vector3(hr * 0.36, hr * 0.13, hr * 0.2), Vector3(0, 0, sx * 0.55), true)
+			for k in 4:
+				_cp(head, _sphere(), _look_mat(Color(1, 1, 1), 0.95), top + Vector3((k - 1.5) * hr * 0.26, -hr * 0.05, hr * 0.15 * float(k % 2)), Vector3.ONE * hr * 0.2, Vector3.ZERO, true)
+		"frog":
+			var white := _look_mat(Color(0.97, 0.97, 0.95), 0.4)
+			var black := _look_mat(Color(0.05, 0.05, 0.06), 0.3)
+			for sx in [-1.0, 1.0]:
+				var e := top + Vector3(sx * hr * 0.42, -hr * 0.04, hr * 0.22)
+				_cp(head, _sphere(), hm, e, Vector3.ONE * hr * 0.27, Vector3.ZERO, true)
+				_cp(head, _sphere(), white, e + Vector3(0, hr * 0.04, hr * 0.13), Vector3.ONE * hr * 0.18, Vector3.ZERO, true)
+				_cp(head, _sphere(), black, e + Vector3(0, hr * 0.05, hr * 0.27), Vector3.ONE * hr * 0.08, Vector3.ZERO, true)
+		"horns":
+			for sx in [-1.0, 1.0]:
+				_cp(head, _cone_m(hr * 0.13, hr * 0.5), hm, top + Vector3(sx * hr * 0.4, hr * 0.08, -hr * 0.05), Vector3.ONE, Vector3(-0.2, 0, -sx * 0.4), true)
+			for k in 3:
+				_cp(head, _cone_m(hr * 0.1, hr * 0.28), _look_mat((o.color as Color).darkened(0.2), 0.8), top + Vector3(0, -hr * 0.05 - k * hr * 0.32, -hr * 0.45 - k * hr * 0.2),
+					Vector3.ONE, Vector3(-0.5 - k * 0.35, 0, 0), true)
+		"hardhat":
+			var hy := top + Vector3(0, -hr * 0.4, 0)
+			var shiny := _look_mat(hcol, 0.3)
+			_cp(head, _sphere(true), shiny, hy, Vector3(hr * 1.08, hr * 0.78, hr * 1.08), Vector3.ZERO, true)
+			_cp(head, _cyl_m(hr * 1.22, hr * 0.06), shiny, hy + Vector3(0, hr * 0.02, hr * 0.12), Vector3(1.0, 1.0, 1.05), Vector3.ZERO, true)
+			_cp(head, _boxm(hr * 0.18, hr * 0.1, hr * 1.9), shiny, hy + Vector3(0, hr * 0.76, 0), Vector3.ONE, Vector3(0.0, 0, 0), true)
+		"goggles":
+			var gy := top + Vector3(0, -hr * 0.42, 0)
+			var strap := _cp(head, TorusMesh.new(), hm, gy, Vector3(hr * 1.06, hr * 0.5, hr * 1.06), Vector3.ZERO, true)
+			(strap.mesh as TorusMesh).inner_radius = 0.92; (strap.mesh as TorusMesh).outer_radius = 1.0
+			var glass := _glassy(Color(0.35, 0.8, 0.85), 0.55)
+			for sx in [-1.0, 1.0]:
+				var gp := gy + Vector3(sx * hr * 0.32, hr * 0.02, hb.size.z * 0.5 - hr * 0.05)
+				_cp(head, _cyl_m(hr * 0.24, hr * 0.2), _look_mat(Color(0.25, 0.22, 0.2), 0.4), gp, Vector3.ONE, Vector3(PI * 0.5, 0, 0), true)
+				_cp(head, _cyl_m(hr * 0.19, hr * 0.06), glass, gp + Vector3(0, 0, hr * 0.09), Vector3.ONE, Vector3(PI * 0.5, 0, 0), true)
+		"sunhat":
+			var sy := top + Vector3(0, -hr * 0.22, 0)
+			_cp(head, _cyl_m(hr * 1.75, hr * 0.06), hm, sy, Vector3.ONE, Vector3(0.08, 0, 0), true)
+			_cp(head, _cyl_m(hr * 0.78, hr * 0.5), hm, sy + Vector3(0, hr * 0.26, 0), Vector3.ONE, Vector3.ZERO, true)
+			_cp(head, _cyl_m(hr * 0.8, hr * 0.13), tm, sy + Vector3(0, hr * 0.1, 0), Vector3.ONE, Vector3.ZERO, true)
+		"rainhat":
+			var ry := top + Vector3(0, -hr * 0.32, 0)
+			var brim := CylinderMesh.new(); brim.top_radius = hr * 0.95; brim.bottom_radius = hr * 1.45; brim.height = hr * 0.28; brim.radial_segments = 16
+			_cp(head, brim, _look_mat(hcol, 0.35), ry + Vector3(0, -hr * 0.04, -hr * 0.1), Vector3.ONE, Vector3(-0.12, 0, 0), true)
+			_cp(head, _sphere(true), _look_mat(hcol, 0.35), ry + Vector3(0, hr * 0.08, 0), Vector3(hr * 0.98, hr * 0.7, hr * 0.98), Vector3.ZERO, true)
+		"chefhat":
+			var cy := top + Vector3(0, -hr * 0.2, 0)
+			_cp(head, _cyl_m(hr * 0.72, hr * 0.75), hm, cy + Vector3(0, hr * 0.32, 0), Vector3.ONE, Vector3.ZERO, true)
+			_cp(head, _sphere(), hm, cy + Vector3(0, hr * 0.85, 0), Vector3(hr * 0.98, hr * 0.5, hr * 0.98), Vector3.ZERO, true)
+	outfit_parts += head.get_child_count() - n0
+	# round the middle
+	var belt := String(o.get("belt", ""))
+	if belt != "":
+		var hips := _on_bone("hips")
+		if hips == null:
+			return
+		var bb := _body_bounds()
+		var rx := bb.size.x * 0.5 * 0.72
+		var rz := bb.size.z * 0.5 * 0.72
+		var cz := bb.get_center().z
+		var bm := _look_mat(o.get("belt_color", Color(0.45, 0.3, 0.16)), 0.75)
+		var n1 := hips.get_child_count()
+		var ring := _cp(hips, TorusMesh.new(), bm, Vector3(0, 0.52, cz), Vector3(rx, 0.32, rz))
+		(ring.mesh as TorusMesh).inner_radius = 0.86; (ring.mesh as TorusMesh).outer_radius = 1.0
+		if belt == "toolbelt":
+			var pouch := _look_mat((o.get("belt_color", Color(0.45, 0.3, 0.16)) as Color).darkened(0.2), 0.8)
+			for sx in [-1.0, 1.0]:
+				_cp(hips, _boxm(0.12, 0.14, 0.1), pouch, Vector3(sx * rx * 0.95, 0.45, cz + rz * 0.35), Vector3.ONE, Vector3(0, sx * 0.5, 0))
+			# a hammer hanging at the side
+			_cp(hips, _cyl_m(0.018, 0.28), _look_mat(Color(0.6, 0.42, 0.22), 0.7), Vector3(rx * 1.02, 0.42, cz - rz * 0.25))
+			_cp(hips, _boxm(0.09, 0.05, 0.05), _look_mat(Color(0.45, 0.45, 0.48), 0.3), Vector3(rx * 1.02, 0.56, cz - rz * 0.25))
+		elif belt == "apron":
+			var am := _look_mat(o.get("belt_color", Color(0.45, 0.28, 0.15)), 0.8)
+			_cp(hips, _boxm(rx * 1.45, 0.62, 0.025), am, Vector3(0, 0.5, cz + rz * 1.05))
+			_cp(hips, _boxm(rx * 1.1, 0.36, 0.025), am, Vector3(0, 0.98, cz + rz * 1.22))
+			_cp(hips, _boxm(rx * 0.5, 0.12, 0.03), _look_mat((o.get("belt_color", Color(0.45, 0.28, 0.15)) as Color).darkened(0.25), 0.8), Vector3(0, 0.4, cz + rz * 1.1))
+		outfit_parts += hips.get_child_count() - n1
+
+## The size of the hero's body (its torso piece) on the rig.
+func _body_bounds() -> AABB:
+	for m in all_meshes:
+		if String(m.name).contains("_Body") and m.visible:
+			return m.get_aabb()
+	return AABB(Vector3(-0.4, 0.38, -0.38), Vector3(0.8, 0.92, 0.75))
+
+## Slippers and boots over your own boots, one on each foot.
+func _footwear(f: Dictionary) -> void:
+	var kind := String(f.get("kind", ""))
+	if kind == "":
+		return
+	var col: Color = f.get("color", Color.WHITE)
+	var body := _look_mat(col, 0.95 if kind in ["fluffy", "bunny", "bear", "dino", "duck"] else 0.55)
+	var black := _look_mat(Color(0.05, 0.05, 0.06), 0.3)
+	var white := _look_mat(Color(0.98, 0.98, 0.97), 0.9)
+	var pink := _look_mat(Color(1.0, 0.65, 0.75), 0.8)
+	for side in ["l", "r"]:
+		var foot := _on_bone("foot." + side)
+		if foot == null:
+			continue
+		var x := 0.17 if side == "l" else -0.17
+		var n0 := foot.get_child_count()
+		match kind:
+			"workboots":
+				_cp(foot, _boxm(0.26, 0.2, 0.38), body, Vector3(x, 0.11, 0.04))
+				_cp(foot, _boxm(0.28, 0.05, 0.4), _look_mat(Color(0.18, 0.13, 0.1), 0.9), Vector3(x, 0.02, 0.04))
+				_cp(foot, _boxm(0.24, 0.1, 0.1), _look_mat(col.darkened(0.3), 0.6), Vector3(x, 0.09, 0.2))
+			"wellies":
+				_cp(foot, _boxm(0.25, 0.14, 0.38), body, Vector3(x, 0.07, 0.05))
+				var leg := _on_bone("lowerleg." + side)
+				if leg:
+					_cp(leg, _cyl_m(0.13, 0.34), body, Vector3(x, 0.26, 0.0))
+					_cp(leg, _cyl_m(0.14, 0.04), _look_mat(col.darkened(0.25), 0.5), Vector3(x, 0.43, 0.0))
+					outfit_parts += 2
+			_:
+				# a soft slipper with something on the toe
+				_cp(foot, _sphere(), body, Vector3(x, 0.08, 0.05), Vector3(0.15, 0.1, 0.22))
+				match kind:
+					"fluffy":
+						_cp(foot, _sphere(), white, Vector3(x, 0.17, 0.17), Vector3.ONE * 0.055)
+					"bunny":
+						for sx in [-1.0, 1.0]:
+							_cp(foot, _sphere(), body, Vector3(x + sx * 0.05, 0.23, 0.1), Vector3(0.03, 0.09, 0.02), Vector3(0, 0, -sx * 0.25))
+							_cp(foot, _sphere(), pink, Vector3(x + sx * 0.05, 0.23, 0.115), Vector3(0.016, 0.065, 0.01), Vector3(0, 0, -sx * 0.25))
+							_cp(foot, _sphere(), black, Vector3(x + sx * 0.045, 0.14, 0.235), Vector3.ONE * 0.014)
+						_cp(foot, _sphere(), pink, Vector3(x, 0.115, 0.265), Vector3.ONE * 0.017)
+					"dino":
+						for k in 3:
+							_cp(foot, _cone_m(0.022, 0.07), white, Vector3(x + (k - 1) * 0.055, 0.06, 0.27), Vector3.ONE, Vector3(PI * 0.5, 0, 0))
+						for k in 2:
+							_cp(foot, _cone_m(0.03, 0.07), _look_mat(col.darkened(0.3), 0.8), Vector3(x, 0.18, 0.02 + k * 0.09), Vector3.ONE, Vector3(-0.3, 0, 0))
+						for sx in [-1.0, 1.0]:
+							_cp(foot, _sphere(), black, Vector3(x + sx * 0.045, 0.15, 0.22), Vector3.ONE * 0.014)
+					"bear":
+						for sx in [-1.0, 1.0]:
+							_cp(foot, _sphere(), body, Vector3(x + sx * 0.065, 0.17, 0.13), Vector3.ONE * 0.035)
+						for k in 3:
+							_cp(foot, _sphere(), _look_mat(col.lightened(0.35), 0.9), Vector3(x + (k - 1) * 0.05, 0.05, 0.255), Vector3.ONE * 0.025)
+						_cp(foot, _sphere(), black, Vector3(x, 0.13, 0.26), Vector3.ONE * 0.018)
+					"duck":
+						_cp(foot, _sphere(), _look_mat(Color(1.0, 0.55, 0.1), 0.5), Vector3(x, 0.1, 0.26), Vector3(0.07, 0.022, 0.06))
+						for sx in [-1.0, 1.0]:
+							_cp(foot, _sphere(), black, Vector3(x + sx * 0.045, 0.15, 0.21), Vector3.ONE * 0.014)
+					"skull":
+						for sx in [-1.0, 1.0]:
+							_cp(foot, _sphere(), black, Vector3(x + sx * 0.045, 0.13, 0.225), Vector3(0.028, 0.03, 0.015))
+						_cp(foot, _sphere(), black, Vector3(x, 0.095, 0.25), Vector3(0.012, 0.016, 0.01))
+						for k in 4:
+							_cp(foot, _boxm(0.016, 0.02, 0.01), white, Vector3(x + (k - 1.5) * 0.02, 0.065, 0.262))
+		outfit_parts += foot.get_child_count() - n0
 
 # --- the Skin Designer: a look mixed from parts of collected skins -------------
 ## custom_look = {"head"|"body"|"arms"|"legs": {"src": "own" | costume id | "adv2/Ranger"...,
@@ -876,9 +1095,9 @@ func _recolor(m: MeshInstance3D, c: Color, strength: float, skin_protect: float,
 		r.shader = _recolor_shader
 		r.set_shader_parameter("tex", sm.albedo_texture)
 		r.set_shader_parameter("tint", c)
-		if _stripes != Color.BLACK:
-			r.set_shader_parameter("stripes", 1.0)
-			r.set_shader_parameter("stripe_color", _stripes)
+		if _pattern > 0:
+			r.set_shader_parameter("pattern", _pattern)
+			r.set_shader_parameter("stripe_color", _pattern_c)
 		r.set_shader_parameter("strength", strength)
 		r.set_shader_parameter("skin_protect", skin_protect)
 		r.set_shader_parameter("tex_is_srgb", RenderingServer.get_current_rendering_method() == "gl_compatibility")

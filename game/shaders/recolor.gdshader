@@ -18,6 +18,8 @@ uniform bool tex_is_srgb = false;         // head meshes only: recolour the hero
 uniform float stripes = 0.0;
 uniform vec3 stripe_color : source_color = vec3(1.0);
 uniform float stripe_freq = 9.0;
+// Wardrobe outfits (Outfits.gd): 1 stripes, 2 dots, 3 checks, 4 stars, in stripe_color.
+uniform int pattern = 0;
 varying vec3 lpos;
 uniform float roughness_v = 0.8;
 uniform float metallic_v = 0.0;
@@ -31,7 +33,29 @@ void fragment() {
 	vec3 c = t.rgb;
 	float l = dot(c, vec3(0.299, 0.587, 0.114));
 	float warm = clamp((c.r - c.g) * 5.0, 0.0, 1.0) * clamp((c.g - c.b) * 5.0, 0.0, 1.0) * step(0.45, c.r) * skin_protect;
-	vec3 band = mix(tint, stripe_color, step(0.5, fract(lpos.y * stripe_freq)) * stripes);
+	int pt = pattern;
+	if (pt == 0 && stripes > 0.5) {
+		pt = 1;
+	}
+	float pm = 0.0;
+	vec2 pp = vec2(lpos.x + lpos.z * 0.8, lpos.y);
+	if (pt == 1) {
+		pm = step(0.5, fract(lpos.y * stripe_freq));
+	} else if (pt == 2) {
+		vec2 g = fract(pp * 7.0 + vec2(0.5 * mod(floor(pp.y * 7.0), 2.0), 0.0)) - 0.5;
+		pm = 1.0 - smoothstep(0.17, 0.2, length(g));
+	} else if (pt == 3) {
+		vec2 g = floor(pp * 5.5);
+		pm = mod(g.x + g.y, 2.0);
+	} else if (pt == 4) {
+		vec2 q = pp * 5.0;
+		q.x += 0.5 * mod(floor(q.y), 2.0);
+		vec2 g = fract(q) - 0.5;
+		float a = atan(g.y, g.x);
+		float sr = 0.2 * (0.55 + 0.45 * cos(5.0 * a + 1.5708));
+		pm = 1.0 - smoothstep(sr - 0.02, sr, length(g));
+	}
+	vec3 band = mix(tint, stripe_color, pm);
 	vec3 rec = band * (0.3 + l * 1.2);
 	c = mix(c, rec, strength * (1.0 - warm));
 	// Masks work on the texture's sRGB values (the sampler hands back linear).

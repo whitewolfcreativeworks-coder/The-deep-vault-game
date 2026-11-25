@@ -457,6 +457,56 @@ func unlock_look(id: String) -> void:
 		return   # goblins, skeletons... can't be taken apart
 	unlocked_looks.append(id)
 
+# --- the Wardrobe (Outfits.gd; designed by Jason's son) ---------------------------
+## What you're wearing, and everything in your wardrobe. Saved with the hero, so
+## each hero (and each class) has their own.
+var outfit := "adventure"
+var footwear := "boots"
+var outfits_owned: Array = []
+var footwear_owned: Array = []
+var wardrobe_new: Array = []       # outfits and shoes you haven't looked at yet ("NEW!")
+
+## Fill the wardrobe with this class's starting outfits (new heroes, older saves).
+func mend_wardrobe() -> void:
+	var hero := String(profile.get("hero", "Knight"))
+	for id in Outfits.starter_outfits(hero):
+		if not outfits_owned.has(id):
+			outfits_owned.append(id)
+	for id in Outfits.starter_footwear(hero):
+		if not footwear_owned.has(id):
+			footwear_owned.append(id)
+	if not outfits_owned.has(outfit):
+		outfit = "adventure"
+	if not footwear_owned.has(footwear):
+		footwear = "boots"
+
+func wear_outfit(id: String) -> void:
+	if not Outfits.OUTFITS.has(id) or not outfits_owned.has(id):
+		return
+	outfit = id
+	wardrobe_new.erase(id)
+	inventory_changed.emit()
+
+func wear_footwear(id: String) -> void:
+	if not Outfits.FOOTWEAR.has(id) or not footwear_owned.has(id):
+		return
+	footwear = id
+	wardrobe_new.erase(id)
+	inventory_changed.emit()
+
+## A new outfit for the wardrobe (the open world will have some to find).
+func grant_outfit(id: String) -> void:
+	if Outfits.OUTFITS.has(id) and not outfits_owned.has(id):
+		outfits_owned.append(id)
+		wardrobe_new.append(id)
+		say("New outfit for your wardrobe: %s!" % Outfits.outfit_name(id), Color(1.0, 0.8, 1.0))
+
+func grant_footwear(id: String) -> void:
+	if Outfits.FOOTWEAR.has(id) and not footwear_owned.has(id):
+		footwear_owned.append(id)
+		wardrobe_new.append(id)
+		say("New for your wardrobe: %s!" % Outfits.footwear_name(id), Color(1.0, 0.8, 1.0))
+
 func set_custom_look(look: Dictionary, on := true) -> void:
 	custom_look = look.duplicate(true)
 	custom_look_on = on
@@ -620,6 +670,7 @@ func reset_run() -> void:
 	day_clock = 150.0
 	costume = {}
 	unlocked_looks = []; custom_look = {}; custom_look_on = false
+	outfit = "adventure"; footwear = "boots"; outfits_owned = []; footwear_owned = []; wardrobe_new = []
 	boons = {}; decor = []; forge_book = {"found": [], "hints": []}
 	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
@@ -920,6 +971,8 @@ func save_slot(i := -1) -> bool:
 		"resume_pos": resume_pos, "resume_yaw": resume_yaw,
 		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual, "day_clock": day_clock, "costume": costume.duplicate(),
 		"unlocked_looks": unlocked_looks.duplicate(), "custom_look": custom_look.duplicate(true), "custom_look_on": custom_look_on,
+		"outfit": outfit, "footwear": footwear, "outfits_owned": outfits_owned.duplicate(), "footwear_owned": footwear_owned.duplicate(),
+		"wardrobe_new": wardrobe_new.duplicate(),
 		"boons": boons.duplicate(), "decor": decor.duplicate(), "forge_book": forge_book.duplicate(true),
 		"loot_next": Loot._next,
 	}
@@ -988,6 +1041,11 @@ func load_slot(i: int) -> bool:
 	unlocked_looks = (d.get("unlocked_looks", []) as Array).duplicate()
 	custom_look = (d.get("custom_look", {}) as Dictionary).duplicate(true)
 	custom_look_on = bool(d.get("custom_look_on", false))
+	outfit = String(d.get("outfit", "adventure")); footwear = String(d.get("footwear", "boots"))
+	outfits_owned = (d.get("outfits_owned", []) as Array).duplicate()
+	footwear_owned = (d.get("footwear_owned", []) as Array).duplicate()
+	wardrobe_new = (d.get("wardrobe_new", []) as Array).duplicate()
+	mend_wardrobe()
 	boons = (d.get("boons", {}) as Dictionary).duplicate()
 	decor = (d.get("decor", []) as Array).duplicate()
 	var fb: Dictionary = d.get("forge_book", {})
