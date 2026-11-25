@@ -192,6 +192,7 @@ func setup(cfg: Dictionary) -> void:
 	hero_name = String(cfg.get("hero", "")) if String(cfg.get("kind", "hero")) == "hero" else ""
 	_aura = null
 	_cloud_kind = ""
+	outfit_parts = 0
 	head_meshes.clear(); all_meshes.clear(); _never_show.clear(); _own_colors.clear()
 	# a costume made from one of the game's own characters is just a different look
 	var costume_file := ""
@@ -572,9 +573,10 @@ func _outfit_extras(o: Dictionary, hero: Dictionary) -> void:
 		return
 	var hb := _head_bounds(hero)
 	var hc := hb.get_center()
-	var hr := hb.size.x * 0.5
-	var top := hc + Vector3(0, hb.size.y * 0.5, 0)
-	var front := hc + Vector3(0, -0.05, hb.size.z * 0.5)
+	hc.x = 0.0
+	# (a head's bounds can include antlers or a wide hood: hats are sized to the head itself)
+	var hr := minf(hb.size.x * 0.5, 0.6)
+	var top := hc + Vector3(0, minf(hb.size.y * 0.5, 0.62), 0)
 	var hcol: Color = o.get("hat_color", Color.WHITE)
 	var trim: Color = o.get("trim", hcol.lightened(0.5))
 	var hm := _look_mat(hcol, 0.85)

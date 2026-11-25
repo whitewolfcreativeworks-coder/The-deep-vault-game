@@ -27,7 +27,7 @@ var _journal_list: VBoxContainer
 var _journal_count: Label
 
 const TABS := [["elixir", "Elixirs"], ["enchant", "Enchantments"], ["bless", "Blessings"], ["costume", "Costumes"],
-	["deco", "For Your Yard"], ["special", "★ Today's Special"], ["sell", "Sell Gear"]]
+	["deco", "For Your Yard"], ["seed", "Seeds"], ["special", "★ Today's Special"], ["sell", "Sell"]]
 
 func setup(menus: Menus) -> void:
 	m = menus
@@ -66,7 +66,7 @@ func _build_shop() -> void:
 	var tabs := HBoxContainer.new(); tabs.add_theme_constant_override("separation", 8); v.add_child(tabs)
 	for t in TABS:
 		var id: String = t[0]
-		var b := Button.new(); b.text = String(t[1]); b.custom_minimum_size = Vector2(196, 52)
+		var b := Button.new(); b.text = String(t[1]); b.custom_minimum_size = Vector2(170, 52)
 		b.toggle_mode = true
 		b.add_theme_font_size_override("font_size", 19)
 		b.pressed.connect(func() -> void:
@@ -88,8 +88,9 @@ const LINES := {
 	"bless": "Tobble: \"Blessings for your armor. One at a time, and it fades as you play. Fireproof is very popular with the Insane crowd!\"",
 	"costume": "Tobble: \"Costumes you won't find in any chest! Each one lasts a whole day.\"",
 	"deco": "Tobble: \"Make your yard lovely! These are yours to keep. I'll set them up myself.\"",
+	"seed": "Tobble: \"Seeds for your garden! Magic seeds? Ah, those you'll have to find for yourself, out in the wild.\"",
 	"special": "Tobble: \"Today's Special: half price, today only! Something different tomorrow.\"",
-	"sell": "Tobble: \"Got gear you're not using? I pay twice what you'd get for salvaging it. What you're wearing stays on you.\"",
+	"sell": "Tobble: \"Got gear you're not using? I pay twice what you'd get for salvaging it. What you're wearing stays on you. Vegetables and flowers from your garden too!\"",
 }
 
 func open_shop(tab: String) -> void:
@@ -148,6 +149,8 @@ func _ware_row(w: Dictionary) -> Control:
 				how += "   WEARING IT: %s left" % Game.costume_time_text()
 		"deco":
 			how = "Yours to keep: it goes in your yard at home."
+		"seed":
+			how = "Plant it in your garden at home.   You have %d." % int(Game.seeds.get(String(w.get("plant", "")), 0))
 	vb.add_child(UIKit.label(how, 15, UIKit.DIM))
 	var why := ShopCatalog.why_not(id)
 	var price := ShopCatalog.price(id)
@@ -174,6 +177,7 @@ func _thanks(w: Dictionary) -> String:
 	match String(w.kind):
 		"costume": return "Ooh, it suits you! Wear it well, it lasts a whole day."
 		"deco": return "Lovely choice! It's in your yard already. Go and have a look!"
+		"seed": return "Happy planting! Don't forget to water them."
 		"enchant": return "There! Your weapon's humming with it. Go get 'em!"
 		"bless": return "Blessed and ready! Off you go, hero."
 	return "Bottoms up! Pleasure doing business."
@@ -202,6 +206,20 @@ func _build_sell() -> void:
 		refresh_shop())
 	top.add_child(all)
 	top.add_child(_wrap(UIKit.label("(Keeps what you're wearing, and your forged and legendary gear, just in case.)", 16, UIKit.DIM), 640))
+	# your garden's harvest (vegetables and flowers)
+	var hv := ShopCatalog.harvest_value()
+	if hv > 0:
+		var hb := Button.new(); hb.name = "SellHarvest"; hb.custom_minimum_size = Vector2(640, 60); hb.add_theme_font_size_override("font_size", 20)
+		var parts: Array = []
+		for id in Game.basket:
+			parts.append("%d %s" % [int(Game.basket[id]), GardenPlants.plant_name(String(id)).to_lower()])
+		hb.text = "Sell my harvest: %s  (%d gold)" % [", ".join(parts), hv]
+		hb.pressed.connect(func() -> void:
+			var g := ShopCatalog.sell_harvest()
+			Sfx.play("coins", -2.0, 0.0)
+			_shop_say.text = "Tobble: \"Fresh from your garden! Lovely. %d gold for you.\"" % g
+			refresh_shop())
+		_shop_list.add_child(hb)
 	var bag: Array = Game.inventory.filter(func(u: String) -> bool: return ShopCatalog.can_sell(u))
 	bag.sort_custom(func(a: String, b: String) -> bool: return ShopCatalog.sell_value(a) > ShopCatalog.sell_value(b))
 	if bag.is_empty():

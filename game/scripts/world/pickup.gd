@@ -61,6 +61,24 @@ func _ready() -> void:
 				m.emission = col; m.emission_energy_multiplier = 1.6
 				m.roughness = 0.2
 				(mi as MeshInstance3D).material_override = m
+		"seed":
+			# a little seed pouch, tied at the top; magic seeds glow
+			var pl: Dictionary = GardenPlants.PLANTS.get(item_id, {})
+			col = pl.get("color", Color(0.6, 1.0, 0.4))
+			var magic := String(pl.get("kind", "")) == "magic"
+			var pouch := MeshInstance3D.new(); var ps := SphereMesh.new(); ps.radius = 0.15; ps.height = 0.3; pouch.mesh = ps
+			var pm := StandardMaterial3D.new(); pm.albedo_color = Color(0.72, 0.58, 0.38); pm.roughness = 0.9
+			pouch.material_override = pm; _vis.add_child(pouch)
+			var tie := MeshInstance3D.new(); var tc := CylinderMesh.new(); tc.top_radius = 0.07; tc.bottom_radius = 0.04; tc.height = 0.1
+			tie.mesh = tc; var tm := StandardMaterial3D.new(); tm.albedo_color = col
+			if magic:
+				tm.emission_enabled = true; tm.emission = col; tm.emission_energy_multiplier = 2.0
+			tie.material_override = tm; tie.position.y = 0.17; _vis.add_child(tie)
+			var leafm := StandardMaterial3D.new(); leafm.albedo_color = Color(0.35, 0.7, 0.25)
+			var lf := MeshInstance3D.new(); var ls := SphereMesh.new(); ls.radius = 0.06; ls.height = 0.03; lf.mesh = ls
+			lf.material_override = leafm; lf.position = Vector3(0.04, 0.24, 0); lf.scale = Vector3(1.4, 1, 0.8); _vis.add_child(lf)
+			if magic:
+				_add_beam(col, 2)
 		"food":
 			# a roast drumstick: golden-brown meat on a bone
 			col = Color(1.0, 0.65, 0.3)
@@ -179,6 +197,12 @@ func _collect() -> void:
 			if p:
 				FX.burst((p as Node3D).global_position + Vector3(0, 1.2, 0), Color(1.0, 0.7, 0.35), 18, 2.0)
 			Game.stats_changed.emit()
+		"seed":
+			Game.add_seeds(item_id, maxi(1, amount))
+			var magic := String(GardenPlants.PLANTS.get(item_id, {}).get("kind", "")) == "magic"
+			Game.say("+1 %s%s Plant %s in your garden at home." % [GardenPlants.seed_name(item_id), " (a MAGIC seed!)" if magic else "!", "it" if magic else "them"],
+				GardenPlants.PLANTS.get(item_id, {}).get("color", Color(0.6, 1.0, 0.4)))
+			Sfx.play("levelup" if magic else "pickup", -6.0 if magic else -5.0, 0.1)
 		"costume":
 			Game.wear_costume(item_id)
 			Sfx.play("levelup", -2.0, 0.0)

@@ -438,6 +438,12 @@ static func roll_chest(tier: String, ilvl: int) -> Array:
 	var achance: float = {"small": 0.3, "big": 0.45, "wild": 0.5, "boss": 0.8, "skin": 0.8, "supply": 0.15}.get(tier, 0.2)
 	if rng.randf() < achance:
 		out.append({"kind": "item", "id": make_armor_skin(ilvl, roll_rarity(0.4))})
+	# seeds for your garden at home (Nov 25): common ones now and then, and a boss
+	# chest always holds a magic one (they can't be bought)
+	var schance: float = {"small": 0.25, "big": 0.35, "wild": 0.45, "boss": 1.0, "weapon": 0.2, "armor": 0.2, "skin": 0.2}.get(tier, 0.0)
+	if rng.randf() < schance:
+		var sid := String(GardenPlants.MAGIC[rng.randi() % GardenPlants.MAGIC.size()]) if tier == "boss" else GardenPlants.roll_seed(rng)
+		out.append({"kind": "seed", "id": sid})
 	match tier:
 		"wild":
 			# the chests that pop up out in the wilds: a bit of everything, and lucky

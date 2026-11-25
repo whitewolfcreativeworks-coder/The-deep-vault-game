@@ -788,6 +788,13 @@ func _on_desk_closed(changed: bool) -> void:
 	_resume()
 
 ## The gear chest in the cabin at home.
+## The garden: an empty bed asks which seed to plant (HomeGarden, GardenBed).
+func open_garden(bed: int) -> void:
+	if state != "play" or menus.current != "":
+		return
+	menus.garden_bed = bed
+	_open("garden")
+
 ## The wardrobe in your cabin: outfits, shoes and slippers (Outfits.gd).
 func open_wardrobe() -> void:
 	if state != "play" or menus.current != "":

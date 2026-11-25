@@ -507,6 +507,106 @@ func grant_footwear(id: String) -> void:
 		wardrobe_new.append(id)
 		say("New for your wardrobe: %s!" % Outfits.footwear_name(id), Color(1.0, 0.8, 1.0))
 
+# --- the Garden at home (HomeGarden, GardenPlants; Jason and his son, Nov 25) ------
+var seeds := {}                    # seed id -> how many
+var basket := {}                   # what you've harvested (vegetables, flowers) -> how many
+var garden_plots: Array = []       # per bed: {"plant", "grow" (seconds grown), "last" (play_time), "wet_until"}
+var garden_starter := false        # the seed box by the gate has been opened
+const GARDEN_BEDS := 6
+
+func _mend_garden() -> void:
+	while garden_plots.size() < GARDEN_BEDS:
+		garden_plots.append({"plant": "", "grow": 0.0, "last": 0.0, "wet_until": 0.0})
+
+func add_seeds(id: String, n := 1) -> void:
+	if not GardenPlants.PLANTS.has(id):
+		return
+	seeds[id] = int(seeds.get(id, 0)) + n
+	inventory_changed.emit()
+
+func seed_count() -> int:
+	var t := 0
+	for k in seeds:
+		t += int(seeds[k])
+	return t
+
+## Bring a bed's growth up to now: play time since we last looked, and twice
+## that while the soil was wet. Returns 0..1 (1 = ready to pick).
+func plot_progress(i: int) -> float:
+	_mend_garden()
+	var p: Dictionary = garden_plots[i]
+	if String(p.plant) == "":
+		return 0.0
+	var now := play_time
+	var last := float(p.last)
+	if now > last:
+		var dt := now - last
+		var wet := clampf(float(p.wet_until) - last, 0.0, dt)
+		p.grow = float(p.grow) + dt + wet
+		p.last = now
+	return clampf(float(p.grow) / GardenPlants.grow_secs(String(p.plant)), 0.0, 1.0)
+
+func plant_seed(i: int, id: String) -> bool:
+	_mend_garden()
+	if i < 0 or i >= garden_plots.size() or String(garden_plots[i].plant) != "" or int(seeds.get(id, 0)) <= 0:
+		return false
+	seeds[id] = int(seeds[id]) - 1
+	if int(seeds[id]) <= 0:
+		seeds.erase(id)
+	garden_plots[i] = {"plant": id, "grow": 0.0, "last": play_time, "wet_until": play_time + GardenPlants.WET_SECS}
+	inventory_changed.emit()
+	return true
+
+func water_plot(i: int) -> void:
+	_mend_garden()
+	plot_progress(i)
+	garden_plots[i].wet_until = play_time + GardenPlants.WET_SECS
+
+func plot_wet(i: int) -> bool:
+	_mend_garden()
+	return String(garden_plots[i].plant) != "" and float(garden_plots[i].wet_until) > play_time
+
+## Pick a ripe plant. Vegetables and flowers go in the basket; magic plants give
+## potions. Returns {"id", "n"} (empty if it wasn't ready).
+func harvest_plot(i: int) -> Dictionary:
+	if plot_progress(i) < 1.0:
+		return {}
+	var id := String(garden_plots[i].plant)
+	var pl: Dictionary = GardenPlants.PLANTS[id]
+	var n := int(pl.get("yield", 1))
+	match String(pl.get("gives", "")):
+		"mana": mana_potions += n
+		"potion": potions += n
+		"stamina": stamina_potions += n
+		_: basket[id] = int(basket.get(id, 0)) + n
+	garden_plots[i] = {"plant": "", "grow": 0.0, "last": play_time, "wet_until": 0.0}
+	stats_changed.emit(); inventory_changed.emit()
+	return {"id": id, "n": n}
+
+## A home-grown meal at the cabin table: one of each vegetable you have, each
+## giving its buff for five minutes of play, and a full belly (health and energy).
+func eat_home_meal() -> Array:
+	var ate: Array = []
+	for id in GardenPlants.PLANTS:
+		var pl: Dictionary = GardenPlants.PLANTS[id]
+		if String(pl.kind) == "veg" and int(basket.get(id, 0)) > 0:
+			basket[id] = int(basket[id]) - 1
+			if int(basket[id]) <= 0:
+				basket.erase(id)
+			add_buff(String(pl.buff), GardenPlants.BUFF_SECS)
+			ate.append(id)
+	if not ate.is_empty():
+		add_buff("fed", GardenPlants.BUFF_SECS)
+		hp = max_hp(); stamina = max_stamina()
+		stats_changed.emit(); inventory_changed.emit()
+	return ate
+
+func has_veg() -> bool:
+	for id in basket:
+		if String(GardenPlants.PLANTS.get(id, {}).get("kind", "")) == "veg" and int(basket[id]) > 0:
+			return true
+	return false
+
 func set_custom_look(look: Dictionary, on := true) -> void:
 	custom_look = look.duplicate(true)
 	custom_look_on = on
@@ -671,6 +771,7 @@ func reset_run() -> void:
 	costume = {}
 	unlocked_looks = []; custom_look = {}; custom_look_on = false
 	outfit = "adventure"; footwear = "boots"; outfits_owned = []; footwear_owned = []; wardrobe_new = []
+	seeds = {}; basket = {}; garden_plots = []; garden_starter = false
 	boons = {}; decor = []; forge_book = {"found": [], "hints": []}
 	zone = "vault"
 	hp = max_hp(); mana = max_mana(); stamina = max_stamina()
@@ -973,6 +1074,7 @@ func save_slot(i := -1) -> bool:
 		"unlocked_looks": unlocked_looks.duplicate(), "custom_look": custom_look.duplicate(true), "custom_look_on": custom_look_on,
 		"outfit": outfit, "footwear": footwear, "outfits_owned": outfits_owned.duplicate(), "footwear_owned": footwear_owned.duplicate(),
 		"wardrobe_new": wardrobe_new.duplicate(),
+		"seeds": seeds.duplicate(), "basket": basket.duplicate(), "garden_plots": garden_plots.duplicate(true), "garden_starter": garden_starter,
 		"boons": boons.duplicate(), "decor": decor.duplicate(), "forge_book": forge_book.duplicate(true),
 		"loot_next": Loot._next,
 	}
@@ -1046,6 +1148,11 @@ func load_slot(i: int) -> bool:
 	footwear_owned = (d.get("footwear_owned", []) as Array).duplicate()
 	wardrobe_new = (d.get("wardrobe_new", []) as Array).duplicate()
 	mend_wardrobe()
+	seeds = (d.get("seeds", {}) as Dictionary).duplicate()
+	basket = (d.get("basket", {}) as Dictionary).duplicate()
+	garden_plots = (d.get("garden_plots", []) as Array).duplicate(true)
+	garden_starter = bool(d.get("garden_starter", false))
+	_mend_garden()
 	boons = (d.get("boons", {}) as Dictionary).duplicate()
 	decor = (d.get("decor", []) as Array).duplicate()
 	var fb: Dictionary = d.get("forge_book", {})

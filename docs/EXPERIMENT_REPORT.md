@@ -1562,3 +1562,71 @@ Jason, playing Hard on the iPad: "It's not intuitive that you're supposed to rid
 
 It also photographs the gate from the road, the yard's corner, the mouth, the portal glade and the side.
 
+## Follow-up 48: the Wardrobe (Nov 25)
+
+The son's idea, relayed by Jason: the cabinet the hero changes in during the opening movie should, back home, let you "put your pajamas back on". It becomes an outfit wardrobe. Jason added:
+- "you should have footwear, of course, different slippers";
+- each class starts with different outfits;
+- "a set of work clothes... for when you're doing construction... different things at your home cabin area".
+
+**What was built** (`scripts/autoload/outfits.gd`, `scripts/ui/wardrobe.gd`):
+- **The outfits:**
+  - Adventuring Clothes and the movie's Striped Pajamas;
+  - two outfits for each class (bedtime wear and a onesie), so 18 in all;
+  - five work outfits that everyone gets: builder, smith, gardener, fishing, chef.
+- **Footwear:** your boots, plus fluffy, bunny, dino, bear-paw, duck and skull slippers, work boots and rain boots.
+- **Saved with each hero** (`Game.outfit`, `footwear`, `outfits_owned`, `footwear_owned`). Older saves get their class's starter set when they load.
+- **How an outfit is drawn:** the hero's own body, recoloured with a pattern (the recolour shader now does stripes, dots, checks and stars). The hat, helmet, crown and cape come off. Pieces made from shapes are added:
+  - on the head: nightcap, toadstool cap, bear, cat, bunny, lamb or frog ears, horns, hard hat, goggles, sun hat, rain hat, chef's hat;
+  - round the middle: tool belt or apron;
+  - on the feet: slippers and boots.
+- **Only a look:** no stats, so every class stays fair (the test checks defence and health don't change). A timed magic costume still goes on top.
+- **The wardrobe screen:**
+  - opened from the cabinet in the cabin, with a slowly turning preview of your hero in front of an open wardrobe;
+  - outfits grouped Adventuring / Bedtime / Just for fun / Work clothes, then Shoes & Slippers;
+  - one tap puts something on, with no confirm step.
+
+**Tested:** the `wardrobe` test (15 checks) covers:
+- a Necromancer's starting wardrobe;
+- the prompt, the screen, and tapping to wear;
+- the hero dressed, with the crown off and slippers on;
+- outfits being a look only;
+- save and load;
+- a Beastmaster getting their own set;
+- a costume going on top.
+
+It also photographs every class in its bedtime, onesie and work outfits.
+
+## Follow-up 49: the Garden (Nov 25)
+
+Jason: "put a garden in the Homeworld too, so that you can collect seeds and plant them in your garden. Will need a gardening outfit too."
+
+**Where and what** (`home_garden.gd`, `garden_bed.gd`, `garden_plants.gd`): a picket-fenced garden east of the cabin.
+- **In the garden:** six raised beds, a seed box by the gate, a scarecrow (with a crow), and a rain barrel with a watering can.
+- **Trees:** the valley's trees are kept out of that spot, with every other tree left where it was.
+
+**How it works:**
+- **Growing:** plants grow on play time, wherever you are, and twice as fast while the soil is wet. Watering keeps it wet for 2 minutes, and planting waters it too.
+  - A bed only works its growth out when it's looked at, so a garden left for an hour is simply ripe when you get home.
+  - Four visible stages; ripe beds sparkle.
+- **Getting things:**
+  - vegetables and flowers go to a harvest basket;
+  - magic plants give potions straight away.
+- **Using the harvest:**
+  - the cabin's breakfast table makes a home-grown meal (each vegetable's buff for 5 minutes of play, plus full health and energy);
+  - Tobble buys vegetables and flowers (the Sell tab) and sells common seeds (a new Seeds tab, also reached from the garden's seed stand).
+- **Seeds from the levels:**
+  - chests sometimes hold a common seed pouch (small 25%, big 35%, wild 45%);
+  - boss chests always hold a magic seed, which can't be bought;
+  - seed pouches lie on the ground like other loot, and magic ones glow with a beam.
+
+**Tested:** the `garden` test covers:
+- the starter seeds;
+- the planting prompt and the seed picker;
+- wet beds growing exactly twice as fast;
+- watering, everything ripening, and picking (basket and potions);
+- the meal's buffs, selling the harvest, and buying seeds;
+- a boss chest's magic seed, picking up a seed pouch, and saving.
+
+It photographs the garden empty, growing, ripe and picked.
+

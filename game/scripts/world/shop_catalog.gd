@@ -64,10 +64,21 @@ const WARES := [
 		"desc": "A stone bird bath. More birds will come and sing.", "color": Color(0.6, 0.85, 1.0)},
 	{"id": "statue", "kind": "deco", "name": "Golden Statue of YOU", "price": 12000,
 		"desc": "A giant golden statue of your hero, right in the yard. The ultimate trophy!", "color": Color(1.0, 0.8, 0.3)},
+	# --- seeds for your garden (magic seeds can't be bought: find them!)
+	{"id": "seed_carrot", "kind": "seed", "plant": "carrot", "name": "Carrot Seeds", "price": 15,
+		"desc": "Three crunchy carrots in 3 minutes. Carrots make you QUICK!", "color": Color(1.0, 0.55, 0.15)},
+	{"id": "seed_tomato", "kind": "seed", "plant": "tomato", "name": "Tomato Seeds", "price": 25,
+		"desc": "Three juicy tomatoes in 5 minutes. Tomatoes make you STRONG!", "color": Color(0.95, 0.25, 0.2)},
+	{"id": "seed_pumpkin", "kind": "seed", "plant": "pumpkin", "name": "Pumpkin Seeds", "price": 50,
+		"desc": "One giant pumpkin in 8 minutes. Pumpkin soup makes you TOUGH!", "color": Color(1.0, 0.6, 0.2)},
+	{"id": "seed_sunflower", "kind": "seed", "plant": "sunflower", "name": "Sunflower Seeds", "price": 20,
+		"desc": "A sunflower taller than you, in 4 minutes. I'll buy it for 30 gold!", "color": Color(1.0, 0.85, 0.2)},
+	{"id": "seed_rose", "kind": "seed", "plant": "rose", "name": "Rose Seeds", "price": 25,
+		"desc": "Two pink roses in 3 and a half minutes. I'll buy them for 18 gold each!", "color": Color(1.0, 0.45, 0.65)},
 ]
 
 const KIND_NAMES := {"elixir": "Elixirs", "enchant": "Weapon Enchantments", "bless": "Armor Blessings",
-	"costume": "Costumes", "deco": "For Your Yard"}
+	"costume": "Costumes", "deco": "For Your Yard", "seed": "Seeds"}
 
 static func ware(id: String) -> Dictionary:
 	for w in WARES:
@@ -82,7 +93,7 @@ static func of_kind(kind: String) -> Array:
 static func special_id(day := -1) -> String:
 	if day < 0:
 		day = int(Time.get_unix_time_from_system() / 86400.0)
-	var pool: Array = WARES.filter(func(w: Dictionary) -> bool: return w.kind != "deco")
+	var pool: Array = WARES.filter(func(w: Dictionary) -> bool: return w.kind != "deco" and w.kind != "seed")
 	return String(pool[posmod(day * 7 + 3, pool.size())].id)
 
 static func price(id: String) -> int:
@@ -116,12 +127,29 @@ static func buy(id: String) -> bool:
 		"deco":
 			Game.decor.append(id)
 			Game.say("Tobble will set up the %s in your yard!" % String(w.name).to_lower(), w.color)
+		"seed":
+			Game.add_seeds(String(w.plant), 1)
+			Game.say("%s! Plant them in your garden." % String(w.name), w.color)
 	Sfx.play("coins", -4.0, 0.1)
 	Game.stats_changed.emit()
 	Game.inventory_changed.emit()
 	return true
 
 # --- selling ----------------------------------------------------------------------
+## Your harvest basket: what Tobble would pay for the lot (vegetables and flowers).
+static func harvest_value() -> int:
+	var g := 0
+	for id in Game.basket:
+		g += int(GardenPlants.PLANTS.get(id, {}).get("sell", 0)) * int(Game.basket[id])
+	return g
+
+static func sell_harvest() -> int:
+	var g := harvest_value()
+	Game.basket.clear()
+	Game.gold += g
+	Game.inventory_changed.emit(); Game.stats_changed.emit()
+	return g
+
 ## Tobble pays twice what you'd get for salvaging it out in the wild (forged gear more).
 static func sell_value(uid: String) -> int:
 	var it := Game.item(uid)

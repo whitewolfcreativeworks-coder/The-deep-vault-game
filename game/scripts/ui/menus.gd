@@ -54,6 +54,7 @@ func _ready() -> void:
 	_build_pause()
 	_build_inventory()
 	_build_stash()
+	_build_garden()
 	_build_ask()
 	_build_modes()
 	_build_levels()
@@ -126,6 +127,8 @@ func show_panel(n: String) -> void:
 		designer.open()
 	if n == "wardrobe" and wardrobe:
 		wardrobe.open()
+	if n == "garden":
+		_refresh_garden()
 	if n == "pause" and _arrange_btn:
 		_arrange_btn.visible = Game.touch_active
 		_reset_btn.visible = Game.touch_active
@@ -1007,6 +1010,60 @@ func _build_pause() -> void:
 	v.add_child(_button("Save & exit to title", func() -> void: exit_to_title_requested.emit(), 360))
 	v.add_child(_button("Restart adventure", func() -> void: restart_requested.emit(), 360))
 	v.add_child(_button("Quit game", func() -> void: quit_requested.emit(), 360))
+
+# --- the Garden: pick a seed to plant (HomeGarden, GardenBed) -----------------------
+var garden_bed := 0
+var _garden_list: VBoxContainer
+var _garden_basket: Label
+
+func _build_garden() -> void:
+	var p := _center_panel("garden", 900, 640)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 10); p.add_child(v)
+	var head := HBoxContainer.new(); v.add_child(head)
+	head.add_child(UIKit.label("Plant a Seed", 34, UIKit.GOLD, true))
+	var sp := Control.new(); sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; head.add_child(sp)
+	head.add_child(_button("✕  Close", func() -> void: resume_requested.emit(), 150))
+	var note := UIKit.label("Plants grow while you play, anywhere, and twice as fast while their soil is wet: water them when you pass!", 16, UIKit.DIM)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD; note.custom_minimum_size.x = 840
+	v.add_child(note)
+	var sc := ScrollContainer.new(); sc.custom_minimum_size = Vector2(860, 400)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(sc)
+	_garden_list = VBoxContainer.new(); _garden_list.add_theme_constant_override("separation", 6)
+	_garden_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(_garden_list)
+	_garden_basket = UIKit.label("", 16, UIKit.PARCH); _garden_basket.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_garden_basket.custom_minimum_size.x = 840
+	v.add_child(_garden_basket)
+
+func _refresh_garden() -> void:
+	for c in _garden_list.get_children():
+		c.queue_free()
+	for id in GardenPlants.PLANTS:
+		var n := int(Game.seeds.get(id, 0))
+		if n <= 0:
+			continue
+		var pl: Dictionary = GardenPlants.PLANTS[id]
+		var b := Button.new(); b.custom_minimum_size = Vector2(840, 60); b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.add_theme_font_size_override("font_size", 19)
+		var what := "%d min" % int(ceilf(float(pl.mins)))
+		b.text = "   %s  ×%d      %s  (%s, grows in %s)" % [String(pl.seed), n, String(pl.line), String(GardenPlants.KIND_NAMES[pl.kind]).to_lower().trim_suffix("s"), what]
+		b.add_theme_color_override("font_color", (pl.color as Color).lightened(0.35))
+		b.pressed.connect(func() -> void:
+			if Game.plant_seed(garden_bed, id):
+				Sfx.play("brush", -4.0, 0.1)
+				Game.say("You plant the %s. Now water it and watch it grow!" % String(pl.seed).to_lower(), Color(0.7, 1.0, 0.6))
+				var w = get_parent().get("world") if get_parent() else null
+				if w and w.get("garden"):
+					var gb: GardenBed = (w.garden as HomeGarden).beds[garden_bed]
+					FX.burst(gb.global_position + Vector3(0, 0.5, 0), Color(0.45, 0.3, 0.18), 24, 2.0, 0.12, 0.7, -1.0)
+					gb.tick(true)
+			resume_requested.emit())
+		_garden_list.add_child(b)
+	var parts: Array = []
+	for id in Game.basket:
+		parts.append("%s ×%d" % [GardenPlants.plant_name(String(id)), int(Game.basket[id])])
+	_garden_basket.text = ("Your basket: " + ", ".join(parts)) if not parts.is_empty() else "Your basket is empty. Pick what you grow, then eat it at your cabin table or sell it to Tobble."
 
 # --- the Wardrobe in your cabin (scripts/ui/wardrobe.gd) ---------------------------
 var wardrobe: WardrobePanel

@@ -32,6 +32,7 @@ var cabin: HomeCabin
 var shop: TradingPost        # Tobble's Trading Post, across the yard
 var forge: HomeForge         # the Forge, through the gap in the fence
 var decor: HomeDecor         # things for the yard you bought at the Trading Post
+var garden: HomeGarden       # the vegetable and flower garden beside the cabin
 var ride: SkyRide
 
 const CABIN := Vector3(0, 0, 0)
@@ -58,6 +59,7 @@ func build() -> void:
 	shop = TradingPost.build_in(self)
 	forge = HomeForge.build_in(self)
 	decor = HomeDecor.build_in(self)
+	garden = HomeGarden.build_in(self)
 	if _scen and _scen.soundscape:
 		_scen.soundscape.inside_fn = indoors      # calmer and further off indoors
 	_cloud_sea()
@@ -131,7 +133,8 @@ func _valley() -> void:
 	_scen.set_process(false)
 	_scen._noise.seed = 3; _scen._noise.frequency = 0.02
 	# room for the Trading Post and the Forge (no trees there, and a gap in the fence)
-	_scen.clear_spots = [Vector2(TradingPost.AT.x, TradingPost.AT.z), Vector2(HomeForge.AT.x, HomeForge.AT.z)]
+	_scen.clear_spots = [Vector2(TradingPost.AT.x, TradingPost.AT.z), Vector2(HomeForge.AT.x, HomeForge.AT.z),
+		Vector2(HomeGarden.C.x, HomeGarden.C.z)]
 	_scen._valley()
 	_scen._yard_portal()
 	# solid ground: the valley floor, the mountains and the cabin

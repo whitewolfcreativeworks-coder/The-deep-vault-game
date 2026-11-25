@@ -92,7 +92,7 @@ const OUTFITS := {
 
 ## kind: "" (your own boots) | "fluffy" | "bunny" | "dino" | "bear" | "duck" | "skull" | "workboots" | "wellies"
 const FOOTWEAR := {
-	"boots": {"name": "Adventuring Boots", "kind": "", "color": Color(0.4, 0.28, 0.18), "line": "Your own sturdy boots."},
+	"boots": {"name": "Your Boots", "kind": "", "color": Color(0.4, 0.28, 0.18), "line": "Your own sturdy adventuring boots."},
 	"fluffy": {"name": "Fluffy Slippers", "kind": "fluffy", "color": Color(0.62, 0.76, 1.0), "line": "Soft and fluffy, with a pompom on each."},
 	"bunny": {"name": "Bunny Slippers", "kind": "bunny", "color": Color(0.97, 0.95, 0.95), "line": "Two little bunnies, one on each foot."},
 	"dino": {"name": "Dino Slippers", "kind": "dino", "color": Color(0.35, 0.68, 0.3), "line": "Stomp stomp! Green, with claws."},

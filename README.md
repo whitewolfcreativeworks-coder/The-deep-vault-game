@@ -73,6 +73,66 @@ Basic gamepad support is included: left stick to move, A jump, X attack, LB bloc
 
 ## What's in it
 
+### The Wardrobe (Nov 25, designed by Jason's son)
+The cabinet you change in at the start of the opening movie is now your **wardrobe**. Walk up to it in your cabin and press USE. Tap an outfit or a pair of shoes and you're wearing it: the hero on the left turns round to show it off.
+- **Every hero has their own wardrobe** (it's saved with the hero), and each class starts with different things in it:
+
+| Class | Bedtime | Just for fun | Slippers |
+|---|---|---|---|
+| Knight | Royal Nightshirt (stars, golden-bobble nightcap) | Dragon Onesie (little horns) | Dino Slippers |
+| Barbarian | Lumberjack PJs (red and black checks) | Bear Onesie (round ears) | Bear Paw Slippers |
+| Rogue | Midnight PJs (silver stars, nightcap) | Black Cat Onesie | Bunny Slippers |
+| Ranger | Leafy PJs (green stripes) | Fox Onesie | Duck Slippers |
+| Mage | Starry Night Robe (gold stars, nightcap) | Magic Bunny Onesie | Bunny Slippers |
+| Priest | Cloudy PJs (white dots) | Fluffy Lamb Onesie | Duck Slippers |
+| Druid | Toadstool PJs (with a mushroom cap) | Frog Onesie (froggy eyes) | Dino Slippers |
+| Necromancer | Skeleton PJs (bony stripes, nightcap) | Bat Onesie (big ears) | Skull Slippers |
+| Beastmaster | Wolf PJs (paw prints) | Tiger Onesie | Bear Paw Slippers |
+
+- **Everybody also has:**
+  - **Adventuring Clothes** (your class outfit, with any armour you've found);
+  - the **Striped Pajamas** from the movie;
+  - **work clothes for home:**
+    - **Builder's Overalls** (hard hat and a tool belt with a hammer);
+    - **Smith's Apron** (leather apron and goggles, for the Forge);
+    - **Gardener's Dungarees** (straw sun hat);
+    - **Fishing Gear** (yellow raincoat and rain hat);
+    - **Chef's Whites** (chef's hat and apron).
+  - **Shoes and slippers, picked separately:** Your Boots, Fluffy Slippers, your class's slippers, Work Boots and Rain Boots.
+- **Outfits are only a look.** They never change health, damage or defence, so every class stays fair. You can wear them anywhere: fight Chief Gruk in your pajamas and bunny slippers if you like.
+- **What goes on top:** a magic costume (from a chest or Tobble's) still goes on top while it lasts, and your outfit comes back after.
+- **More outfits later:** new ones can be given to you (`Game.grant_outfit`); the open world will have some to find.
+
+### The Garden (Nov 25)
+A fenced garden beside the cabin (to the right as you come out of the door), with six raised beds, a seed box by the gate, a scarecrow and a rain barrel.
+- **The seed box:** the first time you open it, it holds a present of seeds (3 carrots, 2 sunflowers, 2 tomatoes, 1 pumpkin). After that it's **Tobble's seed stand**: carrot, tomato, pumpkin, sunflower and rose seeds, from 15 gold.
+- **Planting:** walk up to an empty bed and press USE, then pick a seed.
+- **Growing:** plants grow while you play, **anywhere**, even far away on an adventure. They go from a seed mound to a sprout to a young plant to fully grown.
+  - **Water them** (USE on a growing bed) and they grow **twice as fast** for two minutes; wet soil looks dark.
+  - A ripe bed **sparkles**: press USE to pick it.
+- **What you grow:**
+
+| Plant | Time | You get |
+|---|---|---|
+| Carrots | 3 min | 3 carrots |
+| Tomatoes | 5 min | 3 tomatoes |
+| Pumpkin | 8 min | 1 giant pumpkin |
+| Sunflower | 4 min | a sunflower (Tobble pays 30) |
+| Roses | 3½ min | 2 roses |
+| Moonpetal (magic) | 10 min | 2 mana potions |
+| Heartberry (magic) | 10 min | 2 healing draughts |
+| Fire Blossom (magic) | 12 min | 2 energy potions |
+| Glowcaps (magic) | 8 min | 3 mana potions |
+
+- **Eat what you grow** at the cabin's breakfast table: one of each vegetable you have.
+  - Carrots make you **QUICK**, tomatoes **STRONG**, pumpkin **TOUGH**, each for five minutes of play.
+  - You're also well fed, with full health and energy.
+- **Or sell it:** Tobble buys vegetables and flowers (the Sell tab).
+- **Finding seeds:**
+  - **Common seeds** turn up in chests out in the levels.
+  - **Magic seeds** can't be bought. Every boss chest has one, and now and then a lucky chest does too.
+- **Outfit:** the wardrobe has Gardener's Dungarees and Rain Boots for it.
+
 ### The hot air balloon and the edges of each level (Nov 22)
 - **The hot air balloon** (on its launch deck in the Goblin Forest):
   - **LIFT:** on the iPad, the JUMP button turns into a big yellow **LIFT** button while you're in the basket; hold it to fire the burner. ATTACK says **HOP OUT**.

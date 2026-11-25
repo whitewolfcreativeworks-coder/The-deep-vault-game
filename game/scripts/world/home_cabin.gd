@@ -67,6 +67,7 @@ func _build() -> void:
 	Usable.make(self, w(CHEST + Vector3(0.55, 0.5, 0)), "[E] Open your gear chest", _use_chest)
 	Usable.make(self, w(room._bed + Vector3(1.0, 0.6, 0.2)), "[E] Have a nap in your bed", nap)
 	Usable.make(self, w(room._wardrobe + Vector3(-0.1, 0.9, 0.85)), "[E] Open your wardrobe (outfits, shoes and slippers)", _use_wardrobe)
+	Usable.make(self, w(room._table + Vector3(0.0, 0.7, 0.75)), "[E] Sit down for a home-grown meal", _eat_meal)
 	_wardrobe_sign()
 
 func _process(_delta: float) -> void:
@@ -181,6 +182,25 @@ func _use_desk() -> void:
 	var sc := get_tree().current_scene
 	if sc.has_method("open_desk"):
 		sc.open_desk()
+
+## A meal from your garden (Game.eat_home_meal): carrots make you quick, tomatoes
+## strong, pumpkin tough, for five minutes of play; and a full belly.
+func _eat_meal() -> void:
+	if not Game.has_veg():
+		Game.say("Grow vegetables in your garden, then eat them here! (Carrots make you QUICK, tomatoes STRONG, pumpkin TOUGH.)", Color(0.8, 1.0, 0.7))
+		return
+	var ate := Game.eat_home_meal()
+	var what: Array = []
+	var buffs: Array = []
+	for id in ate:
+		what.append(GardenPlants.plant_name(String(id)).to_lower())
+		buffs.append(String(Game.BUFF_NAMES.get(GardenPlants.PLANTS[id].buff, "")).to_upper())
+	Sfx.play("stir", -4.0, 0.1)
+	Sfx.play("sip", -6.0, 0.2)
+	Game.say("Yum, home-grown %s! You feel %s for five minutes, and full of energy." % [" and ".join(what), " and ".join(buffs)], Color(1.0, 0.85, 0.5))
+	var p := get_tree().get_first_node_in_group("player") as Node3D
+	if p:
+		FX.burst(p.global_position + Vector3(0, 1.2, 0), Color(1.0, 0.75, 0.35), 24, 2.2)
 
 func _use_wardrobe() -> void:
 	var sc := get_tree().current_scene

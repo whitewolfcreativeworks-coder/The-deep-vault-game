@@ -355,6 +355,9 @@ func _run() -> void:
 	elif mode == "wardrobe":
 		if await _wardrobe_test():
 			return
+	elif mode == "garden":
+		if await _garden_test():
+			return
 	elif mode == "balloon2":
 		if await _balloon2_test():
 			return
@@ -5857,6 +5860,146 @@ func _gfx_totals(w: Node) -> Dictionary:
 	out["scale"] = get_viewport().scaling_3d_scale
 	return out
 
+# --- the Garden at home (Jason and his son, Nov 25) ------------------------------------
+func _garden_test() -> bool:
+	if not Game.get_meta("gd_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		Game.profile.hero = "Ranger"
+		await _start()
+		Game.set_meta("gd_phase", true)
+		Game.level = 12
+		Game.gold = 500
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true
+		main._travel("home")
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	var w: HomeWorld = main.world
+	var m = main.menus
+	await tp(w.ground(HomeWorld.LAND.x, HomeWorld.LAND.z) + Vector3(0, 1.0, 0), 0.0, -0.1)
+	await wait(1.5)
+	var g: HomeGarden = w.garden
+	check("gd_built", g != null and g.beds.size() == 6 and Game.garden_plots.size() == 6)
+	# dressed for it: the gardener's dungarees and rain boots
+	Game.wear_outfit("work_gardener"); Game.wear_footwear("wellies")
+	await wait(0.5)
+	await _cam_shot("gd_01_the_garden", g.gp(10.5, 9.0) + Vector3(0, 5.5, 0), g.gp(10.5, -3.5) + Vector3(0, 0.5, 0), 60.0)
+	# the seed box by the gate: a present of seeds
+	await tp(g.gp(HomeGarden.SEED_BOX.x, HomeGarden.SEED_BOX.y + 1.3) + Vector3(0, 0.3, 0), 0.0, -0.1)
+	await wait(0.6)
+	var it = player.interact_target
+	check("gd_seed_box_prompt", it != null and String(it.get_prompt()).contains("seed box"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(0.4)
+	check("gd_starter_seeds", Game.seed_count() == 8 and int(Game.seeds.get("carrot", 0)) == 3, str(Game.seeds))
+	# a bed: plant a seed (the seed picker)
+	var bp: Vector3 = g.beds[3].global_position
+	await tp(bp + Vector3(0, 0.05, 1.85), 0.0, -0.25)
+	await wait(0.6)
+	it = player.interact_target
+	check("gd_bed_prompt", it == g.beds[3] and String(it.get_prompt()).contains("Plant"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(0.8)
+	check("gd_picker_opens", m.current == "garden" and m._garden_list.get_child_count() == 4, "%s %d" % [m.current, m._garden_list.get_child_count()])
+	await shot("gd_02_seed_picker")
+	var carrot_btn: Button = null
+	for b in m._garden_list.get_children():
+		if (b as Button).text.contains("Carrot"):
+			carrot_btn = b
+	if carrot_btn:
+		carrot_btn.pressed.emit()
+	await wait(0.8)
+	check("gd_planted", m.current == "" and String(Game.garden_plots[3].plant) == "carrot" and int(Game.seeds.get("carrot", 0)) == 2, str(Game.garden_plots[3]))
+	# fill the other beds (two of them magic)
+	Game.add_seeds("moonpetal"); Game.add_seeds("fireblossom")
+	for pr in [[0, "pumpkin"], [1, "moonpetal"], [2, "fireblossom"], [4, "tomato"], [5, "sunflower"]]:
+		Game.plant_seed(int(pr[0]), String(pr[1]))
+	# watering: a wet bed grows twice as fast
+	Game.garden_plots[4].wet_until = 0.0
+	Game.plot_progress(3); Game.plot_progress(4)
+	var g3 := float(Game.garden_plots[3].grow)
+	var g4 := float(Game.garden_plots[4].grow)
+	Game.play_time += 60.0
+	Game.plot_progress(3); Game.plot_progress(4)
+	var d3 := float(Game.garden_plots[3].grow) - g3
+	var d4 := float(Game.garden_plots[4].grow) - g4
+	check("gd_wet_grows_twice_as_fast", absf(d3 - 120.0) < 1.0 and absf(d4 - 60.0) < 1.0, "%.1f %.1f" % [d3, d4])
+	await tp(g.beds[4].global_position + Vector3(0, 0.05, 1.85), 0.0, -0.25)
+	await wait(0.6)
+	it = player.interact_target
+	check("gd_water_prompt", it == g.beds[4] and String(it.get_prompt()).contains("Water"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(0.4)
+	check("gd_watered", Game.plot_wet(4))
+	Game.play_time += 45.0
+	for b in g.beds:
+		b.tick(true)
+	await wait(0.5)
+	await _cam_shot("gd_03_growing", g.gp(10.5, 3.6) + Vector3(0, 3.2, 0), g.gp(10.5, -4.0) + Vector3(0, 0.3, 0), 62.0)
+	# later: everything's ripe (it grew while we were out adventuring)
+	Game.play_time += 900.0
+	for b in g.beds:
+		b.tick(true)
+	await wait(0.5)
+	check("gd_all_ripe", g.beds.all(func(b) -> bool: return b.stage == 4 and b._sparkle.emitting))
+	await _cam_shot("gd_04_ripe", g.gp(10.5, 3.6) + Vector3(0, 3.2, 0), g.gp(10.5, -4.0) + Vector3(0, 0.3, 0), 62.0)
+	await _cam_shot("gd_05_ripe_close", g.gp(9.4, -0.2) + Vector3(0, 1.6, 0), g.gp(10.5, -3.0) + Vector3(0, 0.4, 0), 60.0)
+	# pick: carrots for the basket, moonpetals for mana potions
+	await tp(g.beds[3].global_position + Vector3(0, 0.05, 1.85), 0.0, -0.25)
+	await wait(0.6)
+	it = player.interact_target
+	check("gd_pick_prompt", it == g.beds[3] and String(it.get_prompt()).contains("Pick"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(0.4)
+	check("gd_picked_carrots", int(Game.basket.get("carrot", 0)) == 3 and String(Game.garden_plots[3].plant) == "")
+	var mp0 := Game.mana_potions
+	var sp0 := Game.stamina_potions
+	Game.harvest_plot(1); Game.harvest_plot(2)
+	check("gd_magic_potions", Game.mana_potions == mp0 + 2 and Game.stamina_potions == sp0 + 2, "%d %d" % [Game.mana_potions - mp0, Game.stamina_potions - sp0])
+	Game.harvest_plot(0); Game.harvest_plot(4); Game.harvest_plot(5)
+	await wait(0.3)
+	await _cam_shot("gd_06_picked", g.gp(10.5, 3.6) + Vector3(0, 3.2, 0), g.gp(10.5, -4.0) + Vector3(0, 0.3, 0), 62.0)
+	# a home-grown meal at the cabin table
+	var cab: HomeCabin = w.cabin
+	await tp(cab.w(cab.room._table + Vector3(0.0, 0.05, 1.5)), 0.0, -0.2)
+	await wait(0.6)
+	it = player.interact_target
+	check("gd_meal_prompt", it != null and String(it.get_prompt()).contains("meal"), str(it.get_prompt()) if it else "none")
+	if it:
+		it.interact(player)
+	await wait(0.4)
+	check("gd_meal_buffs", Game.has_buff("quick") and Game.has_buff("strong") and Game.has_buff("tough") and Game.has_buff("fed")
+		and int(Game.basket.get("carrot", 0)) == 2, "%s %s" % [Game.buffs, Game.basket])
+	# Tobble buys the rest, and sells seeds
+	var gold0 := Game.gold
+	var hv := ShopCatalog.harvest_value()
+	ShopCatalog.sell_harvest()
+	check("gd_sold_harvest", hv > 0 and Game.gold == gold0 + hv and Game.basket.is_empty(), "%d" % hv)
+	var c0 := int(Game.seeds.get("carrot", 0))
+	check("gd_buy_seeds", ShopCatalog.buy("seed_carrot") and int(Game.seeds.get("carrot", 0)) == c0 + 1)
+	# seeds in chests: a boss chest always has a magic one; a seed pouch on the ground
+	var boss: Array = Loot.roll_chest("boss", 8)
+	check("gd_boss_magic_seed", boss.any(func(l) -> bool: return l.get("kind", "") == "seed" and GardenPlants.MAGIC.has(String(l.id))), str(boss))
+	var n0 := int(Game.seeds.get("heartberry", 0))
+	Pickup.spawn(player.global_position + Vector3(0, 1.0, 0.8), "seed", 1, "heartberry")
+	await wait(1.8)
+	check("gd_seed_pickup", int(Game.seeds.get("heartberry", 0)) == n0 + 1)
+	# saved with the hero
+	Game.plant_seed(3, "heartberry")
+	Game.save_slot()
+	var sv: Dictionary = Game.read_slot(Game.active_slot)
+	check("gd_saved", String((sv.get("garden_plots", []) as Array)[3].plant) == "heartberry" and bool(sv.get("garden_starter", false)))
+	_finish()
+	return true
+
 # --- the Wardrobe: outfits, shoes and slippers (designed by Jason's son, Nov 25) -----------
 func _wardrobe_test() -> bool:
 	if not Game.get_meta("wr_phase", false):
@@ -5929,10 +6072,10 @@ func _wardrobe_test() -> bool:
 			crown_on = true
 	check("wr_hero_dressed", bd.outfit_parts >= 6 and bd._pattern == 1 and not crown_on, "%d parts pattern %d crown %s" % [bd.outfit_parts, bd._pattern, crown_on])
 	check("wr_only_a_look", is_equal_approx(Game.defense(), def0) and is_equal_approx(Game.max_hp(), hp0))
-	await tp(cab.w(cab.room._wardrobe + Vector3(-0.6, 0.05, 2.2)), PI * 0.85, -0.1)
-	player.zoom_target = 3.2; player.zoom = 3.2; player.snap_view()
+	await tp(cab.w(cab.room._wardrobe + Vector3(-0.6, 0.05, 2.0)), PI, -0.1)
 	await wait(1.0)
-	await shot("wr_05_pajamas_in_the_cabin")
+	var pp := player.global_position
+	await _cam_shot("wr_05_pajamas_in_the_cabin", pp + Vector3(0.9, 1.5, 2.6), pp + Vector3(0, 0.8, 0), 55.0)
 	# saved with the hero; each class has its own wardrobe
 	Game.save_slot()
 	var saved: Dictionary = Game.read_slot(Game.active_slot)
@@ -5954,8 +6097,10 @@ func _wardrobe_test() -> bool:
 	await wait(1.0)
 	check("wr_back_in_pajamas", player.body.outfit_parts >= 6 and player.body._pattern == 1)
 	# everybody's outfits: a line-up of all nine classes, in each set
-	var at := w.ground(HomeWorld.LAND.x + 30.0, HomeWorld.LAND.z) + Vector3(0, 0.02, 0)
+	var at := w.ground(HomeWorld.LAND.x + 34.0, HomeWorld.LAND.z) + Vector3(0, 0.02, 0)
 	var line := Node3D.new(); w.add_child(line)
+	var lamp := SpotLight3D.new(); lamp.light_energy = 6.0; lamp.spot_range = 20.0; lamp.spot_angle = 50.0
+	w.add_child(lamp); lamp.position = at + Vector3(0, 5.0, 8.0); lamp.look_at(at + Vector3(0, 0.8, 0))
 	var heroes: Array = Game.HERO_ORDER
 	for set_i in 3:
 		for c in line.get_children():
@@ -5971,9 +6116,11 @@ func _wardrobe_test() -> bool:
 			var cm := CharacterModel.new(); line.add_child(cm)
 			cm.position = at + Vector3((k - 4) * 1.25, 0, 0)
 			cm.setup(cfg)
+			cm.rotation.y = PI            # (facing the camera)
 		await wait(1.0)
 		await _cam_shot("wr_1%d_lineup_%s" % [set_i, ["bedtime", "onesies", "work"][set_i]], at + Vector3(0, 1.4, 7.6), at + Vector3(0, 0.8, 0), 62.0)
 	line.queue_free()
+	lamp.queue_free()
 	_finish()
 	return true
 
