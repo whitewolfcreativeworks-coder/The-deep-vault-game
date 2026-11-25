@@ -66,7 +66,9 @@ func box(a: Vector3, b: Vector3, m: Material, collide := true) -> MeshInstance3D
 
 # --- a white picket fence with a gate arch and a sign -------------------------------
 func _fence() -> void:
+	# (every post and rail is one MultiMesh: the whole fence is one thing to draw)
 	var white := _mat(Color(0.95, 0.93, 0.88), 0.7)
+	var xfs: Array[Transform3D] = []
 	var sides := [[Vector2(X0, Z0), Vector2(X1, Z0)], [Vector2(X0, Z0), Vector2(X0, Z1)], [Vector2(X1, Z0), Vector2(X1, Z1)],
 		[Vector2(X0, Z1), Vector2(GATE[0], Z1)], [Vector2(GATE[1], Z1), Vector2(X1, Z1)]]
 	for s in sides:
@@ -77,15 +79,21 @@ func _fence() -> void:
 		for k in n + 1:
 			var p := a.lerp(b, float(k) / float(n))
 			var y := gp(p.x, p.y).y
-			box(Vector3(p.x - 0.05, y, p.y - 0.05), Vector3(p.x + 0.05, y + 0.85, p.y + 0.05), white, false)
+			xfs.append(Transform3D(Basis.from_scale(Vector3(0.1, 0.85, 0.1)), Vector3(p.x, y + 0.425, p.y)))
 		# two rails, and one long solid strip to bump into
 		var y0 := gp((a.x + b.x) * 0.5, (a.y + b.y) * 0.5).y
 		var lo := Vector3(minf(a.x, b.x) - 0.03, y0, minf(a.y, b.y) - 0.03)
 		var hi := Vector3(maxf(a.x, b.x) + 0.03, y0, maxf(a.y, b.y) + 0.03)
-		box(lo + Vector3(0, 0.28, 0), hi + Vector3(0, 0.36, 0), white, false)
-		box(lo + Vector3(0, 0.6, 0), hi + Vector3(0, 0.68, 0), white, false)
+		for ry in [0.32, 0.64]:
+			xfs.append(Transform3D(Basis.from_scale(Vector3(hi.x - lo.x, 0.08, hi.z - lo.z)), (lo + hi) * 0.5 + Vector3(0, ry, 0)))
 		var wall := box(lo, hi + Vector3(0, 0.9, 0), white, true)
 		wall.visible = false
+	var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.mesh = BoxMesh.new()
+	mm.instance_count = xfs.size()
+	for k in xfs.size():
+		mm.set_instance_transform(k, xfs[k])
+	var mmi := MultiMeshInstance3D.new(); mmi.multimesh = mm; mmi.material_override = white; mmi.name = "Fence"
+	add_child(mmi)
 	# the gate: two posts and an arch with a sign
 	for gx in GATE:
 		var y := gp(gx, Z1).y
@@ -99,13 +107,18 @@ func _fence() -> void:
 	SignText.fit(lb, 1.4, 0.3)
 	# flowers climbing the arch
 	var rng := RandomNumberGenerator.new(); rng.seed = 1125
+	var fm := MultiMesh.new(); fm.transform_format = MultiMesh.TRANSFORM_3D; fm.use_colors = true
+	var sm := SphereMesh.new(); sm.radius = 0.07; sm.height = 0.12; sm.radial_segments = 8; sm.rings = 4
+	fm.mesh = sm; fm.instance_count = 14
 	for k in 14:
 		var t := float(k) / 13.0
 		var side: float = GATE[0] if k % 2 == 0 else GATE[1]
 		var p := Vector3(side, ay + 0.4 + t * 1.9, Z1 + 0.1) if t < 0.95 else Vector3(lerpf(GATE[0], GATE[1], rng.randf()), ay + 2.36, Z1 + 0.12)
-		var fl := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.07; sm.height = 0.12; sm.radial_segments = 8; sm.rings = 4
-		fl.mesh = sm; fl.material_override = _mat([Color(1.0, 0.5, 0.7), Color(1.0, 0.85, 0.3), Color(0.75, 0.55, 1.0)][k % 3], 0.6)
-		fl.position = p; add_child(fl)
+		fm.set_instance_transform(k, Transform3D(Basis(), p))
+		fm.set_instance_color(k, [Color(1.0, 0.5, 0.7), Color(1.0, 0.85, 0.3), Color(0.75, 0.55, 1.0)][k % 3])
+	var fmi := MultiMeshInstance3D.new(); fmi.multimesh = fm
+	var fmat := _mat(Color.WHITE, 0.6); fmat.vertex_color_use_as_albedo = true
+	fmi.material_override = fmat; add_child(fmi)
 
 ## Trodden paths between the beds.
 func _paths() -> void:

@@ -5951,6 +5951,19 @@ func _garden_test() -> bool:
 	check("gd_all_ripe", g.beds.all(func(b) -> bool: return b.stage == 4 and b._sparkle.emitting))
 	await _cam_shot("gd_04_ripe", g.gp(10.5, 3.6) + Vector3(0, 3.2, 0), g.gp(10.5, -4.0) + Vector3(0, 0.3, 0), 62.0)
 	await _cam_shot("gd_05_ripe_close", g.gp(9.4, -0.2) + Vector3(0, 1.6, 0), g.gp(10.5, -3.0) + Vector3(0, 0.4, 0), 60.0)
+	# what the whole garden costs to draw, ripe and sparkling (Jason: "this game must have no lag")
+	var dc_cam := Camera3D.new(); dc_cam.fov = 62.0; w.add_child(dc_cam)
+	dc_cam.global_position = g.gp(10.5, 3.6) + Vector3(0, 3.2, 0); dc_cam.look_at(g.gp(10.5, -4.0) + Vector3(0, 0.3, 0))
+	dc_cam.current = true
+	await frames(6)
+	var dc_with := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+	g.visible = false
+	await frames(6)
+	var dc_without := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+	g.visible = true
+	dc_cam.queue_free(); player.camera.current = true
+	print("GARDEN draw calls: %d with, %d without" % [dc_with, dc_without])
+	check("gd_cheap_to_draw", dc_with - dc_without <= 90, "%d extra draw calls (%d with, %d without)" % [dc_with - dc_without, dc_with, dc_without])
 	# pick: carrots for the basket, moonpetals for mana potions
 	await tp(g.beds[3].global_position + Vector3(0, 0.05, 1.85), 0.0, -0.25)
 	await wait(0.6)

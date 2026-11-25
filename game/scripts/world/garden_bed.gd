@@ -27,18 +27,18 @@ static func make(g: HomeGarden, i: int, at: Vector3) -> GardenBed:
 
 func _build() -> void:
 	add_to_group("interactable")
+	# (the frame is one mesh and the soil another: a bed is two things to draw, not nine)
 	var h := HomeGarden.BED_HALF
 	var wood := garden._mat(Color(0.5, 0.33, 0.18), 0.85)
+	_soil = garden._mat(Color(0.36, 0.25, 0.15), 1.0)
+	var unit := BoxMesh.new()
 	for s in [[Vector3(-h, 0, -h), Vector3(h, 0.34, -h + 0.1)], [Vector3(-h, 0, h - 0.1), Vector3(h, 0.34, h)],
 			[Vector3(-h, 0, -h), Vector3(-h + 0.1, 0.34, h)], [Vector3(h - 0.1, 0, -h), Vector3(h, 0.34, h)]]:
-		var mi := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = s[1] - s[0]; mi.mesh = bm
-		mi.material_override = wood; mi.position = (s[0] + s[1]) * 0.5; add_child(mi)
-	_soil = garden._mat(Color(0.36, 0.25, 0.15), 1.0)
-	var soil := MeshInstance3D.new(); var sm := BoxMesh.new(); sm.size = Vector3(h * 2.0 - 0.2, 0.3, h * 2.0 - 0.2); soil.mesh = sm
-	soil.material_override = _soil; soil.position.y = 0.15; add_child(soil)
+		_add(unit, Transform3D(Basis.from_scale(s[1] - s[0]), (s[0] + s[1]) * 0.5), wood)
+	_add(unit, Transform3D(Basis.from_scale(Vector3(h * 2.0 - 0.2, 0.3, h * 2.0 - 0.2)), Vector3(0, 0.15, 0)), _soil)
 	for k in 3:
-		var fur := MeshInstance3D.new(); var fm := BoxMesh.new(); fm.size = Vector3(h * 2.0 - 0.3, 0.05, 0.12); fur.mesh = fm
-		fur.material_override = _soil; fur.position = Vector3(0, 0.31, (k - 1) * 0.45); add_child(fur)
+		_add(unit, Transform3D(Basis.from_scale(Vector3(h * 2.0 - 0.3, 0.05, 0.12)), Vector3(0, 0.31, (k - 1) * 0.45)), _soil)
+	_flush(self)
 	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(h * 2.0, 0.5, h * 2.0)
 	cs.shape = bs; cs.position.y = 0.25; sb.add_child(cs); add_child(sb)
 	_vis = Node3D.new(); _vis.position.y = 0.3; add_child(_vis)
@@ -118,23 +118,48 @@ func _basket_hint(kind: String) -> String:
 	return "(Eat them at your cabin table, or sell them to Tobble.)" if kind == "veg" else "(Tobble pays well for flowers.)"
 
 # --- how each plant looks as it grows --------------------------------------------------
+# Every piece of a plant is merged into one mesh per colour (MeshInstance3D per
+# material), so a ripe bed is a few things to draw however many tomatoes it has.
+var _parts := {}                   # material -> SurfaceTool
+static var _mat_cache := {}
+static var _ball: SphereMesh
+
+func _add(mesh: Mesh, xf: Transform3D, mat: Material) -> void:
+	var st: SurfaceTool = _parts.get(mat)
+	if st == null:
+		st = SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_parts[mat] = st
+	st.append_from(mesh, 0, xf)
+
+func _flush(parent: Node3D) -> void:
+	for mat in _parts:
+		var mi := MeshInstance3D.new(); mi.mesh = (_parts[mat] as SurfaceTool).commit(); mi.material_override = mat
+		parent.add_child(mi)
+	_parts.clear()
+
 func _m(c: Color, r := 0.8) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new(); m.albedo_color = c; m.roughness = r
-	return m
+	var key := "m%s%.2f" % [c.to_html(), r]
+	if not _mat_cache.has(key):
+		var m := StandardMaterial3D.new(); m.albedo_color = c; m.roughness = r
+		_mat_cache[key] = m
+	return _mat_cache[key]
 
 func _glow(c: Color, e := 1.6) -> StandardMaterial3D:
-	var m := _m(c, 0.4); m.emission_enabled = true; m.emission = c; m.emission_energy_multiplier = e
-	return m
+	var key := "g%s%.2f" % [c.to_html(), e]
+	if not _mat_cache.has(key):
+		var m := StandardMaterial3D.new(); m.albedo_color = c; m.roughness = 0.4
+		m.emission_enabled = true; m.emission = c; m.emission_energy_multiplier = e
+		_mat_cache[key] = m
+	return _mat_cache[key]
 
-func _sph(pos: Vector3, scl: Vector3, m: Material) -> MeshInstance3D:
-	var mi := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 1.0; sm.height = 2.0; sm.radial_segments = 10; sm.rings = 5
-	mi.mesh = sm; mi.material_override = m; mi.position = pos; mi.scale = scl; _vis.add_child(mi)
-	return mi
+func _sph(pos: Vector3, scl: Vector3, m: Material, rot := Vector3.ZERO) -> void:
+	if _ball == null:
+		_ball = SphereMesh.new(); _ball.radius = 1.0; _ball.height = 2.0; _ball.radial_segments = 10; _ball.rings = 5
+	_add(_ball, Transform3D(Basis.from_euler(rot) * Basis.from_scale(scl), pos), m)
 
-func _cyl(pos: Vector3, r_top: float, r_bot: float, h: float, m: Material, rot := Vector3.ZERO) -> MeshInstance3D:
-	var mi := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = r_top; cm.bottom_radius = r_bot; cm.height = h
-	cm.radial_segments = 8; mi.mesh = cm; mi.material_override = m; mi.position = pos; mi.rotation = rot; _vis.add_child(mi)
-	return mi
+func _cyl(pos: Vector3, r_top: float, r_bot: float, h: float, m: Material, rot := Vector3.ZERO) -> void:
+	var cm := CylinderMesh.new(); cm.top_radius = r_top; cm.bottom_radius = r_bot; cm.height = h; cm.radial_segments = 8
+	_add(cm, Transform3D(Basis.from_euler(rot), pos), m)
 
 func _plant_look(id: String, st: int) -> void:
 	var leaf := _m(Color(0.3, 0.62, 0.24), 0.8)
@@ -143,13 +168,15 @@ func _plant_look(id: String, st: int) -> void:
 		_sph(Vector3(0, 0.0, 0), Vector3(0.4, 0.08, 0.4), _m(Color(0.3, 0.2, 0.12), 1.0))
 		_cyl(Vector3(0.45, 0.2, 0.45), 0.02, 0.02, 0.45, _m(Color(0.6, 0.45, 0.25)))
 		_sph(Vector3(0.45, 0.42, 0.45), Vector3(0.09, 0.07, 0.02), _m(GardenPlants.PLANTS[id].color, 0.6))
+		_flush(_vis)
 		return
 	if st == 2:
 		for k in 3:
 			var x := (k - 1) * 0.45
 			_cyl(Vector3(x, 0.07, 0), 0.012, 0.015, 0.14, leaf)
-			_sph(Vector3(x - 0.05, 0.15, 0), Vector3(0.07, 0.02, 0.04), leaf).rotation.z = 0.4
-			_sph(Vector3(x + 0.05, 0.15, 0), Vector3(0.07, 0.02, 0.04), leaf).rotation.z = -0.4
+			_sph(Vector3(x - 0.05, 0.15, 0), Vector3(0.07, 0.02, 0.04), leaf, Vector3(0, 0, 0.4))
+			_sph(Vector3(x + 0.05, 0.15, 0), Vector3(0.07, 0.02, 0.04), leaf, Vector3(0, 0, -0.4))
+		_flush(_vis)
 		return
 	var s := 0.7 if st == 3 else 1.0
 	var ripe := st == 4
@@ -175,26 +202,26 @@ func _plant_look(id: String, st: int) -> void:
 		"pumpkin":
 			for k in 5:
 				var a := k * TAU / 5.0 + 0.3
-				_sph(Vector3(cos(a) * 0.45, 0.05, sin(a) * 0.45), Vector3(0.24, 0.05, 0.2) * s, leaf).rotation.y = a
+				_sph(Vector3(cos(a) * 0.45, 0.05, sin(a) * 0.45), Vector3(0.24, 0.05, 0.2) * s, leaf, Vector3(0, a, 0))
 			var pr := (0.38 if ripe else 0.2) * s
-			var pk := _sph(Vector3(0, pr * 0.8, 0), Vector3(pr * 1.2, pr * 0.85, pr * 1.2), _m(col if ripe else Color(0.45, 0.65, 0.25), 0.55))
+			var pkm := _m(col if ripe else Color(0.45, 0.65, 0.25), 0.55)
+			_sph(Vector3(0, pr * 0.8, 0), Vector3(pr * 1.2, pr * 0.85, pr * 1.2), pkm)
 			for k in 6:
 				var a2 := k * TAU / 6.0
-				_sph(Vector3(cos(a2) * pr * 0.95, pr * 0.8, sin(a2) * pr * 0.95), Vector3(pr * 0.35, pr * 0.82, pr * 0.35), pk.material_override)
+				_sph(Vector3(cos(a2) * pr * 0.95, pr * 0.8, sin(a2) * pr * 0.95), Vector3(pr * 0.35, pr * 0.82, pr * 0.35), pkm)
 			_cyl(Vector3(0, pr * 1.55, 0), 0.03, 0.04, 0.15, _m(Color(0.35, 0.4, 0.15)))
 		"sunflower":
 			for x in [-0.35, 0.35]:
 				var h := 1.7 * s
 				_cyl(Vector3(x, h * 0.5, 0), 0.03, 0.04, h, leaf)
 				for k in 2:
-					_sph(Vector3(x + (0.12 if k == 0 else -0.12), h * (0.35 + k * 0.2), 0), Vector3(0.14, 0.03, 0.08), leaf).rotation.z = 0.5 if k == 0 else -0.5
+					_sph(Vector3(x + (0.12 if k == 0 else -0.12), h * (0.35 + k * 0.2), 0), Vector3(0.14, 0.03, 0.08), leaf, Vector3(0, 0, 0.5 if k == 0 else -0.5))
 				var head := Vector3(x, h + 0.05, 0.05)
 				if ripe:
 					_cyl(head, 0.15, 0.15, 0.06, _m(Color(0.35, 0.2, 0.08), 0.9), Vector3(PI * 0.5, 0, 0))
 					for k in 12:
 						var a := k * TAU / 12.0
-						var pe := _sph(head + Vector3(cos(a) * 0.22, sin(a) * 0.22, -0.01), Vector3(0.09, 0.04, 0.015), _m(col, 0.6))
-						pe.rotation.z = a
+						_sph(head + Vector3(cos(a) * 0.22, sin(a) * 0.22, -0.01), Vector3(0.09, 0.04, 0.015), _m(col, 0.6), Vector3(0, 0, a))
 				else:
 					_sph(head, Vector3.ONE * 0.09, leaf)
 		"rose":
@@ -213,7 +240,7 @@ func _plant_look(id: String, st: int) -> void:
 				for f in 5:
 					var a := f * TAU / 5.0
 					_sph(p + Vector3(cos(a) * 0.09 * s, h + 0.02, sin(a) * 0.09 * s), Vector3(0.08, 0.02, 0.05) * s,
-						_glow(col, 1.8 if ripe else 0.6)).rotation.y = -a
+						_glow(col, 1.8 if ripe else 0.6), Vector3(0, -a, 0))
 				_sph(p + Vector3(0, h + 0.04, 0), Vector3.ONE * 0.04, _glow(Color(1, 1, 1), 2.5 if ripe else 0.8))
 		"heartberry":
 			for k in 3:
@@ -241,5 +268,5 @@ func _plant_look(id: String, st: int) -> void:
 				var p := Vector3(cos(a) * 0.38, 0, sin(a) * 0.3)
 				var h := (0.22 + (k % 3) * 0.08) * s
 				_cyl(p + Vector3(0, h * 0.5, 0), 0.03, 0.04, h, _m(Color(0.9, 0.9, 0.8), 0.6))
-				var cap := _sph(p + Vector3(0, h, 0), Vector3(0.13, 0.08, 0.13) * s, _glow(col, 1.8 if ripe else 0.5))
-				cap.scale.y = 0.07 * s
+				_sph(p + Vector3(0, h, 0), Vector3(0.13, 0.07, 0.13) * s, _glow(col, 1.8 if ripe else 0.5))
+	_flush(_vis)
