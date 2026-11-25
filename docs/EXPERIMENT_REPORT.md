@@ -1644,3 +1644,17 @@ It photographs the garden empty, growing, ripe and picked.
 - **Now:** the ripe garden adds **59 draw calls**. The `garden` test checks it stays within a budget of 90, so the garden can't quietly get expensive later.
 - **The rule from here on:** each new area gets a draw-call budget in its test.
 
+## Follow-up 50: brushing teeth with the right end (Nov 25)
+
+Jason: in the opening movie "the rogue brushes his teeth perfectly right in the mouth, but... every skin of the other characters is a little bit different sizing, so a couple of them are like brushing up the nose instead of the mouth."
+
+- **Why:** the movie found the mouth from the size of the head mesh: 20% up from the bottom and just behind the front. That only matched the Rogue. Other heads are a different size:
+  - the Druid's antlers make his head 1.55 tall instead of about 1.0, so the brush rose to his nose;
+  - beards and long hair hang lower, so the brush dropped;
+  - the Necromancer's hood sticks out 0.26 in front of his face.
+- **Fix:** every KayKit head sits on the same head bone with the face in the same place. The mouth is now a fixed point on that bone, measured on the Rogue, where it was right (`IntroMovie.MOUTH_BRUSH`, and `MOUTH_CUP` for the teacup, which had the same problem).
+- **Tested:** the new `brushing` test puts eight heroes in front of the mirror with the toothbrush at their mouths:
+  - Rogue, Druid, Necromancer, Mage, Priest, Barbarian, a Knight heroine and Beastmaster;
+  - for each, it checks the bristles sit at mouth height just in front of the face;
+  - it photographs each one.
+
