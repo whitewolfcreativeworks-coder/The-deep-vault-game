@@ -30,7 +30,7 @@ func _build() -> void:
 	# (the frame is one mesh and the soil another: a bed is two things to draw, not nine)
 	var h := HomeGarden.BED_HALF
 	var wood := garden._mat(Color(0.5, 0.33, 0.18), 0.85)
-	_soil = garden._mat(Color(0.36, 0.25, 0.15), 1.0)
+	_soil = StandardMaterial3D.new(); _soil.albedo_color = Color(0.36, 0.25, 0.15); _soil.roughness = 1.0   # (its own: it darkens when watered)
 	var unit := BoxMesh.new()
 	for s in [[Vector3(-h, 0, -h), Vector3(h, 0.34, -h + 0.1)], [Vector3(-h, 0, h - 0.1), Vector3(h, 0.34, h)],
 			[Vector3(-h, 0, -h), Vector3(-h + 0.1, 0.34, h)], [Vector3(h - 0.1, 0, -h), Vector3(h, 0.34, h)]]:
@@ -134,6 +134,7 @@ func _add(mesh: Mesh, xf: Transform3D, mat: Material) -> void:
 func _flush(parent: Node3D) -> void:
 	for mat in _parts:
 		var mi := MeshInstance3D.new(); mi.mesh = (_parts[mat] as SurfaceTool).commit(); mi.material_override = mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF      # (low and small: not worth a shadow)
 		parent.add_child(mi)
 	_parts.clear()
 
