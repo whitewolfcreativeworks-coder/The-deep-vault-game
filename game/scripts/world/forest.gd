@@ -34,6 +34,7 @@ var gruk: Enemy
 var day_night: DayNight
 var sinkhole: SinkholeOfDeath
 var wild_chests: WildChests
+var gate_floor := NAN         # the level yard in front of the Warren Gate (WarrenGate)
 
 func _wild_spot_ok(p: Vector2) -> bool:
 	if road_dist(p) < 8.0 or stream_dist(p) < 7.0 or p.distance_to(SinkholeOfDeath.HOLE) < 12.0:
@@ -68,6 +69,7 @@ func build() -> void:
 	clearings = [[Vector2(0, 92), 16.0], [Vector2(-55, 45), 16.0], [Vector2(55, 8), 13.0], [Vector2(-14, -18), 10.0],
 		[Vector2(-58, -42), 15.0], [Vector2(60, -50), 15.0], [Vector2(36, 62), 10.0], [Vector2(0, -92), 15.0],
 		[SinkholeOfDeath.HOLE, 12.0], [MOON_PORTAL, 12.0], [BALLOON_PORT, 9.0]]
+	gate_floor = height(0, WarrenGate.YARD_FRONT - 2.0)       # (the yard is level with the end of the road)
 	_environment()
 	_terrain()
 	_stream()
@@ -132,7 +134,12 @@ func height(x: float, z: float) -> float:
 		var ch := noise.get_noise_2d(c[0].x, c[0].y) * 7.0 * 0.35 + 2.0 * 0.35
 		h = lerpf(h, ch, smoothstep(c[1] + 8.0, c[1] * 0.6, cd))
 	# the northern ridge the Warren is dug into
-	h += smoothstep(-90.0, -112.0, z) * 16.0
+	h += ridge_h(z)
+	# ...with the Warren Gate's yard and tunnel cut level into its foot
+	if not is_nan(gate_floor):
+		var gk := WarrenGate.cut(p)
+		if gk > 0.0:
+			h = lerpf(h, gate_floor, gk)
 	# hills rising at the edge of the valley
 	var edge := maxf(absf(x), absf(z) * (1.0 if z > 0.0 else 0.0))
 	if edge > 100.0:
@@ -145,6 +152,10 @@ func height(x: float, z: float) -> float:
 
 func ground(x: float, z: float) -> Vector3:
 	return Vector3(x, height(x, z), z)
+
+## How high the northern ridge rises above the valley here.
+func ridge_h(z: float) -> float:
+	return smoothstep(-90.0, -112.0, z) * 16.0
 
 func _col(c: Color) -> Color:
 	return c if Game.is_compat() else c.srgb_to_linear()
@@ -175,6 +186,7 @@ func _terrain() -> void:
 				c = c.lerp(grass_b.lerp(dirt, 0.25), smoothstep(cl[1], cl[1] * 0.5, p.distance_to(cl[0])) * 0.35)
 			if z > -40.0 and z < 60.0:
 				c = c.lerp(bed, smoothstep(5.0, 2.5, stream_dist(p)))
+			c = c.lerp(dirt.darkened(0.08), WarrenGate.cut(p) * 0.9)          # the Warren Gate's trodden yard
 			c = c.lerp(rock, smoothstep(0.82, 0.62, nrm.y))
 			verts[j * n + i] = [Vector3(x, y, z), nrm, _col(c)]
 	for j in n - 1:
@@ -542,45 +554,12 @@ func _goblin_outpost(c: Vector2) -> void:
 		_enemy(["goblin", "goblin", "goblin_archer"][k], ground(c.x + k * 2.5 - 2.5, c.y + 2.0), "f_outpost_%d" % k, PI)
 
 func _warren_entrance() -> void:
-	var c := ground(0, -101)
-	var mine := _model("building_mine_green", c + Vector3(0, -0.4, 0), 0.0, 7.0, false)
-	mine.name = "WarrenEntrance"
-	# the mine model sits on a ridge; solid blocks either side of the door
-	var sb := StaticBody3D.new(); add_child(sb)
-	for sx in [-1.0, 1.0]:
-		var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(3.5, 8.0, 12.0)
-		cs.shape = bs; cs.position = c + Vector3(sx * 4.4, 4.0, -2.0); sb.add_child(cs)
-	var back := CollisionShape3D.new(); var bb := BoxShape3D.new(); bb.size = Vector3(12.0, 8.0, 4.0)
-	back.shape = bb; back.position = c + Vector3(0, 4.0, -6.5); sb.add_child(back)
-	# great braziers and banners: visible from the portal far to the south
-	for sx in [-6.5, 6.5]:
-		var bp := c + Vector3(sx, 0, 5.5)
-		Props.place(self, "pillar", bp, 0.0, 1.0, true)
-		var fire := Node3D.new(); add_child(fire); fire.position = bp + Vector3(0, 4.1, 0)
-		var fl := CPUParticles3D.new(); fl.amount = 50; fl.lifetime = 0.9
-		fl.mesh = FX.quad(0.7); fl.material_override = FX.glow_material(Color(1.0, 0.45, 0.12), 3.5)
-		fl.direction = Vector3.UP; fl.spread = 15; fl.initial_velocity_min = 1.5; fl.initial_velocity_max = 3.0
-		fl.gravity = Vector3(0, 1.5, 0); fl.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; fl.emission_sphere_radius = 0.4
-		fl.color_ramp = FX._fade_ramp(Color(1.0, 0.5, 0.15))
-		fire.add_child(fl)
-		var l := OmniLight3D.new(); l.light_color = Color(1.0, 0.5, 0.2); l.light_energy = 4.0; l.omni_range = 16.0
-		l.set_script(load("res://scripts/world/flicker.gd")); fire.add_child(l)
-		_model("flag_red", c + Vector3(sx * 1.4, 0, 3.0), 180.0, 10.0)
-	var beacon := c + Vector3(0, 10.5, -4.0)
-	Props.place(self, "pillar", beacon - Vector3(0, 3.0, 0), 0.0, 1.4, false)
-	var bf := CPUParticles3D.new(); bf.amount = 90; bf.lifetime = 1.3
-	bf.mesh = FX.quad(1.3); bf.material_override = FX.glow_material(Color(1.0, 0.45, 0.1), 4.0)
-	bf.direction = Vector3.UP; bf.spread = 12; bf.initial_velocity_min = 3.0; bf.initial_velocity_max = 5.5
-	bf.gravity = Vector3(0, 2.0, 0); bf.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; bf.emission_sphere_radius = 0.9
-	bf.color_ramp = FX._fade_ramp(Color(1.0, 0.5, 0.15))
-	add_child(bf); bf.position = beacon + Vector3(0, 2.2, 0)
-	var bl := OmniLight3D.new(); bl.light_color = Color(1.0, 0.5, 0.2); bl.light_energy = 8.0; bl.omni_range = 30.0
-	bl.set_script(load("res://scripts/world/flicker.gd")); add_child(bl); bl.position = beacon + Vector3(0, 4.0, 0)
-	door = WarrenDoor.make(self, c + Vector3(0, 0, 3.0), Vector3(0, WY + 0.1, -118.0))
-	NPC.create(self, "aldric", ground(8.5, -88), 200.0, {"hero": "Knight", "hat": true,
+	# the yard, the rock face and the tunnel in (scripts/world/warren_gate.gd)
+	door = WarrenGate.build(self)
+	NPC.create(self, "aldric", ground(5.6, -86.5), 200.0, {"hero": "Knight", "hat": true,
 		"outfit_color": Color(0.35, 0.45, 0.75), "cape_color": Color(0.2, 0.3, 0.7), "skin_color": Color(0.66, 0.45, 0.3),
 		"face": "mustache", "hair_color": Color(0.12, 0.08, 0.06), "weapon": "sword_1handed", "shield": "shield_round"})
-	Interactable.create(self, "shrine", ground(-9, -86), 160.0, "", [], "the Warren Gate")
+	Interactable.create(self, "shrine", ground(-5.8, -85.5), 160.0, "", [], "the Warren Gate")
 	_enemy("goblin_brute", ground(-14, -78), "f_gate_brute", 0.5)
 	_enemy("goblin", ground(14, -76), "f_gate_g1", 2.0)
 
@@ -613,7 +592,10 @@ func _scatter_forest() -> void:
 			var s: float = tt[1] * _rng.randf_range(0.8, 1.25)
 			var gp := ground(p.x, p.y) - Vector3(0, 0.2, 0)
 			var inside := absf(p.x) < PLAY and absf(p.y) < PLAY
-			_instance(tt[0], gp, _rng.randf() * TAU, s, tt[2] * s / tt[1] if inside else 0.0)
+			var ry := _rng.randf() * TAU
+			if WarrenGate.keep_clear(p):
+				continue          # (after the dice: every other tree stays where it was)
+			_instance(tt[0], gp, ry, s, tt[2] * s / tt[1] if inside else 0.0)
 			count += 1
 		z += 7.0
 	# rocks and bushes
@@ -623,7 +605,10 @@ func _scatter_forest() -> void:
 			continue
 		var r: String = ["rock_single_A", "rock_single_B", "rock_single_C", "rock_single_D", "rock_single_E"][k % 5]
 		var s2 := _rng.randf_range(5.0, 11.0)
-		_instance(r, ground(p2.x, p2.y) - Vector3(0, 0.25, 0), _rng.randf() * TAU, s2, 0.12 * s2)
+		var ry2 := _rng.randf() * TAU
+		if WarrenGate.keep_clear(p2):
+			continue
+		_instance(r, ground(p2.x, p2.y) - Vector3(0, 0.25, 0), ry2, s2, 0.12 * s2)
 	print("FOREST trees=%d" % count)
 
 func _horizon() -> void:

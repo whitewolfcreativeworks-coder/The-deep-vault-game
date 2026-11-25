@@ -1,10 +1,13 @@
 extends Node3D
 class_name WarrenDoor
 ## The barred door of the Goblin Warren. Captain Aldric unbars it when he gives
-## you his quest; then E / USE takes you down into the dungeon.
+## you his quest; then E / USE takes you down into the dungeon, and so does walking
+## into the tunnel behind it (WarrenGate builds the tunnel and calls add_walk_in).
 
 var dest := Vector3.ZERO
 var _bars: Node3D
+var interact_reach := 4.5          # USE lights up from further away than for a chest (Player._update_interact)
+var _going := 0.0                  # (so walking on into the tunnel doesn't take you down twice)
 
 static func make(parent: Node, pos: Vector3, to: Vector3) -> WarrenDoor:
 	var d := WarrenDoor.new()
@@ -34,6 +37,18 @@ func _build() -> void:
 	Game.quests_changed.connect(_refresh)
 	_refresh()
 
+## Walking into this box (local to the door) takes you down, once the door is open.
+func add_walk_in(at: Vector3, size: Vector3) -> void:
+	var a := Area3D.new(); a.name = "WalkIn"; a.collision_layer = 0; a.collision_mask = 2
+	var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = size
+	cs.shape = bs; a.add_child(cs); add_child(a); a.position = at
+	a.body_entered.connect(func(bd: Node) -> void:
+		if bd.is_in_group("player") and is_open():
+			interact(bd))
+
+func _process(delta: float) -> void:
+	_going = maxf(0.0, _going - delta)
+
 func _refresh() -> void:
 	_bars.visible = not is_open()
 	var sb := _bars.get_node("Bars") as StaticBody3D
@@ -46,6 +61,9 @@ func interact(_by: Node) -> void:
 	if not is_open():
 		Game.say("The door is barred from outside. Captain Aldric holds the key.", Color(1.0, 0.75, 0.5))
 		return
+	if _going > 0.0:
+		return
+	_going = 2.0
 	var sc := get_tree().current_scene
 	if sc.has_method("teleport_player"):
 		Sfx.play("door", -4.0)

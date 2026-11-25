@@ -349,6 +349,9 @@ func _run() -> void:
 	elif mode == "levers":
 		if await _levers_test():
 			return
+	elif mode == "warrengate":
+		if await _warrengate_test():
+			return
 	elif mode == "balloon2":
 		if await _balloon2_test():
 			return
@@ -5848,6 +5851,94 @@ func _gfx_totals(w: Node) -> Dictionary:
 				out.lamp_reach = minf(out.lamp_reach, (n as Light3D).distance_fade_begin)
 	out["scale"] = get_viewport().scaling_3d_scale
 	return out
+
+# --- the Warren Gate: a yard and a tunnel into the ridge (Jason, Nov 25) ----------------
+func _warrengate_test() -> bool:
+	if not Game.get_meta("wg_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		await _start()
+		Game.set_meta("wg_phase", true)
+		main._travel("forest")
+		return true
+	await wait(2.0)
+	player = main.player
+	god = true
+	var w: ForestWorld = main.world
+	var door: WarrenDoor = w.door
+	var y0: float = w.gate_floor
+	# the yard is level, the door is on it, and the road runs into it without a step
+	var lo := INF
+	var hi := -INF
+	for x: float in [-6.0, -3.0, 0.0, 3.0, 6.0]:
+		for z: float in [-99.0, -96.0, -93.0, -90.0, -87.0]:
+			var h := w.height(x, z)
+			lo = minf(lo, h); hi = maxf(hi, h)
+	check("wg_yard_level", hi - lo < 0.35, "%.2f .. %.2f" % [lo, hi])
+	check("wg_road_runs_in", absf(w.height(0, -82) - y0) < 0.6 and absf(w.height(-2, -66) - y0) < 2.5, "%.2f %.2f vs %.2f" % [w.height(0, -82), w.height(-2, -66), y0])
+	check("wg_door_on_the_ground", absf(door.global_position.y - w.height(0, -98)) < 0.3, "%.2f vs %.2f" % [door.global_position.y, w.height(0, -98)])
+	var space := w.get_world_3d().direct_space_state
+	var ray := func(a: Vector3, b: Vector3) -> Dictionary:
+		var q := PhysicsRayQueryParameters3D.create(a, b, 1)
+		q.exclude = [player.get_rid()]
+		return space.intersect_ray(q)
+	# barred: the planks stop you at the mouth
+	var hit: Dictionary = ray.call(Vector3(0, y0 + 1.2, -90), Vector3(0, y0 + 1.2, -110))
+	check("wg_barred_before", not door.is_open() and not hit.is_empty() and absf((hit.position as Vector3).z - door.global_position.z) < 0.6, str(hit.get("position")))
+	# inside the tunnel: the floor is the yard's floor (no hillside poking in), a roof overhead
+	var fl: Dictionary = ray.call(Vector3(0, y0 + 3.5, -103.5), Vector3(0, y0 - 3.0, -103.5))
+	var rf: Dictionary = ray.call(Vector3(0, y0 + 1.0, -103.5), Vector3(0, y0 + 30.0, -103.5))
+	check("wg_tunnel_floor_and_roof", not fl.is_empty() and absf((fl.position as Vector3).y - y0) < 0.35 and not rf.is_empty() and (rf.position as Vector3).y < y0 + 5.5,
+		"floor %s roof %s" % [fl.get("position"), rf.get("position")])
+	# the tunnel walls are solid either side (you can't walk round into the hill)
+	var sw: Dictionary = ray.call(Vector3(0, y0 + 1.0, -103.5), Vector3(8, y0 + 1.0, -103.5))
+	check("wg_tunnel_walls", not sw.is_empty() and (sw.position as Vector3).x < 3.5, str(sw.get("position")))
+	# pictures: from up the road, from the yard's corner, at the mouth, and from the portal glade
+	player.global_position = Vector3(0, w.height(0, 40) + 0.3, 40)
+	await wait(0.5)
+	await _cam_shot("wg_01_from_the_road", Vector3(-1.5, w.height(-2, -62) + 2.4, -62), Vector3(0, y0 + 4.5, -100), 60.0)
+	await _cam_shot("wg_02_yard_corner", Vector3(9.5, y0 + 3.4, -83), Vector3(-1.0, y0 + 3.0, -100), 62.0)
+	await _cam_shot("wg_03_at_the_mouth", Vector3(0.8, y0 + 1.8, -92.5), Vector3(0, y0 + 2.6, -101), 62.0)
+	await _cam_shot("wg_04_from_the_glade", Vector3(0, w.height(0, 64) + 6.0, 64), Vector3(0, y0 + 8.0, -100), 50.0)
+	await _cam_shot("wg_05_side_view", Vector3(-24, y0 + 9.0, -82), Vector3(0, y0 + 4.0, -100), 55.0)
+	# USE lights up from the yard, about 4 m in front of the tunnel
+	await tp(Vector3(0, y0 + 0.3, -95.6), 0.0, -0.05)
+	await wait(0.8)
+	check("wg_use_from_the_yard", player.interact_target == door, str(player.interact_target))
+	check("wg_barred_prompt", door.get_prompt().contains("Aldric"), door.get_prompt())
+	player.zoom_target = 4.2; player.zoom = 4.2; player.pitch = -0.08; player.snap_view()
+	await wait(0.6)
+	await shot("wg_06_hero_at_the_gate_barred")
+	# Captain Aldric's quest opens it...
+	Game.quest_accept("warren")
+	await wait(0.4)
+	hit = ray.call(Vector3(0, y0 + 1.2, -90), Vector3(0, y0 + 1.2, -110))
+	check("wg_open_see_in", door.is_open() and not hit.is_empty() and (hit.position as Vector3).z < -105.5, str(hit.get("position")))
+	check("wg_open_prompt", door.get_prompt().contains("Enter"), door.get_prompt())
+	await tp(Vector3(0, y0 + 0.3, -93.0), 0.0, -0.08)
+	player.zoom_target = 4.2; player.zoom = 4.2; player.snap_view()
+	await wait(0.8)
+	await shot("wg_07_hero_at_the_gate_open")
+	# ...and walking into the tunnel takes you down
+	await press("move_forward", 3.2)
+	await wait(1.6)
+	check("wg_walk_in_takes_you_down", player.global_position.y < ForestWorld.WY + 5.0, str(player.global_position))
+	await shot("wg_08_down_in_the_warren")
+	# coming back up puts you in the yard, facing away from the tunnel (not straight back in)
+	var out: Node = null
+	for n in get_tree().get_nodes_in_group("interactable"):
+		if n is ClimbOut and (n as Node3D).global_position.y < ForestWorld.WY + 5.0:
+			out = n
+	if out:
+		await tp((out as Node3D).global_position + Vector3(0, 0.3, 1.2), PI)
+		await wait(0.3)
+		out.interact(player)
+		await wait(1.6)
+		await press("move_forward", 0.6)
+		await wait(0.8)
+	check("wg_back_in_the_yard", out != null and absf(player.global_position.y - y0) < 1.5 and player.global_position.z > -97.0, str(player.global_position))
+	_finish()
+	return true
 
 # --- the ornate levers, and the warm-up spots (Jason, Nov 24) ---------------------------
 func _levers_test() -> bool:

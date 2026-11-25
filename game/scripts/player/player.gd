@@ -1434,6 +1434,8 @@ func _update_interact() -> void:
 		to.y = 0
 		var d := to.length()
 		var bonus := 0.0 if d < 0.01 else fwd.dot(to / d) * 0.6
+		if "interact_reach" in n:
+			bonus += float(n.interact_reach) - 2.6      # (a big thing, like the Warren Gate: from further away)
 		if d - bonus < best_d:
 			best_d = d - bonus
 			best = n
