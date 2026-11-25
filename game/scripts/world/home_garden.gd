@@ -84,7 +84,7 @@ func _flush() -> void:
 	for m in _merge:
 		var mi := MeshInstance3D.new(); mi.mesh = (_merge[m] as SurfaceTool).commit(); mi.material_override = m
 		# only the fence, the gate and the bed frames cast shadows; the little things don't
-		if m != _mats.get("%s%.2f" % [Color(0.95, 0.93, 0.88).to_html(), 0.7]) and m != _wood:
+		if m != _mats.get("%s%.2f" % [Color(0.95, 0.93, 0.88).to_html(), 0.95]) and m != _wood:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
 	_merge.clear()
@@ -115,7 +115,7 @@ func cyl(at: Vector3, r_top: float, r_bot: float, h: float, m: Material, rot := 
 # --- a white picket fence with a gate arch and a sign -------------------------------
 func _fence() -> void:
 	# (every post and rail is merged into one mesh: the whole fence is one thing to draw)
-	var white := _mat(Color(0.95, 0.93, 0.88), 0.7)
+	var white := _mat(Color(0.95, 0.93, 0.88), 0.95)
 	var sides := [[Vector2(X0, Z0), Vector2(X1, Z0)], [Vector2(X0, Z0), Vector2(X0, Z1)], [Vector2(X1, Z0), Vector2(X1, Z1)],
 		[Vector2(X0, Z1), Vector2(GATE[0], Z1)], [Vector2(GATE[1], Z1), Vector2(X1, Z1)]]
 	for s in sides:

@@ -1630,3 +1630,17 @@ Jason: "put a garden in the Homeworld too, so that you can collect seeds and pla
 
 It photographs the garden empty, growing, ripe and picked.
 
+**Keeping it cheap to draw (Jason, the same afternoon):** "it's your job to keep me and check that I don't add too many things that will cause lag... I wanna launch this game, and I don't wanna make it too difficult for myself."
+- **The first build was too heavy:**
+  - about 100 separate fence posts;
+  - every leaf, tomato and petal its own object;
+  - all of them also drawn into the sun's shadows.
+- **The cost, measured:** the ripe garden added **199 draw calls** on the iPad renderer, and 200 on desktop.
+- **Changes:**
+  - every fixed piece of the garden (fence, gate, sign, seed box, scarecrow, barrel, paths, bed frames) is merged into one mesh per colour;
+  - each bed's plant is merged into one mesh per colour;
+  - the six beds' sparkles are one particle effect;
+  - only the fence and gate cast shadows.
+- **Now:** the ripe garden adds **59 draw calls**. The `garden` test checks it stays within a budget of 90, so the garden can't quietly get expensive later.
+- **The rule from here on:** each new area gets a draw-call budget in its test.
+
