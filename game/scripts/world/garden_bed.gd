@@ -11,7 +11,6 @@ var stage := -1                    # 0 empty, 1 seed, 2 sprout, 3 growing, 4 rip
 var plant := ""
 var _vis: Node3D
 var _soil: StandardMaterial3D
-var _sparkle: CPUParticles3D
 var _wet := false
 var _t := 0.0
 
@@ -34,7 +33,7 @@ func _build() -> void:
 	var unit := BoxMesh.new()
 	for s in [[Vector3(-h, 0, -h), Vector3(h, 0.34, -h + 0.1)], [Vector3(-h, 0, h - 0.1), Vector3(h, 0.34, h)],
 			[Vector3(-h, 0, -h), Vector3(-h + 0.1, 0.34, h)], [Vector3(h - 0.1, 0, -h), Vector3(h, 0.34, h)]]:
-		_add(unit, Transform3D(Basis.from_scale(s[1] - s[0]), (s[0] + s[1]) * 0.5), wood)
+		garden.box(position + s[0], position + s[1], wood, false)       # (all six frames are one mesh: HomeGarden)
 	_add(unit, Transform3D(Basis.from_scale(Vector3(h * 2.0 - 0.2, 0.3, h * 2.0 - 0.2)), Vector3(0, 0.15, 0)), _soil)
 	for k in 3:
 		_add(unit, Transform3D(Basis.from_scale(Vector3(h * 2.0 - 0.3, 0.05, 0.12)), Vector3(0, 0.31, (k - 1) * 0.45)), _soil)
@@ -42,12 +41,6 @@ func _build() -> void:
 	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bs := BoxShape3D.new(); bs.size = Vector3(h * 2.0, 0.5, h * 2.0)
 	cs.shape = bs; cs.position.y = 0.25; sb.add_child(cs); add_child(sb)
 	_vis = Node3D.new(); _vis.position.y = 0.3; add_child(_vis)
-	_sparkle = CPUParticles3D.new(); _sparkle.amount = 10; _sparkle.lifetime = 1.4
-	_sparkle.mesh = FX.quad(0.08); _sparkle.material_override = FX.glow_material(Color(1.0, 0.95, 0.5), 2.5)
-	_sparkle.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX; _sparkle.emission_box_extents = Vector3(h * 0.8, 0.3, h * 0.8)
-	_sparkle.direction = Vector3.UP; _sparkle.spread = 20; _sparkle.initial_velocity_min = 0.3; _sparkle.initial_velocity_max = 0.7
-	_sparkle.gravity = Vector3.ZERO; _sparkle.color_ramp = FX._fade_ramp(Color(1.0, 0.95, 0.5))
-	_sparkle.position.y = 0.9; _sparkle.emitting = false; add_child(_sparkle)
 	tick(true)
 
 ## Catch up with the plant (main garden _process; cheap).
@@ -73,7 +66,7 @@ func tick(force := false) -> void:
 			c.queue_free()
 		if id != "":
 			_plant_look(id, st)
-		_sparkle.emitting = st == 4
+		garden.sparkles_dirty = true          # (one sparkle effect for every ripe bed: HomeGarden)
 
 func get_prompt() -> String:
 	if plant == "":

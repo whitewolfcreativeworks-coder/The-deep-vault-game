@@ -5948,7 +5948,8 @@ func _garden_test() -> bool:
 	for b in g.beds:
 		b.tick(true)
 	await wait(0.5)
-	check("gd_all_ripe", g.beds.all(func(b) -> bool: return b.stage == 4 and b._sparkle.emitting))
+	await frames(2)
+	check("gd_all_ripe", g.beds.all(func(b) -> bool: return b.stage == 4) and g.sparkle.emitting)
 	await _cam_shot("gd_04_ripe", g.gp(10.5, 3.6) + Vector3(0, 3.2, 0), g.gp(10.5, -4.0) + Vector3(0, 0.3, 0), 62.0)
 	await _cam_shot("gd_05_ripe_close", g.gp(9.4, -0.2) + Vector3(0, 1.6, 0), g.gp(10.5, -3.0) + Vector3(0, 0.4, 0), 60.0)
 	# what the whole garden costs to draw, ripe and sparkling (Jason: "this game must have no lag")

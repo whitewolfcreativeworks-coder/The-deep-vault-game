@@ -23,6 +23,8 @@ const SEED_BOX := Vector2(7.4, 0.1)
 
 var home: HomeWorld
 var beds: Array[GardenBed] = []
+var sparkle: CPUParticles3D        # one for the whole garden: it sparkles over every ripe bed
+var sparkles_dirty := true
 var _wood: StandardMaterial3D
 var _dark: StandardMaterial3D
 
@@ -50,6 +52,12 @@ func _build() -> void:
 	_scarecrow()
 	_water_barrel()
 	_flush()
+	sparkle = CPUParticles3D.new(); sparkle.name = "RipeSparkle"; sparkle.amount = 36; sparkle.lifetime = 1.4
+	sparkle.mesh = FX.quad(0.08); sparkle.material_override = FX.glow_material(Color(1.0, 0.95, 0.5), 2.5)
+	sparkle.emission_shape = CPUParticles3D.EMISSION_SHAPE_POINTS
+	sparkle.direction = Vector3.UP; sparkle.spread = 20; sparkle.initial_velocity_min = 0.3; sparkle.initial_velocity_max = 0.7
+	sparkle.gravity = Vector3.ZERO; sparkle.color_ramp = FX._fade_ramp(Color(1.0, 0.95, 0.5))
+	sparkle.emitting = false; add_child(sparkle)
 
 # --- cheap to draw (Jason: "this game must have no lag") ---------------------------
 # Every fixed piece of the garden (gate, sign, seed box, scarecrow, barrel, paths) is
@@ -75,6 +83,9 @@ func piece(mesh: Mesh, xf: Transform3D, m: Material) -> void:
 func _flush() -> void:
 	for m in _merge:
 		var mi := MeshInstance3D.new(); mi.mesh = (_merge[m] as SurfaceTool).commit(); mi.material_override = m
+		# only the fence, the gate and the bed frames cast shadows; the little things don't
+		if m != _mats.get("%s%.2f" % [Color(0.95, 0.93, 0.88).to_html(), 0.7]) and m != _wood:
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
 	_merge.clear()
 
@@ -162,7 +173,7 @@ func _seed_box() -> void:
 	box(p + Vector3(-0.43, 0.55, -0.33), p + Vector3(0.43, 0.62, 0.33), _dark, false)
 	for k in 4:
 		box(p + Vector3(-0.33 + k * 0.17, 0.62, -0.1), p + Vector3(-0.2 + k * 0.17, 0.8, 0.02),
-			_mat([Color(1.0, 0.55, 0.15), Color(0.9, 0.2, 0.15), Color(1.0, 0.85, 0.2), Color(0.95, 0.3, 0.5)][k], 0.8), false, Vector3(-0.25, 0, 0))
+			_mat([Color(1.0, 0.55, 0.15), Color(0.95, 0.3, 0.5)][k % 2], 0.8), false, Vector3(-0.25, 0, 0))
 	var lb := Label3D.new(); lb.text = "SEEDS"; lb.modulate = Color(1.0, 0.9, 0.55); lb.outline_size = 10
 	lb.outline_modulate = Color(0.2, 0.12, 0.05); lb.font_size = 64; lb.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 	add_child(lb); lb.position = p + Vector3(0, 1.15, 0)
@@ -205,8 +216,8 @@ func _scarecrow() -> void:
 	ball(p + Vector3(0, 1.62, 0), 0.22, _mat(Color(0.9, 0.78, 0.55), 0.9))
 	cyl(p + Vector3(0, 1.86, 0), 0.12, 0.38, 0.28, straw)
 	for sx in [-1.0, 1.0]:
-		ball(p + Vector3(sx * 0.08, 1.66, 0.2), 0.03, _mat(Color(0.05, 0.05, 0.05)))
-	ball(p + Vector3(0.6, 1.45, 0), 0.1, _mat(Color(0.08, 0.08, 0.1)), Vector3(1.4, 1.0, 0.9))
+		ball(p + Vector3(sx * 0.08, 1.66, 0.2), 0.03, _mat(Color(0.06, 0.06, 0.07)))
+	ball(p + Vector3(0.6, 1.45, 0), 0.1, _mat(Color(0.06, 0.06, 0.07)), Vector3(1.4, 1.0, 0.9))
 
 func _water_barrel() -> void:
 	var p := gp(13.6, 0.2)
@@ -225,3 +236,13 @@ func _water_barrel() -> void:
 func _process(_delta: float) -> void:
 	for b in beds:
 		b.tick()
+	if sparkles_dirty and sparkle:
+		sparkles_dirty = false
+		var pts := PackedVector3Array()
+		for b in beds:
+			if b.stage == 4:
+				for k in 6:
+					pts.append(b.position + Vector3(randf_range(-0.6, 0.6), randf_range(0.6, 1.1), randf_range(-0.6, 0.6)))
+		sparkle.emitting = not pts.is_empty()
+		if not pts.is_empty():
+			sparkle.emission_points = pts
