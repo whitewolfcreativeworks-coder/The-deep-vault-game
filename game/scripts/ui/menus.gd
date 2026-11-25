@@ -1240,9 +1240,23 @@ func _refresh_inventory() -> void:
 		var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 12)
 		row.add_child(UIKit.label("Costume: %s  (%s left)" % [c.get("name", "?"), Game.costume_time_text()], 17, Color(1.0, 0.7, 1.0), true))
 		row.add_child(_button("Take it off", func() -> void:
-			Game.clear_costume()
-			Game.say("You take off the costume. Back to your old self!", Color(1.0, 0.85, 0.6))
+			Game.put_away_costume()
+			Game.say("You take off the costume. It's in your wardrobe at home if you want it back!", Color(1.0, 0.85, 0.6))
 			_refresh_inventory(), 170))
+		_equipped_box.add_child(row)
+	# clothes from your wardrobe: only a look, your gear still works underneath
+	elif Game.outfit != "adventure" and Outfits.OUTFITS.has(Game.outfit):
+		var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 12)
+		var ol := UIKit.label("Wearing: %s  (just a look: your gear still protects you)" % String(Outfits.OUTFITS[Game.outfit].name), 16, Color(1.0, 0.85, 1.0), true)
+		ol.autowrap_mode = TextServer.AUTOWRAP_WORD; ol.custom_minimum_size.x = 420
+		row.add_child(ol)
+		var back := _button("Adventure clothes", func() -> void:
+			Game.wear_outfit("adventure")
+			Game.wear_footwear("boots")
+			Game.say("Back in your adventuring clothes!", Color(1.0, 0.85, 0.6))
+			_refresh_inventory(), 230)
+		back.name = "AdventureClothes"
+		row.add_child(back)
 		_equipped_box.add_child(row)
 	var bag: Array = []
 	for id in Game.inventory:

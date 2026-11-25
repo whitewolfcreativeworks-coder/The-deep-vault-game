@@ -1682,3 +1682,23 @@ Jason: "now it's time to work on the kitchen. We can do the basics now. It'll ex
   - it saves, resets and loads the lunchbox;
   - it checks the draw-call budget.
 
+## Follow-up 52: what you pick in the wardrobe is what you wear (Nov 25)
+
+Jason, playing his Druid on the iPad: "I tried to put on the polka-dot pajamas, wanted to wear them, and as soon as I closed, I was still wearing something else." His screenshot showed a goblin with "Goblin: 1:28" in the corner.
+
+- **Why:** he had a magic Goblin costume on, with a minute and a half left. A costume always went on top of your clothes. The wardrobe's preview ignored it and showed the pajamas, but once the wardrobe closed, the goblin was back on top.
+- **Fix:**
+  - **Picking clothes or shoes takes the costume off.** The costume isn't lost: it waits in a new "Magic" row at the top of the wardrobe with the time it had left.
+    - A costume's play time stops while it's put away; a shop costume's real day keeps counting.
+    - Tapping it puts it back on.
+  - **The preview tells the truth:** while a costume is on, the preview shows the costume.
+  - **"Take it off" in the Bag** also puts the costume in the wardrobe now, instead of throwing it away.
+- **Jason's other point, wearing your clothes out on an adventure:** this already worked, and your gear still protects you underneath, since outfits are only a look. To make the way back easy, the Bag now shows what you're wearing and an **Adventure clothes** button when you're in wardrobe clothes.
+- **Tested:** the `wardrobe` test now has 26 checks. It reruns Jason's steps:
+  - put on a goblin costume, pick pajamas, close the wardrobe, and check the hero is in pajamas;
+  - check the costume's time waits while it's put away;
+  - put the costume back on from the wardrobe;
+  - take it off from the Bag;
+  - use the Adventure clothes button;
+  - save.
+

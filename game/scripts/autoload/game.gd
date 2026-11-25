@@ -433,6 +433,7 @@ func wear_costume(id: String, t: Array = []) -> void:
 		t = Loot.roll_costume_time()      # (the shop's costumes come with a set time)
 	var real: bool = t[2]
 	costume = {"id": id, "real": real, "until": (Time.get_unix_time_from_system() if real else play_time) + float(t[1])}
+	costume_away = {}
 	var c: Dictionary = Loot.COSTUMES[id]
 	message.emit("%s  (lasts %s)" % [c.line, t[3]], Color(1.0, 0.75, 1.0))
 	unlock_look(id)
@@ -440,6 +441,50 @@ func wear_costume(id: String, t: Array = []) -> void:
 
 func clear_costume() -> void:
 	costume = {}
+	inventory_changed.emit()
+
+## A magic costume you've taken off is kept in your wardrobe (Jason, Nov 25: pick
+## pajamas in the wardrobe and you should be wearing pajamas). Its time stops while
+## it's put away (a shop costume's real day keeps counting).
+## {"id", "real", "until"} for real-time costumes, {"id", "real": false, "left"} otherwise.
+var costume_away := {}
+
+func put_away_costume() -> void:
+	if costume.is_empty():
+		return
+	var left := costume_left()
+	if left > 1.0:
+		costume_away = {"id": costume.id, "real": bool(costume.get("real", false))}
+		if costume_away.real:
+			costume_away["until"] = float(costume.until)
+		else:
+			costume_away["left"] = left
+	costume = {}
+	inventory_changed.emit()
+
+func costume_away_id() -> String:
+	if costume_away.is_empty():
+		return ""
+	if costume_away_left() <= 1.0:
+		costume_away = {}
+		return ""
+	return String(costume_away.id)
+
+func costume_away_left() -> float:
+	if costume_away.is_empty():
+		return 0.0
+	if costume_away.get("real", false):
+		return float(costume_away.until) - Time.get_unix_time_from_system()
+	return float(costume_away.get("left", 0.0))
+
+## Put the costume from the wardrobe back on, with the time it had left.
+func wear_costume_again() -> void:
+	if costume_away_id() == "":
+		return
+	var real := bool(costume_away.get("real", false))
+	costume = {"id": costume_away.id, "real": real,
+		"until": float(costume_away.until) if real else play_time + float(costume_away.left)}
+	costume_away = {}
 	inventory_changed.emit()
 
 # --- the Skin Designer ---------------------------------------------------------
@@ -769,7 +814,7 @@ func reset_run() -> void:
 	tracked_quest = ""
 	tracked_manual = false
 	day_clock = 150.0
-	costume = {}
+	costume = {}; costume_away = {}
 	unlocked_looks = []; custom_look = {}; custom_look_on = false
 	outfit = "adventure"; footwear = "boots"; outfits_owned = []; footwear_owned = []; wardrobe_new = []
 	seeds = {}; basket = {}; garden_plots = []; garden_starter = false; lunchbox = {}
@@ -1071,7 +1116,7 @@ func save_slot(i := -1) -> bool:
 		"checkpoint_pos": checkpoint_pos, "checkpoint_yaw": checkpoint_yaw, "checkpoint_name": checkpoint_name,
 		"objective": objective,
 		"resume_pos": resume_pos, "resume_yaw": resume_yaw,
-		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual, "day_clock": day_clock, "costume": costume.duplicate(),
+		"zone": zone, "quests": quests.duplicate(true), "tracked_quest": tracked_quest, "tracked_manual": tracked_manual, "day_clock": day_clock, "costume": costume.duplicate(), "costume_away": costume_away.duplicate(),
 		"unlocked_looks": unlocked_looks.duplicate(), "custom_look": custom_look.duplicate(true), "custom_look_on": custom_look_on,
 		"outfit": outfit, "footwear": footwear, "outfits_owned": outfits_owned.duplicate(), "footwear_owned": footwear_owned.duplicate(),
 		"wardrobe_new": wardrobe_new.duplicate(),
@@ -1142,6 +1187,7 @@ func load_slot(i: int) -> bool:
 	tracked_manual = bool(d.get("tracked_manual", false))
 	day_clock = float(d.get("day_clock", 150.0))
 	costume = (d.get("costume", {}) as Dictionary).duplicate()
+	costume_away = (d.get("costume_away", {}) as Dictionary).duplicate()
 	unlocked_looks = (d.get("unlocked_looks", []) as Array).duplicate()
 	custom_look = (d.get("custom_look", {}) as Dictionary).duplicate(true)
 	custom_look_on = bool(d.get("custom_look_on", false))

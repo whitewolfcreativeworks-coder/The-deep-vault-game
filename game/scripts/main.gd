@@ -813,7 +813,10 @@ func _on_wardrobe_closed(changed: bool) -> void:
 	if changed:
 		player.rebuild_body()
 		var o: Dictionary = Outfits.OUTFITS.get(Game.outfit, {})
-		Game.say("All dressed: %s!" % String(o.get("name", "")), Color(1.0, 0.85, 1.0))
+		if Game.costume_id() != "":
+			Game.say("All dressed: your magic %s costume!" % String(Loot.COSTUMES.get(Game.costume_id(), {}).get("name", "")), Color(1.0, 0.85, 1.0))
+		else:
+			Game.say("All dressed: %s!" % String(o.get("name", "")), Color(1.0, 0.85, 1.0))
 
 ## The stove in your cabin: cook what you grow (Cooking, KitchenPanel).
 func open_kitchen() -> void:

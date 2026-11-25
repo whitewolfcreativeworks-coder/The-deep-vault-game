@@ -100,7 +100,11 @@ The cabinet you change in at the start of the opening movie is now your **wardro
     - **Chef's Whites** (chef's hat and apron).
   - **Shoes and slippers, picked separately:** Your Boots, Fluffy Slippers, your class's slippers, Work Boots and Rain Boots.
 - **Outfits are only a look.** They never change health, damage or defence, so every class stays fair. You can wear them anywhere: fight Chief Gruk in your pajamas and bunny slippers if you like.
-- **What goes on top:** a magic costume (from a chest or Tobble's) still goes on top while it lasts, and your outfit comes back after.
+- **Magic costumes and the wardrobe:** a magic costume (from a chest or Tobble's) goes on top of your clothes while it lasts.
+  - **Picking clothes in the wardrobe takes the costume off**, so what you pick is what you wear.
+  - The costume waits in the wardrobe (the "Magic" row) with the time it had left. Its time stops while it's put away, though a shop costume's real day keeps counting. Tap it to put it back on.
+  - "Take it off" in the Bag puts it in the wardrobe the same way.
+- **Back to adventuring clothes:** you don't need to change to fight, since your gear still works underneath. When you're wearing wardrobe clothes, the Bag shows what you're wearing and an **Adventure clothes** button to change back in one tap.
 - **More outfits later:** new ones can be given to you (`Game.grant_outfit`); the open world will have some to find.
 
 ### The Garden (Nov 25)

@@ -6309,6 +6309,61 @@ func _wardrobe_test() -> bool:
 	Game.clear_costume()
 	await wait(1.0)
 	check("wr_back_in_pajamas", player.body.outfit_parts >= 6 and player.body._pattern == 1)
+	# Jason (Nov 25): with a magic costume on, he picked pajamas in the wardrobe, closed it,
+	# and was still a goblin. Now what you pick is what you wear; the costume waits on a hook.
+	Game.wear_costume("goblin", [0, 300.0, false, "five minutes"])
+	await wait(1.0)
+	check("wr_goblin_on", Game.costume_id() == "goblin" and player.body.outfit_parts == 0)
+	main.open_wardrobe()
+	await wait(1.0)
+	check("wr_magic_row", wd._magic_btn != null and wd._magic_btn.button_pressed and wd._preview.outfit_parts == 0
+		and not (wd._outfit_btns["pajamas"] as Button).button_pressed, str(wd._magic_btn.text) if wd._magic_btn else "none")
+	await shot("wr_06_goblin_at_the_wardrobe")
+	(wd._outfit_btns["necro_skeleton"] as Button).pressed.emit()
+	await wait(1.0)
+	check("wr_pick_takes_costume_off", Game.costume_id() == "" and Game.costume_away_id() == "goblin" and Game.outfit == "necro_skeleton"
+		and wd._preview.outfit_parts > 0 and not wd._magic_btn.button_pressed, "%s / %s / %s" % [Game.costume_id(), Game.costume_away, Game.outfit])
+	await shot("wr_07_picked_pajamas_costume_on_its_hook")
+	wd.close()
+	await wait(1.2)
+	check("wr_wearing_what_you_picked", m.current == "" and Game.costume_id() == "" and player.body.outfit_parts >= 6, "%d parts" % player.body.outfit_parts)
+	var pp2 := player.global_position
+	await _cam_shot("wr_08_skeleton_pjs_not_a_goblin", pp2 + Vector3(0.9, 1.5, 2.6), pp2 + Vector3(0, 0.8, 0), 55.0)
+	var left0 := Game.costume_away_left()
+	Game.play_time += 120.0
+	check("wr_costume_time_waits", left0 > 280.0 and absf(Game.costume_away_left() - left0) < 0.01, "%.1f" % left0)
+	main.open_wardrobe()
+	await wait(1.0)
+	if wd._magic_btn:
+		wd._magic_btn.pressed.emit()
+	await wait(0.8)
+	check("wr_costume_back_on", Game.costume_id() == "goblin" and absf(Game.costume_left() - left0) < 2.0 and Game.costume_away.is_empty(),
+		"%s %.1f" % [Game.costume_id(), Game.costume_left()])
+	wd.close()
+	await wait(1.2)
+	check("wr_goblin_again", player.body.outfit_parts == 0 and Game.costume_id() == "goblin")
+	# the Bag: "Take it off" hangs it back in the wardrobe; in wardrobe clothes, a button back to your adventuring clothes
+	main._open("inventory")
+	await wait(0.6)
+	var off_btn: Button = null
+	for b in m._equipped_box.find_children("*", "Button", true, false):
+		if (b as Button).text == "Take it off":
+			off_btn = b
+	if off_btn:
+		off_btn.pressed.emit()
+	await wait(0.6)
+	check("wr_bag_take_off_keeps_it", Game.costume_id() == "" and Game.costume_away_id() == "goblin")
+	var adv: Button = m._equipped_box.find_child("AdventureClothes", true, false)
+	check("wr_bag_adventure_button", adv != null)
+	await shot("wr_09_bag_wearing_pjs")
+	if adv:
+		adv.pressed.emit()
+	await wait(0.6)
+	check("wr_bag_back_to_adventure_clothes", Game.outfit == "adventure" and Game.footwear == "boots" and m._equipped_box.find_child("AdventureClothes", true, false) == null)
+	main._resume()
+	await wait(0.6)
+	Game.save_slot()
+	check("wr_costume_away_saved", String((Game.read_slot(Game.active_slot).get("costume_away", {}) as Dictionary).get("id", "")) == "goblin")
 	# everybody's outfits: a line-up of all nine classes, in each set
 	var at := w.ground(HomeWorld.LAND.x + 34.0, HomeWorld.LAND.z) + Vector3(0, 0.02, 0)
 	var line := Node3D.new(); w.add_child(line)

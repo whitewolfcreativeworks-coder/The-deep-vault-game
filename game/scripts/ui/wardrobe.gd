@@ -16,7 +16,8 @@ var _outfit_box: VBoxContainer
 var _foot_box: GridContainer
 var _outfit_btns := {}
 var _foot_btns := {}
-var _start := []                 # [outfit, footwear] when the wardrobe was opened
+var _start := []                 # [outfit, footwear, costume] when the wardrobe was opened
+var _magic_btn: Button           # a magic costume you're wearing, or one put away here
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(1560, 860)
@@ -136,7 +137,7 @@ func _choice(text: String, c: Color, c2: Color, cb: Callable, wdt: float, is_new
 # --- state ---------------------------------------------------------------------------
 func open() -> void:
 	Game.mend_wardrobe()
-	_start = [Game.outfit, Game.footwear]
+	_start = [Game.outfit, Game.footwear, Game.costume_id()]
 	_title.text = "%s's Wardrobe" % String(Game.profile.get("name", "Your"))
 	_fill()
 	_refresh()
@@ -147,6 +148,15 @@ func _fill() -> void:
 	for c in _foot_box.get_children():
 		c.queue_free()
 	_outfit_btns.clear(); _foot_btns.clear()
+	_magic_btn = null
+	var magic := Game.costume_id() if Game.costume_id() != "" else Game.costume_away_id()
+	if magic != "":
+		var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 6); _outfit_box.add_child(row)
+		var gl := UIKit.label("Magic", 14, Color(1.0, 0.7, 1.0), true); gl.custom_minimum_size.x = 132
+		gl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(gl)
+		_magic_btn = _choice("", Color(0.75, 0.4, 0.95), Color(1.0, 0.85, 1.0), func() -> void: _pick_magic(), 580, false)
+		row.add_child(_magic_btn)
 	for g in Outfits.GROUPS:
 		var ids: Array = []
 		for id in Game.outfits_owned:
@@ -177,21 +187,46 @@ func _fill() -> void:
 		_foot_btns[id] = b
 
 func _pick_outfit(id: String) -> void:
+	_put_magic_away()
 	Game.wear_outfit(id)
 	_refresh(true)
 
 func _pick_footwear(id: String) -> void:
+	_put_magic_away()
 	Game.wear_footwear(id)
 	_refresh(true)
 
+## Picking clothes takes a magic costume off (it stays here, its time paused), so what
+## you pick is what you wear. Picking the costume puts it back on.
+func _put_magic_away() -> void:
+	if Game.costume_id() != "":
+		Game.put_away_costume()
+
+func _pick_magic() -> void:
+	if Game.costume_id() == "":
+		Game.wear_costume_again()
+	_refresh(true)
+
 func _refresh(cheer := false) -> void:
+	var magic_on := Game.costume_id() != ""
 	for id in _outfit_btns:
-		(_outfit_btns[id] as Button).set_pressed_no_signal(id == Game.outfit)
+		(_outfit_btns[id] as Button).set_pressed_no_signal(id == Game.outfit and not magic_on)
 	for id in _foot_btns:
-		(_foot_btns[id] as Button).set_pressed_no_signal(id == Game.footwear)
+		(_foot_btns[id] as Button).set_pressed_no_signal(id == Game.footwear and not magic_on)
 	var o: Dictionary = Outfits.OUTFITS.get(Game.outfit, {})
 	var f: Dictionary = Outfits.FOOTWEAR.get(Game.footwear, {})
 	_line.text = "%s: %s   %s: %s" % [String(o.get("name", "")), String(o.get("line", "")), String(f.get("name", "")), String(f.get("line", ""))]
+	if _magic_btn:
+		var id := Game.costume_id() if magic_on else Game.costume_away_id()
+		var nm := String(Loot.COSTUMES.get(id, {}).get("name", "Magic"))
+		if magic_on:
+			_magic_btn.text = "     ★ %s costume  (on: %s left)" % [nm, Game.costume_time_text()]
+			_line.text = "You're wearing your magic %s costume. Pick any clothes and it goes on this hook, ready for later." % nm
+		else:
+			var s := maxf(Game.costume_away_left(), 0.0)
+			var left := ("%dh %dm" % [int(s / 3600.0), int(fmod(s, 3600.0) / 60.0)]) if s >= 3600.0 else ("%d:%02d" % [int(s / 60.0), int(fmod(s, 60.0))])
+			_magic_btn.text = "     ★ %s costume  (put away: %s left)" % [nm, left]
+		_magic_btn.set_pressed_no_signal(magic_on)
 	_update_preview(cheer)
 
 func preview_cfg() -> Dictionary:
@@ -210,6 +245,9 @@ func preview_cfg() -> Dictionary:
 		cfg["outfit_model"] = skin.outfit
 		if skin.has("fx"):
 			cfg["outfit_fx"] = skin.fx
+	if Game.costume_id() != "":
+		cfg["costume"] = Game.costume_id()       # (what you'll really look like)
+		return cfg
 	if Game.outfit == "adventure" and Game.custom_look_on and not Game.custom_look.is_empty():
 		cfg["custom_look"] = Game.custom_look
 	Outfits.dress(cfg, Game.outfit, Game.footwear)
@@ -227,7 +265,7 @@ func _update_preview(cheer := false) -> void:
 		_preview.play_role("cheer")
 
 func close() -> void:
-	closed.emit(_start != [Game.outfit, Game.footwear])
+	closed.emit(_start != [Game.outfit, Game.footwear, Game.costume_id()])
 
 func _process(delta: float) -> void:
 	if not visible or _preview == null:
