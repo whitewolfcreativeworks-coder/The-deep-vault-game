@@ -5871,6 +5871,7 @@ func _brushing_test() -> void:
 	im.set_process(false)
 	if im._ui:
 		im._ui.visible = false           # (the movie's letterbox and fade)
+	main.menus.close_all()
 	var R := IntroMovie.ROOM
 	var ok := 0
 	var n := 0
@@ -5904,9 +5905,9 @@ func _brushing_test() -> void:
 		n += 1
 		var mouth := im._head_point(IntroMovie.MOUTH_BRUSH)
 		im.cam.current = true
-		im.cam.global_position = mouth + Vector3(-0.75, 0.12, 0.28)
-		im.cam.look_at(mouth + Vector3(0, -0.02, 0))
-		im.cam.fov = 40.0
+		im.cam.global_position = mouth + Vector3(-1.35, 0.18, 0.55)
+		im.cam.look_at(mouth + Vector3(0, -0.05, 0))
+		im.cam.fov = 32.0
 		await frames(3)
 		await shot("br_%s%s" % [String(hc[0]).to_lower(), ("_" + String(hc[1])) if hc[1] != "" else ""])
 		im._hand_free(0.0)
