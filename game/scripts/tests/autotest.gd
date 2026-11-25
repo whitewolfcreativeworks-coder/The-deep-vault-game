@@ -1579,12 +1579,14 @@ func _forest_test() -> bool:
 		await wait(1.5)
 		await shot("fo_01_arrival")
 		var w: ForestWorld = main.world
-		var entrance := w.ground(0, -101)
+		# the Warren Gate's beacon fire, on the rock above the tunnel (since Nov 25)
+		var entrance := Vector3(0, w.gate_floor + WarrenGate.TOP + 5.9, WarrenGate.MOUTH_Z - 2.0)
 		var cam_to_warren: Vector3 = entrance - player.camera.global_position
-		var q := PhysicsRayQueryParameters3D.create(player.camera.global_position, entrance + Vector3(0, 12.0, -4.0), 1)
+		var q := PhysicsRayQueryParameters3D.create(player.camera.global_position, entrance, 1)
 		q.exclude = [player.get_rid()]
 		var hit := player.get_world_3d().direct_space_state.intersect_ray(q)
-		check("warren_in_view_from_portal", hit.is_empty() or (hit.position as Vector3).distance_to(entrance) < 14.0, "%.0f m away" % cam_to_warren.length())
+		check("warren_in_view_from_portal", hit.is_empty() or (hit.position as Vector3).distance_to(entrance) < 14.0,
+			"%.0f m away, hit %s" % [cam_to_warren.length(), hit.get("position")])
 		player.zoom_target = 9.5; player.zoom = 9.5; player.snap_view()
 		await wait(1.2)
 		await shot("fo_02_arrival_high")
