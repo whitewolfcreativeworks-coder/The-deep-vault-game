@@ -226,6 +226,18 @@ func _hold_wanted() -> bool:
 	# (the automated tests time things from the moment a level starts)
 	return not (OS.get_cmdline_user_args().size() > 0 or OS.has_environment("DEEPVAULT_AUTOTEST") or _web_autotest() != "")
 
+## The name on the dark "getting ready" card: the place, and the mode if it isn't Normal.
+func arrival_title() -> String:
+	if Game.zone == "home":
+		# home is home, whatever mode your adventure's in (Jason, Nov 25: "it should always say
+		# welcome home"). (The first time, you're still flying home on the Sky Ride.)
+		var flown: bool = Game.quest_state("flight_home") == "done" or Game.flags.get("adventure_done", false)
+		return "Welcome home!" if flown else "The Flight Home"
+	var title: String = Game.ZONE_NAMES.get(Game.zone, "")
+	if Game.mode != "normal":
+		title += "  ·  " + Game.mode_name().to_upper()
+	return title
+
 func _get_ready() -> void:
 	if not _hold_wanted() or player == null:
 		return
@@ -234,11 +246,7 @@ func _get_ready() -> void:
 	get_tree().paused = true
 	menus.fade_to(1.0, 0.01)
 	menus.fade.color.a = 1.0
-	var title: String = Game.ZONE_NAMES.get(Game.zone, "Home" if Game.zone == "home" else "")
-	if Game.zone == "home":
-		title = "Home"
-	if Game.mode != "normal":
-		title += "  ·  " + Game.mode_name().to_upper()
+	var title := arrival_title()
 	menus.show_getting_ready(title, "Getting ready")
 	ready_title = title
 	ready_held_paused = get_tree().paused
@@ -654,12 +662,12 @@ func _port_home() -> void:
 	FX.burst(player.global_position + Vector3(0, 1.0, 0), Color(0.5, 1.0, 0.85), 80, 6.0, 0.2, 1.0, 2.0)
 	FX.screen_flash(Color(0.75, 1.0, 0.9), 0.9, 1.0)
 	if Game.zone == "home":
-		teleport_player(HomeCabin.arrival(), 0.0, "Whoosh! Home sweet home.")
+		teleport_player(HomeCabin.arrival(), 0.0, "Whoosh! Welcome home!")
 		return
 	player.input_enabled = false
 	Game.flags["port_from"] = {"zone": Game.zone, "pos": Game.resume_pos, "yaw": Game.resume_yaw}
 	await menus.fade_to(1.0, 0.8).finished
-	Game.set_meta("arrive_say", "Whoosh! Home sweet home.")
+	Game.set_meta("arrive_say", "Whoosh! Welcome home, %s!" % Game.profile.name)
 	_travel("home", HomeCabin.arrival(), 0.0)
 
 ## Walking into the family portal after porting home. Before the first adventure is

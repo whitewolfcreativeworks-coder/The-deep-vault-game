@@ -8158,7 +8158,8 @@ func _outbuildings_test_2() -> void:
 	var nu := Loot.make_random(10, 0.0, 0)
 	check("ob2_new_id", Game.items.size() == n0 + 1 and not forged.has(nu), "%s (%d -> %d)" % [nu, n0, Game.items.size()])
 	await _cam_shot("ob_15_yard", Vector3(2, 7, 24), Vector3(-6, 1, 6), 65.0)
-	await _cam_shot("ob_16_statue", Vector3(4.5, 2.6, 10), Vector3(7.6, 2.6, 3.4), 60.0)
+	var obst: Vector3 = (main.world as HomeWorld).decor.movable["statue"].node.global_position
+	await _cam_shot("ob_16_statue", obst + Vector3(1.0, 2.6, -8.0), obst + Vector3(0, 2.6, 0), 60.0)
 	_finish()
 
 # --- getting ready on arrival, and the riding rules -----------------------------------
@@ -8202,6 +8203,20 @@ func _arrival_test() -> bool:
 	m.fade.color.a = 1.0
 	m.show_getting_ready(main.ready_title, "Getting ready..")
 	await shot("ar_03_card")
+	m.show_getting_ready("")
+	m.fade.color.a = 0.0
+	# porting home from a Hard (or Insane) level always says "Welcome home!" (Jason, Nov 25)
+	Game.flags["adventure_done"] = true
+	Game.mode = "insane"
+	Game.zone = "home"
+	var home_title: String = main.arrival_title()
+	Game.zone = "forest"
+	var forest_title: String = main.arrival_title()
+	Game.mode = "hard"
+	check("ar_welcome_home", home_title == "Welcome home!" and forest_title.contains("INSANE"), "%s / %s" % [home_title, forest_title])
+	m.fade.color.a = 1.0
+	m.show_getting_ready(home_title, "Getting ready..")
+	await shot("ar_04_welcome_home_card")
 	m.show_getting_ready("")
 	m.fade.color.a = 0.0
 	# --- riding: pets and class powers wait until you're on your feet

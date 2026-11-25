@@ -1760,3 +1760,12 @@ Jason's son wanted to move the statue: touch it, hold on, "a ring goes around un
 - it moves the bird bath with USE;
 - it reloads home and checks the statue stayed where it was put.
 
+## Follow-up 55: "Welcome home!" (Nov 25)
+
+Jason: when you Port Home from an Insane level, the getting-ready card said "Home · INSANE". "It should always say welcome home whenever you port home." He likes that some of a level's effects linger at home for a moment and then wear off, so those stay.
+
+- **The card** (`Main.arrival_title()`): at home it now says **"Welcome home!"**, whatever the mode. On the very first trip, which is still the Sky Ride, it says "The Flight Home". Elsewhere it's unchanged: the place, plus the mode if it isn't Normal.
+- **Port Home's message** now says "Whoosh! Welcome home, <name>!" too.
+- **Tested:** the `arrival` test checks the home card says "Welcome home!" with an Insane adventure under way, while a level's card still says INSANE, and photographs the card.
+  - Its hold-time check (at most 7 s on this slow software renderer) failed once at 7.27 s and passed on the rerun, so it's timing-sensitive on this machine.
+

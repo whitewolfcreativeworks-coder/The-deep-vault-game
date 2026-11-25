@@ -266,6 +266,7 @@ Forged gear is stronger than found gear and gets stronger with every tier, so it
   - it waits until the frame rate settles.
 
   It takes at least 2 seconds, up to 5 on a slow iPad. The world is paused meanwhile, so nothing can attack you.
+- **Coming home always says "Welcome home!"** (Jason, Nov 25), whatever mode your adventure is in. Away from home, the card still names the place and the mode ("The Goblin Forest · INSANE"). Anything still wearing off from where you were, like an Insane effect, fades away on its own as before.
 - **Hard is now Normal with about three times the monster health** (Jason: "exactly like normal mode with more hit points"). The monsters still grow to match your level, fire and lava still burn harder, and the rewards are still better. Hard no longer adds twin monsters. They were what made Hard lag in the Goblin Forest on the iPad, so Hard now has exactly as many monsters as Normal.
 - **Riding is fair for every hero.** While you're on any mount:
   - **pets and summoned friends don't fight.** The Beastmaster's wolves, the Necromancer's skeletons and the forge's risen friends trot along on the ground below and join in again once you get off;
