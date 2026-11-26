@@ -1769,3 +1769,23 @@ Jason: when you Port Home from an Insane level, the getting-ready card said "Hom
 - **Tested:** the `arrival` test checks the home card says "Welcome home!" with an Insane adventure under way, while a level's card still says INSANE, and photographs the card.
   - Its hold-time check (at most 7 s on this slow software renderer) failed once at 7.27 s and passed on the rerun, so it's timing-sensitive on this machine.
 
+## Follow-up 56: bigger, clearer menu text (Nov 26)
+
+Jason: "I've got bad eyesight. LOL. Can we increase the text size in the menus throughout the game? ... this game will probably be for younger kids. so a little bigger text would be good." His screenshot of the wardrobe on the iPad also showed little empty boxes where ★ and ✔ should be.
+
+- **Bigger:** every font size in the interface now goes through `UIKit.fs()` with `TEXT_SCALE = 1.25`:
+  - menus, buttons, the Bag, the shop, the forge, the wardrobe, the kitchen and the designer;
+  - the HUD, messages and prompts;
+  - the fishing labels.
+
+  The keyboard-help line at the bottom stays small, since it's for computers only.
+- **A font for young readers:** Andika (SIL International, OFL), which has distinct I, l and 1 and a plain 0. Atkinson Hyperlegible was tried first, but its slashed zero ("1Ø minutes") would puzzle young players.
+  - The menus used to ask for Georgia or Cinzel from the computer. The iPad's browser can't use the computer's fonts, so it was really showing Godot's built-in font, without ★ ✔ ▸ ✕ ▶. Now the font ships with the game.
+  - Those symbols come from a 17 KB cut-down DejaVu Sans set as a fallback. The game die emoji on the designer's Random button is gone.
+- **Nothing falls off the screen:**
+  - **Panels:** each centres itself at the size its contents need (`Menus._fit`) and shrinks if it would be bigger than the screen.
+  - **On the iPad's 4:3 screen** (1600×1200 logical) every menu fits at full size.
+  - **On 16:9 (1600×900)** three tall ones are trimmed slightly to fit: the Bag and the level picker to 94%, the new-adventure picker to 88%. Their text is still bigger than before.
+  - **Elsewhere:** messages on the right wrap instead of running off the edge, and the touch zoom slider moves down below the taller status box. The wardrobe's buttons are wider, so the stars and "Fluffy Slippers" aren't cut off.
+- **Tested:** the new `bigtext` test opens every menu at both screen shapes and checks each one is entirely on screen. That's the creator, save slots, pause, Bag, chest, all 8 shop tabs, the forge, journal, wardrobe, kitchen, garden, Port Home question, adventure and level pickers, a lore page, the designer, and the death and victory screens. It photographs each, at 26 checks per shape. The `ui`, `touch`, `wardrobe` and `decor` tests also pass.
+

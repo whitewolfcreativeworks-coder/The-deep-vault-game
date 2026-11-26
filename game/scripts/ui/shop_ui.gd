@@ -68,7 +68,7 @@ func _build_shop() -> void:
 		var id: String = t[0]
 		var b := Button.new(); b.text = String(t[1]); b.custom_minimum_size = Vector2(170, 52)
 		b.toggle_mode = true
-		b.add_theme_font_size_override("font_size", 19)
+		b.add_theme_font_size_override("font_size", UIKit.fs(19))
 		b.pressed.connect(func() -> void:
 			Sfx.play("footstep", -8.0, 0.0)
 			show_tab(id))
@@ -156,7 +156,7 @@ func _ware_row(w: Dictionary) -> Control:
 	var price := ShopCatalog.price(id)
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(230, 66)
-	b.add_theme_font_size_override("font_size", 22)
+	b.add_theme_font_size_override("font_size", UIKit.fs(22))
 	if why == "In your yard":
 		b.text = "In your yard ✓"
 		b.disabled = true
@@ -189,7 +189,7 @@ func _build_sell() -> void:
 		total += ShopCatalog.sell_value(u)
 	var top := HBoxContainer.new(); top.add_theme_constant_override("separation", 16)
 	_shop_list.add_child(top)
-	var all := Button.new(); all.custom_minimum_size = Vector2(640, 66); all.add_theme_font_size_override("font_size", 20)
+	var all := Button.new(); all.custom_minimum_size = Vector2(640, 66); all.add_theme_font_size_override("font_size", UIKit.fs(20))
 	all.text = ("Sell everything I'm not using  (%d pieces: %d gold)" % [junk.size(), total]) if not _sell_all_armed else ("Are you sure? Tap again to sell %d pieces for %d gold" % [junk.size(), total])
 	all.disabled = junk.is_empty()
 	all.pressed.connect(func() -> void:
@@ -209,7 +209,7 @@ func _build_sell() -> void:
 	# your garden's harvest (vegetables and flowers)
 	var hv := ShopCatalog.harvest_value()
 	if hv > 0:
-		var hb := Button.new(); hb.name = "SellHarvest"; hb.custom_minimum_size = Vector2(640, 60); hb.add_theme_font_size_override("font_size", 20)
+		var hb := Button.new(); hb.name = "SellHarvest"; hb.custom_minimum_size = Vector2(640, 60); hb.add_theme_font_size_override("font_size", UIKit.fs(20))
 		var parts: Array = []
 		for id in Game.basket:
 			parts.append("%d %s" % [int(Game.basket[id]), GardenPlants.plant_name(String(id)).to_lower()])
@@ -234,7 +234,7 @@ func _build_sell() -> void:
 		vb.add_child(UIKit.label("%s   [%s %s]" % [it.get("name", id), Loot.rarity_label(it), Game.SLOT_NAMES.get(it.get("slot", ""), "")], 19, it.get("color", UIKit.PARCH), true))
 		vb.add_child(_wrap(UIKit.label(", ".join(Game.item_lines(id)), 15, UIKit.DIM), 1000))
 		var b := Button.new(); b.text = "Sell  %d gold" % ShopCatalog.sell_value(id); b.custom_minimum_size = Vector2(200, 56)
-		b.add_theme_font_size_override("font_size", 20)
+		b.add_theme_font_size_override("font_size", UIKit.fs(20))
 		b.pressed.connect(func() -> void:
 			var g := ShopCatalog.sell(id)
 			if g > 0:
@@ -276,7 +276,7 @@ func _build_forge() -> void:
 	for i in 3:
 		var k := i
 		var b := Button.new(); b.custom_minimum_size = Vector2(620, 64)
-		b.add_theme_font_size_override("font_size", 19)
+		b.add_theme_font_size_override("font_size", UIKit.fs(19))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.pressed.connect(func() -> void:
 			if k < anvil.size():
@@ -290,7 +290,7 @@ func _build_forge() -> void:
 	_tier_lbl = _wrap(UIKit.label("", 18, UIKit.DIM), 620)
 	right.add_child(_tier_lbl)
 	_forge_btn = Button.new(); _forge_btn.text = "FORGE!"; _forge_btn.custom_minimum_size = Vector2(620, 74)
-	_forge_btn.add_theme_font_size_override("font_size", 28)
+	_forge_btn.add_theme_font_size_override("font_size", UIKit.fs(28))
 	_forge_btn.pressed.connect(_do_forge)
 	right.add_child(_forge_btn)
 	_result_box = VBoxContainer.new(); _result_box.add_theme_constant_override("separation", 6)
@@ -355,7 +355,7 @@ func _gear_row(id: String) -> Control:
 	vb.add_child(UIKit.label(String(it.get("name", id)), 18, it.get("color", UIKit.PARCH), true))
 	var where := "  (in the chest)" if Game.stash.has(id) else ""
 	vb.add_child(_wrap(UIKit.label("%s %s%s   %s" % [Loot.rarity_label(it), Game.SLOT_NAMES.get(it.get("slot", ""), ""), where, ", ".join(Game.item_lines(id))], 14, UIKit.DIM), 520))
-	var b := Button.new(); b.custom_minimum_size = Vector2(150, 54); b.add_theme_font_size_override("font_size", 18)
+	var b := Button.new(); b.custom_minimum_size = Vector2(150, 54); b.add_theme_font_size_override("font_size", UIKit.fs(18))
 	if anvil.has(id):
 		b.text = "On the anvil"
 		b.disabled = true

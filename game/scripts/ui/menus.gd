@@ -143,6 +143,26 @@ func is_open() -> bool:
 func close_all() -> void:
 	show_panel("")
 
+## Keep a panel in the middle of the screen at the size its contents need, and if
+## (with the bigger text) that's ever more than the screen, shrink it to fit.
+func _fit(p: Control) -> void:
+	if not (p is PanelContainer) or not p.visible:
+		return
+	var vp: Vector2 = root.size
+	if vp.x < 10.0 or vp.y < 10.0:
+		return
+	var sz := p.get_combined_minimum_size()
+	if p.anchor_left != 0.0 or p.anchor_top != 0.0 or p.anchor_right != 0.0 or p.anchor_bottom != 0.0:
+		p.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	if p.size != sz:
+		p.size = sz
+	var s := minf(1.0, minf((vp.x - 12.0) / sz.x, (vp.y - 12.0) / sz.y))
+	if not is_equal_approx(p.scale.x, s):
+		p.scale = Vector2(s, s)
+	var at := ((vp - sz * s) * 0.5).floor()
+	if p.position != at:
+		p.position = at
+
 func _center_panel(n: String, w: float, h: float) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.set_anchors_preset(Control.PRESET_CENTER)
@@ -195,7 +215,7 @@ func _build_title() -> void:
 	var sp := Control.new(); sp.custom_minimum_size.y = 40; v.add_child(sp)
 	_continue_btn = _button("Continue", func() -> void: _open_slots("continue"))
 	_continue_btn.custom_minimum_size.y = 58
-	_continue_btn.add_theme_font_size_override("font_size", 24)
+	_continue_btn.add_theme_font_size_override("font_size", UIKit.fs(24))
 	v.add_child(_continue_btn)
 	v.add_child(_button("New Adventure", func() -> void: _new_adventure()))
 	_mute_btn = _button(_sound_label(), func() -> void: _toggle_mute())
@@ -271,7 +291,7 @@ func _swatch(col: Color, tip: String, cb: Callable, w := 48.0, txt := "") -> But
 	b.add_theme_stylebox_override("normal", sb); b.add_theme_stylebox_override("hover", sb)
 	b.add_theme_stylebox_override("pressed", sbp); b.add_theme_stylebox_override("focus", sb)
 	b.add_theme_stylebox_override("hover_pressed", sbp)
-	b.add_theme_color_override("font_color", Color(1, 1, 1)); b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_color_override("font_color", Color(1, 1, 1)); b.add_theme_font_size_override("font_size", UIKit.fs(16))
 	b.pressed.connect(func() -> void:
 		Sfx.play("footstep", -10.0, 0.0)
 		cb.call())
@@ -280,7 +300,7 @@ func _swatch(col: Color, tip: String, cb: Callable, w := 48.0, txt := "") -> But
 func _choice(text: String, cb: Callable, w := 118.0) -> Button:
 	var b := Button.new(); b.text = text; b.toggle_mode = true
 	b.custom_minimum_size = Vector2(w, 42)
-	b.add_theme_font_size_override("font_size", 17)
+	b.add_theme_font_size_override("font_size", UIKit.fs(17))
 	b.pressed.connect(func() -> void:
 		Sfx.play("footstep", -10.0, 0.0)
 		cb.call())
@@ -437,7 +457,7 @@ func _build_creator() -> void:
 		var id: String = t[0]
 		var tb := _choice(t[1], func() -> void: _set_tab(id), 170)
 		tb.custom_minimum_size.y = 54
-		tb.add_theme_font_size_override("font_size", 21)
+		tb.add_theme_font_size_override("font_size", UIKit.fs(21))
 		tabs.add_child(tb)
 		_tab_btns[id] = tb
 	var pages := PanelContainer.new()
@@ -455,7 +475,7 @@ func _build_creator() -> void:
 			Game.profile.hero = hero
 			_refresh_preview(true), 270)
 		hb.custom_minimum_size.y = 64
-		hb.add_theme_font_size_override("font_size", 22)
+		hb.add_theme_font_size_override("font_size", UIKit.fs(22))
 		hg.add_child(hb)
 		_hero_btns[hero] = hb
 	# man or woman (every class can be either)
@@ -465,7 +485,7 @@ func _build_creator() -> void:
 		var sid: String = sx[0]
 		var sb := _choice(sx[1], func() -> void: _set_sex(sid), 200)
 		sb.custom_minimum_size.y = 56
-		sb.add_theme_font_size_override("font_size", 22)
+		sb.add_theme_font_size_override("font_size", UIKit.fs(22))
 		sxr.add_child(sb)
 		_sex_btns[sid] = sb
 	_hero_desc = UIKit.label("", 19, UIKit.PARCH)
@@ -497,7 +517,7 @@ func _build_creator() -> void:
 			Game.profile.hair_style = st
 			_hair_changed(), 200)
 		b.custom_minimum_size.y = 56
-		b.add_theme_font_size_override("font_size", 20)
+		b.add_theme_font_size_override("font_size", UIKit.fs(20))
 		hsg.add_child(b); _hair_btns[st] = b
 	_heading("Colour", pr)
 	var hcg := _grid(10, pr)
@@ -519,7 +539,7 @@ func _build_creator() -> void:
 			Game.profile.face = f
 			_refresh_preview(), 200)
 		b.custom_minimum_size.y = 56
-		b.add_theme_font_size_override("font_size", 20)
+		b.add_theme_font_size_override("font_size", UIKit.fs(20))
 		fg.add_child(b); _face_btns[f] = b
 	pf.add_child(UIKit.label("Beards and mustaches take your hair colour. Heroines get makeup and glitter instead.", 16, UIKit.DIM))
 	# Colours
@@ -533,7 +553,7 @@ func _build_creator() -> void:
 			_refresh_preview(), 110, "Own" if i == 0 else "")
 		cg.add_child(b); _cape_btns.append(b)
 	_hat_btn = CheckButton.new(); _hat_btn.text = "Wear helm / hat"; _hat_btn.button_pressed = true
-	_hat_btn.add_theme_font_size_override("font_size", 20)
+	_hat_btn.add_theme_font_size_override("font_size", UIKit.fs(20))
 	_hat_btn.toggled.connect(func(on: bool) -> void:
 		Game.profile.show_hat = on
 		_refresh_preview())
@@ -558,7 +578,7 @@ func _build_creator() -> void:
 	br.add_child(_creator_back)
 	var dice := _button("Surprise me!", func() -> void: _randomize_look(), 300)
 	dice.custom_minimum_size.y = 64
-	dice.add_theme_font_size_override("font_size", 26)
+	dice.add_theme_font_size_override("font_size", UIKit.fs(26))
 	var dsb := StyleBoxFlat.new(); dsb.bg_color = Color(0.55, 0.36, 0.08); dsb.set_corner_radius_all(12)
 	dsb.border_color = Color(1.0, 0.85, 0.35); dsb.set_border_width_all(3)
 	var dsh := dsb.duplicate() as StyleBoxFlat; dsh.bg_color = Color(0.72, 0.48, 0.1)
@@ -635,7 +655,7 @@ func _build_keys(parent: Control) -> void:
 		for ch in r:
 			var c: String = ch
 			var b := Button.new(); b.text = c; b.custom_minimum_size = Vector2(82, 72)
-			b.add_theme_font_size_override("font_size", 30)
+			b.add_theme_font_size_override("font_size", UIKit.fs(30))
 			b.pressed.connect(func() -> void:
 				if _name_edit.text.length() < _name_edit.max_length:
 					var t := c if _keys_caps else c.to_lower()
@@ -649,13 +669,13 @@ func _build_keys(parent: Control) -> void:
 	h2.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(h2)
 	var caps := Button.new(); caps.text = "⇧ Caps"; caps.custom_minimum_size = Vector2(170, 72); caps.toggle_mode = true
-	caps.add_theme_font_size_override("font_size", 24)
+	caps.add_theme_font_size_override("font_size", UIKit.fs(24))
 	caps.pressed.connect(func() -> void:
 		_keys_caps = not _keys_caps
 		_keys_refresh.call())
 	h2.add_child(caps)
 	var sp := Button.new(); sp.text = "Space"; sp.custom_minimum_size = Vector2(300, 72)
-	sp.add_theme_font_size_override("font_size", 24)
+	sp.add_theme_font_size_override("font_size", UIKit.fs(24))
 	sp.pressed.connect(func() -> void:
 		if _name_edit.text.length() < _name_edit.max_length:
 			_name_edit.text += " "
@@ -663,21 +683,21 @@ func _build_keys(parent: Control) -> void:
 			_keys_refresh.call())
 	h2.add_child(sp)
 	var bk := Button.new(); bk.text = "⌫ Back"; bk.custom_minimum_size = Vector2(170, 72)
-	bk.add_theme_font_size_override("font_size", 24)
+	bk.add_theme_font_size_override("font_size", UIKit.fs(24))
 	bk.pressed.connect(func() -> void:
 		_name_edit.text = _name_edit.text.left(-1)
 		_keys_caps = _name_edit.text == "" or _name_edit.text.ends_with(" ")
 		_keys_refresh.call())
 	h2.add_child(bk)
 	var clr := Button.new(); clr.text = "Clear"; clr.custom_minimum_size = Vector2(140, 72)
-	clr.add_theme_font_size_override("font_size", 24)
+	clr.add_theme_font_size_override("font_size", UIKit.fs(24))
 	clr.pressed.connect(func() -> void:
 		_name_edit.text = ""
 		_keys_caps = true
 		_keys_refresh.call())
 	h2.add_child(clr)
 	var ok := Button.new(); ok.text = "✓ Done"; ok.custom_minimum_size = Vector2(190, 72)
-	ok.add_theme_font_size_override("font_size", 26)
+	ok.add_theme_font_size_override("font_size", UIKit.fs(26))
 	ok.pressed.connect(func() -> void: _hide_keys())
 	h2.add_child(ok)
 	_keys_refresh = func() -> void:
@@ -801,6 +821,8 @@ func _update_preview_cam(k: float) -> void:
 	_preview_cam.look_at(body_at.lerp(face_at, _cam_t))
 
 func _process(delta: float) -> void:
+	if current != "" and _panels.has(current):
+		_fit(_panels[current])
 	if current == "creator" and _preview:
 		_update_preview_cam(1.0 - exp(-6.0 * delta))
 		_spin_hold -= delta
@@ -891,7 +913,7 @@ func _refresh_slots() -> void:
 		if _slots_mode == "continue":
 			var go := _button("Continue", func() -> void: continue_requested.emit(idx), 380)
 			go.custom_minimum_size.y = 60
-			go.add_theme_font_size_override("font_size", 24)
+			go.add_theme_font_size_override("font_size", UIKit.fs(24))
 			cv.add_child(go)
 			var del := _button("Tap again to delete" if _delete_armed == idx else "Delete", func() -> void:
 				if _delete_armed == idx:
@@ -904,7 +926,7 @@ func _refresh_slots() -> void:
 					_delete_armed = idx
 				_refresh_slots(), 380)
 			del.custom_minimum_size.y = 40
-			del.add_theme_font_size_override("font_size", 15)
+			del.add_theme_font_size_override("font_size", UIKit.fs(15))
 			cv.add_child(del)
 		else:
 			cv.add_child(_button("Replace with a new hero", func() -> void:
@@ -979,7 +1001,7 @@ func _build_pause() -> void:
 		var gb := Button.new()
 		gb.text = c.capitalize()
 		gb.name = "Gfx_" + c
-		gb.add_theme_font_size_override("font_size", 16)
+		gb.add_theme_font_size_override("font_size", UIKit.fs(16))
 		gb.custom_minimum_size = Vector2(84 if c == "medium" else 64, 46)
 		gb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		gb.pressed.connect(func() -> void:
@@ -1048,7 +1070,7 @@ func _refresh_garden() -> void:
 			continue
 		var pl: Dictionary = GardenPlants.PLANTS[id]
 		var b := Button.new(); b.custom_minimum_size = Vector2(840, 60); b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.add_theme_font_size_override("font_size", 19)
+		b.add_theme_font_size_override("font_size", UIKit.fs(19))
 		var what := "%d min" % int(ceilf(float(pl.mins)))
 		b.text = "   %s  ×%d      %s  (%s, grows in %s)" % [String(pl.seed), n, String(pl.line), String(GardenPlants.KIND_NAMES[pl.kind]).to_lower().trim_suffix("s"), what]
 		b.add_theme_color_override("font_color", (pl.color as Color).lightened(0.35))
@@ -1297,7 +1319,7 @@ func ask(title: String, text: String, options: Array) -> void:
 	for o in options:
 		var b := _button(String(o[0]), o[1], 320.0 if options.size() <= 2 else (270.0 if options.size() == 3 else 205.0))
 		b.custom_minimum_size.y = 66
-		b.add_theme_font_size_override("font_size", 22)
+		b.add_theme_font_size_override("font_size", UIKit.fs(22))
 		_ask_btns.add_child(b)
 	show_panel("ask")
 
@@ -1335,7 +1357,7 @@ func _build_modes() -> void:
 				if _mode_pick.is_valid():
 					_mode_pick.call(m, g), 200)
 			b.custom_minimum_size.y = 64
-			b.add_theme_font_size_override("font_size", 20)
+			b.add_theme_font_size_override("font_size", UIKit.fs(20))
 			h.add_child(b)
 	var foot := HBoxContainer.new(); foot.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(foot)
 	foot.add_child(_button("Not now", func() -> void:
@@ -1386,7 +1408,7 @@ func _build_levels() -> void:
 			if _level_pick.is_valid():
 				_level_pick.call(z), 220)
 		b.custom_minimum_size.y = 64
-		b.add_theme_font_size_override("font_size", 22)
+		b.add_theme_font_size_override("font_size", UIKit.fs(22))
 		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		h.add_child(b)
 	var foot := HBoxContainer.new(); foot.alignment = BoxContainer.ALIGNMENT_CENTER; v.add_child(foot)
@@ -1458,7 +1480,7 @@ func _stash_row(id: String, in_chest: bool) -> Control:
 	st.autowrap_mode = TextServer.AUTOWRAP_WORD; st.custom_minimum_size.x = 420
 	vb.add_child(st)
 	var b := Button.new(); b.custom_minimum_size = Vector2(150, 54)
-	b.add_theme_font_size_override("font_size", 20)
+	b.add_theme_font_size_override("font_size", UIKit.fs(20))
 	if in_chest:
 		b.text = "Take  ⇦"
 		b.pressed.connect(func() -> void:
@@ -1541,7 +1563,7 @@ func _build_victory() -> void:
 	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER; hb.add_theme_constant_override("separation", 16); v.add_child(hb)
 	var go := _button("Step through the portal  →  Level 2: The Goblin Forest", func() -> void: forest_requested.emit(), 640)
 	go.custom_minimum_size.y = 62
-	go.add_theme_font_size_override("font_size", 22)
+	go.add_theme_font_size_override("font_size", UIKit.fs(22))
 	v.add_child(go)
 	hb.add_child(_button("Play the Vault again", func() -> void: restart_requested.emit(), 300))
 	hb.add_child(_button("Quit", func() -> void: quit_requested.emit(), 200))
@@ -1578,7 +1600,7 @@ func _build_dialogue() -> void:
 func _dlg_button(text: String, cb: Callable, primary := false) -> void:
 	var b := _button(text, cb, 330 if primary else 230)
 	b.custom_minimum_size.y = 60 if primary else 52
-	b.add_theme_font_size_override("font_size", 23 if primary else 19)
+	b.add_theme_font_size_override("font_size", UIKit.fs(23 if primary else 19))
 	_dlg_buttons.add_child(b)
 
 func _close_dialogue() -> void:

@@ -136,11 +136,11 @@ func _make_ui() -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ui.add_child(box)
 	_label = Label.new(); _label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.add_theme_font_size_override("font_size", 26)
+	_label.add_theme_font_size_override("font_size", UIKit.fs(26))
 	_label.add_theme_color_override("font_outline_color", Color(0, 0, 0)); _label.add_theme_constant_override("outline_size", 8)
 	box.add_child(_label)
 	var tl := Label.new(); tl.text = "LINE TENSION   (slack  ·  just right  ·  snap!)"; tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tl.add_theme_font_size_override("font_size", 18)
+	tl.add_theme_font_size_override("font_size", UIKit.fs(18))
 	tl.add_theme_color_override("font_outline_color", Color(0, 0, 0)); tl.add_theme_constant_override("outline_size", 6)
 	_tbar = TensionBar.new(); _tbar.custom_minimum_size = Vector2(520, 30)
 	_tbar.visible = false; tl.visible = false
@@ -148,11 +148,11 @@ func _make_ui() -> void:
 	box.add_child(tl)
 	box.add_child(_tbar)
 	_hint = Label.new(); _hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint.add_theme_font_size_override("font_size", 22)
+	_hint.add_theme_font_size_override("font_size", UIKit.fs(22))
 	_hint.add_theme_color_override("font_outline_color", Color(0, 0, 0)); _hint.add_theme_constant_override("outline_size", 8)
 	box.add_child(_hint)
 	var rl := Label.new(); rl.text = "REEL IT IN"; rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rl.add_theme_font_size_override("font_size", 18)
+	rl.add_theme_font_size_override("font_size", UIKit.fs(18))
 	rl.add_theme_color_override("font_outline_color", Color(0, 0, 0)); rl.add_theme_constant_override("outline_size", 6)
 	box.add_child(rl)
 	rl.visible = false

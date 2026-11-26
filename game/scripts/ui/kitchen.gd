@@ -171,7 +171,7 @@ func _build() -> void:
 	head.add_child(UIKit.label("Kitchen", 34, UIKit.GOLD, true))
 	var sp := Control.new(); sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; head.add_child(sp)
 	var done := Button.new(); done.text = "✔  Done"; done.custom_minimum_size = Vector2(170, 54)
-	done.add_theme_font_size_override("font_size", 22)
+	done.add_theme_font_size_override("font_size", UIKit.fs(22))
 	done.pressed.connect(func() -> void:
 		if not busy:
 			Sfx.play("footstep", -8.0, 0.0)
@@ -187,7 +187,7 @@ func _build() -> void:
 	for id in Cooking.ORDER:
 		var b := Button.new(); b.toggle_mode = true; b.custom_minimum_size = Vector2(440, 74)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT; b.clip_text = true
-		b.add_theme_font_size_override("font_size", 16)
+		b.add_theme_font_size_override("font_size", UIKit.fs(16))
 		var on := StyleBoxFlat.new(); on.bg_color = Color(0.42, 0.3, 0.14); on.border_color = Color(1.0, 0.85, 0.4)
 		on.set_border_width_all(3); on.set_corner_radius_all(8)
 		b.add_theme_stylebox_override("pressed", on); b.add_theme_stylebox_override("hover_pressed", on)
@@ -199,7 +199,7 @@ func _build() -> void:
 		grid.add_child(b)
 		_cards[id] = b
 	var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 16); col.add_child(row)
-	_cook_btn = Button.new(); _cook_btn.custom_minimum_size = Vector2(300, 70); _cook_btn.add_theme_font_size_override("font_size", 26)
+	_cook_btn = Button.new(); _cook_btn.custom_minimum_size = Vector2(300, 70); _cook_btn.add_theme_font_size_override("font_size", UIKit.fs(26))
 	_cook_btn.pressed.connect(func() -> void: cook())
 	row.add_child(_cook_btn)
 	_status = UIKit.label("", 18, Color(1.0, 0.9, 0.6), true); _status.autowrap_mode = TextServer.AUTOWRAP_WORD

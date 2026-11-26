@@ -120,11 +120,11 @@ func _build() -> void:
 			sw.add_child(b)
 			(_swatch_btns[part] as Array).append(b)
 	var foot := HBoxContainer.new(); foot.add_theme_constant_override("separation", 14); col.add_child(foot)
-	foot.add_child(_btn("🎲  Random!", func() -> void: randomize_look(), 200))
+	foot.add_child(_btn("Random!", func() -> void: randomize_look(), 200))
 	foot.add_child(_btn("Start over", func() -> void: _reset_look(), 180))
 	foot.add_child(_btn("Take it off", func() -> void: take_off(), 180))
 	var wear := _btn("✔  Wear it", func() -> void: wear(), 220)
-	wear.add_theme_font_size_override("font_size", 22)
+	wear.add_theme_font_size_override("font_size", UIKit.fs(22))
 	foot.add_child(wear)
 	_status = UIKit.label("", 16, UIKit.DIM); col.add_child(_status)
 

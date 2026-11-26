@@ -174,7 +174,7 @@ func _ready() -> void:
 	# --- messages (right)
 	msg_box = VBoxContainer.new()
 	msg_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	msg_box.position = Vector2(-520, 120); msg_box.size = Vector2(500, 400)
+	msg_box.position = Vector2(-580, 120); msg_box.size = Vector2(560, 400)
 	msg_box.alignment = BoxContainer.ALIGNMENT_BEGIN
 	msg_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(msg_box)
@@ -187,7 +187,7 @@ func _ready() -> void:
 		crosshair.draw_arc(Vector2.ZERO, 9.0, 0, TAU, 24, Color(1, 1, 1, 0.25), 1.5))
 	root.add_child(crosshair)
 
-	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt · X special · B 2nd special\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · T follow next quest%s · Esc menu" % (" · Y port home" if Game.can_port_home() else ""), 15, UIKit.DIM)
+	hint = UIKit.label("WASD move · Mouse look · Wheel zoom (1st/3rd person) · LMB attack (hits recharge mana) · RMB block · Q arcane bolt · X special · B 2nd special\nSpace jump/climb · Shift sprint · C dodge · E interact · R heal · F mana · I inventory · T follow next quest%s · Esc menu" % (" · Y port home" if Game.can_port_home() else ""), 12, UIKit.DIM)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	hint.position = Vector2(-600, -70); hint.size = Vector2(1200, 50)
@@ -241,7 +241,8 @@ func set_target(n: Node) -> void:
 func push_message(text: String, color: Color) -> void:
 	var l := UIKit.label(text, 18, color)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	l.custom_minimum_size.x = 500
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART      # (long ones wrap instead of running off the screen)
+	l.custom_minimum_size.x = 560
 	msg_box.add_child(l)
 	while msg_box.get_child_count() > 7:
 		msg_box.get_child(0).free()

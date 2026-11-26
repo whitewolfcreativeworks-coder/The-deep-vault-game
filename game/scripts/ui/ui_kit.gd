@@ -8,20 +8,37 @@ const DIM := Color(0.62, 0.58, 0.52)
 static var _title_font: Font
 static var _body_font: Font
 
+## Bigger text everywhere in the menus (Jason, Nov 26: "a little bigger text would be good",
+## for his eyes and for younger kids). Every size in the interface goes through fs().
+const TEXT_SCALE := 1.25
+static func fs(size: float) -> int:
+	return int(round(size * TEXT_SCALE))
+
+## The menus' letters: Andika, made by SIL for children learning to read (clear letter
+## shapes: I, l and 1 all different, a plain 0). The same on every device: the iPad's
+## browser can't use the computer's own fonts. A few symbols (★ ✔ ▶ ...) come from a tiny
+## piece of DejaVu Sans.
+static func _font_file(path: String, symbols: String) -> Font:
+	if not ResourceLoader.exists(path):
+		return ThemeDB.fallback_font
+	var f := load(path) as FontFile
+	if f == null:
+		return ThemeDB.fallback_font
+	f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	if ResourceLoader.exists(symbols):
+		var sym := load(symbols) as FontFile
+		if sym:
+			f.fallbacks = [sym]
+	return f
+
 static func title_font() -> Font:
 	if _title_font == null:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Cinzel", "Trajan Pro", "Georgia", "Palatino Linotype", "Book Antiqua", "DejaVu Serif", "Liberation Serif", "serif"])
-		f.font_weight = 600
-		f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-		_title_font = f
+		_title_font = _font_file("res://assets/fonts/Andika-Bold.ttf", "res://assets/fonts/DejaVuSans-Bold-UISymbols.ttf")
 	return _title_font
 
 static func body_font() -> Font:
 	if _body_font == null:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Georgia", "Palatino Linotype", "DejaVu Serif", "Liberation Serif", "serif"])
-		_body_font = f
+		_body_font = _font_file("res://assets/fonts/Andika-Regular.ttf", "res://assets/fonts/DejaVuSans-UISymbols.ttf")
 	return _body_font
 
 static func panel_style(alpha := 0.86, border := GOLD, radius := 6) -> StyleBoxFlat:
@@ -39,7 +56,7 @@ static func panel_style(alpha := 0.86, border := GOLD, radius := 6) -> StyleBoxF
 static func theme() -> Theme:
 	var t := Theme.new()
 	t.default_font = body_font()
-	t.default_font_size = 18
+	t.default_font_size = fs(18)
 	var btn := StyleBoxFlat.new()
 	btn.bg_color = Color(0.13, 0.11, 0.10, 0.92)
 	btn.border_color = Color(GOLD.r, GOLD.g, GOLD.b, 0.55)
@@ -57,7 +74,7 @@ static func theme() -> Theme:
 	t.set_color("font_color", "Button", PARCH)
 	t.set_color("font_hover_color", "Button", Color(1, 0.92, 0.7))
 	t.set_font("font", "Button", title_font())
-	t.set_font_size("font_size", "Button", 19)
+	t.set_font_size("font_size", "Button", fs(19))
 	t.set_color("font_color", "Label", PARCH)
 	t.set_stylebox("panel", "PanelContainer", panel_style())
 	var le := btn.duplicate() as StyleBoxFlat
@@ -65,13 +82,13 @@ static func theme() -> Theme:
 	t.set_stylebox("normal", "LineEdit", le)
 	t.set_stylebox("focus", "LineEdit", hov)
 	t.set_color("font_color", "LineEdit", PARCH)
-	t.set_font_size("font_size", "LineEdit", 22)
+	t.set_font_size("font_size", "LineEdit", fs(22))
 	return t
 
 static func label(text: String, size := 18, color := PARCH, title := false) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", fs(size))
 	l.add_theme_color_override("font_color", color)
 	if title:
 		l.add_theme_font_override("font", title_font())

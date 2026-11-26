@@ -364,6 +364,9 @@ func _run() -> void:
 	elif mode == "decor":
 		if await _decor_test():
 			return
+	elif mode == "bigtext":
+		if await _bigtext_test():
+			return
 	elif mode == "brushing":
 		await _brushing_test()
 	elif mode == "balloon2":
@@ -6085,6 +6088,89 @@ func _garden_test() -> bool:
 	Game.save_slot()
 	var sv: Dictionary = Game.read_slot(Game.active_slot)
 	check("gd_saved", String((sv.get("garden_plots", []) as Array)[3].plant) == "heartberry" and bool(sv.get("garden_starter", false)))
+	_finish()
+	return true
+
+# --- bigger, clearer menu text (Jason, Nov 26) -------------------------------------------
+## Is this panel on the screen, and how much did it have to shrink to fit?
+func _bt_check(name: String) -> void:
+	var m = main.menus
+	await wait(0.5)
+	await frames(3)
+	var p: Control = m._panels.get(name)
+	if p == null:
+		check("bt_%s_exists" % name, false)
+		return
+	var vp: Vector2 = m.root.size
+	var r := p.get_global_rect()
+	var inside := r.position.x >= -1.0 and r.position.y >= -1.0 and r.end.x <= vp.x + 1.0 and r.end.y <= vp.y + 1.0
+	print("BIGTEXT %s size %s scale %.2f viewport %s" % [name, p.size, p.scale.x, vp])
+	check("bt_%s_on_screen" % name, inside and p.visible, "%s in %s (scale %.2f)" % [r, vp, p.scale.x])
+	await shot("bt_%s" % name)
+
+func _bigtext_test() -> bool:
+	var m = main.menus
+	if not Game.get_meta("bt_phase", false):
+		for i in Game.SAVE_SLOTS:
+			Game.delete_slot(i)
+		check("bt_font_is_andika", UIKit.body_font() is FontFile and (UIKit.body_font() as FontFile).resource_path.contains("Andika") and UIKit.fs(16) == 20)
+		await shot("bt_title")
+		m.show_panel("creator"); m._refresh_preview()
+		await _bt_check("creator")
+		m._open_slots("new")
+		await _bt_check("slots")
+		Game.profile.hero = "Ranger"
+		await _start()
+		Game.set_meta("bt_phase", true)
+		Game.level = 16; Game.gold = 25000
+		Game.quests["mr_bubbles"] = {"state": "done", "n": 1}
+		Game.quests["flight_home"] = {"state": "done", "n": 1}
+		Game.flags["home_won"] = true; Game.flags["adventure_done"] = true
+		Game.decor = ["statue", "gnome"]
+		Game.basket = {"carrot": 4, "tomato": 3, "pumpkin": 2, "sunflower": 1, "rose": 2}
+		Game.lunchbox = {"carrot_soup": 2, "heros_feast": 1, "rose_tea": 2}
+		Game.seeds = {"carrot": 3, "tomato": 2, "moonpetal": 1}
+		for k in 6:
+			Game.inventory.append([Loot.make_weapon(16, k % 5), Loot.make_armor(16, (k + 2) % 5), Loot.make_trinket(16, k % 4)][k % 3])
+		Game.wear_costume("goblin", [0, 300.0, false, "five minutes"])
+		main._travel("home", Vector3(4, 1, 10))
+		return true
+	await wait(2.5)
+	player = main.player
+	god = true
+	await wait(1.0)
+	Game.say("Bigger text: can you read me from across the room?", Color(1.0, 0.9, 0.6))
+	await wait(0.5)
+	await shot("bt_hud")
+	main._open("pause"); await _bt_check("pause")
+	main._resume(); main._open("inventory"); await _bt_check("inventory")
+	main._resume(); main._open("stash"); await _bt_check("stash")
+	main._resume()
+	for t in ShopUI.TABS:
+		main.open_shop(String(t[0]))
+		await wait(0.2)
+		m.shop_ui.show_tab(String(t[0]))
+		await wait(0.3)
+		var nm := "shop"
+		await _bt_check(nm)
+		var f := "bt_shop_%s" % String(t[0])
+		await shot(f)
+		main._resume()
+	main.open_forge(); await _bt_check("forge"); main._resume()
+	main.open_forge(true); await _bt_check("journal"); main._resume()
+	main.open_wardrobe(); await _bt_check("wardrobe"); m.wardrobe.close(); await wait(0.5)
+	main.open_kitchen(); await _bt_check("kitchen"); m.kitchen.closed.emit(); await wait(0.5)
+	main.open_garden(0); await _bt_check("garden"); main._resume()
+	main.ask_port_home(); await _bt_check("ask"); main._resume()
+	m.choose_mode(func(_a, _b) -> void: pass, func() -> void: main._resume()); main._open("modes"); await _bt_check("modes"); main._resume()
+	m.choose_level(func(_a) -> void: pass, func() -> void: main._resume()); main._open("levels"); await _bt_check("levels"); main._resume()
+	main.show_lore("The Deep Vault", "Long ago, the dwarves of the mountain sealed something deep below. Read every word of this from across the room: that's the idea!"); await _bt_check("lore"); main._resume()
+	main._open("designer"); await _bt_check("designer"); main._resume()
+	m.show_death(); await _bt_check("death"); main._resume()
+	m.show_victory(); await _bt_check("victory"); main._resume()
+	var npcs := get_tree().get_nodes_in_group("npc").filter(func(n) -> bool: return n is NPC and Game.QUESTS.has(String(n.quest)))
+	if not npcs.is_empty():
+		main._open("dialogue"); m.show_dialogue(npcs[0]); await _bt_check("dialogue"); main._resume()
 	_finish()
 	return true
 

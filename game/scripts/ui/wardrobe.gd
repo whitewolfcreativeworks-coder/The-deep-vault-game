@@ -84,14 +84,14 @@ func _build() -> void:
 	_title = UIKit.label("Wardrobe", 34, UIKit.GOLD, true); head.add_child(_title)
 	var sp := Control.new(); sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; head.add_child(sp)
 	var done := _btn("✔  Done", func() -> void: close(), 190)
-	done.add_theme_font_size_override("font_size", 22)
+	done.add_theme_font_size_override("font_size", UIKit.fs(22))
 	head.add_child(done)
 	_line = UIKit.label("", 17, UIKit.PARCH); _line.autowrap_mode = TextServer.AUTOWRAP_WORD; _line.custom_minimum_size = Vector2(980, 48)
 	col.add_child(_line)
 	col.add_child(UIKit.label("OUTFITS", 22, UIKit.GOLD, true))
 	_outfit_box = VBoxContainer.new(); _outfit_box.add_theme_constant_override("separation", 4); col.add_child(_outfit_box)
 	col.add_child(UIKit.label("SHOES & SLIPPERS", 22, UIKit.GOLD, true))
-	_foot_box = GridContainer.new(); _foot_box.columns = 5
+	_foot_box = GridContainer.new(); _foot_box.columns = 4
 	_foot_box.add_theme_constant_override("h_separation", 6); _foot_box.add_theme_constant_override("v_separation", 6)
 	col.add_child(_foot_box)
 
@@ -115,7 +115,7 @@ func _btn(text: String, cb: Callable, wdt := 200.0) -> Button:
 func _choice(text: String, c: Color, c2: Color, cb: Callable, wdt: float, is_new: bool) -> Button:
 	var b := Button.new(); b.custom_minimum_size = Vector2(wdt, 52); b.toggle_mode = true
 	b.text = ("  " + text + ("  NEW!" if is_new else "")); b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_font_size_override("font_size", UIKit.fs(16))
 	b.clip_text = true
 	var sw := ColorRect.new(); sw.color = c; sw.custom_minimum_size = Vector2(16, 40)
 	sw.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -152,7 +152,7 @@ func _fill() -> void:
 	var magic := Game.costume_id() if Game.costume_id() != "" else Game.costume_away_id()
 	if magic != "":
 		var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 6); _outfit_box.add_child(row)
-		var gl := UIKit.label("Magic", 14, Color(1.0, 0.7, 1.0), true); gl.custom_minimum_size.x = 132
+		var gl := UIKit.label("Magic", 14, Color(1.0, 0.7, 1.0), true); gl.custom_minimum_size.x = 118
 		gl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		row.add_child(gl)
 		_magic_btn = _choice("", Color(0.75, 0.4, 0.95), Color(1.0, 0.85, 1.0), func() -> void: _pick_magic(), 580, false)
@@ -165,7 +165,7 @@ func _fill() -> void:
 		if ids.is_empty():
 			continue
 		var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 6); _outfit_box.add_child(row)
-		var gl := UIKit.label(Outfits.GROUP_NAMES[g], 14, UIKit.DIM, true); gl.custom_minimum_size.x = 132
+		var gl := UIKit.label(Outfits.GROUP_NAMES[g], 14, UIKit.DIM, true); gl.custom_minimum_size.x = 118
 		gl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		row.add_child(gl)
 		var grid := GridContainer.new(); grid.columns = 3
@@ -176,14 +176,14 @@ func _fill() -> void:
 			var c1: Color = o.get("color", Color(0.55, 0.42, 0.3))
 			var c2: Color = o.get("pattern_color", o.get("hat_color", c1.lightened(0.3)))
 			var b := _choice(String(o.name) + ("  ★" if Outfits.PERKS.has(id) and String(Outfits.PERKS[id].id) != "" else ""), c1, c2,
-				func() -> void: _pick_outfit(id), 284, Game.wardrobe_new.has(id))
+				func() -> void: _pick_outfit(id), 316, Game.wardrobe_new.has(id))
 			grid.add_child(b)
 			_outfit_btns[id] = b
 	for id in Game.footwear_owned:
 		if not Outfits.FOOTWEAR.has(id):
 			continue
 		var f: Dictionary = Outfits.FOOTWEAR[id]
-		var b := _choice(String(f.name), f.color, (f.color as Color).lightened(0.4), func() -> void: _pick_footwear(id), 196, Game.wardrobe_new.has(id))
+		var b := _choice(String(f.name), f.color, (f.color as Color).lightened(0.4), func() -> void: _pick_footwear(id), 250, Game.wardrobe_new.has(id))
 		_foot_box.add_child(b)
 		_foot_btns[id] = b
 

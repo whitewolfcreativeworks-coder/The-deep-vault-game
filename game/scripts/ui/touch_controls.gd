@@ -142,6 +142,11 @@ func set_arrange(on: bool) -> void:
 func _zoom_rect() -> Rect2:
 	var r := _screen()
 	var top := maxf(190.0, r.y * 0.24)
+	# (below the status box in the corner, which is taller with the bigger text)
+	var hud := get_tree().get_first_node_in_group("hud")
+	if hud and hud.get("status") and (hud.status as Control).visible:
+		var sb := (hud.status as Control).get_global_rect()
+		top = maxf(top, sb.end.y + 34.0)
 	var bottom := minf(r.y - 470.0, r.y * 0.62)
 	return Rect2(14.0, top, 76.0, maxf(bottom - top, 160.0))
 

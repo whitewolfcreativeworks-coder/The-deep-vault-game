@@ -195,6 +195,16 @@ The same game on every device. Only how much it draws changes, never the levels,
 
 Resolution, shadows, lamps and sparks change straight away; the scenery savings and sleeping monsters start from the next place you arrive.
 
+### Bigger, clearer text (Nov 26)
+Jason: "Can we increase the text size in the menus throughout the game? ... this game will probably be for younger kids."
+- **A quarter bigger:** all text in the menus and on screen (`UIKit.TEXT_SCALE`, 1.25). Every size goes through `UIKit.fs()`, so it's one number to change.
+- **A font made for reading:** Andika, designed by SIL for children learning to read. Its I, l and 1 all look different, and it has a plain 0. It's the same on every device; before this, the iPad's browser couldn't use the computer's fonts and fell back to Godot's own.
+- **No more empty boxes:** the iPad showed little boxes instead of ★, ✔ and ▸, because its fallback font didn't have them. A tiny piece of DejaVu Sans now supplies those symbols.
+- **Every menu fits:**
+  - each menu panel centres itself at the size its contents need;
+  - if that is ever bigger than the screen (say, on a small phone), it shrinks to fit;
+  - messages on the right of the screen wrap instead of running off the edge.
+
 ### Moving your yard decorations, and a roomier yard (Nov 25, Jason's son's idea)
 - **Move what you've bought:** the golden statue, the gnome, the bench, the bird bath and the two flower beds. The twinkle lights and the buildings stay put.
   - **On the iPad:** touch the decoration and hold still. A ring of lights fills up around it, then flashes, and the decoration lifts off the ground. Drag it where you want it and let go. It turns to face you while you carry it.
